@@ -544,6 +544,67 @@
              :variant variant
              :variant-opts variant-opts})))))
 
+(defui eval-chart-card
+  "Renders an eval metric chart - handles its own data fetching to avoid hooks-in-loop issues.
+  
+  Props:
+  - :config - Chart configuration
+  - :module-id, :agent-name - Agent identifiers
+  - :granularity-config - Current granularity configuration
+  - :time-window - Current time window
+  - :metadata-key - Current metadata key (or nil)
+  - :refresh-counter - Refresh counter for live mode"
+  [{:keys [config module-id agent-name granularity-config time-window metadata-key refresh-counter]}]
+  (let [{:keys [title description variant variant-opts y-label color metric-id metrics-set]} config
+        
+        ;; Fetch data for this eval metric
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:analytics-telemetry
+                      metric-id
+                      module-id
+                      agent-name
+                      (:seconds granularity-config)
+                      (:start-time-millis time-window)
+                      metadata-key
+                      refresh-counter]
+          :sente-event [:analytics/fetch-telemetry
+                        {:module-id module-id
+                         :agent-name agent-name
+                         :granularity (:seconds granularity-config)
+                         :metric-id metric-id
+                         :start-time-millis (:start-time-millis time-window)
+                         :end-time-millis (:end-time-millis time-window)
+                         :metrics-set metrics-set
+                         :metadata-key metadata-key}]
+          :enabled? (boolean (and module-id agent-name))})]
+
+    ($ :div.bg-white.p-6.rounded-lg.shadow-md.border.border-gray-200
+       ($ :h3.text-lg.font-medium.text-gray-700.mb-2 title)
+       ($ :p.text-sm.text-gray-500.mb-4 description)
+
+       (cond
+         loading?
+         ($ :div.flex.items-center.justify-center.h-64.gap-2.text-blue-600
+            ($ common/spinner {:size :medium}) "Loading...")
+
+         error
+         ($ :div.text-red-600 "Error: " (str error))
+
+         :else
+         ($ chart/analytics-chart
+            {:data (or data {})
+             :granularity (:seconds granularity-config)
+             :metadata-key metadata-key
+             :start-time-millis (:start-time-millis time-window)
+             :end-time-millis (:end-time-millis time-window)
+             :height 300
+             :title nil
+             :y-label y-label
+             :color color
+             :variant variant
+             :variant-opts variant-opts})))))
+
 (defui analytics-page []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         decoded-agent-name (common/url-decode agent-name)
@@ -584,27 +645,23 @@
                                              :agent-name decoded-agent-name}]
                               :enabled? (boolean (and module-id decoded-agent-name))})
 
-        ;; Parse and create configs for eval metrics
+        ;; Parse eval metrics (stable - only used for rendering, not querying)
         eval-chart-configs (uix/use-memo
                             (fn []
-                              (->> all-metrics
-                                   (filter #(and (vector? %) (= :eval (first %))))
-                                   (keep parse-eval-metric-id)
-                                   (mapv create-eval-chart-config)))
+                              (when all-metrics
+                                (->> all-metrics
+                                     (filter #(and (vector? %) (= :eval (first %))))
+                                     (keep parse-eval-metric-id)
+                                     (mapv create-eval-chart-config))))
                             [all-metrics])
 
-        ;; Combine static and eval charts
-        all-chart-configs (uix/use-memo
-                           (fn [] (concat chart-configs eval-chart-configs))
-                           [eval-chart-configs])
+        ;; Group ONLY static charts by metric-id (stable hook count)
+        static-metric-groups (uix/use-memo
+                              (fn [] (group-charts-by-metric chart-configs))
+                              [])
 
-        ;; Group charts by metric-id to batch queries
-        metric-groups (uix/use-memo
-                       (fn [] (group-charts-by-metric all-chart-configs))
-                       [all-chart-configs])
-
-        ;; Create one query per metric-id with union of all metrics
-        metric-queries
+        ;; Create queries for static metrics
+        static-metric-queries
         (into {}
               (map (fn [[metric-id {:keys [metrics-set]}]]
                      (let [{:keys [data loading? error]}
@@ -628,7 +685,9 @@
                                             :metadata-key metadata-key}]
                              :enabled? (boolean (and module-id decoded-agent-name))})]
                        [metric-id {:data data :loading? loading? :error error}]))
-                   metric-groups))]
+                   static-metric-groups))
+
+        metric-queries static-metric-queries]
 
     ($ :div.p-6
        ;; Page header
@@ -671,18 +730,16 @@
             ($ :h3.text-xl.font-bold.text-gray-900.mt-8.mb-4.border-t.border-gray-200.pt-6
                "Evaluator Metrics")
 
-            ;; Eval charts grid
+            ;; Eval charts grid - each handles its own query
             ($ :div.grid.grid-cols-1.lg:grid-cols-2.gap-6
                (map (fn [config]
-                      (let [metric-id (:metric-id config)
-                            query-result (get metric-queries metric-id)]
-                        ($ chart-card
-                           {:key (:id config)
-                            :config config
-                            :data (:data query-result)
-                            :loading? (:loading? query-result)
-                            :error (:error query-result)
-                            :granularity-config granularity-config
-                            :time-window time-window
-                            :metadata-key metadata-key})))
+                      ($ eval-chart-card
+                         {:key (:id config)
+                          :config config
+                          :module-id module-id
+                          :agent-name decoded-agent-name
+                          :granularity-config granularity-config
+                          :time-window time-window
+                          :metadata-key metadata-key
+                          :refresh-counter refresh-counter}))
                     eval-chart-configs)))))))
