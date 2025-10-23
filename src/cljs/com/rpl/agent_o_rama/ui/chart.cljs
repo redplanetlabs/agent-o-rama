@@ -129,7 +129,19 @@
   - :on-change - Function called with new set of selected metrics"
   [{:keys [available-metrics selected-metrics on-change]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
-        
+        button-ref (useRef nil)
+        [dropdown-position set-dropdown-position] (uix/use-state nil)
+
+        ;; Calculate dropdown position when opened
+        _ (uix/use-effect
+           (fn []
+             (when (and dropdown-open? (.-current button-ref))
+               (let [rect (.getBoundingClientRect (.-current button-ref))]
+                 (set-dropdown-position {:top (+ (.-bottom rect) 4)
+                                         :right (- js/window.innerWidth (.-right rect))})))
+             js/undefined)
+           #js [dropdown-open?])
+
         ;; Close dropdown when clicking outside
         _ (uix/use-effect
            (fn []
@@ -141,14 +153,14 @@
                    (.removeEventListener js/document "click" handle-click))))
              js/undefined)
            #js [dropdown-open?])
-        
+
         ;; Helper to format metric label
         format-metric-label (fn [m]
                               (cond
                                 (keyword? m) (name m)
                                 (number? m) (str "p" (int (* m 100)))
                                 :else (str m)))
-        
+
         ;; Toggle metric selection
         toggle-metric (fn [metric]
                         (let [new-selection (if (contains? selected-metrics metric)
@@ -158,21 +170,24 @@
                                               (conj selected-metrics metric))]
                           (when on-change
                             (on-change new-selection))))]
-    
+
     ($ :div.relative
        ($ :button.px-3.py-1.text-sm.border.border-gray-300.rounded.bg-white.hover:bg-gray-50.flex.items-center.gap-2
-          {:on-click (fn [e]
+          {:ref button-ref
+           :on-click (fn [e]
                        (.preventDefault e)
                        (.stopPropagation e)
                        (set-dropdown-open not))}
           "Metrics"
           ($ :svg.w-4.h-4 {:xmlns "http://www.w3.org/2000/svg" :viewBox "0 0 20 20" :fill "currentColor"}
              ($ :path {:fill-rule "evenodd" :d "M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" :clip-rule "evenodd"})))
-       
-       ;; Dropdown menu
-       (when dropdown-open?
-         ($ :div.absolute.right-0.mt-1.w-48.bg-white.border.border-gray-300.rounded-md.shadow-lg.z-10
-            {:on-click (fn [e] (.stopPropagation e))}
+
+       ;; Dropdown menu with fixed positioning
+       (when (and dropdown-open? dropdown-position)
+         ($ :div.fixed.w-48.bg-white.border.border-gray-300.rounded-md.shadow-lg.z-50
+            {:style {:top (str (:top dropdown-position) "px")
+                     :right (str (:right dropdown-position) "px")}
+             :on-click (fn [e] (.stopPropagation e))}
             ($ :div.py-1
                (for [metric (sort-metrics available-metrics)]
                  ($ :label.flex.items-center.px-3.py-2.hover:bg-gray-100.cursor-pointer
@@ -283,10 +298,10 @@
   [{:keys [data granularity metrics metadata-key start-time-millis end-time-millis width height title y-label]}]
   (let [;; All available metrics
         all-metrics #{:min :max 0.5 0.9 0.99}
-        
+
         ;; State for selected metrics (default to just p50 when metadata split is active)
         [selected-metrics set-selected-metrics] (uix/use-state #{0.5})
-        
+
         ;; Determine which metrics to show:
         ;; - If metrics prop provided, use that (backward compatibility)
         ;; - If metadata-key is active, use selected metrics (default p50)
@@ -295,7 +310,7 @@
                             (if metadata-key
                               selected-metrics
                               all-metrics))
-        
+
         height (or height 300)
 
         ;; Container ref to measure width
@@ -424,7 +439,7 @@
        ($ :div.flex.items-center.justify-between.mb-3
           (when title
             ($ :h4.text-base.font-medium.text-gray-700 title))
-          
+
           ;; Metrics selector dropdown (only show when metadata-key is active)
           (when metadata-key
             ($ metrics-selector
