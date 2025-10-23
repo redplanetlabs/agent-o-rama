@@ -902,22 +902,24 @@
   (c/result! agent-node val))
 
 (defn get-store
-  "Gets a store instance for accessing persistent storage within a node.
-
-   Stores provide distributed, persistent, replicated storage that agents can use to
-   maintain state across executions.
-
-   Args:
-     agent-node - agent node instance from the current node function
-     name - String name of the store (declared with declare-*-store functions)
-
-   Returns:
-     Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, delete!, etc.)
-
-   Example:
-     (let [store (get-store agent-node \"$$user-cache\")]
-       (store/put! store \"user-123\" user-data)
-       (store/get store \"user-123\"))"
+  "Gets a store instance for accessing persistent storage within a node.\n
+\n
+Stores provide distributed, persistent, replicated storage that agents can use to\n
+maintain state across executions.\n
+\n
+Args:\n
+  agent-node - agent node instance from the current node function\n
+  name - String name of the store (declared with declare-*-store functions)\n
+\n
+Returns:\n
+  Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, delete!, etc.)\n
+\n
+Example:\n
+<pre>
+(let [store (get-store agent-node \"$$user-cache\")]
+  (store/put! store \"user-123\" user-data)
+  (store/get store \"user-123\"))
+</pre>"
   [^AgentNode agent-node name]
   (.getStore agent-node name))
 

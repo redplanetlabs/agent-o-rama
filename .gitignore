@@ -20,6 +20,7 @@ target/
 .project
 scripts/code-format
 .on-save.json
+.vscode
 
 # frontend
 .shadow-cljs/
