@@ -187,6 +187,7 @@
     :chart-type :multi-category
     :metric-id [:agent :token-counts]
     :metrics-set #{:rest-sum}
+    :metric-key :rest-sum
     :y-label "Tokens"
     :categories ["input" "output" "total"]}
 
@@ -197,6 +198,7 @@
     :chart-type :multi-category-percentiles
     :metric-id [:agent :token-counts]
     :metrics-set #{:min 0.25 0.5 0.75 :max}
+    :metric-key :min ; Using :min as the representative metric (charts will use all metrics from set)
     :y-label "Tokens"
     :categories ["input" "output" "total"]}
 
@@ -207,6 +209,7 @@
     :chart-type :model-success-rate
     :metric-id [:agent :model-success-rate]
     :metrics-set #{:rest-sum}
+    :metric-key :rest-sum
     :color "#10b981"}
 
    ;; NOTE: Evaluator Score Charts

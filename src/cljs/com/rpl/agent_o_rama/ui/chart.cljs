@@ -133,43 +133,72 @@
   Returns:
   - uPlot data format [[timestamps] [series1] [series2] ...], or empty structure spanning the time window if no data"
   [telemetry-data granularity metrics-to-show start-time-millis end-time-millis]
+  (println "=== prepare-analytics-data ===")
+  (println "metrics-to-show:" metrics-to-show)
+  (println "telemetry-data (first 2 buckets):" (take 2 telemetry-data))
+
   (if (seq telemetry-data)
     (let [;; Sort buckets chronologically
           sorted-buckets (sort (keys telemetry-data))
 
           ;; Get metadata keys from the first bucket only
           first-bucket (first sorted-buckets)
+          first-bucket-data (get telemetry-data first-bucket)
           first-bucket-metadata-keys (when first-bucket
-                                       (keys (get telemetry-data first-bucket)))
+                                       (keys first-bucket-data))
           ;; Use "_aor/default" if available, otherwise first available key
           metadata-key (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
                            (first first-bucket-metadata-keys)
                            "_aor/default")
 
+          _ (println "first-bucket:" first-bucket)
+          _ (println "first-bucket-data:" first-bucket-data)
+          _ (println "first-bucket-metadata-keys:" first-bucket-metadata-keys)
+          _ (println "chosen metadata-key:" metadata-key)
+
           ;; Convert bucket numbers to timestamps in seconds (uPlot expects seconds for time scale)
           timestamps (mapv #(* % granularity) sorted-buckets)
 
           ;; For each metric, extract values across all buckets using the metadata key from first bucket
+          ;; When metadata split is active, there's an extra "_aor/default" level
           series-data (reduce
                        (fn [acc metric-key]
-                         (let [values (mapv
+                         (let [;; Try path with _aor/default first (for metadata splits)
+                               path-with-default [first-bucket metadata-key "_aor/default" metric-key]
+                               ;; Try direct path (for no metadata split)
+                               path-direct [first-bucket metadata-key metric-key]
+                               first-value-with-default (get-in telemetry-data path-with-default)
+                               first-value-direct (get-in telemetry-data path-direct)
+                               ;; Determine which path to use
+                               use-default-path? (some? first-value-with-default)
+                               _ (println "  metric:" metric-key
+                                          "path-with-default:" path-with-default "=>" first-value-with-default
+                                          "path-direct:" path-direct "=>" first-value-direct
+                                          "using-default-path?:" use-default-path?)
+                               values (mapv
                                        (fn [bucket]
-                                         (get-in telemetry-data
-                                                 [bucket metadata-key metric-key]))
+                                         (if use-default-path?
+                                           (get-in telemetry-data [bucket metadata-key "_aor/default" metric-key])
+                                           (get-in telemetry-data [bucket metadata-key metric-key])))
                                        sorted-buckets)]
+                           (println "  metric:" metric-key "values (first 5):" (take 5 values))
                            (assoc acc metric-key values)))
                        {}
                        metrics-to-show)]
 
       ;; Sort metrics in display order: min, percentiles, max
-      (let [sorted-metrics (sort-metrics metrics-to-show)]
-        (into [timestamps] (map series-data sorted-metrics))))
+      (let [sorted-metrics (sort-metrics metrics-to-show)
+            result (into [timestamps] (map series-data sorted-metrics))]
+        (println "Final result - timestamps (first 5):" (take 5 timestamps))
+        result))
     ;; Return empty data structure spanning the actual time window
     ;; This ensures the chart x-axis shows the correct historical time range even with no data
-    (let [sorted-metrics (sort-metrics metrics-to-show)
-          ;; Create timestamps at the start and end of the time window (in seconds)
-          timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]]
-      (into [timestamps] (repeat (count sorted-metrics) [nil nil])))))
+    (do
+      (println "Empty telemetry-data!")
+      (let [sorted-metrics (sort-metrics metrics-to-show)
+            ;; Create timestamps at the start and end of the time window (in seconds)
+            timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]]
+        (into [timestamps] (repeat (count sorted-metrics) [nil nil]))))))
 
 (defui analytics-time-series-chart
   "A time-series chart for analytics telemetry data.
@@ -301,25 +330,48 @@
   Returns:
   - uPlot data format [[timestamps] [values]]"
   [telemetry-data granularity metric-key start-time-millis end-time-millis]
+  (println "=== prepare-bar-chart-data ===")
+  (println "metric-key:" metric-key)
+  (println "telemetry-data (first 2 buckets):" (take 2 telemetry-data))
+
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
 
           ;; Get metadata key from the first bucket only
           first-bucket (first sorted-buckets)
+          first-bucket-data (get telemetry-data first-bucket)
           first-bucket-metadata-keys (when first-bucket
-                                       (keys (get telemetry-data first-bucket)))
+                                       (keys first-bucket-data))
           metadata-key-to-use (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
                                   (first first-bucket-metadata-keys)
                                   "_aor/default")
 
+          _ (println "first-bucket:" first-bucket)
+          _ (println "first-bucket-data:" first-bucket-data)
+          _ (println "metadata-key-to-use:" metadata-key-to-use)
+
           timestamps (mapv #(* % granularity) sorted-buckets)
+
+          ;; Try both paths - with and without _aor/default layer
           values (mapv
                   (fn [bucket]
-                    (get-in telemetry-data [bucket metadata-key-to-use metric-key]))
+                    (let [;; Try path with _aor/default (for both split and no-split cases)
+                          path-with-default [bucket metadata-key-to-use "_aor/default" metric-key]
+                          ;; Try direct path (fallback)
+                          path-direct [bucket metadata-key-to-use metric-key]
+                          value-with-default (get-in telemetry-data path-with-default)
+                          value-direct (get-in telemetry-data path-direct)]
+                      (when (= bucket first-bucket)
+                        (println "  path-with-default:" path-with-default "=>" value-with-default)
+                        (println "  path-direct:" path-direct "=>" value-direct))
+                      (or value-with-default value-direct)))
                   sorted-buckets)]
+      (println "values (first 5):" (take 5 values))
       [timestamps values])
     ;; Empty data
-    [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]]))
+    (do
+      (println "Empty telemetry-data!")
+      [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]])))
 
 (defui analytics-bar-chart
   "A bar chart for analytics telemetry data.
@@ -421,27 +473,49 @@
   Returns:
   - uPlot data format [[timestamps] [values]] where values are in 0-100 range"
   [telemetry-data granularity metric-key start-time-millis end-time-millis]
+  (println "=== prepare-percentage-chart-data ===")
+  (println "metric-key:" metric-key)
+  (println "telemetry-data (first 2 buckets):" (take 2 telemetry-data))
+
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
 
           ;; Get metadata key from the first bucket only
           first-bucket (first sorted-buckets)
+          first-bucket-data (get telemetry-data first-bucket)
           first-bucket-metadata-keys (when first-bucket
-                                       (keys (get telemetry-data first-bucket)))
+                                       (keys first-bucket-data))
           metadata-key-to-use (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
                                   (first first-bucket-metadata-keys)
                                   "_aor/default")
 
+          _ (println "first-bucket:" first-bucket)
+          _ (println "first-bucket-data:" first-bucket-data)
+          _ (println "metadata-key-to-use:" metadata-key-to-use)
+
           timestamps (mapv #(* % granularity) sorted-buckets)
           ;; Convert 0.0-1.0 values to 0-100 percentages
+          ;; Try both paths - with and without _aor/default layer
           values (mapv
                   (fn [bucket]
-                    (when-let [val (get-in telemetry-data [bucket metadata-key-to-use metric-key])]
-                      (* val 100)))
+                    (let [;; Try path with _aor/default (for both split and no-split cases)
+                          path-with-default [bucket metadata-key-to-use "_aor/default" metric-key]
+                          ;; Try direct path (fallback)
+                          path-direct [bucket metadata-key-to-use metric-key]
+                          value-with-default (get-in telemetry-data path-with-default)
+                          value-direct (get-in telemetry-data path-direct)]
+                      (when (= bucket first-bucket)
+                        (println "  path-with-default:" path-with-default "=>" value-with-default)
+                        (println "  path-direct:" path-direct "=>" value-direct))
+                      (when-let [val (or value-with-default value-direct)]
+                        (* val 100))))
                   sorted-buckets)]
+      (println "values (first 5):" (take 5 values))
       [timestamps values])
     ;; Empty data
-    [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]]))
+    (do
+      (println "Empty telemetry-data!")
+      [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]])))
 
 (defui analytics-percentage-chart
   "A line chart for percentage data (0-100%).
@@ -703,7 +777,8 @@
   
   Note: This function expects the telemetry data to have \"success \" and \"failure \" as
   the category keys. When no metadata split is active, they're at level 2. When a metadata
-  split is active, they're at level 3 (after the metadata value).
+  split is active, they're at level 3 (after the metadata value), with an additional
+  \"_aor/default\" layer at level 4.
   
   Args:
   - telemetry-data: Map of {bucket-number {category {metric-key value}}} (no split)
@@ -717,36 +792,68 @@
   Returns:
   - uPlot data format [[timestamps] [percentage-values]]"
   [telemetry-data granularity metric-key metadata-key start-time-millis end-time-millis]
+  (println "=== prepare-model-success-rate-data ===")
+  (println "metadata-key:" metadata-key)
+  (println "metric-key:" metric-key)
+  (println "telemetry-data (first 2 buckets):" (take 2 telemetry-data))
+
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
 
           ;; Get metadata value from first bucket if metadata split is active
+          first-bucket (first sorted-buckets)
+          first-bucket-data (get telemetry-data first-bucket)
           metadata-value (when metadata-key
-                           (first (keys (get telemetry-data (first sorted-buckets)))))
+                           (first (keys first-bucket-data)))
+
+          _ (println "first-bucket:" first-bucket)
+          _ (println "first-bucket-data:" first-bucket-data)
+          _ (println "metadata-value:" metadata-value)
 
           timestamps (mapv #(* % granularity) sorted-buckets)
 
           ;; Calculate success rate for each bucket
           values (mapv
                   (fn [bucket]
-                    (let [success-count (if metadata-key
-                                          ;; With split: bucket -> metadata-value -> "success " -> metric-key
-                                          (get-in telemetry-data [bucket metadata-value "success " metric-key] 0)
-                                          ;; No split: bucket -> "success " -> metric-key
-                                          (get-in telemetry-data [bucket "success " metric-key] 0))
-                          failure-count (if metadata-key
-                                          ;; With split: bucket -> metadata-value -> "failure " -> metric-key
-                                          (get-in telemetry-data [bucket metadata-value "failure " metric-key] 0)
-                                          ;; No split: bucket -> "failure " -> metric-key
-                                          (get-in telemetry-data [bucket "failure " metric-key] 0))
+                    (let [;; Build paths - try with _aor/default layer first
+                          success-path-with-default (if metadata-key
+                                                      [bucket metadata-value "success " "_aor/default" metric-key]
+                                                      [bucket "success " "_aor/default" metric-key])
+                          failure-path-with-default (if metadata-key
+                                                      [bucket metadata-value "failure " "_aor/default" metric-key]
+                                                      [bucket "failure " "_aor/default" metric-key])
+                          ;; Fallback paths without _aor/default
+                          success-path-direct (if metadata-key
+                                                [bucket metadata-value "success " metric-key]
+                                                [bucket "success " metric-key])
+                          failure-path-direct (if metadata-key
+                                                [bucket metadata-value "failure " metric-key]
+                                                [bucket "failure " metric-key])
+
+                          success-count (or (get-in telemetry-data success-path-with-default)
+                                            (get-in telemetry-data success-path-direct)
+                                            0)
+                          failure-count (or (get-in telemetry-data failure-path-with-default)
+                                            (get-in telemetry-data failure-path-direct)
+                                            0)
                           total (+ success-count failure-count)]
+                      (when (= bucket first-bucket)
+                        (println "  success-path-with-default:" success-path-with-default "=>" (get-in telemetry-data success-path-with-default))
+                        (println "  success-path-direct:" success-path-direct "=>" (get-in telemetry-data success-path-direct))
+                        (println "  success-count:" success-count)
+                        (println "  failure-count:" failure-count)
+                        (println "  total:" total))
                       (if (pos? total)
                         (* (/ success-count total) 100)
                         nil))) ;; Return nil if no data
                   sorted-buckets)]
+      (println "values (first 5):" (take 5 values))
+      (println "Final result - timestamps (first 5):" (take 5 timestamps))
       [timestamps values])
     ;; Empty data
-    [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]]))
+    (do
+      (println "Empty telemetry-data!")
+      [[(/ start-time-millis 1000) (/ end-time-millis 1000)] [nil nil]])))
 
 (defui analytics-model-success-rate-chart
   "A line chart for model success rate with special calculation.
