@@ -26,9 +26,9 @@ public interface RunInfo {
   String getAgentName();
 
   /**
-   * Get agent invoke for the run
+   * Get agent invoke handle for the run
    *
-   * @return agent invoke
+   * @return agent invoke handle
    */
   AgentInvoke getAgentInvoke();
 
