@@ -227,6 +227,7 @@
     (def metrics-set metrics-set)
     (def metadata-key metadata-key)
     (def metric-id metric-id)
+    (println metric-id)
     (ana/select-telemetry telemetry-pstate
                           decoded-agent-name
                           granularity
@@ -235,3 +236,16 @@
                           end-time-millis
                           (vec metrics-set)
                           metadata-key)))
+
+(comment
+  (ana/select-telemetry telemetry-pstate
+                        decoded-agent-name
+                        granularity
+                        [:agent :success-rate]
+                        start-time-millis
+                        end-time-millis
+                        (vec metrics-set)
+                        "region")
+  
+  
+  )

@@ -125,78 +125,74 @@
   
   Args:
   - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
+                    or {bucket-number {metadata-value {\"_aor/default\" {metric-key value}}}} (when split)
   - granularity: Granularity in seconds (e.g., 60 for minute)
   - metrics-to-show: Set of metric keys to display (e.g., #{:min :max 0.5 0.9})
+  - metadata-key: The metadata key being split by (nil if no split)
   - start-time-millis: Start of the time window being queried
   - end-time-millis: End of the time window being queried
   
   Returns:
   - uPlot data format [[timestamps] [series1] [series2] ...], or empty structure spanning the time window if no data"
-  [telemetry-data granularity metrics-to-show start-time-millis end-time-millis]
+  [telemetry-data granularity metrics-to-show metadata-key start-time-millis end-time-millis]
   (println "=== prepare-analytics-data ===")
+  (println "metadata-key:" metadata-key)
   (println "metrics-to-show:" metrics-to-show)
   (println "telemetry-data (first 2 buckets):" (take 2 telemetry-data))
 
   (if (seq telemetry-data)
-    (let [;; Sort buckets chronologically
-          sorted-buckets (sort (keys telemetry-data))
-
-          ;; Get metadata keys from the first bucket only
-          first-bucket (first sorted-buckets)
-          first-bucket-data (get telemetry-data first-bucket)
-          first-bucket-metadata-keys (when first-bucket
-                                       (keys first-bucket-data))
-          ;; Use "_aor/default" if available, otherwise first available key
-          metadata-key (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
-                           (first first-bucket-metadata-keys)
-                           "_aor/default")
-
-          _ (println "first-bucket:" first-bucket)
-          _ (println "first-bucket-data:" first-bucket-data)
-          _ (println "first-bucket-metadata-keys:" first-bucket-metadata-keys)
-          _ (println "chosen metadata-key:" metadata-key)
-
-          ;; Convert bucket numbers to timestamps in seconds (uPlot expects seconds for time scale)
+    (let [sorted-buckets (sort (keys telemetry-data))
           timestamps (mapv #(* % granularity) sorted-buckets)
 
-          ;; For each metric, extract values across all buckets using the metadata key from first bucket
-          ;; When metadata split is active, there's an extra "_aor/default" level
-          series-data (reduce
-                       (fn [acc metric-key]
-                         (let [;; Try path with _aor/default first (for metadata splits)
-                               path-with-default [first-bucket metadata-key "_aor/default" metric-key]
-                               ;; Try direct path (for no metadata split)
-                               path-direct [first-bucket metadata-key metric-key]
-                               first-value-with-default (get-in telemetry-data path-with-default)
-                               first-value-direct (get-in telemetry-data path-direct)
-                               ;; Determine which path to use
-                               use-default-path? (some? first-value-with-default)
-                               _ (println "  metric:" metric-key
-                                          "path-with-default:" path-with-default "=>" first-value-with-default
-                                          "path-direct:" path-direct "=>" first-value-direct
-                                          "using-default-path?:" use-default-path?)
-                               values (mapv
-                                       (fn [bucket]
-                                         (if use-default-path?
-                                           (get-in telemetry-data [bucket metadata-key "_aor/default" metric-key])
-                                           (get-in telemetry-data [bucket metadata-key metric-key])))
-                                       sorted-buckets)]
-                           (println "  metric:" metric-key "values (first 5):" (take 5 values))
-                           (assoc acc metric-key values)))
-                       {}
-                       metrics-to-show)]
+          _ (println "sorted-buckets (first 5):" (take 5 sorted-buckets))
 
-      ;; Sort metrics in display order: min, percentiles, max
-      (let [sorted-metrics (sort-metrics metrics-to-show)
-            result (into [timestamps] (map series-data sorted-metrics))]
-        (println "Final result - timestamps (first 5):" (take 5 timestamps))
-        result))
+          result (if metadata-key
+                   ;; METADATA SPLIT: Create one series per metadata-value per metric
+                   ;; Data structure: {bucket -> metadata-value -> "_aor/default" -> {metric-key value}}
+                   (let [;; Collect all unique metadata values across all buckets
+                         all-metadata-values (into (sorted-set)
+                                                   (mapcat (fn [bucket]
+                                                             (keys (get telemetry-data bucket)))
+                                                           sorted-buckets))
+                         _ (println "all-metadata-values:" all-metadata-values)
+
+                         ;; For each metric and each metadata value, create a series
+                         sorted-metrics (sort-metrics metrics-to-show)
+                         series-data (mapcat
+                                      (fn [metric-key]
+                                        (map
+                                         (fn [metadata-value]
+                                           (let [values (mapv
+                                                         (fn [bucket]
+                                                           (get-in telemetry-data [bucket metadata-value "_aor/default" metric-key]))
+                                                         sorted-buckets)]
+                                             (println "  metric:" metric-key "metadata-value:" metadata-value "values (first 5):" (take 5 values))
+                                             values))
+                                         all-metadata-values))
+                                      sorted-metrics)]
+                     (into [timestamps] series-data))
+
+                   ;; NO SPLIT: Create one series per metric
+                   ;; Data structure: {bucket -> "_aor/default" -> {metric-key value}}
+                   (let [series-data (reduce
+                                      (fn [acc metric-key]
+                                        (let [values (mapv
+                                                      (fn [bucket]
+                                                        (get-in telemetry-data [bucket "_aor/default" metric-key]))
+                                                      sorted-buckets)]
+                                          (println "  metric:" metric-key "values (first 5):" (take 5 values))
+                                          (assoc acc metric-key values)))
+                                      {}
+                                      metrics-to-show)
+                         sorted-metrics (sort-metrics metrics-to-show)]
+                     (into [timestamps] (map series-data sorted-metrics))))]
+
+      (println "Final result - timestamps (first 5):" (take 5 timestamps))
+      result)
     ;; Return empty data structure spanning the actual time window
-    ;; This ensures the chart x-axis shows the correct historical time range even with no data
     (do
       (println "Empty telemetry-data!")
       (let [sorted-metrics (sort-metrics metrics-to-show)
-            ;; Create timestamps at the start and end of the time window (in seconds)
             timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]]
         (into [timestamps] (repeat (count sorted-metrics) [nil nil]))))))
 
@@ -207,13 +203,14 @@
   - :data - Analytics telemetry data {bucket-number {metadata-key {metric-key value}}}
   - :granularity - Time granularity in seconds (e.g., 60 for minute)
   - :metrics - Set of metrics to display (defaults to #{:min :max 0.5 0.9 0.99})
+  - :metadata-key - The metadata key being split by (nil if no split)
   - :start-time-millis - Start of time window (required for proper empty chart display)
   - :end-time-millis - End of time window (required for proper empty chart display)
   - :width - Chart width in pixels (optional, auto-detects container width if not provided)
   - :height - Chart height in pixels (optional, defaults to 300)
   - :title - Chart title (optional)
   - :y-label - Y-axis label (optional)"
-  [{:keys [data granularity metrics start-time-millis end-time-millis width height title y-label]}]
+  [{:keys [data granularity metrics metadata-key start-time-millis end-time-millis width height title y-label]}]
   (let [metrics (or metrics #{:min :max 0.5 0.9 0.99})
         height (or height 300)
 
@@ -222,8 +219,8 @@
 
         ;; Transform data for uPlot
         chart-data (uix/use-memo
-                    (fn [] (prepare-analytics-data data granularity metrics start-time-millis end-time-millis))
-                    [data granularity metrics start-time-millis end-time-millis])
+                    (fn [] (prepare-analytics-data data granularity metrics metadata-key start-time-millis end-time-millis))
+                    [data granularity metrics metadata-key start-time-millis end-time-millis])
 
         ;; Define series configurations with nice colors
         metric-colors {:min "#10b981" ; green
@@ -232,17 +229,41 @@
                        0.9 "#f59e0b" ; amber
                        0.99 "#8b5cf6"} ; purple
 
-        series (mapv
-                (fn [metric-key]
-                  {:label (cond
-                            (keyword? metric-key) (name metric-key)
-                            (number? metric-key) (str "p" (int (* metric-key 100)))
-                            :else (str metric-key))
-                   :stroke (get metric-colors metric-key "#6b7280")
-                   :width 2
-                   :points {:show true :size 4}})
-                ;; Sort metrics in display order: min, percentiles, max
-                (sort-metrics metrics))
+        ;; When metadata split is active, we have multiple series per metric (one per metadata value)
+        ;; When no split, we have one series per metric
+        series (if metadata-key
+                 ;; METADATA SPLIT: Extract metadata values from data and create series
+                 (let [sorted-buckets (sort (keys data))
+                       all-metadata-values (into (sorted-set)
+                                                 (mapcat (fn [bucket]
+                                                           (keys (get data bucket)))
+                                                         sorted-buckets))
+                       sorted-metrics (sort-metrics metrics)]
+                   (vec (mapcat
+                         (fn [metric-key]
+                           (map
+                            (fn [metadata-value]
+                              {:label (str (cond
+                                             (keyword? metric-key) (name metric-key)
+                                             (number? metric-key) (str "p" (int (* metric-key 100)))
+                                             :else (str metric-key))
+                                           " (" metadata-value ")")
+                               :stroke (get metric-colors metric-key "#6b7280")
+                               :width 2
+                               :points {:show true :size 4}})
+                            all-metadata-values))
+                         sorted-metrics)))
+                 ;; NO SPLIT: One series per metric
+                 (mapv
+                  (fn [metric-key]
+                    {:label (cond
+                              (keyword? metric-key) (name metric-key)
+                              (number? metric-key) (str "p" (int (* metric-key 100)))
+                              :else (str metric-key))
+                     :stroke (get metric-colors metric-key "#6b7280")
+                     :width 2
+                     :points {:show true :size 4}})
+                  (sort-metrics metrics)))
 
         ;; Build uPlot options for time-series (size will be set dynamically)
         options (uix/use-memo
@@ -322,52 +343,58 @@
   
   Args:
   - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
+                    or {bucket-number {metadata-value {\"_aor/default\" {metric-key value}}}} (when split)
   - granularity: Granularity in seconds
   - metric-key: The metric key to extract (e.g., :count or :rest-sum)
+  - metadata-key: The metadata key being split by (nil if no split)
   - start-time-millis: Start of the time window
   - end-time-millis: End of the time window
   
   Returns:
-  - uPlot data format [[timestamps] [values]]"
-  [telemetry-data granularity metric-key start-time-millis end-time-millis]
+  - uPlot data format [[timestamps] [values1] [values2] ...] (one series per metadata value if split)"
+  [telemetry-data granularity metric-key metadata-key start-time-millis end-time-millis]
   (println "=== prepare-bar-chart-data ===")
   (println "metric-key:" metric-key)
+  (println "metadata-key:" metadata-key)
   (println "telemetry-data (first 2 buckets):" (take 2 telemetry-data))
 
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
-
-          ;; Get metadata key from the first bucket only
-          first-bucket (first sorted-buckets)
-          first-bucket-data (get telemetry-data first-bucket)
-          first-bucket-metadata-keys (when first-bucket
-                                       (keys first-bucket-data))
-          metadata-key-to-use (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
-                                  (first first-bucket-metadata-keys)
-                                  "_aor/default")
-
-          _ (println "first-bucket:" first-bucket)
-          _ (println "first-bucket-data:" first-bucket-data)
-          _ (println "metadata-key-to-use:" metadata-key-to-use)
-
           timestamps (mapv #(* % granularity) sorted-buckets)
 
-          ;; Try both paths - with and without _aor/default layer
-          values (mapv
-                  (fn [bucket]
-                    (let [;; Try path with _aor/default (for both split and no-split cases)
-                          path-with-default [bucket metadata-key-to-use "_aor/default" metric-key]
-                          ;; Try direct path (fallback)
-                          path-direct [bucket metadata-key-to-use metric-key]
-                          value-with-default (get-in telemetry-data path-with-default)
-                          value-direct (get-in telemetry-data path-direct)]
-                      (when (= bucket first-bucket)
-                        (println "  path-with-default:" path-with-default "=>" value-with-default)
-                        (println "  path-direct:" path-direct "=>" value-direct))
-                      (or value-with-default value-direct)))
-                  sorted-buckets)]
-      (println "values (first 5):" (take 5 values))
-      [timestamps values])
+          _ (println "sorted-buckets (first 5):" (take 5 sorted-buckets))
+
+          result (if metadata-key
+                   ;; METADATA SPLIT: Create one series per metadata value
+                   ;; Data structure: {bucket -> metadata-value -> "_aor/default" -> {metric-key value}}
+                   (let [all-metadata-values (into (sorted-set)
+                                                   (mapcat (fn [bucket]
+                                                             (keys (get telemetry-data bucket)))
+                                                           sorted-buckets))
+                         _ (println "all-metadata-values:" all-metadata-values)
+
+                         series-data (map
+                                      (fn [metadata-value]
+                                        (let [values (mapv
+                                                      (fn [bucket]
+                                                        (get-in telemetry-data [bucket metadata-value "_aor/default" metric-key]))
+                                                      sorted-buckets)]
+                                          (println "  metadata-value:" metadata-value "values (first 5):" (take 5 values))
+                                          values))
+                                      all-metadata-values)]
+                     (into [timestamps] series-data))
+
+                   ;; NO SPLIT: Create one series
+                   ;; Data structure: {bucket -> "_aor/default" -> {metric-key value}}
+                   (let [values (mapv
+                                 (fn [bucket]
+                                   (get-in telemetry-data [bucket "_aor/default" metric-key]))
+                                 sorted-buckets)]
+                     (println "values (first 5):" (take 5 values))
+                     [timestamps values]))]
+
+      (println "Final result - timestamps (first 5):" (take 5 timestamps))
+      result)
     ;; Empty data
     (do
       (println "Empty telemetry-data!")
@@ -380,13 +407,14 @@
   - :data - Analytics telemetry data {bucket-number {metadata-key {metric-key value}}}
   - :granularity - Time granularity in seconds
   - :metric-key - Which metric to display (e.g., :count or :rest-sum)
+  - :metadata-key - The metadata key being split by (nil if no split)
   - :start-time-millis - Start of time window
   - :end-time-millis - End of time window
   - :height - Chart height in pixels (optional, defaults to 300)
   - :title - Chart title (optional)
   - :y-label - Y-axis label (optional)
   - :color - Bar color (optional, defaults to blue)"
-  [{:keys [data granularity metric-key start-time-millis end-time-millis height title y-label color]}]
+  [{:keys [data granularity metric-key metadata-key start-time-millis end-time-millis height title y-label color]}]
   (let [height (or height 300)
         color (or color "#3b82f6")
 
@@ -394,14 +422,31 @@
 
         ;; Transform data for uPlot
         chart-data (uix/use-memo
-                    (fn [] (prepare-bar-chart-data data granularity metric-key start-time-millis end-time-millis))
-                    [data granularity metric-key start-time-millis end-time-millis])
+                    (fn [] (prepare-bar-chart-data data granularity metric-key metadata-key start-time-millis end-time-millis))
+                    [data granularity metric-key metadata-key start-time-millis end-time-millis])
 
-;; Line chart series configuration with dots
-        series [{:label (or y-label "Value")
-                 :stroke color
-                 :width 2
-                 :points {:show true :size 4}}]
+        ;; Color palette for multiple series
+        series-colors ["#3b82f6" "#10b981" "#f59e0b" "#ef4444" "#8b5cf6" "#ec4899" "#14b8a6" "#f97316"]
+
+        ;; When metadata split is active, we have multiple series (one per metadata value)
+        series (if metadata-key
+                 (let [sorted-buckets (sort (keys data))
+                       all-metadata-values (into (sorted-set)
+                                                 (mapcat (fn [bucket]
+                                                           (keys (get data bucket)))
+                                                         sorted-buckets))]
+                   (vec (map-indexed
+                         (fn [idx metadata-value]
+                           {:label metadata-value
+                            :stroke (get series-colors (mod idx (count series-colors)))
+                            :width 2
+                            :points {:show true :size 4}})
+                         all-metadata-values)))
+                 ;; NO SPLIT: Single series
+                 [{:label (or y-label "Value")
+                   :stroke color
+                   :width 2
+                   :points {:show true :size 4}}])
 
         ;; Build uPlot options
         options (uix/use-memo
@@ -431,7 +476,7 @@
                              :y {:auto true}}
                     :legend {:show true
                              :live true}})
-                 [height y-label start-time-millis end-time-millis])
+                 [height y-label series start-time-millis end-time-millis])
 
         [target-ref chart-ref] (use-uplot options chart-data)
 
@@ -465,53 +510,60 @@
   
   Args:
   - telemetry-data: Map of {bucket-number {metadata-key {metric-key value}}}
+                    or {bucket-number {metadata-value {\"_aor/default\" {metric-key value}}}} (when split)
   - granularity: Granularity in seconds
   - metric-key: The metric key to extract (e.g., :mean)
+  - metadata-key: The metadata key being split by (nil if no split)
   - start-time-millis: Start of the time window
   - end-time-millis: End of the time window
   
   Returns:
-  - uPlot data format [[timestamps] [values]] where values are in 0-100 range"
-  [telemetry-data granularity metric-key start-time-millis end-time-millis]
+  - uPlot data format [[timestamps] [values1] [values2] ...] where values are in 0-100 range"
+  [telemetry-data granularity metric-key metadata-key start-time-millis end-time-millis]
   (println "=== prepare-percentage-chart-data ===")
   (println "metric-key:" metric-key)
+  (println "metadata-key:" metadata-key)
   (println "telemetry-data (first 2 buckets):" (take 2 telemetry-data))
 
   (if (seq telemetry-data)
     (let [sorted-buckets (sort (keys telemetry-data))
-
-          ;; Get metadata key from the first bucket only
-          first-bucket (first sorted-buckets)
-          first-bucket-data (get telemetry-data first-bucket)
-          first-bucket-metadata-keys (when first-bucket
-                                       (keys first-bucket-data))
-          metadata-key-to-use (or (first (filter #(= "_aor/default" %) first-bucket-metadata-keys))
-                                  (first first-bucket-metadata-keys)
-                                  "_aor/default")
-
-          _ (println "first-bucket:" first-bucket)
-          _ (println "first-bucket-data:" first-bucket-data)
-          _ (println "metadata-key-to-use:" metadata-key-to-use)
-
           timestamps (mapv #(* % granularity) sorted-buckets)
-          ;; Convert 0.0-1.0 values to 0-100 percentages
-          ;; Try both paths - with and without _aor/default layer
-          values (mapv
-                  (fn [bucket]
-                    (let [;; Try path with _aor/default (for both split and no-split cases)
-                          path-with-default [bucket metadata-key-to-use "_aor/default" metric-key]
-                          ;; Try direct path (fallback)
-                          path-direct [bucket metadata-key-to-use metric-key]
-                          value-with-default (get-in telemetry-data path-with-default)
-                          value-direct (get-in telemetry-data path-direct)]
-                      (when (= bucket first-bucket)
-                        (println "  path-with-default:" path-with-default "=>" value-with-default)
-                        (println "  path-direct:" path-direct "=>" value-direct))
-                      (when-let [val (or value-with-default value-direct)]
-                        (* val 100))))
-                  sorted-buckets)]
-      (println "values (first 5):" (take 5 values))
-      [timestamps values])
+
+          _ (println "sorted-buckets (first 5):" (take 5 sorted-buckets))
+
+          result (if metadata-key
+                   ;; METADATA SPLIT: Create one series per metadata value
+                   ;; Data structure: {bucket -> metadata-value -> "_aor/default" -> {metric-key value}}
+                   (let [all-metadata-values (into (sorted-set)
+                                                   (mapcat (fn [bucket]
+                                                             (keys (get telemetry-data bucket)))
+                                                           sorted-buckets))
+                         _ (println "all-metadata-values:" all-metadata-values)
+
+                         series-data (map
+                                      (fn [metadata-value]
+                                        (let [values (mapv
+                                                      (fn [bucket]
+                                                        (when-let [val (get-in telemetry-data [bucket metadata-value "_aor/default" metric-key])]
+                                                          (* val 100)))
+                                                      sorted-buckets)]
+                                          (println "  metadata-value:" metadata-value "values (first 5):" (take 5 values))
+                                          values))
+                                      all-metadata-values)]
+                     (into [timestamps] series-data))
+
+                   ;; NO SPLIT: Create one series
+                   ;; Data structure: {bucket -> "_aor/default" -> {metric-key value}}
+                   (let [values (mapv
+                                 (fn [bucket]
+                                   (when-let [val (get-in telemetry-data [bucket "_aor/default" metric-key])]
+                                     (* val 100)))
+                                 sorted-buckets)]
+                     (println "values (first 5):" (take 5 values))
+                     [timestamps values]))]
+
+      (println "Final result - timestamps (first 5):" (take 5 timestamps))
+      result)
     ;; Empty data
     (do
       (println "Empty telemetry-data!")
@@ -524,12 +576,13 @@
   - :data - Analytics telemetry data {bucket-number {metadata-key {metric-key value}}}
   - :granularity - Time granularity in seconds
   - :metric-key - Which metric to display (e.g., :mean)
+  - :metadata-key - The metadata key being split by (nil if no split)
   - :start-time-millis - Start of time window
   - :end-time-millis - End of time window
   - :height - Chart height in pixels (optional, defaults to 300)
   - :title - Chart title (optional)
   - :color - Line color (optional, defaults to green)"
-  [{:keys [data granularity metric-key start-time-millis end-time-millis height title color]}]
+  [{:keys [data granularity metric-key metadata-key start-time-millis end-time-millis height title color]}]
   (let [height (or height 300)
         color (or color "#10b981")
 
@@ -537,14 +590,31 @@
 
         ;; Transform data for uPlot
         chart-data (uix/use-memo
-                    (fn [] (prepare-percentage-chart-data data granularity metric-key start-time-millis end-time-millis))
-                    [data granularity metric-key start-time-millis end-time-millis])
+                    (fn [] (prepare-percentage-chart-data data granularity metric-key metadata-key start-time-millis end-time-millis))
+                    [data granularity metric-key metadata-key start-time-millis end-time-millis])
 
-        ;; Line chart series configuration
-        series [{:label "Success Rate"
-                 :stroke color
-                 :width 2
-                 :points {:show true :size 4}}]
+        ;; Color palette for multiple series
+        series-colors ["#3b82f6" "#10b981" "#f59e0b" "#ef4444" "#8b5cf6" "#ec4899" "#14b8a6" "#f97316"]
+
+        ;; When metadata split is active, we have multiple series (one per metadata value)
+        series (if metadata-key
+                 (let [sorted-buckets (sort (keys data))
+                       all-metadata-values (into (sorted-set)
+                                                 (mapcat (fn [bucket]
+                                                           (keys (get data bucket)))
+                                                         sorted-buckets))]
+                   (vec (map-indexed
+                         (fn [idx metadata-value]
+                           {:label metadata-value
+                            :stroke (get series-colors (mod idx (count series-colors)))
+                            :width 2
+                            :points {:show true :size 4}})
+                         all-metadata-values)))
+                 ;; NO SPLIT: Single series
+                 [{:label "Success Rate"
+                   :stroke color
+                   :width 2
+                   :points {:show true :size 4}}])
 
         ;; Build uPlot options
         options (uix/use-memo
@@ -580,7 +650,7 @@
                                           #js [0 100])}}
                     :legend {:show true
                              :live true}})
-                 [height start-time-millis end-time-millis])
+                 [height series start-time-millis end-time-millis])
 
         [target-ref chart-ref] (use-uplot options chart-data)
 
