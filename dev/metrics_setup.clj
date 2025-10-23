@@ -125,10 +125,10 @@
        (aor/node
         "start"
         "process"
-        (fn [agent-node {:keys [flags delay-ms] :as params}]
+        (fn [agent-node {:keys [flags delay-ms input] :as params}]
           (when delay-ms (TopologyUtils/advanceSimTime delay-ms))
           (when (contains? flags :model)
-            (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") "test-prompt"))
+            (lc4j/basic-chat (aor/get-agent-object agent-node "my-model") input))
           (aor/emit! agent-node "process" params)))
        (aor/node
         "process"
@@ -223,11 +223,17 @@
               (flush)
               (dotimes [_ invokes-per-unit]
                 (let [profile (rand-nth profiles)
-                      params {:input (str "run-" i)
+                      ;; 15% of inputs will contain "fail-model" to trigger model failures
+                      input-text (if (< (rand) 0.15)
+                                   (str "fail-model run-" i)
+                                   (str "run-" i))
+                      params {:input input-text
                               :flags (cond-> #{}
                                        (> (rand) 0.5) (conj :model)
-                                       (> (rand) 0.8) (conj :store-write)
-                                       (> (rand) 0.9) (conj :db-read))
+                                       (> (rand) 0.7) (conj :store-write)
+                                       (> (rand) 0.7) (conj :store-read)
+                                       (> (rand) 0.8) (conj :db-write)
+                                       (> (rand) 0.8) (conj :db-read))
                               :delay-ms (+ 20 (rand-int 100)) ; Shorter delay
                               :should-fail? (< (rand) 0.1)}]
                   (try
