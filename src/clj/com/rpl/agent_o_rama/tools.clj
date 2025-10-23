@@ -257,7 +257,6 @@ Example:\n
           \"Add two numbers together\")
         (fn [args] (+ (get args \"a\") (get args \"b\"))))]
   (new-tools-agent topology \"calculator\" [calculator-tool]))
-
 ;; With custom error handling
 (new-tools-agent topology \"robust-calculator\" tools
   {:error-handler (error-handler-static-string \"Calculation failed\")})
