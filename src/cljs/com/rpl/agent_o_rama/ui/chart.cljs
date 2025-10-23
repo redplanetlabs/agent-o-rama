@@ -4,7 +4,8 @@
    [uix.core :as uix :refer [defui defhook $]]
    ["react" :refer [useRef useLayoutEffect useEffect]]
    ["uplot" :as uPlot]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [com.rpl.specter :as sp :refer [select select-one ALL MAP-KEYS MAP-VALS]]))
 
 (defhook use-uplot
   "React hook to manage a uPlot chart instance lifecycle.
@@ -228,7 +229,7 @@
     - For :multi-category: {:metric-key :rest-sum :categories ['input' 'output' 'total']}
   
   Returns:
-  - uPlot data format [[timestamps] [series1] [series2] ...]"
+  - Map with :data (uPlot format) and :metadata-values (vector or nil)"
   [telemetry-data granularity metadata-key start-time-millis end-time-millis variant variant-opts]
 
   (if (seq telemetry-data)
@@ -251,16 +252,13 @@
                                      ;; For other variants, check if "_aor/default" is at first level (no split)
                                      (not (contains? first-bucket-data "_aor/default"))))
 
-          ;; Extract up to 5 metadata values if split is actually present in data
+          ;; Extract up to 5 metadata values using Specter
           metadata-values (when has-metadata-split?
-                            (loop [remaining sorted-buckets
-                                   collected (sorted-set)]
-                              (if (or (empty? remaining) (>= (count collected) 5))
-                                collected
-                                (recur (rest remaining)
-                                       (into collected
-                                             (take (- 5 (count collected))
-                                                   (keys (get telemetry-data (first remaining)))))))))
+                            (vec (take 5 (select [first-bucket MAP-KEYS] telemetry-data))))
+
+          ;; Helper: extract time series for a path
+          extract-series (fn [path]
+                           (mapv #(select-one path (get telemetry-data %)) sorted-buckets))
 
           series-data
           (case variant
@@ -268,43 +266,28 @@
             :single-metric
             (let [{:keys [metric-key]} variant-opts]
               (if has-metadata-split?
-                ;; Multiple series (one per metadata value)
-                (map (fn [mv]
-                       (mapv #(get-in telemetry-data [% mv "_aor/default" metric-key])
-                             sorted-buckets))
-                     metadata-values)
-                ;; Single series
-                [(mapv #(get-in telemetry-data [% "_aor/default" metric-key])
-                       sorted-buckets)]))
+                (mapv (fn [mv] (extract-series [mv "_aor/default" metric-key])) metadata-values)
+                [(extract-series ["_aor/default" metric-key])]))
 
-            ;; Multi-metric: multiple metrics per bucket (percentiles)
+            ;; Multi-metric: multiple percentiles per bucket
             :multi-metric
             (let [{:keys [metrics]} variant-opts
                   sorted-metrics (sort-metrics metrics)]
               (if has-metadata-split?
-                ;; Series per metric per metadata value
-                (mapcat (fn [metric]
-                          (map (fn [mv]
-                                 (mapv #(get-in telemetry-data [% mv "_aor/default" metric])
-                                       sorted-buckets))
-                               metadata-values))
-                        sorted-metrics)
-                ;; Series per metric
-                (map (fn [metric]
-                       (mapv #(get-in telemetry-data [% "_aor/default" metric])
-                             sorted-buckets))
-                     sorted-metrics)))
+                (vec (for [metric sorted-metrics, mv metadata-values]
+                       (extract-series [mv "_aor/default" metric])))
+                (mapv (fn [metric] (extract-series ["_aor/default" metric])) sorted-metrics)))
 
-            ;; Percentage: single metric converted to 0-100%
+            ;; Percentage: single metric scaled to 0-100%
             :percentage
             (let [{:keys [metric-key]} variant-opts]
               (if has-metadata-split?
-                (map (fn [mv]
-                       (mapv #(when-let [v (get-in telemetry-data [% mv "_aor/default" metric-key])]
-                                (* v 100))
-                             sorted-buckets))
-                     metadata-values)
-                [(mapv #(when-let [v (get-in telemetry-data [% "_aor/default" metric-key])]
+                (mapv (fn [mv]
+                        (mapv #(when-let [v (select-one [mv "_aor/default" metric-key] (get telemetry-data %))]
+                                 (* v 100))
+                              sorted-buckets))
+                      metadata-values)
+                [(mapv #(when-let [v (select-one ["_aor/default" metric-key] (get telemetry-data %))]
                           (* v 100))
                        sorted-buckets)]))
 
@@ -312,43 +295,26 @@
             :multi-category
             (let [{:keys [metric-key categories]} variant-opts]
               (if has-metadata-split?
-                ;; Multiple series per category (one per metadata value)
-                (mapcat (fn [category]
-                          (map (fn [mv]
-                                 (mapv #(get-in telemetry-data [% mv category metric-key])
-                                       sorted-buckets))
-                               metadata-values))
-                        categories)
-                ;; Single series per category
-                (map (fn [category]
-                       (mapv #(get-in telemetry-data [% category metric-key])
-                             sorted-buckets))
-                     categories)))
+                (vec (for [category categories, mv metadata-values]
+                       (extract-series [mv category metric-key])))
+                (mapv (fn [category] (extract-series [category metric-key])) categories)))
 
 ;; Computed percentage: success/(success+failure)*100
             :computed-percentage
-            (let [{:keys [metric-key]} variant-opts]
+            (let [{:keys [metric-key]} variant-opts
+                  compute-pct (fn [bucket-data path]
+                                (let [success (or (select-one (conj path "success" metric-key) bucket-data) 0)
+                                      failure (or (select-one (conj path "failure" metric-key) bucket-data) 0)
+                                      total (+ success failure)]
+                                  (when (pos? total) (* (/ success total) 100))))]
               (if has-metadata-split?
-                ;; Multiple series (one per metadata value)
-                (map (fn [mv]
-                       (mapv (fn [bucket]
-                               (let [success (get-in telemetry-data [bucket mv "success" metric-key] 0)
-                                     failure (get-in telemetry-data [bucket mv "failure" metric-key] 0)
-                                     total (+ success failure)]
-                                 (when (pos? total)
-                                   (* (/ success total) 100))))
-                             sorted-buckets))
-                     metadata-values)
-                ;; Single series
-                [(mapv (fn [bucket]
-                         (let [success (get-in telemetry-data [bucket "success" metric-key] 0)
-                               failure (get-in telemetry-data [bucket "failure" metric-key] 0)
-                               total (+ success failure)]
-                           (when (pos? total)
-                             (* (/ success total) 100))))
-                       sorted-buckets)])))]
+                (mapv (fn [mv]
+                        (mapv #(compute-pct (get telemetry-data %) [mv]) sorted-buckets))
+                      metadata-values)
+                [(mapv #(compute-pct (get telemetry-data %) []) sorted-buckets)])))]
 
-      (into [timestamps] series-data))
+      {:data (into [timestamps] series-data)
+       :metadata-values metadata-values})
 
     ;; Empty data - generate 60 evenly-spaced timestamps to match bucket structure
     ;; This ensures consistent x-axis rendering with charts that have data
@@ -364,7 +330,8 @@
                        :percentage 1
                        :multi-category (count (:categories variant-opts))
                        :computed-percentage 1)]
-      (into [timestamps] (repeat num-series (vec (repeat 60 nil)))))))
+      {:data (into [timestamps] (repeat num-series (vec (repeat 60 nil))))
+       :metadata-values nil})))
 
 (defn- build-series-config
   "Build uPlot series configuration based on variant and data.
@@ -522,44 +489,39 @@
                              (assoc variant-opts :metrics selected-metrics)
                              variant-opts)
 
-        ;; Detect if data has metadata split (same logic as in prepare-chart-data)
-        metadata-values (uix/use-memo
-                         (fn []
-                           (when (and metadata-key (seq data))
-                             (let [first-bucket (first (sort (keys data)))
-                                   first-bucket-data (get data first-bucket)
-                                   has-split? (case variant
-                                                :computed-percentage
-                                                ;; Check if "success" is at top level (no split)
-                                                (let [success-data (get first-bucket-data "success")]
-                                                  (not (and success-data
-                                                           (map? success-data)
-                                                           (contains? success-data (:metric-key final-variant-opts)))))
-                                                ;; For other variants, check if "_aor/default" is at first level
-                                                (not (contains? first-bucket-data "_aor/default")))]
-                               (when has-split?
-                                 (let [sorted-buckets (sort (keys data))]
-                                   (loop [remaining sorted-buckets
-                                          collected (sorted-set)]
-                                     (if (or (empty? remaining) (>= (count collected) 5))
-                                       (vec collected)
-                                       (recur (rest remaining)
-                                              (into collected
-                                                    (take (- 5 (count collected))
-                                                          (keys (get data (first remaining)))))))))))))
-                         [data metadata-key variant final-variant-opts])
+        ;; Transform data - returns both data and metadata-values used
+        prepared (uix/use-memo
+                  (fn [] 
+                    (prepare-chart-data data granularity metadata-key
+                                        start-time-millis end-time-millis
+                                        variant final-variant-opts))
+                  [data granularity metadata-key start-time-millis end-time-millis
+                   variant final-variant-opts])
+        
+        chart-data (:data prepared)
+        metadata-values (:metadata-values prepared)
 
-        ;; Transform data
-        chart-data (uix/use-memo
-                    (fn [] (prepare-chart-data data granularity metadata-key
-                                               start-time-millis end-time-millis
-                                               variant final-variant-opts))
-                    [data granularity metadata-key start-time-millis end-time-millis
-                     variant final-variant-opts])
+        ;; Debug logging
+        _ (uix/use-effect
+           (fn []
+             (println "=== CHART DATA DEBUG ===")
+             (println "variant:" variant)
+             (println "metadata-key:" metadata-key)
+             (println "chart-data length:" (count chart-data))
+             (println "timestamps length:" (count (first chart-data)))
+             (println "series count:" (dec (count chart-data)))
+             (doseq [[idx series] (map-indexed vector (rest chart-data))]
+               (println "  series" idx "type:" (type series) "length:" (if series (count series) "nil")))
+             (println "metadata-values:" metadata-values)
+             js/undefined)
+           [chart-data metadata-values variant])
 
-        ;; Build series configuration
+        ;; Build series configuration using same metadata-values
         series (uix/use-memo
-                (fn [] (build-series-config variant final-variant-opts metadata-values color))
+                (fn [] 
+                  (let [result (build-series-config variant final-variant-opts metadata-values color)]
+                    (println "series config count:" (count result))
+                    result))
                 [variant final-variant-opts metadata-values color])
 
         ;; Determine if this is a percentage chart (affects y-axis)
