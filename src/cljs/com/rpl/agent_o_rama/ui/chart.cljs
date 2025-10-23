@@ -260,7 +260,8 @@
                                            " (" metadata-value ")")
                                :stroke (get metric-colors metric-key "#6b7280")
                                :width 2
-                               :points {:show true :size 4}})
+                               :points {:show true :size 4}
+                               :spanGaps true})
                             all-metadata-values))
                          sorted-metrics)))
                  ;; NO SPLIT: One series per metric
@@ -272,7 +273,8 @@
                               :else (str metric-key))
                      :stroke (get metric-colors metric-key "#6b7280")
                      :width 2
-                     :points {:show true :size 4}})
+                     :points {:show true :size 4}
+                     :spanGaps true})
                   (sort-metrics metrics)))
 
         ;; Build uPlot options for time-series (size will be set dynamically)
@@ -460,13 +462,15 @@
                            {:label metadata-value
                             :stroke (get series-colors (mod idx (count series-colors)))
                             :width 2
-                            :points {:show true :size 4}})
+                            :points {:show true :size 4}
+                            :spanGaps true})
                          all-metadata-values)))
                  ;; NO SPLIT: Single series
                  [{:label (or y-label "Value")
                    :stroke color
                    :width 2
-                   :points {:show true :size 4}}])
+                   :points {:show true :size 4}
+                   :spanGaps true}])
 
         ;; Build uPlot options
         options (uix/use-memo
@@ -638,13 +642,15 @@
                            {:label metadata-value
                             :stroke (get series-colors (mod idx (count series-colors)))
                             :width 2
-                            :points {:show true :size 4}})
+                            :points {:show true :size 4}
+                            :spanGaps true})
                          all-metadata-values)))
                  ;; NO SPLIT: Single series
                  [{:label "Success Rate"
                    :stroke color
                    :width 2
-                   :points {:show true :size 4}}])
+                   :points {:show true :size 4}
+                   :spanGaps true}])
 
         ;; Build uPlot options
         options (uix/use-memo
@@ -806,7 +812,8 @@
                   {:label (str (clojure.string/capitalize category))
                    :stroke (get category-colors category "#6b7280")
                    :width 2
-                   :points {:show true :size 4}})
+                   :points {:show true :size 4}
+                   :spanGaps true})
                 categories)
 
         ;; Build uPlot options
@@ -983,7 +990,8 @@
         series [{:label "Success Rate"
                  :stroke color
                  :width 2
-                 :points {:show true :size 4}}]
+                 :points {:show true :size 4}
+                 :spanGaps true}]
 
         ;; Build uPlot options
         options (uix/use-memo
