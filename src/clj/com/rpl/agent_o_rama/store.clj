@@ -193,7 +193,7 @@ Example:\n
 PState stores provide direct access to Rama's built-in storage capabilities with powerful querying using path expressions. This function returns a collection of all matching values.\n
 \n
 Args:\n
-  - apath - Rama path expression (e.g., [:a :b ALL], [ALL (selected? :active)])
+  - apath - Rama path expression
   - store - PState store instance obtained from [[get-store]]
   - partitioning-key - Optional partitioning key for the query. Mandatory if the path does not begin with key navigation.
 \n
@@ -217,7 +217,7 @@ Example:\n
 Similar to [[pstate-select]] but returns only the first matching value. Useful when you know the path will match exactly one item.\n
 \n
 Args:\n
-  - apath - Rama path expression (e.g., [:a :b], [ALL (selected? :active) FIRST])
+  - apath - Rama path expression
   - store - PState store instance obtained from [[get-store]]
   - partitioning-key - Optional partitioning key for the query. Mandatory if the path does not begin with key navigation.
 \n
@@ -240,7 +240,7 @@ Example:\n
 Applies a transformation function to data matching the path expression.\n
 \n
 Args:\n
-  - apath - Rama path expression with transformation (e.g., [:a MAP-VALS (termval new-value)])
+  - apath - Rama path expression with transformation
   - store - PState store instance obtained from [[get-store]]
   - partitioning-key - Partitioning key for the transformation
 \n

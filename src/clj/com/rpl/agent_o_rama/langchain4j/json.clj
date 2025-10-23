@@ -196,7 +196,7 @@ Example:\n
 ;; Simple object
 (lj/object {\"name\" (lj/string \"User name\")
             \"age\" (lj/int \"User age\")})
-;; Complex object with options\n
+;; Complex object with options
 (lj/object
   {:description \"User profile with required fields\"
    :required [\"id\" \"name\"]
