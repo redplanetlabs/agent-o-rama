@@ -170,7 +170,7 @@ public interface AgentGraph {
    * Adds an aggregation start node with zero arguments that scopes aggregation within a subgraph.
    * 
    * Aggregation start nodes work like regular nodes but define the beginning
-   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, Object, RamaVoidFunction3)}
+   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, RamaAccumulatorAgg, RamaVoidFunction3)}
    * downstream. Within the aggregation subgraph, edges must stay within
    * the subgraph and cannot connect to nodes outside of it.
    * 
@@ -192,7 +192,7 @@ public interface AgentGraph {
    * Adds an aggregation start node with one argument that scopes aggregation within a subgraph.
    * 
    * Aggregation start nodes work like regular nodes but define the beginning
-   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, Object, RamaVoidFunction3)}
+   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, RamaAccumulatorAgg, RamaVoidFunction3)}
    * downstream. Within the aggregation subgraph, edges must stay within
    * the subgraph and cannot connect to nodes outside of it.
    * 
@@ -214,7 +214,7 @@ public interface AgentGraph {
    * Adds an aggregation start node with two arguments that scopes aggregation within a subgraph.
    * 
    * Aggregation start nodes work like regular nodes but define the beginning
-   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, Object, RamaVoidFunction3)}
+   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, RamaAccumulatorAgg, RamaVoidFunction3)}
    * downstream. Within the aggregation subgraph, edges must stay within
    * the subgraph and cannot connect to nodes outside of it.
    * 
@@ -236,7 +236,7 @@ public interface AgentGraph {
    * Adds an aggregation start node with three arguments that scopes aggregation within a subgraph.
    * 
    * Aggregation start nodes work like regular nodes but define the beginning
-   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, Object, RamaVoidFunction3)}
+   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, RamaAccumulatorAgg, RamaVoidFunction3)}
    * downstream. Within the aggregation subgraph, edges must stay within
    * the subgraph and cannot connect to nodes outside of it.
    * 
@@ -258,7 +258,7 @@ public interface AgentGraph {
    * Adds an aggregation start node with four arguments that scopes aggregation within a subgraph.
    * 
    * Aggregation start nodes work like regular nodes but define the beginning
-   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, Object, RamaVoidFunction3)}
+   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, RamaAccumulatorAgg, RamaVoidFunction3)}
    * downstream. Within the aggregation subgraph, edges must stay within
    * the subgraph and cannot connect to nodes outside of it.
    * 
@@ -280,7 +280,7 @@ public interface AgentGraph {
    * Adds an aggregation start node with five arguments that scopes aggregation within a subgraph.
    * 
    * Aggregation start nodes work like regular nodes but define the beginning
-   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, Object, RamaVoidFunction3)}
+   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, RamaAccumulatorAgg, RamaVoidFunction3)}
    * downstream. Within the aggregation subgraph, edges must stay within
    * the subgraph and cannot connect to nodes outside of it.
    * 
@@ -302,7 +302,7 @@ public interface AgentGraph {
    * Adds an aggregation start node with six arguments that scopes aggregation within a subgraph.
    * 
    * Aggregation start nodes work like regular nodes but define the beginning
-   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, Object, RamaVoidFunction3)}
+   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, RamaAccumulatorAgg, RamaVoidFunction3)}
    * downstream. Within the aggregation subgraph, edges must stay within
    * the subgraph and cannot connect to nodes outside of it.
    * 
@@ -324,7 +324,7 @@ public interface AgentGraph {
    * Adds an aggregation start node with seven arguments that scopes aggregation within a subgraph.
    * 
    * Aggregation start nodes work like regular nodes but define the beginning
-   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, Object, RamaVoidFunction3)}
+   * of an aggregation subgraph. They must have a corresponding {@link #aggNode(String, Object, RamaAccumulatorAgg, RamaVoidFunction3)}
    * downstream. Within the aggregation subgraph, edges must stay within
    * the subgraph and cannot connect to nodes outside of it.
    * 

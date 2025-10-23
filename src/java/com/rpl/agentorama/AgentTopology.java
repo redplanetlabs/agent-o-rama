@@ -13,13 +13,15 @@ import java.util.*;
  * within an agent module.
  *
  * The topology provides the configuration context for:
- * - Declaring agents with {@link #newAgent(String)}
- * - Declaring stores: {@link #declareKeyValueStore(String, Class, Class)}, {@link #declareDocumentStore(String)}, {@link #declarePStateStore(String, PState)}
- * - Declaring agent objects: {@link #declareAgentObject(String, Object)}, {@link #declareAgentObjectBuilder(String, com.rpl.rama.ops.RamaFunction1)}
- * - Declaring evaluators: {@link #declareEvaluatorBuilder(String, com.rpl.rama.ops.RamaFunction1)}, {@link #declareComparativeEvaluatorBuilder(String, com.rpl.rama.ops.RamaFunction1)}, {@link #declareSummaryEvaluatorBuilder(String, com.rpl.rama.ops.RamaFunction1)}
- * - Declaring actions: {@link #declareActionBuilder(String, com.rpl.rama.ops.RamaFunction1)}
- * - Declaring cluster agents: {@link #declareClusterAgent(String, com.rpl.rama.ops.RamaFunction1)}
- *
+ * <ul>
+ * <li>Declaring agents with {@link #newAgent(String)}</li>
+ * <li>Declaring stores: {@link #declareKeyValueStore(String, Class, Class)}, {@link #declareDocumentStore(String, Class, Object...)}, {@link #declarePStateStore(String, Class)}</li>
+ * <li>Declaring agent objects: {@link #declareAgentObject(String, Object)}, {@link #declareAgentObjectBuilder(String, com.rpl.rama.ops.RamaFunction1)}</li>
+ * <li>Declaring evaluators: {@link #declareEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}, {@link #declareComparativeEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}, {@link #declareSummaryEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}</li>
+ * <li>Declaring actions: {@link #declareActionBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}</li>
+ * <li>Declaring cluster agents: {@link #declareClusterAgent(String, String, String)}</li>
+ * </ul>
+ * 
  * Example:
  * <pre>{@code
  * public class MyAgentModule extends AgentModule {

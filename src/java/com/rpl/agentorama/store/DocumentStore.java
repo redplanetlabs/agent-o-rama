@@ -8,7 +8,7 @@ import com.rpl.rama.ops.RamaFunction1;
  * DocumentStore is like a key-value store where each value is a document (map) that can contain
  * nested fields. Stores are distributed, durable, and replicated.
  * 
- * Document stores are created using {@link com.rpl.agentorama.AgentTopology#declareDocumentStore(String)}.
+ * Document stores are created using {@link com.rpl.agentorama.AgentTopology#declareDocumentStore(String, Class, Object...)}.
  * 
  * @param <K> the type of keys
  */
