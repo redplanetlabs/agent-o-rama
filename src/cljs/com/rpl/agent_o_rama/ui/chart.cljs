@@ -546,7 +546,7 @@
                                        (recur (rest remaining)
                                               (into collected
                                                     (take (- 5 (count collected))
-                                                          (keys (get data (first remaining))))))))))))))
+                                                          (keys (get data (first remaining)))))))))))))
                          [data metadata-key variant final-variant-opts])
 
         ;; Transform data
