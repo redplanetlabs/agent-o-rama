@@ -310,7 +310,7 @@
                             (if metadata-key
                               selected-metrics
                               all-metrics))
- 
+
         height (or height 300)
 
         ;; Container ref to measure width
@@ -328,12 +328,16 @@
                        0.9 "#f59e0b" ; amber
                        0.99 "#8b5cf6"} ; purple
 
+        ;; Color palette for metadata values (when split is active)
+        series-colors ["#3b82f6" "#10b981" "#f59e0b" "#ef4444" "#8b5cf6" "#ec4899" "#14b8a6" "#f97316"]
+
         ;; When metadata split is active, we have multiple series per metric (one per metadata value)
         ;; When no split, we have one series per metric
         series (uix/use-memo
                 (fn []
                   (if metadata-key
                     ;; METADATA SPLIT: Extract up to 5 metadata values from data and create series
+                    ;; Color by metadata value (not by metric) for better distinction
                     (let [sorted-buckets (sort (keys data))
                           all-metadata-values (loop [remaining-buckets sorted-buckets
                                                      collected-values (sorted-set)]
@@ -344,21 +348,22 @@
                                                         bucket-values (keys (get data bucket))]
                                                     (recur (rest remaining-buckets)
                                                            (into collected-values (take (- 5 (count collected-values)) bucket-values))))))
-                          sorted-metrics (sort-metrics metrics-to-show)]
+                          sorted-metrics (sort-metrics metrics-to-show)
+                          metadata-value-vec (vec all-metadata-values)]
                       (vec (mapcat
                             (fn [metric-key]
-                              (map
-                               (fn [metadata-value]
+                              (map-indexed
+                               (fn [idx metadata-value]
                                  {:label (str (cond
                                                 (keyword? metric-key) (name metric-key)
                                                 (number? metric-key) (str "p" (int (* metric-key 100)))
                                                 :else (str metric-key))
                                               " (" metadata-value ")")
-                                  :stroke (get metric-colors metric-key "#6b7280")
+                                  :stroke (get series-colors idx "#6b7280")
                                   :width 2
                                   :points {:show true :size 4}
                                   :spanGaps true})
-                               all-metadata-values))
+                               metadata-value-vec))
                             sorted-metrics)))
                     ;; NO SPLIT: One series per metric
                     (mapv
