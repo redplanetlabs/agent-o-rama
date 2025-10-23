@@ -581,5 +581,11 @@
                 :selected-metrics selected-metrics
                 :on-change set-selected-metrics})))
 
-       ;; Chart container
-       ($ :div {:ref target-ref}))))
+       ;; Add style tag for vertical legend layout
+       ($ :style ".uplot-vertical-legend .u-legend { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+                  .uplot-vertical-legend .u-legend .u-series { display: flex; align-items: center; gap: 8px; }
+                  .uplot-vertical-legend .u-legend .u-series > * { display: inline-block; }
+                  .uplot-vertical-legend .u-legend .u-marker { width: 12px; height: 12px; border-radius: 50%; }")
+
+       ;; Chart container with vertical legend class
+       ($ :div.uplot-vertical-legend {:ref target-ref}))))
