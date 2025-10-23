@@ -245,7 +245,10 @@
                         start-time-millis
                         end-time-millis
                         (vec metrics-set)
-                        "region")
-  
-  
-  )
+                        "region"))
+
+(defmethod sente/-event-msg-handler :analytics/fetch-all-metrics
+  [{:keys [manager decoded-agent-name]} uid]
+  (let [agent-client (aor/agent-client manager decoded-agent-name)
+        {:keys [all-agent-metrics-query]} (aor-types/underlying-objects agent-client)]
+    (foreign-invoke-query all-agent-metrics-query)))

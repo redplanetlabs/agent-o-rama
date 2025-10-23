@@ -267,6 +267,7 @@
   Returns: [val1 val2 ... valN] where N = (count sorted-buckets)"
   [spec sorted-buckets telemetry-data]
   (if (:computed? spec)
+
     ;; Computed series: call compute-fn for each bucket
     (mapv #((:compute-fn spec) telemetry-data % (:metadata-val spec)) sorted-buckets)
     ;; Simple series: navigate path and apply value-fn

@@ -239,6 +239,33 @@
      :end-time-millis end-time-millis
      :is-live? (= offset 0)}))
 
+(defn- parse-eval-metric-id
+  "Parse an eval metric ID like [:eval :numeric-rule :score] into component parts."
+  [metric-id]
+  (when (and (vector? metric-id) 
+             (= 3 (count metric-id))
+             (= :eval (first metric-id)))
+    (let [[_ rule-name score-name] metric-id]
+      {:rule-name (name rule-name)
+       :score-name (name score-name)
+       :metric-id metric-id})))
+
+(defn- create-eval-chart-config
+  "Create a chart configuration for an eval metric.
+  
+  Spec: Use options [:count :min 0.5 0.9 0.99 :max]
+  If there are categories besides _aor/default, only display count for each category."
+  [{:keys [rule-name score-name metric-id]}]
+  {:id (keyword (str "eval-" rule-name "-" score-name))
+   :title (str "Evaluator score " rule-name "/" score-name)
+   :description (str "Score distribution for " rule-name "/" score-name)
+   :variant :multi-metric
+   :metric-id metric-id
+   :metrics-set #{:count :min 0.5 0.9 0.99 :max}
+   :variant-opts {:metrics #{:count :min 0.5 0.9 0.99 :max}}
+   :y-label "Score"
+   :eval-metric? true})
+
 (defn- group-charts-by-metric
   "Group charts by their metric-id and compute union of metrics-set for each group.
   Returns: {metric-id {:charts [chart-configs...] :metrics-set #{...}}}"
@@ -549,10 +576,32 @@
                js/undefined))
            [is-live?])
 
+        ;; Query for all agent metrics to get eval metrics
+        {all-metrics :data} (queries/use-sente-query
+                             {:query-key [:all-agent-metrics module-id decoded-agent-name]
+                              :sente-event [:analytics/fetch-all-metrics
+                                            {:module-id module-id
+                                             :agent-name decoded-agent-name}]
+                              :enabled? (boolean (and module-id decoded-agent-name))})
+
+        ;; Parse and create configs for eval metrics
+        eval-chart-configs (uix/use-memo
+                            (fn []
+                              (->> all-metrics
+                                   (filter #(and (vector? %) (= :eval (first %))))
+                                   (keep parse-eval-metric-id)
+                                   (mapv create-eval-chart-config)))
+                            [all-metrics])
+
+        ;; Combine static and eval charts
+        all-chart-configs (uix/use-memo
+                           (fn [] (concat chart-configs eval-chart-configs))
+                           [eval-chart-configs])
+
         ;; Group charts by metric-id to batch queries
         metric-groups (uix/use-memo
-                       (fn [] (group-charts-by-metric chart-configs))
-                       [])
+                       (fn [] (group-charts-by-metric all-chart-configs))
+                       [all-chart-configs])
 
         ;; Create one query per metric-id with union of all metrics
         metric-queries
@@ -599,9 +648,8 @@
            :module-id module-id
            :agent-name decoded-agent-name})
 
-       ;; Charts grid - 2 columns on large screens, 1 column on mobile
+       ;; Static metrics section
        ($ :div.grid.grid-cols-1.lg:grid-cols-2.gap-6
-          ;; Render all charts from configuration
           (map (fn [config]
                  (let [metric-id (:metric-id config)
                        query-result (get metric-queries metric-id)]
@@ -614,4 +662,27 @@
                        :granularity-config granularity-config
                        :time-window time-window
                        :metadata-key metadata-key})))
-               chart-configs)))))
+               chart-configs))
+
+       ;; Eval metrics section (if any exist)
+       (when (seq eval-chart-configs)
+         ($ :div
+            ;; Section header
+            ($ :h3.text-xl.font-bold.text-gray-900.mt-8.mb-4.border-t.border-gray-200.pt-6
+               "Evaluator Metrics")
+
+            ;; Eval charts grid
+            ($ :div.grid.grid-cols-1.lg:grid-cols-2.gap-6
+               (map (fn [config]
+                      (let [metric-id (:metric-id config)
+                            query-result (get metric-queries metric-id)]
+                        ($ chart-card
+                           {:key (:id config)
+                            :config config
+                            :data (:data query-result)
+                            :loading? (:loading? query-result)
+                            :error (:error query-result)
+                            :granularity-config granularity-config
+                            :time-window time-window
+                            :metadata-key metadata-key})))
+                    eval-chart-configs)))))))
