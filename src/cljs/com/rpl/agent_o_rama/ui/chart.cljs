@@ -5,7 +5,7 @@
    ["react" :refer [useRef useLayoutEffect useEffect]]
    ["uplot" :as uPlot]
    [clojure.string :as str]
-   [com.rpl.specter :as sp :refer [select select-one ALL MAP-KEYS MAP-VALS]]))
+   [com.rpl.specter :as sp :refer [select select-one ALL MAP-KEYS MAP-VALS collect-one]]))
 
 (defhook use-uplot
   "React hook to manage a uPlot chart instance lifecycle.
@@ -233,41 +233,40 @@
   [telemetry-data granularity metadata-key start-time-millis end-time-millis variant variant-opts]
 
   (if (seq telemetry-data)
-    (let [sorted-buckets (sort (keys telemetry-data))
+    (let [;; Extract sorted buckets and timestamps once
+          sorted-buckets (sort (keys telemetry-data))
           timestamps (mapv #(* % granularity) sorted-buckets)
           first-bucket (first sorted-buckets)
           first-bucket-data (get telemetry-data first-bucket)
 
           ;; Detect if data actually has metadata split by checking structure
-          ;; This prevents using stale non-split data with a split metadata-key
-          has-metadata-split? (and metadata-key
-                                   (case variant
-                                     :computed-percentage
-                                     ;; For categorical metrics, check if "success" is at top level (no split)
-                                     ;; vs nested under metadata values (split)
-                                     (let [success-data (get first-bucket-data "success")]
-                                       (not (and success-data
-                                                (map? success-data)
-                                                (contains? success-data (:metric-key variant-opts)))))
-                                     ;; For other variants, check if "_aor/default" is at first level (no split)
-                                     (not (contains? first-bucket-data "_aor/default"))))
+          has-metadata-split? (boolean metadata-key)
 
-          ;; Extract up to 5 unique metadata values from all buckets using Specter
+          ;; Extract metadata values - scan all buckets for unique values
           metadata-values (when has-metadata-split?
                             (vec (take 5 (distinct (select [MAP-VALS MAP-KEYS] telemetry-data)))))
 
-          ;; Helper: extract time series for a path
-          extract-series (fn [path]
-                           (mapv #(select-one path (get telemetry-data %)) sorted-buckets))
+          ;; Declarative extraction using Specter for navigation
+          ;; For time-series, we MUST iterate sorted buckets to align with timestamps
+          ;; But we use Specter for clean path-based value extraction
+          extract-series (fn [path-vec metadata-val]
+                           (mapv (fn [bucket]
+                                   (select-one 
+                                    (vec (concat [bucket] 
+                                                 (when metadata-val [metadata-val])
+                                                 path-vec))
+                                    telemetry-data))
+                                 sorted-buckets))
 
           series-data
           (case variant
             ;; Single metric: one value per bucket
             :single-metric
-            (let [{:keys [metric-key]} variant-opts]
+            (let [{:keys [metric-key]} variant-opts
+                  path ["_aor/default" metric-key]]
               (if has-metadata-split?
-                (mapv (fn [mv] (extract-series [mv "_aor/default" metric-key])) metadata-values)
-                [(extract-series ["_aor/default" metric-key])]))
+                (mapv #(extract-series path %) metadata-values)
+                [(extract-series path nil)]))
 
             ;; Multi-metric: multiple percentiles per bucket
             :multi-metric
@@ -275,20 +274,23 @@
                   sorted-metrics (sort-metrics metrics)]
               (if has-metadata-split?
                 (vec (for [metric sorted-metrics, mv metadata-values]
-                       (extract-series [mv "_aor/default" metric])))
-                (mapv (fn [metric] (extract-series ["_aor/default" metric])) sorted-metrics)))
+                       (extract-series ["_aor/default" metric] mv)))
+                (mapv #(extract-series ["_aor/default" %] nil) sorted-metrics)))
 
             ;; Percentage: single metric scaled to 0-100%
             :percentage
-            (let [{:keys [metric-key]} variant-opts]
+            (let [{:keys [metric-key]} variant-opts
+                  path ["_aor/default" metric-key]]
               (if has-metadata-split?
                 (mapv (fn [mv]
-                        (mapv #(when-let [v (select-one [mv "_aor/default" metric-key] (get telemetry-data %))]
-                                 (* v 100))
+                        (mapv (fn [bucket]
+                                (when-let [v (select-one (vec (concat [bucket mv] path)) telemetry-data)]
+                                  (* v 100)))
                               sorted-buckets))
                       metadata-values)
-                [(mapv #(when-let [v (select-one ["_aor/default" metric-key] (get telemetry-data %))]
-                          (* v 100))
+                [(mapv (fn [bucket]
+                         (when-let [v (select-one (vec (concat [bucket] path)) telemetry-data)]
+                           (* v 100)))
                        sorted-buckets)]))
 
             ;; Multi-category: multiple categories (e.g., input/output/total tokens)
@@ -296,22 +298,21 @@
             (let [{:keys [metric-key categories]} variant-opts]
               (if has-metadata-split?
                 (vec (for [category categories, mv metadata-values]
-                       (extract-series [mv category metric-key])))
-                (mapv (fn [category] (extract-series [category metric-key])) categories)))
+                       (extract-series [category metric-key] mv)))
+                (mapv #(extract-series [% metric-key] nil) categories)))
 
-;; Computed percentage: success/(success+failure)*100
+            ;; Computed percentage: success/(success+failure)*100
             :computed-percentage
             (let [{:keys [metric-key]} variant-opts
-                  compute-pct (fn [bucket-data path]
-                                (let [success (or (select-one (conj path "success" metric-key) bucket-data) 0)
-                                      failure (or (select-one (conj path "failure" metric-key) bucket-data) 0)
+                  compute-pct (fn [bucket mv]
+                                (let [base-path (vec (concat [bucket] (when mv [mv])))
+                                      success (or (select-one (vec (concat base-path ["success" metric-key])) telemetry-data) 0)
+                                      failure (or (select-one (vec (concat base-path ["failure" metric-key])) telemetry-data) 0)
                                       total (+ success failure)]
                                   (when (pos? total) (* (/ success total) 100))))]
               (if has-metadata-split?
-                (mapv (fn [mv]
-                        (mapv #(compute-pct (get telemetry-data %) [mv]) sorted-buckets))
-                      metadata-values)
-                [(mapv #(compute-pct (get telemetry-data %) []) sorted-buckets)])))]
+                (mapv (fn [mv] (mapv #(compute-pct % mv) sorted-buckets)) metadata-values)
+                [(mapv #(compute-pct % nil) sorted-buckets)])))]
 
       {:data (into [timestamps] series-data)
        :metadata-values metadata-values})
