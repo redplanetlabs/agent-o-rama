@@ -68,13 +68,11 @@
   (let [tuples (transform [(view vec) ALL LAST] (fn [s] (constantly s)) tuples)]
     (error-handler-by-type tuples)))
 
-(defn hook:new-tools-agent-options [name options])
-
 (defn new-tools-agent
   ([topology name tools]
    (new-tools-agent topology name tools nil))
   ([topology name tools options]
-   (hook:new-tools-agent-options name options)
+   (tools-impl/hook:new-tools-agent-options name options)
    (let [options (merge {:error-handler (error-handler-default)}
                         options)]
      (h/validate-options! name

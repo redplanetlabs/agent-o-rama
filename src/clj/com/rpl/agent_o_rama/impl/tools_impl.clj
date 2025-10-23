@@ -17,6 +17,8 @@
    [dev.langchain4j.data.message
     ToolExecutionResultMessage]))
 
+(defn hook:new-tools-agent-options [name options])
+
 (def INVALID-ERROR-TEMPLATE
   "Error: %s is not a valid tool, try one of [%s].")
 
