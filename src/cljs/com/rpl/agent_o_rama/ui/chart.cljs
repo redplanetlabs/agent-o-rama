@@ -338,15 +338,21 @@
 
       (into [timestamps] series-data))
 
-    ;; Empty data - return placeholder spanning time window
-    (let [timestamps [(/ start-time-millis 1000) (/ end-time-millis 1000)]
+    ;; Empty data - generate 60 evenly-spaced timestamps to match bucket structure
+    ;; This ensures consistent x-axis rendering with charts that have data
+    (let [start-seconds (/ start-time-millis 1000)
+          end-seconds (/ end-time-millis 1000)
+          ;; Generate 60 evenly-spaced buckets
+          timestamps (mapv (fn [i]
+                             (+ start-seconds (* i (/ (- end-seconds start-seconds) 59))))
+                           (range 60))
           num-series (case variant
                        :single-metric 1
                        :multi-metric (count (:metrics variant-opts))
                        :percentage 1
                        :multi-category (count (:categories variant-opts))
                        :computed-percentage 1)]
-      (into [timestamps] (repeat num-series [nil nil])))))
+      (into [timestamps] (repeat num-series (vec (repeat 60 nil)))))))
 
 (defn- build-series-config
   "Build uPlot series configuration based on variant and data.
