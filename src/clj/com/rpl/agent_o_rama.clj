@@ -63,8 +63,8 @@
 
 (defn agent-topology
   "Creates a topology instance for defining agents, stores, and objects within a module. This function is used to add agents
-   to a regular Rama module defined with [defmodule](https://redplanetlabs.com/clojuredoc/com.rpl.rama.html#var-defmodule). 
-   
+   to a regular Rama module defined with [defmodule](https://redplanetlabs.com/clojuredoc/com.rpl.rama.html#var-defmodule).
+
    The topology provides the configuration context for:
    - Declaring agents with [[new-agent]]
    - Declaring stores: [[declare-key-value-store]], [[declare-document-store]], [[declare-pstate-store]]
@@ -72,11 +72,11 @@
    - Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]
    - Declaring actions: [[declare-action-builder]]
    - Declaring cluster agents: [[declare-cluster-agent]]
-   
+
    Args:
      setup - Rama module setup instance from defmodule parameters
      topologies - Rama module topologies instance from defmodule parameters
-   
+
    Returns:
      agent topology instance"
   [setup topologies]
@@ -323,13 +323,13 @@
 
 (defn underlying-stream-topology
   "Gets the underlying stream topology from an agent topology.
-   
+
    This provides access to the low-level Rama topology for advanced use cases
    that require direct interaction with Rama's stream processing capabilities.
-   
+
    Args:
      at - agent topology instance
-   
+
    Returns:
      the underlying Rama stream topology"
   [^AgentTopology at]
@@ -338,11 +338,11 @@
 (defn define-agents!
   "Finalizes the agent topology definition and prepares it for deployment. This is used when adding agents to a regular Rama module
    with [[agent-topology]].
-   
+
    This function must be called after all agents, stores, and objects have been
    declared on the topology. It validates the configuration and prepares the
    topology for module launch.
-   
+
    Args:
      at - agent topology instance to finalize"
   [^AgentTopology at]
@@ -350,16 +350,16 @@
 
 (defn declare-key-value-store
   "Declares a key-value store in the agent topology.
-   
+
    Key-value stores provide simple typed storage for agent state with automatic
    partitioning and distributed access.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the store that must begin with `$$`(used with [[get-store]])
      key-class - Class for store keys (e.g., String, Long)
      val-class - Class for store values (e.g., String, Object)
-   
+
    Example:
      (declare-key-value-store topology \"$$user-cache\" String UserProfile)"
   [^AgentTopology agent-topology name key-class val-class]
@@ -367,18 +367,18 @@
 
 (defn declare-document-store
   "Declares a document store in the agent topology.
-   
+
    Document stores provide schema-flexible storage for complex nested data
    structures. Each document has a primary key and multiple typed fields
    that can be accessed independently.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the store that must begin with `$$` (used with [[get-store]])
      key-class - Class for document primary keys (e.g., String, Long)
      key-val-classes - Alternating field names (strings) and classes
                        (e.g., \"user-id\" String \"profile\" Object \"preferences\" Map)
-   
+
    Example:
      (declare-document-store topology \"$$user-docs\" String
        :profile UserProfile
@@ -391,17 +391,17 @@
 
 (defn declare-pstate-store
   "Declares a PState store that directly uses Rama's built-in storage.
-   
+
    PState stores are defined as any combination of durable, compound data structures.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the store that must begin with `$$` (used with [[get-store]])
      schema - Rama PState schema definition
-   
+
    Returns:
      PState$Declaration - The PState declaration for further configuration
-   
+
    Example:
      (declare-pstate-store topology \"$$user-stats\" {String (fixed-keys-schema {:a String :b (set-schema Long)})})"
   [^AgentTopology agent-topology name schema]
@@ -409,16 +409,16 @@
 
 (defn declare-agent-object
   "Declares a static agent object that will be shared across all agent executions.
-   
+
    Agent objects are shared resources like AI models, database connections,
    or API clients that agents can access during execution. Static objects
    are created once and reused.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the object (used with get-agent-object)
      val - The object instance to share
-   
+
    Example:
      (declare-agent-object topology \"openai-api-key\" (System/getenv \"OPENAI_API_KEY\"))"
   [^AgentTopology agent-topology name val]
@@ -426,13 +426,13 @@
 
 (defn declare-agent-object-builder
   "Declares an agent object builder that creates objects on-demand during agent execution.
-   
+
    Builder objects are created lazily when first accessed, allowing for
    complex initialization logic and dependency injection. When a node gets an object,
    it gets exclusive access to it. A pool of up to worker-object-limit objects is
    created on demand, except when thread-safe? is set, in which case one object is
    created and shared for all usage within agents.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the object (used with [[get-agent-object]])
@@ -441,7 +441,7 @@
        :thread-safe? - Boolean, whether object is thread-safe (default false)
        :auto-tracing? - Boolean, whether to auto-trace object calls (default true)
        :worker-object-limit - Number, max objects per worker (default 1000)
-   
+
    Example:
      (declare-agent-object-builder topology \"openai-model\"
        (fn [setup]
@@ -461,9 +461,9 @@
 
 (defn declare-evaluator-builder
   "Declares an evaluator builder for creating custom evaluation functions for use in experiments or actions.
-   
+
    Evaluators measure agent performance and can use AI models, databases, or custom logic to score agent outputs.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the evaluator builder
@@ -479,7 +479,7 @@
        :input-path? - Boolean, whether user must specify JSON path to extract input value (default true)
        :output-path? - Boolean, whether user must specify JSON path to extract output value (default true)
        :reference-output-path? - Boolean, whether user must specify JSON path to extract reference output value (default true)
-   
+
    Example:
      (declare-evaluator-builder topology \"length-checker\"
        \"Checks if text meets length criteria\"
@@ -504,10 +504,10 @@
 
 (defn declare-comparative-evaluator-builder
   "Declares a comparative evaluator builder for comparing multiple agent outputs.
-   
+
    Comparative evaluators compare multiple agent outputs against a reference
    to determine which performs better, useful for A/B testing and model selection.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the evaluator builder
@@ -525,7 +525,7 @@
        :input-path? - Boolean, whether user must specify JSON path to extract input value (default true)
        :output-path? - Boolean, whether user must specify JSON path to extract output value (default true)
        :reference-output-path? - Boolean, whether user must specify JSON path to extract reference output value (default true)
-   
+
    Example:
      (declare-comparative-evaluator-builder topology \"quality-ranker\"
        \"Ranks outputs by quality metric\"
@@ -554,10 +554,10 @@
 
 (defn declare-summary-evaluator-builder
   "Declares a summary evaluator builder for evaluating collections of example runs.
-   
+
    Summary evaluators analyze multiple example runs to produce aggregate metrics
    and insights about agent performance across a dataset.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the evaluator builder
@@ -573,7 +573,7 @@
        :input-path? - Boolean, whether user must specify JSON path to extract input value (default true)
        :output-path? - Boolean, whether user must specify JSON path to extract output value (default true)
        :reference-output-path? - Boolean, whether user must specify JSON path to extract reference output value (default true)
-   
+
    Example:
      (declare-summary-evaluator-builder topology \"accuracy-summary\"
        \"Calculates accuracy across multiple examples\"
@@ -605,10 +605,10 @@
 
 (defn declare-action-builder
   "Declares an action builder for creating custom actions that run on agent executions.
-   
+
    Actions are hooks that execute on a sampled subset of live agent runs for
    online evaluation, dataset capture, webhook triggers, or custom logic.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the action builder
@@ -619,7 +619,7 @@
          :description - String description of the parameter
          :default - String default value for the parameter
         :limit-concurrency? - Boolean, whether to limit concurrent executions of the action (e.g. to avoid hitting model rate limits). Concurrency is controlled in the UI by the global action max.limited.actions.concurrency setting (default false)
-   
+
    Example:
      (declare-action-builder topology \"telemetry-exporter\"
        \"Exports agent execution metrics to OpenTelemetry\"
@@ -642,19 +642,19 @@
 
 (defn declare-cluster-agent
   "Declares a reference to an agent from another module.
-   
+
    Mirror agents enable cross-module agent interactions by creating a local
    proxy for an agent defined in a different module. This allows agents
    to invoke other agents across module boundaries.
 
    Subagents are fetched inside agent node functions with [[agent-client]]
-   
+
    Args:
      agent-topology - agent topology instance
      local-name - String name for the local mirror agent
      module-name - String name of the module containing the target agent
      agent-name - String name of the target agent in the remote module
-   
+
    Example:
      (declare-cluster-agent topology \"remote-chat\" \"chat-module\" \"chat-agent\")"
   [^AgentTopology agent-topology local-name module-name agent-name]
@@ -662,13 +662,13 @@
 
 (defn setup-object-name
   "Gets the name of an agent object from its setup context.
-   
+
    Used within agent object builder functions to identify which object
    is being built.
-   
+
    Args:
      setup - setup instance from builder function
-   
+
    Returns:
      String - The name of the object being built"
   [^AgentObjectSetup setup]
@@ -676,23 +676,23 @@
 
 (defn new-agent
   "Creates a new agent graph builder for defining an agent's execution flow.
-   
+
    Returns an object that can be configured with nodes, edges, and
    execution logic. Agents are defined as directed graphs where nodes
    represent computation steps and edges define data flow. Graphs can
    contain loops for iterative processing.
-   
+
    Args:
      agent-topology - agent topology instance
      name - String name for the agent (must be unique within the module)
-   
+
    Returns:
      Builder for configuring the agent's execution graph
-   
+
    Example:
      (-> topology
          (aor/new-agent \"text-processor\")
-         (aor/node \"start\" \"process\" 
+         (aor/node \"start\" \"process\"
            (fn [agent-node input]
              (let [preprocessed (str/trim (str/upper-case input))]
                (aor/emit! agent-node \"process\" preprocessed))))
@@ -705,11 +705,11 @@
 
 (defn node
   "Adds a node to an agent graph created with [[new-agent]] with specified execution logic.
-   
+
    Nodes are the fundamental computation units in agent graphs. Each node
    receives data from upstream nodes and can emit data to downstream nodes
    or return a final result.
-   
+
    Args:
      agent-graph - agent graph builder instance
      name - String name for the node (must be unique within the agent)
@@ -718,7 +718,7 @@
                            inside the node function must target one of these declared nodes.
      node-fn - Function that implements the node logic. Takes (agent-node & args)
                where args come from upstream emissions or agent invocation.
-   
+
    Example:
      (node agent-graph \"process\" \"finalize\"
        (fn [agent-node data]
@@ -729,16 +729,16 @@
 
 (defn agg-start-node
   "Adds an aggregation start node that scopes aggregation within a subgraph.
-   
+
    Aggregation start nodes work like regular nodes but define the beginning
    of an aggregation subgraph. They must have a corresponding [[agg-node]]
    downstream. Within the aggregation subgraph, edges must stay within
    the subgraph and cannot connect to nodes outside of it.
-   
+
    The return value of the node function is passed to the downstream [[agg-node]]
    as its last argument, allowing propagation of non-aggregated information
    downstream post-aggregation.
-   
+
    Args:
      agent-graph - agent graph builder instance
      name - String name for the node
@@ -748,7 +748,7 @@
      node-fn - Function that implements the node logic. Takes (agent-node & args)
                where args come from upstream emissions or agent invocation.
                Return value is passed to downstream [[agg-node]] as last argument.
-   
+
    Example:
      (-> topology
          (aor/new-agent \"data-processor\")
@@ -770,11 +770,11 @@
 
 (defn agg-node
   "Adds an aggregation node that collects and combines results from multiple sources.
-   
+
    Aggregation nodes gather results from parallel processing nodes and combine
    them using a specified aggregation function. They receive both the collected
    results and any metadata from the aggregation start node.
-   
+
    Args:
      agent-graph - agent graph builder instance
      name - String name for the node
@@ -787,7 +787,7 @@
      node-fn - Function that processes the aggregated results. Takes
                (agent-node aggregated-value agg-start-res) where agg-start-res
                is the return value from the corresponding [[agg-start-node]]
-   
+
    Example:
      (-> topology
          (aor/new-agent \"data-processor\")
@@ -810,16 +810,16 @@
 (defn set-update-mode
   "Sets the update mode for an agent graph to control how in-flight agent executions
    are handled after the module is updated.
-   
+
    When a module is updated, in-flight agent executions can be handled in three ways:
    - :continue - Executions continue where they left off with the new agent definition
-   - :restart - Executions restart from the beginning with the new agent definition  
+   - :restart - Executions restart from the beginning with the new agent definition
    - :drop - In-flight executions are dropped and not processed
-   
+
    Args:
      agent-graph - agent graph builder instance
      mode - Update mode keyword: :continue, :restart, or :drop
-   
+
    Example:
      (set-update-mode agent-graph :continue)"
   [^AgentGraph agent-graph mode]
@@ -829,22 +829,22 @@
 
 (defmacro multi-agg
   "Creates an aggregator for use with [[agg-node]] that supports multiple dispatch targets.
-   
+
    The first argument when emitting to the agg node is the dispatch target, which runs the corresponding `on` declaration.
-   
+
    Args:
      body - Forms defining the multi-aggregation:
        (init [bindings] & body) - Returns the initial aggregation value
        (on dispatch-target [agg-value & additional-args] & body) - Handler for each
          dispatch target. Takes the current aggregation value plus additional
          arguments from the emit! call
-   
+
    Example:
      (multi-agg
        (init [] {:sum 0 :texts []})
-       (on \"add\" [acc value] 
+       (on \"add\" [acc value]
          (update acc :sum + value))
-       (on \"text\" [acc text] 
+       (on \"text\" [acc text]
          (update acc :texts conj text)))"
   [& body]
   (let [ret-sym (gensym "ret")]
@@ -869,15 +869,15 @@
 
 (defn emit!
   "Emits data from the current node to the specified target node.
-   
+
    This is the primary mechanism for data flow between nodes in agent graphs.
    Emissions trigger execution of downstream nodes with the provided arguments.
-   
+
    Args:
      agent-node - agent node instance from the current node function
      node - String name of the target node
      args - Arguments to pass to the target node
-   
+
    Example:
      (aor/emit! agent-node \"process\" data)"
   [agent-node node & args]
@@ -885,17 +885,17 @@
 
 (defn result!
   "Sets the final result for the agent that will be displayed in the UI and returned for calls to [[agent-result]] and [[agent-invoke]].
-   
+
    This function signals completion of the agent execution and returns the
    final result to the client. If multiple nodes call `result!` in parallel,
    only the first one will be used as the agent result and others will be
    dropped (first-one-wins behavior). It is mutually exclusive with emit! - a node
    should either emit to other nodes or return a result, not both.
-   
+
    Args:
      agent-node - agent node instance from the current node function
      val - The final result value to return to the client
-   
+
    Example:
      (result! agent-node {:status \"success\" :data processed-data})"
   [agent-node val]
@@ -903,17 +903,17 @@
 
 (defn get-store
   "Gets a store instance for accessing persistent storage within a node.
-   
+
    Stores provide distributed, persistent, replicated storage that agents can use to
    maintain state across executions.
-   
+
    Args:
      agent-node - agent node instance from the current node function
      name - String name of the store (declared with declare-*-store functions)
-   
+
    Returns:
      Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, delete!, etc.)
-   
+
    Example:
      (let [store (get-store agent-node \"$$user-cache\")]
        (store/put! store \"user-123\" user-data)
@@ -923,18 +923,18 @@
 
 (defn get-agent-object
   "Gets a shared agent object (AI models, database clients, etc.) within a node, evaluator, or action function.
-   
+
    Agent objects are shared resources declared in the topology that can be
    accessed by any node. They support automatic lifecycle management and
    connection pooling.
-   
+
    Args:
      fetch - object fetcher instance (agent-node or first argument to evaluator or action function)
      name - String name of the object (declared with declare-agent-object*)
-   
+
    Returns:
      The shared object instance
-   
+
    Example:
      (let [model (get-agent-object agent-node \"openai-model\")]
        (lc4j/chat model messages))"
@@ -943,15 +943,15 @@
 
 (defn stream-chunk!
   "Manually streams a chunk of data from the current node for real-time consumption from agent clients via [[agent-stream]] or [[agent-stream-all]].
-   
+
    Streaming chunks are separate from the agent's final result and allow
    for real-time progress updates and incremental data delivery to clients.
    Chunks are delivered to streaming subscriptions in order.
-   
+
    Args:
      agent-node - agent node instance from the current node function
      chunk - The data chunk to stream (any serializable value)
-   
+
    Example:
      (aor/stream-chunk! agent-node {:progress (count processed) :item item})"
   [^AgentNode agent-node chunk]
@@ -959,11 +959,11 @@
 
 (defn record-nested-op!
   "Records a nested operation for tracing and performance monitoring.
-   
+
    This function is used by the framework to track operations like AI model calls, database queries,
    and external API calls, is viewable in the trace in the UI, and is included in aggregated statistics about
    agent execution.
-   
+
    Args:
      agent-node - agent node instance from the current node function
      nested-op-type - Keyword type of the operation. Must be one of:
@@ -983,24 +983,24 @@
 
 (defn get-human-input
   "Requests human input during agent execution, blocking until response is received.
-   
+
    This function pauses agent execution and requests input from a human user.
    The agent will remain in a waiting state until the human provides a response
    through the client API or web UI. Since nodes run on virtual threads, this is efficient.
-   
+
    Args:
      agent-node - agent node instance from the current node function
      prompt - String prompt to display to the human user
-   
+
    Returns:
      String - The human's response
-   
+
    Example:
      (defn human-yes?
       [agent-node prompt]
       (loop [res (aor/get-human-input agent-node prompt)]
-        (cond (= res "yes") true
-              (= res "no") false
+        (cond (= res \"yes\") true
+              (= res \"no\") false
               :else (recur (aor/get-human-input agent-node \"Please answer 'yes' or 'no'.\")))))"
   [^AgentNode agent-node prompt]
   (.getHumanInput agent-node prompt))
@@ -1009,20 +1009,20 @@
 (defn get-metadata
   "Gets metadata associated with an agent invocation. Can be called from an agent client to get the
    metadata for that invoke, or can be called from within any agent node function.
-   
+
    Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
    parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
    agents by calling [[get-metadata]] within node functions.
-   
+
    Args:
      client - agent client instance
      agent-invoke - agent invoke returned by [[agent-initiate]]
    OR
      agent-node - agent node instance (for accessing within agent execution)
-   
+
    Returns:
      Map - The metadata associated with the invocation or node
-   
+
    Example:
      (get-metadata client agent-invoke)
      (get-metadata agent-node)"
@@ -1036,12 +1036,12 @@
   (if (map? arg1) [arg1 rest-args] [{} args]))
 
 (defmacro agentmodule
-   "Creates an anonymous agent module for packaging agents, stores, and objects into a deployable unit.
-   
+  "Creates an anonymous agent module for packaging agents, stores, and objects into a deployable unit.
+
    An agent module is the top-level container that defines a complete agent system,
    encapsulating all resources needed for distributed agent execution. It provides
    the context for defining agents, stores, and shared objects within a Rama module.
-   
+
    The topology provides the configuration context for:
    - Declaring agents with [[new-agent]]
    - Declaring stores: [[declare-key-value-store]], [[declare-document-store]], [[declare-pstate-store]]
@@ -1049,16 +1049,16 @@
    - Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]
    - Declaring actions: [[declare-action-builder]]
    - Declaring cluster agents: [[declare-cluster-agent]]
-   
+
    Args:
      options - Optional map with configuration:
        :module-name - String name for the module (defaults to auto-generated)
      agent-topology-sym - Symbol for the agent topology binding in the body
      body - Forms that define agents, stores, and objects using the topology
-   
+
    Returns:
      Rama module that can be deployed to a cluster
-   
+
    Example:
      (agentmodule
        [topology]
@@ -1077,12 +1077,12 @@
        ))))
 
 (defmacro defagentmodule
-   "Defines a named agent module for packaging agents, stores, and objects into a deployable unit.
-   
+  "Defines a named agent module for packaging agents, stores, and objects into a deployable unit.
+
    This is a convenience macro that creates a def binding for an agent module,
    automatically setting the module name to the symbol name. It's the primary
    way to define agent modules in most applications.
-   
+
    The topology provides the configuration context for:
    - Declaring agents with [[new-agent]]
    - Declaring stores: [[declare-key-value-store]], [[declare-document-store]], [[declare-pstate-store]]
@@ -1090,16 +1090,16 @@
    - Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]
    - Declaring actions: [[declare-action-builder]]
    - Declaring cluster agents: [[declare-cluster-agent]]
-   
+
    Args:
      sym - Symbol name for the module (becomes the module name)
      options - Optional map with configuration to override the module name
      agent-topology-sym - Symbol for the agent topology binding in the body
      body - Forms that define agents, stores, and objects using the topology
-   
+
    Returns:
      Defines a Rama module that can be deployed to a cluster
-   
+
    Example:
      (defagentmodule BasicAgentModule
        [topology]
@@ -1116,17 +1116,17 @@
 
 (defn agent-manager
   "Creates an agent manager for managing and interacting with deployed agents on a Rama cluster.
-   
+
    The agent manager provides access to agent clients, dataset management,
    and evaluation capabilities for a specific module deployed on a cluster.
-   
+
    Args:
      cluster - Rama cluster instance (IPC or remote cluster)
      module-name - String name of the deployed module
-   
+
    Returns:
      Interface for managing agents and datasets
-   
+
    Example:
      (let [manager (aor/agent-manager ipc \"MyModule\")]
        (aor/agent-client manager \"MyAgent\"))"
@@ -1738,29 +1738,29 @@
        }))))
 
 (defn agent-client
-  "Gets an agent client for interacting with a specific agent either in a client or within an agent node function. 
-   
+  "Gets an agent client for interacting with a specific agent either in a client or within an agent node function.
+
    Agent clients provide the interface for invoking agents, streaming data,
    handling human input, and managing agent executions.
-   
+
    When called from within an agent node function, this enables subagent execution:
    - Can invoke any other agent in the same module (including the current agent)
    - Enables recursive agent execution patterns
    - Enables mutually recursive agent execution between different agents
    - Subagent calls are tracked and displayed in the UI trace
-   
+
    Args:
      agent-client-fetcher - either an agent manager or agent node
      agent-name - String name of the agent
-   
+
    Returns:
      AgentClient - Interface for agent interaction
-   
+
    Example:
      ;; From client code
      (let [client (aor/agent-client manager \"my-agent\")]
        (aor/agent-invoke client \"Hello world\"))
-     
+
      ;; From within an agent node (subagent execution)
      (fn [agent-node input]
        (let [subagent-client (aor/agent-client agent-node \"helper-agent\")
@@ -1771,13 +1771,13 @@
 
 (defn agent-names
   "Gets the names of all available agents in a module.
-   
+
    Args:
      agent-manager - agent manager instance
-   
+
    Returns:
      Set of agent names available in the module
-   
+
    Example:
      (aor/agent-names manager) ; => #{\"ChatAgent\" \"ProcessAgent\" \"ToolsAgent\"}"
   [^AgentManager agent-manager]
@@ -1785,18 +1785,18 @@
 
 (defn agent-invoke
   "Synchronously invokes an agent with the provided arguments.
-   
+
    This function blocks until the agent execution completes and returns
    the final result. For long-running agents, consider using [[agent-initiate]]
    with [[agent-result]] for better control.
-   
+
    Args:
      agent-client - agent client instance
      args - Arguments to pass to the agent
-   
+
    Returns:
      The final result from the agent execution
-   
+
    Example:
      (aor/agent-invoke client \"Hello world\")
      (aor/agent-invoke client {:query \"What is AI?\" :context \"educational\"})"
@@ -1805,17 +1805,17 @@
 
 (defn agent-invoke-async
   "Asynchronously invokes an agent with the provided arguments.
-   
+
    Returns a CompletableFuture that will complete with the agent's result.
    This allows for non-blocking agent execution and better resource utilization.
-   
+
    Args:
      agent-client - agent client instance
      args - Arguments to pass to the agent
-   
+
    Returns:
      CompletableFuture - Future that completes with the agent result
-   
+
    Example:
      (-> (agent-invoke-async client \"Hello world\")
          (.thenAccept println))"
@@ -1824,18 +1824,18 @@
 
 (defn agent-initiate
   "Initiates an agent execution and returns a handle for tracking.
-   
+
    This function starts an agent execution but doesn't wait for completion.
    Use the returned result handle with [[agent-result]], [[agent-next-step]], or
    streaming functions to interact with the running agent.
-   
+
    Args:
      agent-client - agent client instance
      args - Arguments to pass to the agent
-   
+
    Returns:
      \"Agent invoke\" handle for tracking and interacting with the execution
-   
+
    Example:
      (let [invoke (aor/agent-initiate client \"Hello world\")]
        (aor/agent-result client invoke))"
@@ -1844,11 +1844,11 @@
 
 (defn agent-initiate-async
   "Asynchronously initiates an agent execution and returns a CompletableFuture with a handle for tracking.
-   
+
    Args:
      agent-client - agent client instance
      args - Arguments to pass to the agent
-   
+
    Returns:
      CompletableFuture<AgentInvoke> - Future that completes with the handle"
   ^CompletableFuture [agent-client & args]
@@ -1856,19 +1856,19 @@
 
 (defn agent-invoke-with-context-async
   "Asynchronously invokes an agent with context metadata.
-   
+
    Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
    parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
    agents by calling [[get-metadata]] within node functions.
-   
+
    Args:
      agent-client - agent client instance
      context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans
      args - Arguments to pass to the agent
-   
+
    Returns:
      CompletableFuture - Future that completes with the agent result
-   
+
    Example:
      (aor/agent-invoke-with-context-async client
        {:metadata {\"model\" \"openai\"}}
@@ -1878,19 +1878,19 @@
 
 (defn agent-invoke-with-context
   "Synchronously invokes an agent with context metadata.
-   
+
    Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
    parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
    agents by calling [[get-metadata]] within node functions.
-   
+
    Args:
      agent-client - agent client instance
      context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans
      args - Arguments to pass to the agent
-   
+
    Returns:
      The final result from the agent execution
-   
+
    Example:
      (aor/agent-invoke-with-context client
        {:metadata {\"model\" \"openai\"}}
@@ -1900,19 +1900,19 @@
 
 (defn agent-initiate-with-context-async
   "Asynchronously initiates an agent execution with context metadata.
-   
+
    Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
    parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
    agents by calling [[get-metadata]] within node functions.
-   
+
    Args:
      agent-client - agent client instance
      context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans
      args - Arguments to pass to the agent
-   
+
    Returns:
      CompletableFuture<AgentInvoke> - Future that completes with the AgentInvoke handle
-   
+
    Example:
      (aor/agent-initiate-with-context-async client
        {:metadata {\"model\" \"openai\"}}
@@ -1922,19 +1922,19 @@
 
 (defn agent-initiate-with-context
   "Initiates an agent execution with context metadata.
-   
+
    Metadata allows attaching custom key-value data to agent executions. Metadata is an additional optional
    parameter to agent execution, and its also used for analytics. Metadata can be accessed anywhere inside
    agents by calling [[get-metadata]] within node functions.
-   
+
    Args:
      agent-client - agent client instance
      context - Map with single key :metadata containing a map with string keys and values that are strings, numbers, or booleans
      args - Arguments to pass to the agent
-   
+
    Returns:
      AgentInvoke - Handle for tracking and interacting with the execution
-   
+
    Example:
      (aor/agent-initiate-with-context client
        {:metadata {\"model\" \"openai\"}}
@@ -1944,15 +1944,15 @@
 
 (defn agent-fork
   "Creates a fork of an agent execution with modified parameters for specific nodes.
-   
+
    Forking allows creating execution branches with different inputs for testing
    variations or exploring alternative execution paths.
-   
+
    Args:
      agent-client - agent clint instance
      invoke - agent invoke handle to fork from
      node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.
-   
+
    Returns:
     Result of the forked execution"
   [^AgentClient agent-client ^AgentInvoke invoke node-invoke-id->new-args]
@@ -1963,12 +1963,12 @@
 
    Forking allows creating execution branches with different inputs for testing
    variations or exploring alternative execution paths.
-   
+
    Args:
      agent-client - AgentClient instance
      invoke - AgentInvoke instance to fork from
      node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.
-   
+
    Returns:
      CompletableFuture - Future that completes with the result of the forked execution"
   ^CompletableFuture
@@ -1977,12 +1977,12 @@
 
 (defn agent-initiate-fork
   "Initiates a fork of an agent execution without waiting for completion.
-   
+
    Args:
      agent-client - AgentClient instance
      invoke - AgentInvoke instance to fork from
      node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.
-   
+
    Returns:
      New agent invoke handle for the forked execution"
   ^AgentInvoke
@@ -1991,12 +1991,12 @@
 
 (defn agent-initiate-fork-async
   "Asynchronously initiates a fork of an agent execution.
-   
+
    Args:
      agent-client - AgentClient instance
      invoke - AgentInvoke instance to fork from
      node-invoke-id->new-args - Map from node invoke ID (UUID) to new arguments. Node invoke IDs can be found in the trace UI.
-   
+
    Returns:
      Future that completes with the forked agent invoke handle"
   ^CompletableFuture
@@ -2005,18 +2005,18 @@
 
 (defn agent-next-step
   "Gets the next step in an agent execution for step-by-step control.
-   
+
    Returns the next execution step, which is either a human input request or agent result.
    Check which one by calling [[human-input-request?]]. If it's a result, it's a record with
    a key `:result` in it. If the agent fails, it will throw an exception.
-   
+
    Args:
      client - agent client instance
      agent-invoke - agent invoke handle
-   
+
    Returns:
      Either a human input request or agent result record
-   
+
    Example:
      (let [step (agent-next-step client invoke)]
        (if (human-input-request? step)
@@ -2028,18 +2028,18 @@
 
 (defn agent-next-step-async
   "Asynchronously gets the next step in an agent execution.
-   
+
    Returns the next execution step, which is either a human input request or agent result.
    Check which one by calling [[human-input-request?]]. If it's a result, it's a record with
    a key `:result` in it. If the agent fails, it will deliver an exception.
-   
+
    Args:
      client - agent client instance
      agent-invoke - agent invoke handle
-   
+
    Returns:
      CompletableFuture - Future that completes with either a human input request or agent result record
-   
+
    Example:
      (-> (agent-next-step-async client invoke)
          (.thenAccept (fn [step]
@@ -2053,17 +2053,17 @@
 
 (defn set-metadata!
   "Sets metadata on an agent invocation for tracking and debugging.
-   
+
    Note: This only affects metadata visible to external clients and analytics. For agent execution
    within nodes, only the metadata provided at invocation time via [[agent-invoke-with-context]]
    or [[agent-initiate-with-context]] is accessible via [[get-metadata]].
-   
+
    Args:
      client - agent client instance
      agent-invoke - agent invoke handle
      key - String key for the metadata
      value - Value to store (must be a restricted type: int, long, float, double, boolean, or string)
-   
+
    Example:
      (set-metadata! client invoke \"user-id\" \"user-123\")"
   [client agent-invoke key value]
@@ -2071,11 +2071,11 @@
 
 (defn remove-metadata!
   "Removes metadata from an agent invocation.
-   
+
    Note: This only affects metadata visible to external clients and analytics. For agent execution
    within nodes, only the metadata provided at invocation time via [[agent-invoke-with-context]]
    or [[agent-initiate-with-context]] is accessible via [[get-metadata]].
-   
+
    Args:
      client - agent client instance
      agent-invoke - agent invoke handle
@@ -2085,10 +2085,10 @@
 
 (defn human-input-request?
   "Checks if an object returned by [[agent-next-step]] is a human input request.
-   
+
    Args:
      obj - Object to check
-   
+
    Returns:
      Boolean - True if the object is a human input request"
   [obj]
@@ -2096,14 +2096,14 @@
 
 (defn agent-result
   "Gets the final result from an agent execution.
-   
+
    Blocks until the agent execution completes and returns the final result.
    For non-blocking access, use [[agent-result-async]].
-   
+
    Args:
      agent-client - agent client instance
      agent-invoke - agent invoke handle
-   
+
    Returns:
      The final result from the agent execution"
   [agent-client agent-invoke]
@@ -2111,11 +2111,11 @@
 
 (defn agent-result-async
   "Asynchronously gets the final result from an agent execution.
-   
+
    Args:
      agent-client - agent client instance
      agent-invoke - agent invoke handle
-   
+
    Returns:
      CompletableFuture - Future that completes with the agent result"
   ^CompletableFuture [agent-client agent-invoke]
@@ -2123,11 +2123,11 @@
 
 (defn agent-invoke-complete?
   "Checks if an agent invocation has completed.
-   
+
    Args:
      agent-client - agent client instance
      agent-invoke - agent invoke handle
-   
+
    Returns:
      Boolean - True if the invocation has completed"
   [^AgentClient agent-client agent-invoke]
@@ -2135,13 +2135,13 @@
 
 (defn agent-stream
   "Creates a streaming subscription to receive data from a specific node.
-   
+
    Streams data from the first invocation of the specified node during
    agent execution. Useful for real-time monitoring and progress tracking.
-   
+
    The returned object can be deref'd to get the current streamed chunks (list of chunks).
    The returned object can have Closeable/close called on it to immediately stop streaming.
-   
+
    Args:
      agent-client - agent client instance
      agent-invoke - agent invoke handle
@@ -2151,10 +2151,10 @@
                    list of chunks so far, new-chunks are the latest chunks, reset? indicates
                    if the stream was reset because the node failed and retried, and complete?
                    indicates if streaming is finished
-   
+
    Returns:
      Streaming subscription for the node.
-   
+
    Example:
      (aor/agent-stream client invoke \"process-node\"
        (fn [all-chunks new-chunks reset? complete?]
@@ -2169,13 +2169,13 @@
 
 (defn agent-stream-specific
   "Creates a streaming subscription to a specific node invocation.
-   
+
    Streams data from a particular invocation of a node, useful when
    a node is invoked multiple times and you want to track a specific one.
-   
+
    The returned object can be deref'd to get the current streamed chunks (list of chunks).
    The returned object can have Closeable/close called on it to immediately stop streaming.
-   
+
    Args:
      agent-client - agent client instance
      agent-invoke - agent invoke handle
@@ -2186,7 +2186,7 @@
                    list of chunks so far, new-chunks are the latest chunks, reset? indicates
                    if the stream was reset because the node failed and retried, and complete?
                    indicates if streaming is finished
-   
+
    Returns:
      Streaming subscription for the specific node invocation"
   (^AgentStream
@@ -2202,13 +2202,13 @@
 
 (defn agent-stream-all
   "Creates a streaming subscription to all invocations of a specific node.
-   
+
    Streams data from all invocations of the specified node, with chunks
    grouped by invocation ID. Useful for monitoring parallel processing.
-   
+
    The returned object can be deref'd to get the current streamed chunks (map from node invoke ID to chunks).
    The returned object can have Closeable/close called on it to immediately stop streaming.
-   
+
    Args:
      agent-client - agent client instance
      agent-invoke - agent invoke handle
@@ -2218,10 +2218,10 @@
                    node invoke ID to complete list of chunks, new-chunks are the latest chunks
                    grouped by invoke ID, reset-invoke-ids indicates if any nodes invokes in this iteration failed and retried,
                    and complete? indicates if streaming is finished across all nodes invocations for the full agent execution.
-   
+
    Returns:
      Streaming subscription for all node invocations
-   
+
    Example:
      (aor/agent-stream-all client invoke \"process-node\"
        (fn [all-chunks new-chunks reset-invoke-ids complete?]
@@ -2237,16 +2237,16 @@
 
 (defn agent-stream-reset-info
   "Gets reset information from a streaming subscription.
-   
+
    Returns reset information based on the stream type:
    - For streams created with [[agent-stream]] or [[agent-stream-specific]]: Number of resets
    - For streams created with [[agent-stream-all]]: Map from node invoke ID to reset count
-   
+
    Resets occur due to nodes failing and retrying.
-   
+
    Args:
      stream - return from [[agent-stream]], [[agent-stream-all]], or [[agent-stream-specific]]
-   
+
    Returns:
      Number or Map - Reset count for single streams, or map of invoke ID to reset count for stream-all"
   [stream]
@@ -2260,17 +2260,17 @@
 
 (defn pending-human-inputs
   "Gets all pending human input requests for an agent invocation handle.
-   
+
    Returns a collection of request objects that are waiting
    for human responses to continue agent execution.
-   
+
    Args:
      client - agent client instance
      agent-invoke - agent invoke handle
-   
+
    Returns:
      Collection - Pending human input requests. Each request has fields `:node` and `:prompt` to get the node name making the request and the prompt.
-   
+
    Example:
      (let [requests (aor/pending-human-inputs client invoke)]
        (doseq [request requests]
@@ -2280,11 +2280,11 @@
 
 (defn pending-human-inputs-async
   "Asynchronously gets all pending human input requests for an agent invocation.
-   
+
    Args:
      client - agent client instance
      agent-invoke - agent invoke handle
-   
+
    Returns:
      CompletableFuture - Future with pending requests. Each request has fields `:node` and `:prompt` to get the node name making the request and the prompt."
   ^CompletableFuture
@@ -2293,15 +2293,15 @@
 
 (defn provide-human-input
   "Provides a human response to a pending human input request.
-   
+
    This function sends a response to continue agent execution
    that was paused waiting for human input.
-   
+
    Args:
      client - agent client instance
      request - request object from [[pending-human-inputs]] or [[agent-next-step]]
      response - String response from the human
-   
+
    Example:
      (aor/provide-human-input agent-client request \"yes\")"
   [^AgentClient client request response]
@@ -2309,12 +2309,12 @@
 
 (defn provide-human-input-async
   "Asynchronously provides a human response to a pending human input request.
-   
+
    Args:
      client - agent client instance
      request - request object from [[pending-human-inputs]] or [[agent-next-step]]
      response - String response from the human
-   
+
    Returns:
      CompletableFuture - Future that completes when the response is processed"
   ^CompletableFuture
@@ -2324,10 +2324,10 @@
 
 (defn create-dataset!
   "Creates a new dataset for agent testing and evaluation.
-   
+
    Datasets are collections of input/output examples used for testing
    agent performance, running experiments, and regression testing.
-   
+
    Args:
      manager - agent manager instance
      name - String name for the dataset
@@ -2335,10 +2335,10 @@
        :description - String description of the dataset
        :input-json-schema - JSON schema for input validation
        :output-json-schema - JSON schema for output validation
-   
+
    Returns:
      UUID of the created dataset
-   
+
    Example:
      (aor/create-dataset! agent-manager \"test-cases\"
        {:description \"Basic test cases\"
@@ -2360,7 +2360,7 @@
 
 (defn set-dataset-name!
   "Updates the name of an existing dataset.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2370,7 +2370,7 @@
 
 (defn set-dataset-description!
   "Updates the description of an existing dataset.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2380,7 +2380,7 @@
 
 (defn destroy-dataset!
   "Permanently deletes a dataset and all its examples.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset to delete"
@@ -2389,7 +2389,7 @@
 
 (defn add-dataset-example-async!
   "Asynchronously adds an example to a dataset. Fails and throws exception of input or output violates the dataset's JSON schemas.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2397,7 +2397,7 @@
      options - Optional map with configuration:
        :reference-output - Expected output for the example
        :tags - Set of tags for categorization
-   
+
    Returns:
      CompletableFuture<UUID> - Future that completes with the example UUID"
   (^CompletableFuture [manager dataset-id input]
@@ -2407,16 +2407,16 @@
 
 (defn add-dataset-example!
   "Adds an example to a dataset for testing and evaluation. Fails and throws exception of input or output violates the dataset's JSON schemas.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
      input - Input data for the example
      options - Optional map with configuration (same as add-dataset-example-async!)
-   
+
    Returns:
      UUID of the added example
-   
+
    Example:
      (aor/add-dataset-example! agent-manager dataset-id
        {:query \"What is AI?\" :context \"educational\"}
@@ -2429,7 +2429,7 @@
 
 (defn set-dataset-example-input!
   "Updates the input data for a specific dataset example.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2450,7 +2450,7 @@
 
 (defn set-dataset-example-reference-output!
   "Updates the reference output for a specific dataset example.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2475,7 +2475,7 @@
 
 (defn remove-dataset-example!
   "Removes a specific example from a dataset.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2494,7 +2494,7 @@
 
 (defn add-dataset-example-tag!
   "Adds a tag to a specific dataset example for categorization.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2515,7 +2515,7 @@
 
 (defn remove-dataset-example-tag!
   "Removes a tag from a specific dataset example.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2536,7 +2536,7 @@
 
 (defn snapshot-dataset!
   "Creates a snapshot of a dataset at its current state.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2547,7 +2547,7 @@
 
 (defn remove-dataset-snapshot!
   "Removes a specific snapshot from a dataset.
-   
+
    Args:
      manager - agent manager instance
      dataset-id - UUID of the dataset
@@ -2557,12 +2557,12 @@
 
 (defn search-datasets
   "Searches for datasets by name or description.
-   
+
    Args:
      manager - agent manager instance
      search-string - String to search for in names and descriptions
      limit - Maximum number of results to return
-   
+
    Returns:
      Map - Map from dataset UUID to dataset name"
   [^AgentManager manager search-string limit]
@@ -2570,7 +2570,7 @@
 
 (defn create-evaluator!
   "Creates an evaluator instance from a builder for measuring agent performance in experiments or actions.
-   
+
    Args:
      manager - agent manager instance
      name - String name for the evaluator
@@ -2581,7 +2581,7 @@
        :input-json-path - JSON path to extract input from runs
        :output-json-path - JSON path to extract output from runs
        :reference-output-json-path - JSON path to extract reference output from runs
-   
+
    Example:
      (aor/create-evaluator! agent-manager \"brief-check\" \"aor/conciseness\"
        {\"threshold\" \"150\"} \"Checks if response is under 150 characters\")"
@@ -2607,7 +2607,7 @@
 
 (defn remove-evaluator!
   "Removes an evaluator from the system.
-   
+
    Args:
      manager - agent manager instance
      name - String name of the evaluator to remove"
@@ -2616,11 +2616,11 @@
 
 (defn search-evaluators
   "Searches for evaluators by name or description.
-   
+
    Args:
      manager - agent manager instance
      search-string - String to search for in evaluator names
-   
+
    Returns:
      Set - Set of matching evaluator names"
   [^AgentManager manager search-string]
@@ -2628,14 +2628,14 @@
 
 (defn try-evaluator
   "Tests an evaluator on a single sample input / reference output / output.
-   
+
    Args:
      manager - agent manager instance
      name - String name of the evaluator
      input - Input data for the evaluation
      reference-output - Reference output for comparison
      output - Actual output to evaluate
-   
+
    Returns:
      Map - Result scores from score name to score value"
   [^AgentManager manager name input reference-output output]
@@ -2643,14 +2643,14 @@
 
 (defn try-comparative-evaluator
   "Tests a comparative evaluator on multiple outputs.
-   
+
    Args:
      manager - agent manager instance
      name - String name of the evaluator
      input - Input data for the evaluation
      reference-output - Reference output for comparison
      outputs - Collection of actual outputs to compare
-   
+
    Returns:
      Map - Comparative evaluation result, a map of score name to score value"
   [^AgentManager manager name input reference-output outputs]
@@ -2658,12 +2658,12 @@
 
 (defn mk-example-run
   "Creates an example run for summary evaluation with [[try-summary-evaluator]].
-   
+
    Args:
      input - Input data for the example
      reference-output - Expected output
      output - Actual output
-   
+
    Returns:
      Example run instance for summary evaluation"
   [input reference-output output]
@@ -2671,12 +2671,12 @@
 
 (defn try-summary-evaluator
   "Tests a summary evaluator on a collection of example runs.
-   
+
    Args:
      manager - agent manager instance
      name - String name of the evaluator
      example-runs - Collection of example runs created with [[mk-example-run]]
-   
+
    Returns:
      Map - Summary evaluation result with aggregate metrics, a map from score name to score value"
   [^AgentManager manager name example-runs]
@@ -2684,19 +2684,19 @@
 
 (defn start-ui
   "Starts the Agent-o-rama web UI for monitoring and debugging.
-   
+
    The UI provides real-time visualization of agent execution, traces,
    datasets, experiments, and telemetry. Accessible via web browser.
-   
+
    Args:
      ipc - In-Process Cluster instance
      options - Optional map with configuration:
        :port - Port number for the UI (default 1974)
        :host - Host address to bind to (default \"localhost\")
-   
+
    Returns:
      UI instance that should be closed when done
-   
+
    Example:
      (with-open [ui (aor/start-ui ipc {:port 8080})]
        (run-agents))"
