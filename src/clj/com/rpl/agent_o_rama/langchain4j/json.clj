@@ -1,10 +1,7 @@
 (ns com.rpl.agent-o-rama.langchain4j.json
   "JSON schema builders for LangChain4j structured outputs and tool specifications.\n
 \n
-This namespace provides Clojure-friendly functions for building JSON schemas\n
-used throughout LangChain4j for structured outputs, tool parameter definitions,\n
-and response formatting. These schemas ensure models return data in predictable\n
-formats and enable type-safe tool calling."
+This namespace provides Clojure-friendly functions for building JSON schemas used throughout LangChain4j for structured outputs, tool parameter definitions, and response formatting. These schemas ensure models return data in predictable formats and enable type-safe tool calling."
   (:refer-clojure :exclude [boolean int])
   (:require
    [com.rpl.agent-o-rama.impl.helpers :as h])
@@ -26,15 +23,14 @@ formats and enable type-safe tool calling."
 (defn any-of
   "Creates a JSON schema that accepts any of the provided schema types.\n
 \n
-This is useful for union types where a field can be one of several\n
-different types or values.\n
+This is useful for union types where a field can be one of several different types or values.\n
 \n
 Args:\n
-  elems - Collection of JsonSchema objects that are valid alternatives\n
-  description - Optional string description of the schema\n
+  - elems - Collection of JsonSchema objects that are valid alternatives
+  - description - Optional string description of the schema
 \n
 Returns:\n
-  JsonAnyOfSchema - Schema that accepts any of the provided types\n
+  - JsonAnyOfSchema - Schema that accepts any of the provided types
 \n
 Example:\n
 <pre>
@@ -42,7 +38,6 @@ Example:\n
 (lj/any-of \"ID can be string or number\"
            [(lj/string \"String identifier\")
             (lj/number \"Numeric identifier\")])
-
 ;; Field can be any of several enum values
 (lj/any-of [(lj/enum \"Status\" [\"active\" \"inactive\"])
             (lj/null)])
@@ -58,17 +53,16 @@ Example:\n
   "Creates a JSON schema for arrays with a specific item type.\n
 \n
 Args:\n
-  item-schema - JsonSchema object defining the type of array elements\n
-  description - Optional string description of the array\n
+  - item-schema - JsonSchema object defining the type of array elements
+  - description - Optional string description of the array
 \n
 Returns:\n
-  JsonArraySchema - Schema for arrays with the specified item type\n
+  - JsonArraySchema - Schema for arrays with the specified item type
 \n
 Example:\n
 <pre>
 ;; Array of strings
 (lj/array \"List of tags\" (lc4j/string \"A tag\"))
-
 ;; Array of objects
 (lj/array \"List of users\"
           (lj/object {\"name\" (lc4j/string)
@@ -85,10 +79,10 @@ Example:\n
   "Creates a JSON schema for boolean values.\n
 \n
 Args:\n
-  description - Optional string description of the boolean field\n
+  - description - Optional string description of the boolean field
 \n
 Returns:\n
-  JsonBooleanSchema - Schema for boolean values\n
+  - JsonBooleanSchema - Schema for boolean values
 \n
 Example:\n
 <pre>
@@ -105,17 +99,16 @@ Example:\n
   "Creates a JSON schema for enumerated values.\n
 \n
 Args:\n
-  vals - Collection of valid string values\n
-  description - Optional string description of the enum\n
+  - vals - Collection of valid string values
+  - description - Optional string description of the enum
 \n
 Returns:\n
-  JsonEnumSchema - Schema that accepts only the specified values\n
+  - JsonEnumSchema - Schema that accepts only the specified values
 \n
 Example:\n
 <pre>
 ;; Status field with specific values
 (lj/enum \"User status\" [\"active\" \"inactive\" \"pending\"])
-
 ;; Priority levels
 (lj/enum [\"low\" \"medium\" \"high\" \"critical\"])
 </pre>"
@@ -130,10 +123,10 @@ Example:\n
   "Creates a JSON schema for integer values.\n
 \n
 Args:\n
-  description - Optional string description of the integer field\n
+  - description - Optional string description of the integer field
 \n
 Returns:\n
-  JsonIntegerSchema - Schema for integer values\n
+  - JsonIntegerSchema - Schema for integer values
 \n
 Example:\n
 <pre>
@@ -150,7 +143,7 @@ Example:\n
   "Creates a JSON schema for null values.\n
 \n
 Returns:\n
-  JsonNullSchema - Schema that only accepts null\n
+  - JsonNullSchema - Schema that only accepts null
 \n
 Example:\n
 <pre>
@@ -166,10 +159,10 @@ Example:\n
   "Creates a JSON schema for numeric values (integers and floats).\n
 \n
 Args:\n
-  description - Optional string description of the number field\n
+  - description - Optional string description of the number field
 \n
 Returns:\n
-  JsonNumberSchema - Schema for numeric values\n
+  - JsonNumberSchema - Schema for numeric values
 \n
 Example:\n
 <pre>
@@ -188,22 +181,21 @@ Example:\n
 This is the most commonly used schema type for structured data.\n
 \n
 Args:\n
-  name->schema - Map from property names (strings) to their JsonSchema definitions\n
-  options - Optional configuration map or string description:\n
-    :description - String description of the object\n
-    :required - Collection of required property names\n
-    :definitions - Map of reusable schema definitions\n
-    :additional-properties? - Boolean, whether additional properties are allowed\n
+  - name->schema - Map from property names (strings) to their JsonSchema definitions
+  - options - Optional configuration map or string description:
+    - :description - String description of the object
+    - :required - Collection of required property names
+    - :definitions - Map of reusable schema definitions
+    - :additional-properties? - Boolean, whether additional properties are allowed
 \n
 Returns:\n
-  JsonObjectSchema - Schema for objects with the specified properties\n
+  - JsonObjectSchema - Schema for objects with the specified properties
 \n
 Example:\n
 <pre>
 ;; Simple object
 (lj/object {\"name\" (lj/string \"User name\")
             \"age\" (lj/int \"User age\")})
-
 ;; Complex object with options\n
 (lj/object
   {:description \"User profile with required fields\"
@@ -214,7 +206,6 @@ Example:\n
    \"email\" (lj/string \"Email address\")
    \"preferences\" (lj/object {\"theme\" (lj/enum [\"light\" \"dark\"])
                              \"notifications\" (lj/boolean)})})
-
 ;; With string description
 (lj/object \"Simple user object\"
            {\"id\" (lj/string)
@@ -243,20 +234,18 @@ Example:\n
 (defn reference
   "Creates a JSON schema reference to a definition.\n
 \n
-References are used to avoid duplicating schema definitions and\n
-enable recursive schemas.\n
+References are used to avoid duplicating schema definitions and enable recursive schemas.\n
 \n
 Args:\n
-  ref - String reference path (e.g., \"#/$defs/User\")\n
+  - ref - String reference path (e.g., \"#/$defs/User\")
 \n
 Returns:\n
-  JsonReferenceSchema - Schema that references another definition\n
+  - JsonReferenceSchema - Schema that references another definition
 \n
 Example:\n
 <pre>
 ;; Reference to a definition
 (lj/reference \"#/$defs/User\")
-
 ;; Self-reference for recursive structures
 (lj/object {\"value\" (lj/string)
             \"children\" (lj/array (lj/reference \"#\")})
@@ -270,10 +259,10 @@ Example:\n
   "Creates a JSON schema for string values.\n
 \n
 Args:\n
-  description - Optional string description of the string field\n
+  - description - Optional string description of the string field
 \n
 Returns:\n
-  JsonStringSchema - Schema for string values\n
+  - JsonStringSchema - Schema for string values
 \n
 Example:\n
 <pre>

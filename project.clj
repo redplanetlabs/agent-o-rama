@@ -78,8 +78,7 @@
                          [clj-kondo "2025.09.22"]]}
              :examples {:test-paths   ["examples/clj/test"]
                         :source-paths ["examples/clj/src"]}
-             :provided {:dependencies
-                        [[com.rpl/rama "1.2.0"]]}
+             :provided {:dependencies [[com.rpl/rama "0.0.6-open-fields-SNAPSHOT"]]}
              :gen      {:prep-tasks   []
                         :source-paths ["scripts"]
                         :dependencies [[comb "0.1.1"]
