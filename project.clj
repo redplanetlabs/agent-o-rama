@@ -102,7 +102,9 @@
           :output-path  "target/doc"
           :namespaces   [com.rpl.agent-o-rama
                          com.rpl.agent-o-rama.langchain4j
+                         com.rpl.agent-o-rama.langchain4j.json
                          com.rpl.agent-o-rama.store
+                         com.rpl.agent-o-rama.throttled-logging
                          com.rpl.agent-o-rama.tools]}
   :aliases {"test-all" ["with-profile" "+examples" "test"]}
   :plugins [[lein-exec "0.3.7"]
