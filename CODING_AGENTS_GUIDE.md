@@ -473,39 +473,44 @@ Aggregators can be written to return early, which causes aggregation to immediat
 
 #### Java API
 
-TODO: this java example should be written as a class that implements RamaAccumulatorAgg. just base it on EarlySumAccum.java in the tests
 ```java
+import com.rpl.agentorama.FinishedAgg;
+import com.rpl.rama.ops.RamaAccumulatorAgg1;
+
 // Custom aggregator that stops when sum exceeds 100
-RamaAccumulatorAgg<Integer, Integer> sumUntil100 = new RamaAccumulatorAgg<Integer, Integer>() {
+public class SumUntil100 implements RamaAccumulatorAgg1<Integer, Integer> {
   @Override
-  public Integer init() {
+  public Integer initVal() {
     return 0;
   }
 
   @Override
-  public Object update(Integer state, Integer value) {
-    int newSum = state + value;
+  public Integer accumulate(Integer curr, Integer value) {
+    Integer newSum = curr + value;
     if (newSum > 100) {
       return new FinishedAgg(newSum); // Stop aggregating early
     }
     return newSum;
   }
-};
+}
 ```
 
 #### Clojure API
 
-TODO: this should be a def that makes an accumulator... look in the tests for basically this exact example
 ```clojure
 ;; Custom aggregator that stops when sum exceeds 100
-(defn sum-until-100-agg []
-  (aggs/accumulator-agg
-   (init [] 0)
-   (update [state value]
-     (let [new-sum (+ state value)]
-       (if (> new-sum 100)
-         (reduced new-sum) ; Stop aggregating early
-         new-sum)))))
+(def +sum-until-100
+  (accumulator
+   (fn [v]
+     (term (fn [curr]
+             (let [ret (+ curr v)]
+               (if (> ret 100)
+                 (reduced ret) ; Stop aggregating early
+                 ret
+               ))
+           )))
+   :init-fn
+   (constantly 0)))
 ```
 
 ## Agent Objects
