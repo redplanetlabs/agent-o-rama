@@ -120,6 +120,71 @@
                (get metric-order k 999)) ; Unknown metrics go to end
              metrics)))
 
+(defui metrics-selector
+  "A dropdown component for selecting which metrics to display.
+  
+  Props:
+  - :available-metrics - Set of all available metrics (e.g., #{:min :max 0.5 0.9 0.99})
+  - :selected-metrics - Set of currently selected metrics
+  - :on-change - Function called with new set of selected metrics"
+  [{:keys [available-metrics selected-metrics on-change]}]
+  (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
+        
+        ;; Close dropdown when clicking outside
+        _ (uix/use-effect
+           (fn []
+             (when dropdown-open?
+               (let [handle-click (fn [e]
+                                    (set-dropdown-open false))]
+                 (.addEventListener js/document "click" handle-click)
+                 (fn []
+                   (.removeEventListener js/document "click" handle-click))))
+             js/undefined)
+           #js [dropdown-open?])
+        
+        ;; Helper to format metric label
+        format-metric-label (fn [m]
+                              (cond
+                                (keyword? m) (name m)
+                                (number? m) (str "p" (int (* m 100)))
+                                :else (str m)))
+        
+        ;; Toggle metric selection
+        toggle-metric (fn [metric]
+                        (let [new-selection (if (contains? selected-metrics metric)
+                                              (if (> (count selected-metrics) 1) ; Don't allow deselecting all
+                                                (disj selected-metrics metric)
+                                                selected-metrics)
+                                              (conj selected-metrics metric))]
+                          (when on-change
+                            (on-change new-selection))))]
+    
+    ($ :div.relative
+       ($ :button.px-3.py-1.text-sm.border.border-gray-300.rounded.bg-white.hover:bg-gray-50.flex.items-center.gap-2
+          {:on-click (fn [e]
+                       (.preventDefault e)
+                       (.stopPropagation e)
+                       (set-dropdown-open not))}
+          "Metrics"
+          ($ :svg.w-4.h-4 {:xmlns "http://www.w3.org/2000/svg" :viewBox "0 0 20 20" :fill "currentColor"}
+             ($ :path {:fill-rule "evenodd" :d "M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" :clip-rule "evenodd"})))
+       
+       ;; Dropdown menu
+       (when dropdown-open?
+         ($ :div.absolute.right-0.mt-1.w-48.bg-white.border.border-gray-300.rounded-md.shadow-lg.z-10
+            {:on-click (fn [e] (.stopPropagation e))}
+            ($ :div.py-1
+               (for [metric (sort-metrics available-metrics)]
+                 ($ :label.flex.items-center.px-3.py-2.hover:bg-gray-100.cursor-pointer
+                    {:key (str metric)}
+                    ($ :input.mr-2
+                       {:type "checkbox"
+                        :checked (contains? selected-metrics metric)
+                        :on-change (fn [e]
+                                     (.stopPropagation e)
+                                     (toggle-metric metric))})
+                    ($ :span.text-sm.text-gray-700 (format-metric-label metric))))))))))
+
 (defn- prepare-analytics-data
   "Transform analytics data into uPlot format.
   
@@ -216,7 +281,21 @@
   - :title - Chart title (optional)
   - :y-label - Y-axis label (optional)"
   [{:keys [data granularity metrics metadata-key start-time-millis end-time-millis width height title y-label]}]
-  (let [metrics (or metrics #{:min :max 0.5 0.9 0.99})
+  (let [;; All available metrics
+        all-metrics #{:min :max 0.5 0.9 0.99}
+        
+        ;; State for selected metrics (default to just p50 when metadata split is active)
+        [selected-metrics set-selected-metrics] (uix/use-state #{0.5})
+        
+        ;; Determine which metrics to show:
+        ;; - If metrics prop provided, use that (backward compatibility)
+        ;; - If metadata-key is active, use selected metrics (default p50)
+        ;; - Otherwise show all metrics
+        metrics-to-show (or metrics
+                            (if metadata-key
+                              selected-metrics
+                              all-metrics))
+        
         height (or height 300)
 
         ;; Container ref to measure width
@@ -224,8 +303,8 @@
 
         ;; Transform data for uPlot
         chart-data (uix/use-memo
-                    (fn [] (prepare-analytics-data data granularity metrics metadata-key start-time-millis end-time-millis))
-                    [data granularity metrics metadata-key start-time-millis end-time-millis])
+                    (fn [] (prepare-analytics-data data granularity metrics-to-show metadata-key start-time-millis end-time-millis))
+                    [data granularity metrics-to-show metadata-key start-time-millis end-time-millis])
 
         ;; Define series configurations with nice colors
         metric-colors {:min "#10b981" ; green
@@ -248,7 +327,7 @@
                                                      bucket-values (keys (get data bucket))]
                                                  (recur (rest remaining-buckets)
                                                         (into collected-values (take (- 5 (count collected-values)) bucket-values))))))
-                       sorted-metrics (sort-metrics metrics)]
+                       sorted-metrics (sort-metrics metrics-to-show)]
                    (vec (mapcat
                          (fn [metric-key]
                            (map
@@ -275,7 +354,7 @@
                      :width 2
                      :points {:show true :size 4}
                      :spanGaps true})
-                  (sort-metrics metrics)))
+                  (sort-metrics metrics-to-show)))
 
         ;; Build uPlot options for time-series (size will be set dynamically)
         options (uix/use-memo
@@ -337,13 +416,23 @@
                  ;; Cleanup
                  (fn []
                    (.removeEventListener js/window "resize" handle-resize)))))
-           [width height chart-data])] ; Add chart-data to re-run resize when data changes
+           [width height chart-data])]
 
     ($ :div.w-full
        {:ref container-ref}
-       (when title
-         ($ :h4.text-base.font-medium.text-gray-700.mb-3 title))
-;; Add style tag for vertical legend layout
+       ;; Header with title and metrics selector (only when metadata split is active)
+       ($ :div.flex.items-center.justify-between.mb-3
+          (when title
+            ($ :h4.text-base.font-medium.text-gray-700 title))
+          
+          ;; Metrics selector dropdown (only show when metadata-key is active)
+          (when metadata-key
+            ($ metrics-selector
+               {:available-metrics all-metrics
+                :selected-metrics selected-metrics
+                :on-change set-selected-metrics})))
+
+       ;; Add style tag for vertical legend layout
        ($ :style ".uplot-vertical-legend .u-legend { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
                   .uplot-vertical-legend .u-legend .u-series { display: flex; align-items: center; gap: 8px; }
                   .uplot-vertical-legend .u-legend .u-series > * { display: inline-block; }
