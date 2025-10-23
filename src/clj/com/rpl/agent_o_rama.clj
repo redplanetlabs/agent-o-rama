@@ -2448,35 +2448,37 @@ Returns:\n
    (c/add-dataset-example-async! manager dataset-id input options)))
 
 (defn add-dataset-example!
-  "Adds an example to a dataset for testing and evaluation. Fails and throws exception of input or output violates the dataset's JSON schemas.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     input - Input data for the example
-     options - Optional map with configuration (same as add-dataset-example-async!)
-
-   Returns:
-     UUID of the added example
-
-   Example:
-     (aor/add-dataset-example! agent-manager dataset-id
-       {:query \"What is AI?\" :context \"educational\"}
-       {:reference-output \"AI is artificial intelligence...\"
-        :tags #{\"basic\" \"ai\"}})"
+  "Adds an example to a dataset for testing and evaluation. Fails and throws exception of input or output violates the dataset's JSON schemas.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  input - Input data for the example\n
+  options - Optional map with configuration (same as add-dataset-example-async!)\n
+\n
+Returns:\n
+  UUID of the added example\n
+\n
+Example:\n
+<pre>
+(aor/add-dataset-example! agent-manager dataset-id
+  {:query \"What is AI?\" :context \"educational\"}
+  {:reference-output \"AI is artificial intelligence...\"
+   :tags #{\"basic\" \"ai\"}})
+</pre>"
   ([manager dataset-id input]
    (c/add-dataset-example! manager dataset-id input))
   ([^AgentManager manager dataset-id input options]
    (c/add-dataset-example! manager dataset-id input options)))
 
 (defn set-dataset-example-input!
-  "Updates the input data for a specific dataset example.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     example-id - UUID of the example
-     input - New input data for the example"
+  "Updates the input data for a specific dataset example.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  example-id - UUID of the example\n
+  input - New input data for the example"
   ([manager dataset-id example-id input]
    (set-dataset-example-input! manager dataset-id example-id input nil))
   ([^AgentManager manager dataset-id example-id input options]
@@ -2491,13 +2493,13 @@ Returns:\n
                             input)))
 
 (defn set-dataset-example-reference-output!
-  "Updates the reference output for a specific dataset example.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     example-id - UUID of the example
-     reference-output - New reference output for the example"
+  "Updates the reference output for a specific dataset example.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  example-id - UUID of the example\n
+  reference-output - New reference output for the example"
   ([manager dataset-id example-id reference-output]
    (set-dataset-example-reference-output! manager
                                           dataset-id
@@ -2516,12 +2518,12 @@ Returns:\n
                                       reference-output)))
 
 (defn remove-dataset-example!
-  "Removes a specific example from a dataset.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     example-id - UUID of the example to remove"
+  "Removes a specific example from a dataset.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  example-id - UUID of the example to remove"
   ([manager dataset-id example-id]
    (remove-dataset-example! manager dataset-id example-id nil))
   ([^AgentManager manager dataset-id example-id options]
@@ -2535,13 +2537,13 @@ Returns:\n
                           example-id)))
 
 (defn add-dataset-example-tag!
-  "Adds a tag to a specific dataset example for categorization.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     example-id - UUID of the example
-     tag - String tag to add"
+  "Adds a tag to a specific dataset example for categorization.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  example-id - UUID of the example\n
+  tag - String tag to add"
   ([manager dataset-id example-id tag]
    (add-dataset-example-tag! manager dataset-id example-id tag nil))
   ([^AgentManager manager dataset-id example-id tag options]
@@ -2556,13 +2558,13 @@ Returns:\n
                           tag)))
 
 (defn remove-dataset-example-tag!
-  "Removes a tag from a specific dataset example.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     example-id - UUID of the example
-     tag - String tag to remove"
+  "Removes a tag from a specific dataset example.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  example-id - UUID of the example\n
+  tag - String tag to remove"
   ([manager dataset-id example-id tag]
    (remove-dataset-example-tag! manager dataset-id example-id tag nil))
   ([^AgentManager manager dataset-id example-id tag options]
@@ -2577,56 +2579,58 @@ Returns:\n
                              tag)))
 
 (defn snapshot-dataset!
-  "Creates a snapshot of a dataset at its current state.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     from-snapshot - String name of the source snapshot (or nil for current)
-     to-snapshot - String name for the new snapshot"
+  "Creates a snapshot of a dataset at its current state.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  from-snapshot - String name of the source snapshot (or nil for current)\n
+  to-snapshot - String name for the new snapshot"
   [^AgentManager manager dataset-id from-snapshot to-snapshot]
   (.snapshotDataset manager dataset-id from-snapshot to-snapshot))
 
 (defn remove-dataset-snapshot!
-  "Removes a specific snapshot from a dataset.
-
-   Args:
-     manager - agent manager instance
-     dataset-id - UUID of the dataset
-     snapshot-name - String name of the snapshot to remove"
+  "Removes a specific snapshot from a dataset.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  dataset-id - UUID of the dataset\n
+  snapshot-name - String name of the snapshot to remove"
   [^AgentManager manager dataset-id snapshot-name]
   (.removeDatasetSnapshot manager dataset-id snapshot-name))
 
 (defn search-datasets
-  "Searches for datasets by name or description.
-
-   Args:
-     manager - agent manager instance
-     search-string - String to search for in names and descriptions
-     limit - Maximum number of results to return
-
-   Returns:
-     Map - Map from dataset UUID to dataset name"
+  "Searches for datasets by name or description.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  search-string - String to search for in names and descriptions\n
+  limit - Maximum number of results to return\n
+\n
+Returns:\n
+  Map - Map from dataset UUID to dataset name"
   [^AgentManager manager search-string limit]
   (.searchDatasets manager search-string limit))
 
 (defn create-evaluator!
-  "Creates an evaluator instance from a builder for measuring agent performance in experiments or actions.
-
-   Args:
-     manager - agent manager instance
-     name - String name for the evaluator
-     builder-name - String name of the evaluator builder (declared in topology or built-in)
-     params - Map of parameters for the evaluator. Parameters are a map from parameter name to parameter value, both strings.
-     description - String description of what the evaluator measures
-     options - Optional map with configuration:
-       :input-json-path - JSON path to extract input from runs
-       :output-json-path - JSON path to extract output from runs
-       :reference-output-json-path - JSON path to extract reference output from runs
-
-   Example:
-     (aor/create-evaluator! agent-manager \"brief-check\" \"aor/conciseness\"
-       {\"threshold\" \"150\"} \"Checks if response is under 150 characters\")"
+  "Creates an evaluator instance from a builder for measuring agent performance in experiments or actions.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  name - String name for the evaluator\n
+  builder-name - String name of the evaluator builder (declared in topology or built-in)\n
+  params - Map of parameters for the evaluator. Parameters are a map from parameter name to parameter value, both strings.\n
+  description - String description of what the evaluator measures\n
+  options - Optional map with configuration:\n
+    :input-json-path - JSON path to extract input from runs\n
+    :output-json-path - JSON path to extract output from runs\n
+    :reference-output-json-path - JSON path to extract reference output from runs\n
+\n
+Example:\n
+<pre>
+(aor/create-evaluator! agent-manager \"brief-check\" \"aor/conciseness\"
+  {\"threshold\" \"150\"} \"Checks if response is under 150 characters\")
+</pre>"
   ([^AgentManager manager name builder-name params description]
    (create-evaluator! manager name builder-name params description nil))
   ([^AgentManager manager name builder-name params description options]
@@ -2648,100 +2652,102 @@ Returns:\n
                        joptions))))
 
 (defn remove-evaluator!
-  "Removes an evaluator from the system.
-
-   Args:
-     manager - agent manager instance
-     name - String name of the evaluator to remove"
+  "Removes an evaluator from the system.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  name - String name of the evaluator to remove"
   [^AgentManager manager name]
   (.removeEvaluator manager name))
 
 (defn search-evaluators
-  "Searches for evaluators by name or description.
-
-   Args:
-     manager - agent manager instance
-     search-string - String to search for in evaluator names
-
-   Returns:
-     Set - Set of matching evaluator names"
+  "Searches for evaluators by name or description.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  search-string - String to search for in evaluator names\n
+\n
+Returns:\n
+  Set - Set of matching evaluator names"
   [^AgentManager manager search-string]
   (.searchEvaluators manager search-string))
 
 (defn try-evaluator
-  "Tests an evaluator on a single sample input / reference output / output.
-
-   Args:
-     manager - agent manager instance
-     name - String name of the evaluator
-     input - Input data for the evaluation
-     reference-output - Reference output for comparison
-     output - Actual output to evaluate
-
-   Returns:
-     Map - Result scores from score name to score value"
+  "Tests an evaluator on a single sample input / reference output / output.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  name - String name of the evaluator\n
+  input - Input data for the evaluation\n
+  reference-output - Reference output for comparison\n
+  output - Actual output to evaluate\n
+\n
+Returns:\n
+  Map - Result scores from score name to score value"
   [^AgentManager manager name input reference-output output]
   (.tryEvaluator manager name input reference-output output))
 
 (defn try-comparative-evaluator
-  "Tests a comparative evaluator on multiple outputs.
-
-   Args:
-     manager - agent manager instance
-     name - String name of the evaluator
-     input - Input data for the evaluation
-     reference-output - Reference output for comparison
-     outputs - Collection of actual outputs to compare
-
-   Returns:
-     Map - Comparative evaluation result, a map of score name to score value"
+  "Tests a comparative evaluator on multiple outputs.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  name - String name of the evaluator\n
+  input - Input data for the evaluation\n
+  reference-output - Reference output for comparison\n
+  outputs - Collection of actual outputs to compare\n
+\n
+Returns:\n
+  Map - Comparative evaluation result, a map of score name to score value"
   [^AgentManager manager name input reference-output outputs]
   (.tryComparativeEvaluator manager name input reference-output outputs))
 
 (defn mk-example-run
-  "Creates an example run for summary evaluation with [[try-summary-evaluator]].
-
-   Args:
-     input - Input data for the example
-     reference-output - Expected output
-     output - Actual output
-
-   Returns:
-     Example run instance for summary evaluation"
+  "Creates an example run for summary evaluation with [[try-summary-evaluator]].\n
+\n
+Args:\n
+  input - Input data for the example\n
+  reference-output - Expected output\n
+  output - Actual output\n
+\n
+Returns:\n
+  Example run instance for summary evaluation"
   [input reference-output output]
   (aor-types/->ExampleRunImpl input reference-output output))
 
 (defn try-summary-evaluator
-  "Tests a summary evaluator on a collection of example runs.
-
-   Args:
-     manager - agent manager instance
-     name - String name of the evaluator
-     example-runs - Collection of example runs created with [[mk-example-run]]
-
-   Returns:
-     Map - Summary evaluation result with aggregate metrics, a map from score name to score value"
+  "Tests a summary evaluator on a collection of example runs.\n
+\n
+Args:\n
+  manager - agent manager instance\n
+  name - String name of the evaluator\n
+  example-runs - Collection of example runs created with [[mk-example-run]]\n
+\n
+Returns:\n
+  Map - Summary evaluation result with aggregate metrics, a map from score name to score value"
   [^AgentManager manager name example-runs]
   (.trySummaryEvaluator manager name example-runs))
 
 (defn start-ui
-  "Starts the Agent-o-rama web UI for monitoring and debugging.
-
-   The UI provides real-time visualization of agent execution, traces,
-   datasets, experiments, and telemetry. Accessible via web browser.
-
-   Args:
-     ipc - In-Process Cluster instance
-     options - Optional map with configuration:
-       :port - Port number for the UI (default 1974)
-       :host - Host address to bind to (default \"localhost\")
-
-   Returns:
-     UI instance that should be closed when done
-
-   Example:
-     (with-open [ui (aor/start-ui ipc {:port 8080})]
-       (run-agents))"
+  "Starts the Agent-o-rama web UI for monitoring and debugging.\n
+\n
+The UI provides real-time visualization of agent execution, traces,\n
+datasets, experiments, and telemetry. Accessible via web browser.\n
+\n
+Args:\n
+  ipc - In-Process Cluster instance\n
+  options - Optional map with configuration:\n
+    :port - Port number for the UI (default 1974)\n
+    :host - Host address to bind to (default \"localhost\")\n
+\n
+Returns:\n
+  UI instance that should be closed when done\n
+\n
+Example:\n
+<pre>
+(with-open [ui (aor/start-ui ipc {:port 8080})]
+  (run-agents))
+</pre>"
   (^AutoCloseable [ipc] (start-ui ipc nil))
   (^AutoCloseable [ipc options]
    (let [start-fn (requiring-resolve
