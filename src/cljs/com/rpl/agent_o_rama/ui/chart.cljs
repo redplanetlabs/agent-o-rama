@@ -252,9 +252,9 @@
                                      ;; For other variants, check if "_aor/default" is at first level (no split)
                                      (not (contains? first-bucket-data "_aor/default"))))
 
-          ;; Extract up to 5 metadata values using Specter
+          ;; Extract up to 5 unique metadata values from all buckets using Specter
           metadata-values (when has-metadata-split?
-                            (vec (take 5 (select [first-bucket MAP-KEYS] telemetry-data))))
+                            (vec (take 5 (distinct (select [MAP-VALS MAP-KEYS] telemetry-data)))))
 
           ;; Helper: extract time series for a path
           extract-series (fn [path]
