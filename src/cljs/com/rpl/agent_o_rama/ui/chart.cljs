@@ -390,20 +390,23 @@
                 metrics)))
 
       :percentage
-      (if (seq metadata-values)
-        (mapv (fn [idx mv]
-                {:label (str mv)
-                 :stroke (get series-colors idx "#6b7280")
-                 :width 2
-                 :points {:show true :size 4}
-                 :spanGaps true})
-              (range)
-              metadata-values)
-        [{:label "Success Rate"
-          :stroke (or color "#10b981")
-          :width 2
-          :points {:show true :size 4}
-          :spanGaps true}])
+      (let [pct-formatter (fn [_self v] (when v (str (int v) "%")))]
+        (if (seq metadata-values)
+          (mapv (fn [idx mv]
+                  {:label (str mv)
+                   :stroke (get series-colors idx "#6b7280")
+                   :width 2
+                   :points {:show true :size 4}
+                   :spanGaps true
+                   :value pct-formatter})
+                (range)
+                metadata-values)
+          [{:label "Success Rate"
+            :stroke (or color "#10b981")
+            :width 2
+            :points {:show true :size 4}
+            :spanGaps true
+            :value pct-formatter}]))
 
       :multi-category
       (let [{:keys [categories]} variant-opts]
@@ -428,20 +431,23 @@
                 categories)))
 
       :computed-percentage
-      (if (seq metadata-values)
-        (mapv (fn [idx mv]
-                {:label (str mv)
-                 :stroke (get series-colors idx "#6b7280")
-                 :width 2
-                 :points {:show true :size 4}
-                 :spanGaps true})
-              (range)
-              metadata-values)
-        [{:label "Success Rate"
-          :stroke (or color "#10b981")
-          :width 2
-          :points {:show true :size 4}
-          :spanGaps true}]))))
+      (let [pct-formatter (fn [_self v] (when v (str (int v) "%")))]
+        (if (seq metadata-values)
+          (mapv (fn [idx mv]
+                  {:label (str mv)
+                   :stroke (get series-colors idx "#6b7280")
+                   :width 2
+                   :points {:show true :size 4}
+                   :spanGaps true
+                   :value pct-formatter})
+                (range)
+                metadata-values)
+          [{:label "Success Rate"
+            :stroke (or color "#10b981")
+            :width 2
+            :points {:show true :size 4}
+            :spanGaps true
+            :value pct-formatter}])))))
 
 (defui analytics-chart
   "Unified analytics chart component that handles all chart variants.
