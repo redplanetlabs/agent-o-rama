@@ -1,7 +1,6 @@
 (defproject com.rpl/agent-o-rama-examples "1.0.0-SNAPSHOT"
   ;; TODO: fix agent-o-rama version
-  :dependencies [[org.clojure/clojure "1.12.2"]
-                 [com.rpl/agent-o-rama "0.9.0-SNAPSHOT"]
+  :dependencies [[com.rpl/agent-o-rama "0.5.0-SNAPSHOT"]
                  [dev.langchain4j/langchain4j-open-ai "1.4.0"]
                  [dev.langchain4j/langchain4j-web-search-engine-tavily
                   "1.4.0-beta10"]]
@@ -30,6 +29,7 @@
                         :jvm-opts       ["-Xss6m"]}
              :provided {:dependencies
                         [[com.rpl/rama "1.2.0"]
+                         [org.clojure/clojure "1.12.2"]
                          [org.apache.logging.log4j/log4j-slf4j2-impl
                           "2.25.1"]]}
              :test     {:resource-paths ["test/resources/"]
