@@ -3,6 +3,7 @@
 (defproject com.rpl/agent-o-rama VERSION
   :source-paths ["src/clj" "src/cljs" "resource"]
   :java-source-paths ["src/java"]
+  :aot [com.rpl.agent-o-rama.impl.ui.launch]
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"
              "-Xms6g"

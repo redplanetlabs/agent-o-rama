@@ -88,4 +88,4 @@ echo "Starting Agent-o-rama UI on port $PORT..."
 echo "Rama root: $RAMA_ROOT"
 echo ""
 
-java -cp "$CLASSPATH" com.rpl.agent-o-rama.impl.ui.core "$PORT"
+java -cp "$CLASSPATH" com.rpl.agent-o-rama.impl.ui.launch "$PORT"

@@ -1,17 +1,17 @@
 #!/bin/sh
 
+VERSION=$(cat VERSION)
+
 rm -rf _release
 rm -rf target
 mkdir _release
 
-lein jar
-cp target/agent-o-rama*jar _release/agent-o-rama.jar
-cp VERSION _release/
 cp scripts/aor _release/
+cp VERSION _release/
 
 sh scripts/build-ui.sh
-cp -r resource _release/
-rm -rf _release/resource/clj-kondo.exports
+lein jar
+cp target/agent-o-rama*jar _release/agent-o-rama.jar
 
 # gather all dependency jars into the lib subdir
 mkdir _release/lib
