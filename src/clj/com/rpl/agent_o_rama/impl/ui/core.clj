@@ -14,7 +14,8 @@
     AutoCloseable]
    [java.util.concurrent
     ScheduledThreadPoolExecutor
-    TimeUnit]))
+    TimeUnit])
+  (:gen-class))
 
 (defn refresh-agent-modules! []
   (let [rama-client (ui/get-object :rama-client)
@@ -100,3 +101,11 @@
           (read-line))
         (stop-ui)
         :closed)))))
+
+(defn -main
+  "Main entry point for the Agent-o-rama UI"
+  [port]
+  (let [port (Long/parseLong port)
+        cluster-manager (open-cluster-manager {"conductor.host" "localhost"})]
+    (cljlogging/info "Starting Agent-o-rama UI...")
+    (start-ui cluster-manager {:port port})))
