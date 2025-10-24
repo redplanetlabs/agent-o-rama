@@ -1,4 +1,4 @@
-# Coding Agents in Agent-O-Rama
+# Coding Agents in Agent-o-rama
 
 This page explains how to code agents with Agent-o-rama. All examples are shown in both Java and Clojure.
 
@@ -11,7 +11,10 @@ This page explains how to code agents with Agent-o-rama. All examples are shown 
 5. [Agent Objects](#agent-objects)
 6. [Stores](#stores)
 7. [Subagents and Recursion](#subagents-and-recursion)
-8. [Advanced Patterns](#advanced-patterns)
+8. [Human Input](#human-input)
+9. [Streaming Data](#streaming-data)
+10. [Deploying Modules](#deploying-modules)
+11. [Updating Modules](#updating-modules)
 
 ## Basic Concepts
 
@@ -19,7 +22,7 @@ Agent-o-rama is a library for building AI agents as directed graphs. Nodes are t
 
 Agent-o-rama captures all inputs, nested operations (e.g. model calls or database operations), and outputs from each node for viewing in the web UI. This information is also used and for to produce and display aggregated analytics about individual agent executions and time-series analytics for all agent executions.
 
-Besides tracing, nodes are also the granularity at which streaming is consumed by agent clients. Things like calls to Langchain4j models are automatically streamed for the node, and node functionsd can explicitly stream chunks back as well. This is discussed more on the [agent client](TODO) page.
+Besides tracing, nodes are also the granularity at which streaming is consumed by agent clients. Things like calls to [Langchain4j](https://docs.langchain4j.dev/) models are automatically streamed for the node, and node functionsd can explicitly stream chunks back as well. This is discussed more on the [agent client](TODO) page.
 
 ### Key Components
 
@@ -665,11 +668,9 @@ topology.declareAgentObjectBuilder("blocking-model", setup -> {
 
 ## Stores
 
-Stores provide persistent data access for agents, enabling them to maintain state across invocations and share data between different agent executions. There are three types of stores optimized for different use cases.
+Real agents need to remember information, maintain user sessions, cache results, and share data between executions. Agent-o-rama stores provide persistent data access for agents, enabling them to maintain state across invocations and share data between different agent executions. Stores are built-in and are high-performance, durable, scalable, and replicated. Because they're built-in, they require no additional work for deployment or configuration. While it's easy to use databases from Agent-o-rama, it's usually much more convenient and higher performance to just use a store.
 
-### Why Stores Matter
-
-Real agents need to remember information, maintain user sessions, cache results, and share data between executions. Stores provide efficient, persistent storage that integrates seamlessly with the agent execution model.
+There are three types of stores available in Agent-o-rama: key-value store, document store, and [PState](https://redplanetlabs.com/docs/~/pstates.html) store. Stores are declared as part of the agent module definition, and store names always begin with `$$`. Stores are fetched within agent nodes by calling `getStore`.
 
 ### Key-Value Store Example
 
@@ -679,30 +680,27 @@ Key-value stores are perfect for simple data like counters, flags, or cached val
 
 ```java
 public class KeyValueStoreModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.declareKeyValueStore("$$counters", String.class, Long.class);
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.declareKeyValueStore("$$counters", String.class, Integer.class);
 
-        topology.newAgent("KeyValueStoreAgent")
-            .node("manage-counter", null, (AgentNode agentNode, Map<String, Object> data) -> {
-                KeyValueStore<String, Long> store = agentNode.getStore("$$counters");
-                String counterName = (String) data.get("counter-name");
-                String operation = (String) data.get("operation");
-
-                switch (operation) {
-                    case "get":
-                        Long value = store.get(counterName);
-                        agentNode.result(Map.of("counter", counterName, "value", value));
-                        break;
-                    case "increment":
-                        Long currentValue = store.get(counterName);
-                        if (currentValue == null) currentValue = 0L;
-                        store.put(counterName, currentValue + 1);
-                        agentNode.result(Map.of("counter", counterName, "new-value", currentValue + 1));
-                        break;
-                }
+    topology.newAgent("KeyValueStoreAgent")
+            .node("manage-counter", null, (AgentNode agentNode, String counterName, String operation) -> {
+              KeyValueStore<String, Integer> store = agentNode.getStore("$$counters");
+              switch (operation) {
+                  case "get":
+                      Integer value = store.get(counterName);
+                      agentNode.result(Map.of("counter", counterName, "value", value));
+                      break;
+                  case "increment":
+                      Integer currentValue = store.get(counterName);
+                      if (currentValue == null) currentValue = 0;
+                      store.put(counterName, currentValue + 1);
+                      agentNode.result(Map.of("counter", counterName, "new-value", currentValue + 1));
+                      break;
+              }
             });
-    }
+  }
 }
 ```
 
@@ -717,7 +715,7 @@ public class KeyValueStoreModule extends AgentModule {
       (aor/node
        "manage-counter"
        nil
-       (fn [agent-node {:keys [counter-name operation]}]
+       (fn [agent-node counter-name operation]
          (let [store (aor/get-store agent-node "$$counters")]
            (case operation
              "get"
@@ -726,46 +724,45 @@ public class KeyValueStoreModule extends AgentModule {
              (let [current-value (or (store/get store counter-name) 0)
                    new-value (inc current-value)]
                (store/put! store counter-name new-value)
-               (aor/result! agent-node {:counter counter-name :new-value new-value})))))))
+               (aor/result! agent-node {:counter counter-name :new-value new-value}))))))))
 ```
 
 ### Document Store Example
 
-Document stores are ideal for structured data with multiple fields, like user profiles or configuration objects.
+Document stores are essentially key-value stores where the values are maps with their own schema for each field. You can perform operations on individual nested values without reading or writing the entire document. This is ideal for structured data with multiple fields, like user profiles.
 
 #### Java API
 
 ```java
 public class DocumentStoreModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.declareDocumentStore("$$user-profiles", String.class,
-                                     "name", String.class,
-                                     "age", Long.class,
-                                     "preferences", Object.class);
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.declareDocumentStore("$$user-profiles", String.class,
+                                   "name", String.class,
+                                   "age", Long.class);
 
-        topology.newAgent("DocumentStoreAgent")
+    topology.newAgent("DocumentStoreAgent")
             .node("update-profile", "read-profile", (AgentNode agentNode, Map<String, Object> data) -> {
-                DocumentStore store = agentNode.getStore("$$user-profiles");
-                String userId = (String) data.get("user-id");
-                Map<String, Object> updates = (Map<String, Object>) data.get("updates");
+              DocumentStore store = agentNode.getStore("$$user-profiles");
+              String userId = (String) data.get("user-id");
+              Map<String, Object> updates = (Map<String, Object>) data.get("updates");
 
-                if (updates.containsKey("name")) {
-                    store.putDocumentField(userId, "name", updates.get("name"));
-                }
-                if (updates.containsKey("age")) {
-                    store.putDocumentField(userId, "age", updates.get("age"));
-                }
+              if (updates.containsKey("name")) {
+                store.putDocumentField(userId, "name", updates.get("name"));
+              }
+              if (updates.containsKey("age")) {
+                store.putDocumentField(userId, "age", updates.get("age"));
+              }
 
-                agentNode.emit("read-profile", userId);
+              agentNode.emit("read-profile", userId);
             })
             .node("read-profile", null, (AgentNode agentNode, String userId) -> {
-                DocumentStore store = agentNode.getStore("$$user-profiles");
-                String name = store.getDocumentField(userId, "name");
-                Long age = store.getDocumentField(userId, "age");
-                agentNode.result(Map.of("user-id", userId, "name", name, "age", age));
+              DocumentStore store = agentNode.getStore("$$user-profiles");
+              String name = store.getDocumentField(userId, "name");
+              Long age = store.getDocumentField(userId, "age");
+              agentNode.result(Map.of("user-id", userId, "name", name, "age", age));
             });
-    }
+  }
 }
 ```
 
@@ -776,8 +773,7 @@ public class DocumentStoreModule extends AgentModule {
   [topology]
   (aor/declare-document-store topology "$$user-profiles" String
                               "name" String
-                              "age" Long
-                              "preferences" Object)
+                              "age" Long)
 
   (-> (aor/new-agent topology "DocumentStoreAgent")
       (aor/node
@@ -795,54 +791,253 @@ public class DocumentStoreModule extends AgentModule {
          (let [store (aor/get-store agent-node "$$user-profiles")
                name (store/get-document-field store user-id "name")
                age (store/get-document-field store user-id "age")]
-           (aor/result! agent-node {:user-id user-id :name name :age age})))))
+           (aor/result! agent-node {:user-id user-id :name name :age age}))))))
+```
+
+### PState Store Example
+
+PState stores provide direct access to Rama's [PStates](https://redplanetlabs.com/docs/~/pstates.html). PStates are declared as any combination of data structures of any size with any amount of nesting. PState stores are extremely flexible and are used when you need more sophisticated structures than key-value or document stores provide, such as nested maps, lists with subindexing, or complex hierarchical data.
+
+#### Java API
+
+```java
+import com.rpl.rama.Path;
+import com.rpl.rama.PState;
+
+public class PStateStoreModule extends AgentModule {
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    // Declare PState store with nested schema
+    topology.declarePStateStore(
+      "$$user-data",
+      PState.mapSchema(
+        String.class,  // user-id
+        PState.fixedKeysSchema(
+          "age", Integer.class,
+          "memories", PState.listSchema(String.class).subindexed())));
+
+    topology.newAgent("PStateStoreAgent")
+            .node("update-user", "read-user", (AgentNode agentNode, Map<String, Object> data) -> {
+              PStateStore store = agentNode.getStore("$$user-data");
+              String userId = (String) data.get("user-id");
+              Integer age = (Integer) data.get("age");
+              String memory = (String) data.get("memory");
+
+              // Update age if provided
+              if (age != null) {
+                store.transform(userId, Path.key(userId, "age").termVal(age));
+              }
+
+              // Append memory if provided
+              if (memory != null) {
+                store.transform(userId, Path.key(userId, "memories").afterElem().termVal(memory));
+              }
+
+              agentNode.emit("read-user", userId);
+            })
+            .node("read-user", null, (AgentNode agentNode, String userId) -> {
+              PStateStore store = agentNode.getStore("$$user-data");
+
+              // Read age
+              Integer age = (Integer) store.selectOne(Path.key(userId, "age"));
+
+              // Read all memories
+              List<String> memories = store.select(Path.key(userId, "memories").all());
+
+              agentNode.result(Map.of("user-id", userId, "age", age, "memories", memories));
+            });
+  }
+}
+```
+
+#### Clojure API
+
+```clojure
+(require '[com.rpl.rama.path :as path])
+
+(aor/defagentmodule PStateStoreModule
+  [topology]
+  ;; Declare PState store with nested schema
+  (aor/declare-pstate-store
+   topology
+   "$$user-data"
+   {String (fixed-keys-schema
+            {:age Long
+             :memories (vector-schema String {:subindex? true})})})
+
+  (-> topology
+      (aor/new-agent "PStateStoreAgent")
+      (aor/node
+       "update-user"
+       "read-user"
+       (fn [agent-node {:keys [user-id age memory]}]
+         (let [store (aor/get-store agent-node "$$user-data")]
+           ;; Update age if provided
+           (when age
+             (store/pstate-transform!
+              [(path/keypath user-id :age) (path/termval age)]
+              store
+              user-id))
+
+           ;; Append memory if provided
+           (when memory
+             (store/pstate-transform!
+              [(path/keypath user-id :memories) AFTER-ELEM (path/termval memory)]
+              store
+              user-id))
+
+           (aor/emit! agent-node "read-user" user-id))))
+      (aor/node
+       "read-user"
+       nil
+       (fn [agent-node user-id]
+         (let [store (aor/get-store agent-node "$$user-data")
+               ;; Read age using path
+               age (store/pstate-select-one (path/keypath user-id :age) store user-id)
+               ;; Read all memories using path
+               memories (store/pstate-select [(path/keypath user-id :memories) ALL] store user-id)]
+           (aor/result! agent-node {:user-id user-id :age age :memories memories}))))))
 ```
 
 ## Subagents and Recursion
 
-Agents can call other agents (subagents) within the same module or across modules, enabling recursive and mutually recursive patterns. This is essential for building complex agent hierarchies and implementing recursive algorithms.
-
-### Why Subagents Matter
+Agents can call other agents within the same module or across modules, including recursively and mutually recursively. This makes it trivial to orchestrate complex applications consisting of many agents working together.
 
 Real-world systems often need to break down complex tasks into smaller, manageable pieces. Subagents enable this decomposition while maintaining the benefits of the agent execution model. They also enable recursive patterns for algorithms that naturally decompose into smaller instances of the same problem.
 
+### Calling Agents in the Same Module
+
+The simplest form of subagent invocation is calling another agent within the same module. You get an agent client within node functions and invoke them directly. Subagent calls are also tracked in traces and incorporated into agent analytics.
+
+#### Java API
+
+```java
+public class SubagentModule extends AgentModule {
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    // Helper agent that processes text
+    topology.newAgent("TextProcessor")
+            .node("process", null, (AgentNode agentNode, String text) -> {
+              String processed = text.toUpperCase();
+              agentNode.result(processed);
+            });
+
+    // Main agent that uses the helper
+    topology.newAgent("MainAgent")
+            .node("orchestrate", null, (AgentNode agentNode, String input) -> {
+              AgentClient processor = agentNode.getAgentClient("TextProcessor");
+              String result = processor.invoke(input);
+              agentNode.result("Processed: " + result);
+            });
+  }
+}
+```
+
+#### Clojure API
+
+```clojure
+(aor/defagentmodule SubagentModule
+  [topology]
+  ;; Helper agent that processes text
+  (-> topology
+      (aor/new-agent "TextProcessor")
+      (aor/node
+       "process"
+       nil
+       (fn [agent-node text]
+         (aor/result! agent-node (str/upper-case text)))))
+
+  ;; Main agent that uses the helper
+  (-> topology
+      (aor/new-agent "MainAgent")
+      (aor/node
+       "orchestrate"
+       nil
+       (fn [agent-node input]
+         (let [processor (aor/agent-client agent-node "TextProcessor")
+               result (aor/agent-invoke processor input)]
+           (aor/result! agent-node (str "Processed: " result)))))))
+```
+
+### Recursive Agent Invocation
+
+Agents can call themselves recursively, enabling elegant implementations of recursive algorithms.
+
+#### Java API
+
+```java
+public class RecursiveModule extends AgentModule {
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("Factorial")
+            .node("compute", null, (AgentNode agentNode, Integer n) -> {
+              if (n <= 1) {
+                agentNode.result(1);
+              } else {
+                AgentClient self = agentNode.getAgentClient("Factorial");
+                Integer subResult = (Integer) self.invoke(n - 1);
+                agentNode.result(n * subResult);
+              }
+            });
+  }
+}
+```
+
+#### Clojure API
+
+```clojure
+(aor/defagentmodule RecursiveModule
+  [topology]
+  (-> topology
+      (aor/new-agent "Factorial")
+      (aor/node
+       "compute"
+       nil
+       (fn [agent-node n]
+         (if (<= n 1)
+           (aor/result! agent-node 1)
+           (let [self (aor/agent-client agent-node "Factorial")
+                 sub-result (aor/agent-invoke self (dec n))]
+             (aor/result! agent-node (* n sub-result))))))))
+```
+
 ### Cross-Module Agent Calls
 
-This example shows how one agent can call another agent in a different module.
+This example shows how one agent can call another agent in a different module. The agent from the other module is declared and given a local name with `declareClusterAgent`.
 
 #### Java API
 
 ```java
 // Module 1: Greeter agent
 public class GreeterModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.newAgent("Greeter")
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("Greeter")
             .node("greet", null, (AgentNode agentNode, String name) -> {
-                agentNode.result("Hello, " + name + "!");
+              agentNode.result("Hello, " + name + "!");
             });
-    }
+  }
 }
 
 // Module 2: Mirror agent that calls Greeter
 public class MirrorModule extends AgentModule {
-    private final String greeterModuleName;
+  private final String greeterModuleName;
 
-    public MirrorModule(String greeterModuleName) {
-        this.greeterModuleName = greeterModuleName;
-    }
+  public MirrorModule(String greeterModuleName) {
+    this.greeterModuleName = greeterModuleName;
+  }
 
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.declareClusterAgent("GreeterMirror", greeterModuleName, "Greeter");
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.declareClusterAgent("GreeterMirror", new GreeterModule().getModuleName(), "Greeter");
 
-        topology.newAgent("MirrorAgent")
+    topology.newAgent("MirrorAgent")
             .node("process", null, (AgentNode agentNode, String name) -> {
                 AgentClient greeterClient = agentNode.getAgentClient("GreeterMirror");
                 String greeting = (String) greeterClient.invoke(name);
                 agentNode.result("Mirror says: " + greeting);
             });
-    }
+  }
 }
 ```
 
@@ -861,163 +1056,200 @@ public class MirrorModule extends AgentModule {
          (aor/result! agent-node (str "Hello, " name "!"))))))
 
 ;; Module 2: Mirror agent that calls Greeter
-(defn create-mirror-module [greeter-module-name]
-  (aor/agentmodule
-   [topology]
-   (aor/declare-cluster-agent topology "GreeterMirror" greeter-module-name "Greeter")
+(aor/defagentmodule MirrorModule
+ [topology]
+ (aor/declare-cluster-agent topology "GreeterMirror" (get-module-name GreeterModule) "Greeter")
 
-   (-> topology
-       (aor/new-agent "MirrorAgent")
-       (aor/node
-        "process"
-        nil
-        (fn [agent-node name]
-          (let [greeter-client (aor/agent-client agent-node "GreeterMirror")
-                greeting (aor/agent-invoke greeter-client name)]
-            (aor/result! agent-node (str "Mirror says: " greeting))))))))
+ (-> topology
+     (aor/new-agent "MirrorAgent")
+     (aor/node
+      "process"
+      nil
+      (fn [agent-node name]
+        (let [greeter-client (aor/agent-client agent-node "GreeterMirror")
+              greeting (aor/agent-invoke greeter-client name)]
+          (aor/result! agent-node (str "Mirror says: " greeting)))))))
 ```
 
-### Recursive Agent Patterns
+## Deploying Modules
 
-This example shows how agents can implement recursive algorithms.
+Once you've defined your agents, you need to deploy them to a Rama cluster. Agent-o-rama modules are Rama modules, so they follow the standard Rama deployment process. For deploying a Rama cluster, consult the Rama docs on [setting up a cluster](https://redplanetlabs.com/docs/~/operating-rama.html#_setting_up_a_rama_cluster). There are also one-click deploys available [for AWS](https://github.com/redplanetlabs/rama-aws-deploy) and [for Azure](https://github.com/redplanetlabs/rama-azure-deploy).
+
+### Local Development
+
+For local development and testing, you can use `InProcessCluster` which runs everything in a single JVM process. This is perfect for development and doesn't require any cluster setup.
 
 #### Java API
 
 ```java
-public class RecursiveAgentModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.newAgent("RecursiveAgent")
-            .node("process", null, (AgentNode agentNode, Map<String, Object> data) -> {
-                Integer n = (Integer) data.get("n");
-                String operation = (String) data.get("operation");
+import com.rpl.rama.test.*;
 
-                if ("factorial".equals(operation)) {
-                    long result = factorial(n);
-                    agentNode.result(Map.of("operation", "factorial", "n", n, "result", result));
-                } else {
-                    agentNode.result(Map.of("error", "Unknown operation: " + operation));
-                }
-            });
-    }
+public class Main {
+  public static void main(String[] args) throws Exception {
+    try (InProcessCluster ipc = InProcessCluster.create()) {
+      // Launch your module
+      MyAgentModule module = new MyAgentModule();
+      ipc.launchModule(module, new LaunchConfig(4, 2));
 
-    private long factorial(int n) {
-        if (n <= 1) return 1;
-        return n * factorial(n - 1);
+      // Get agent manager and interact with agents
+      String moduleName = module.getModuleName();
+      AgentManager manager = AgentManager.create(ipc, moduleName);
+      AgentClient agent = manager.getAgentClient("MyAgent");
+
+      // Invoke the agent
+      Object result = agent.invoke("input data");
+      System.out.println("Result: " + result);
     }
+  }
 }
 ```
 
 #### Clojure API
 
 ```clojure
-(aor/defagentmodule RecursiveAgentModule
-  [topology]
-  (-> (aor/new-agent topology "RecursiveAgent")
-      (aor/node
-       "process"
-       nil
-       (fn [agent-node {:keys [n operation]}]
-         (case operation
-           "factorial"
-           (aor/result! agent-node {:operation "factorial" :n n :result (factorial n)})
-           (aor/result! agent-node {:error (str "Unknown operation: " operation)})))))
+(require '[com.rpl.rama.test :as rtest])
 
-(defn factorial [n]
-  (if (<= n 1) 1 (* n (factorial (dec n)))))
+(with-open [ipc (rtest/create-ipc)]
+  ;; Launch your module
+  (rtest/launch-module! ipc MyAgentModule {:tasks 4 :threads 2})
+
+  ;; Get agent manager and interact with agents
+  (let [module-name (rama/get-module-name MyAgentModule)
+        manager (aor/agent-manager ipc module-name)
+        agent (aor/agent-client manager "MyAgent")]
+
+    ;; Invoke the agent
+    (let [result (aor/agent-invoke agent "input data")]
+      (println "Result:" result))))
 ```
 
-## Advanced Patterns
+### Deploying to a Cluster
 
-### Human Input Integration
+To deploy to a production Rama cluster, you use the Rama CLI. First, package your module as a JAR file with all dependencies included.
 
-Agents can request human input during execution, enabling human-in-the-loop patterns for tasks that require human judgment or approval.
+#### Building the JAR
+
+For Maven projects, use the Maven Assembly or Shade plugin to create an uber-jar:
+
+```bash
+mvn clean package
+```
+
+For Leiningen projects:
+
+```bash
+lein uberjar
+```
+
+#### Deploying with Rama CLI
+
+Once you have your JAR, deploy it using the `rama deploy` command:
+
+```bash
+rama deploy \
+  --action launch
+  --jar target/my-agents.jar \
+  --module com.mycompany.MyAgentModule \
+  --tasks 32 \
+  --threads 8 \
+  --workers 4
+```
+
+See the [Rama documentation on launching modules](https://redplanetlabs.com/docs/~/operating-rama.html#_launching_modules) for a full explanation of these parameters.
+
+## Updating Modules
+
+Modules aren't static – their code evolves over time as you add features, fix bugs, or optimize performance. To update a module, you use Rama's one-line [update command](https://redplanetlabs.com/docs/~/operating-rama.html#_updating_modules), like so:
+
+
+```bash
+rama deploy \
+  --action update \
+  --jar target/my-agents-v2.jar \
+  --module com.mycompany.MyAgentModule
+```
+
+It's possible or even likely there are some agent invocations mid-execution when you perform an update, especially if you have long-running agents. Agent-o-rama lets you decide what to do with these in-flight agent invocations on update by setting an "update mode" on the agent definition.
+
+
+Update mode is set on the agent graph when defining the agent. Here's how to set it:
 
 #### Java API
 
 ```java
-public class HumanInputAgentModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.newAgent("HumanInputAgent")
+public class MyAgentModule extends AgentModule {
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("MyAgent")
+            .setUpdateMode(UpdateMode.CONTINUE)  // or RESTART or DROP
             .node("process", null, (AgentNode agentNode, String input) -> {
-                String humanResponse = agentNode.getHumanInput("Please review: " + input + "\nIs this correct? (y/n): ");
-
-                if ("y".equals(humanResponse)) {
-                    agentNode.result("Human approved: " + input);
-                } else {
-                    agentNode.result("Human rejected: " + input);
-                }
+              // Agent logic here
+              agentNode.result("processed: " + input);
             });
-    }
+  }
 }
 ```
 
 #### Clojure API
 
 ```clojure
-(aor/defagentmodule HumanInputAgentModule
+(aor/defagentmodule MyAgentModule
   [topology]
-  (-> (aor/new-agent topology "HumanInputAgent")
+  (-> (aor/new-agent topology "MyAgent")
+      (aor/set-update-mode :continue)  ; or :restart or :drop
       (aor/node
        "process"
        nil
        (fn [agent-node input]
-         (let [human-response (aor/get-human-input agent-node
-                                                   (str "Please review: " input "\nIs this correct? (y/n): "))]
-           (if (= "y" human-response)
-             (aor/result! agent-node (str "Human approved: " input))
-             (aor/result! agent-node (str "Human rejected: " input)))))))
+         (aor/result! agent-node (str "processed: " input))))))
 ```
 
-### Streaming Data
+### Update Modes
 
-Agents can stream data to clients in real-time, enabling progressive results and better user experience for long-running operations.
+You can choose from three update modes:
 
-#### Java API
+#### 1. **CONTINUE Mode** (Default)
 
-```java
-public class StreamingAgentModule extends AgentModule {
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-        topology.newAgent("StreamingAgent")
-            .node("process", null, (AgentNode agentNode, String input) -> {
-                String[] words = input.split("\\s+");
-                for (int i = 0; i < words.length; i++) {
-                    agentNode.streamChunk(Map.of("word", words[i], "index", i, "total", words.length));
-                }
-                agentNode.result(Map.of("total-words", words.length, "status", "complete"));
-            });
-    }
-}
+In-flight executions continue where they left off with the new agent definition. The agent's execution state is preserved and it resumes on the new code version.
+
+Use this mode when:
+- You want agents to complete their work without interruption
+- The new code is compatible with in-flight execution state
+- You're making incremental changes that don't fundamentally alter the agent's logic
+
+#### 2. **RESTART Mode**
+
+In-flight executions restart from the beginning with the new agent definition. The agent is invoked again with its original input arguments.
+
+Use this mode when:
+- The new code has significant changes that make continuing problematic
+- You want all executions to use the new logic from start to finish
+
+#### 3. **DROP Mode**
+
+In-flight executions are terminated and not restarted. The agent invocation is simply dropped.
+
+Use this mode when:
+- The agent's work is no longer needed
+- You're deprecating functionality
+- Completing in-flight work would be problematic or wasteful
+
+### Scaling Modules
+
+You can also scale a module to change its resource allocation without changing code:
+
+```bash
+rama scaleExecutors \
+  --module com.mycompany.MyAgentModule \
+  --threads 32
+  --workers 16
 ```
 
-#### Clojure API
+The docs on scaling are [here](https://redplanetlabs.com/docs/~/operating-rama.html#_scaling_modules).
 
-```clojure
-(aor/defagentmodule StreamingAgentModule
-  [topology]
-  (-> (aor/new-agent topology "StreamingAgent")
-      (aor/node
-       "process"
-       nil
-       (fn [agent-node input]
-         (let [words (str/split input #"\\s+")]
-           (doseq [[word index] (map-indexed vector words)]
-             (aor/stream-chunk! agent-node {:word word :index index :total (count words)}))
-           (aor/result! agent-node {:total-words (count words) :status "complete"})))))
-```
+## Learn next
 
-## Conclusion
-
-This guide covers the essential concepts for coding agents in agent-o-rama:
-
-1. **Basic Concepts**: Nodes, emits, and results form the foundation
-2. **Graph Patterns**: Loops, conditional routing, and complex control flow
-3. **Aggregation**: Fan-out/fan-in patterns with custom aggregators
-4. **Persistence**: Stores for maintaining state across invocations
-5. **Integration**: Agent objects for external resources
-6. **Composition**: Subagents and recursive patterns
-7. **Advanced Features**: Human input, streaming, and error handling
-
-The framework provides a powerful and flexible foundation for building complex AI agents with sophisticated control flow, data processing, and integration capabilities.
+- [Agent clients](TODO)
+- [Human-in-the-loop](TODO)
+- [Streaming](TODO)
+- [Tools agent](TODO)
