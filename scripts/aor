@@ -63,12 +63,13 @@ CLASSPATH=""
 
 # Add current directory (where script is located)
 CLASSPATH="$SCRIPT_DIR/*"
+CLASSPATH="$CLASSPATH:$SCRIPT_DIR"
 
 # Add lib/ directory from script location
 CLASSPATH="$CLASSPATH:$SCRIPT_DIR/lib/*"
 
 # Add Rama release root
-CLASSPATH="$CLASSPATH:$RAMA_ROOT/*"
+CLASSPATH="$CLASSPATH:$RAMA_ROOT/rama.jar"
 
 # Add Rama release lib/ directory
 CLASSPATH="$CLASSPATH:$RAMA_ROOT/lib/*"

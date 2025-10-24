@@ -7,6 +7,7 @@ rm -rf target
 mkdir _release
 
 cp scripts/aor _release/
+cp scripts/log4j2.properties _release/
 cp VERSION _release/
 
 sh scripts/build-ui.sh
