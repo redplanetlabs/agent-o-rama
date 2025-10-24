@@ -8,13 +8,14 @@ This page explains how to code agents with Agent-o-rama. All examples are shown 
 2. [Nodes, Emits, and Results](#nodes-emits-and-results)
 3. [Routing in Agent Graphs](#routing-in-agent-graphs)
 4. [Aggregation Subgraphs](#aggregation-subgraphs)
-5. [Agent Objects](#agent-objects)
-6. [Stores](#stores)
-7. [Subagents and Recursion](#subagents-and-recursion)
-8. [Human Input](#human-input)
-9. [Streaming Data](#streaming-data)
-10. [Deploying Modules](#deploying-modules)
-11. [Updating Modules](#updating-modules)
+5. [Metadata](#metadata)
+6. [Agent Objects](#agent-objects)
+7. [Stores](#stores)
+8. [Subagents and Recursion](#subagents-and-recursion)
+9. [Human Input](#human-input)
+10. [Streaming Data](#streaming-data)
+11. [Deploying Modules](#deploying-modules)
+12. [Updating Modules](#updating-modules)
 
 ## Basic Concepts
 
@@ -295,7 +296,7 @@ Aggregation subgraphs can be nested, where each invocation of an agg start node 
 
 For example, imagine processing multiple documents where each document needs to be analyzed by multiple experts in parallel, then the expert results for each document need to be combined, and finally all document results need to be aggregated together.
 
-Agg start nodes are the only nodes that have return values. The return value is passed as the last argument to the corresponding agg node, allowing you to pass non-aggregated information (like metadata or configuration) through the aggregation.
+Agg start nodes are the only nodes that have return values. The return value is passed as the last argument to the corresponding agg node, allowing you to pass non-aggregated information through the aggregation.
 
 #### Java API
 
@@ -516,6 +517,99 @@ public class SumUntil100 implements RamaAccumulatorAgg1<Integer, Integer> {
    (constantly 0)))
 ```
 
+
+## Metadata
+
+Metadata allows you to attach custom key-value data to agent executions. Metadata is set when invoking an agent and can be accessed from any node within the agent execution.
+
+Common use cases for metadata include:
+
+- **Tracking**: User IDs, session IDs, request IDs for correlating agent executions with application events
+- **A/B Testing**: Feature flags, model versions, or experimental configurations
+- **Configuration**: Runtime parameters that affect agent behavior without changing code, like model names to use
+- **Debugging**: Additional context for troubleshooting specific executions
+
+Metadata is automatically included in traces and analytics, making it easy to filter and analyze agent performance by any metadata dimension.
+
+### Setting Metadata
+
+Metadata is set when invoking an agent using the "with context" methods. Metadata keys must be strings, and values must be strings, numbers (int, long, float, double), or booleans.
+
+Here's a quick example of invoking an agent with metadata:
+
+#### Java API
+
+```java
+import com.rpl.agentorama.AgentContext;
+
+// Create context with metadata
+AgentContext context = AgentContext.metadata("user-id", "user-123")
+                                   .metadata("model", "gpt-4");
+
+// Invoke with context
+String result = agent.invokeWithContext(context, "Hello, world!");
+```
+
+#### Clojure API
+
+```clojure
+;; Create context with metadata
+(let [context {:metadata {"user-id" "user-123"
+                          "model" "gpt-4"}}]
+
+  ;; Invoke with context
+  (let [result (aor/agent-invoke-with-context agent context "Hello, world!")]
+    (println "Result:" result)))
+```
+
+### Accessing Metadata in Agents
+
+Inside agent nodes, you can access the metadata using `getMetadata` / `get-metadata`. The metadata is immutable during execution – it reflects what was set at invocation time even if its modified after initiation through the UI or API.
+
+#### Java API
+
+```java
+public class MetadataAgentModule extends AgentModule {
+  @Override
+  protected void defineAgents(AgentTopology topology) {
+    topology.newAgent("MetadataAgent")
+            .node("process", null, (AgentNode agentNode) -> {
+              // Get metadata
+              Map<String, Object> metadata = agentNode.getMetadata();
+
+              String userId = (String) metadata.get("user-id");
+              String model = (String) metadata.get("model");
+
+              System.out.println("Processing for user: " + userId);
+              System.out.println("Using model: " + model);
+
+              agentNode.result("Processed for " + userId);
+            });
+  }
+}
+```
+
+#### Clojure API
+
+```clojure
+(aor/defagentmodule MetadataAgentModule
+  [topology]
+  (-> (aor/new-agent topology "MetadataAgent")
+      (aor/node
+       "process"
+       nil
+       (fn [agent-node]
+         ;; Get metadata
+         (let [metadata (aor/get-metadata agent-node)
+               user-id (get metadata "user-id")
+               model (get metadata "model")]
+
+           (println "Processing for user:" user-id)
+           (println "Using model:" model)
+
+           (aor/result! agent-node (str "Processed for " user-id)))))))
+```
+
 ## Agent Objects
 
 Agent objects are shared resources like AI models, database connections, or API clients that agents can access during execution. They enable agents to interact with external systems and maintain expensive resources efficiently. Many resources like AI models and database connections are expensive to create and maintain persistent connections. Agent object builders allow you to create these resources once and reuse them across multiple agent invocations, rather than recreating them for every agent execution.
@@ -664,7 +758,6 @@ topology.declareAgentObjectBuilder("blocking-model", setup -> {
        (.modelName "gpt-4")
        .build)))
 ```
-
 
 ## Stores
 
