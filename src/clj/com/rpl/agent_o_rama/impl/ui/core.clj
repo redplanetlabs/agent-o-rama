@@ -14,8 +14,7 @@
     AutoCloseable]
    [java.util.concurrent
     ScheduledThreadPoolExecutor
-    TimeUnit])
-  (:gen-class))
+    TimeUnit]))
 
 (defn refresh-agent-modules! []
   (let [rama-client (ui/get-object :rama-client)
@@ -91,13 +90,13 @@
   ([ipc] (start-ui ipc nil))
   ([ipc options]
    (let [options (merge {:port 1974} options)]
-     (println "Starting Agent-o-rama UI on port" (:port options))
+     (cljlogging/info "Starting Agent-o-rama UI on port" (:port options))
      (start ipc (:port options))
      (reify
       AutoCloseable
       (close [_this]
         (when-not (:no-input-before-close options)
-          (println "press enter to close the ui, default port is 1974")
+          (cljlogging/info "press enter to close the ui, default port is 1974")
           (read-line))
         (stop-ui)
         :closed)))))

@@ -20,6 +20,6 @@ cp $(lein with-profile -provided,-dev,-test classpath | tr ':' '\n' | grep -v '/
 mkdir _release/logs
 
 cd _release
-zip ../agent-o-rama-$VERSION.zip *
+zip -r ../agent-o-rama-$VERSION.zip *
 cd ..
 rm -rf _release
