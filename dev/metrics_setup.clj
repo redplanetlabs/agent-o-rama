@@ -110,6 +110,22 @@
       (fn [fetcher input ref-output output]
         {"is-concise?" (< (count (str output)) 20)})))
 
+   (aor/declare-evaluator-builder
+    topology "output-classifier" ""
+    (fn [params]
+      (fn [fetcher input ref-output output]
+        (let [output-str (str output)
+              length (count output-str)]
+          {"verbosity" (cond
+                         (< length 15) "terse"
+                         (< length 30) "concise"
+                         (< length 50) "moderate"
+                         :else "verbose")
+           "sentiment" (cond
+                         (re-find #"Success|success" output-str) "positive"
+                         (re-find #"fail|error|Error" output-str) "negative"
+                         :else "neutral")}))))
+
    (aor/declare-action-builder
     topology "logging-action" "A simple action that logs its execution"
     (fn [params]
@@ -156,7 +172,7 @@
 (defn setup-metrics-env
   "Sets up a rich development environment with varied analytics data.
    Returns the IPC handle."
-  []
+  [ipc]
   (println "🚀 Starting metrics environment setup...")
 
   (with-redefs [i/SUBSTITUTE-TICK-DEPOTS true
@@ -167,8 +183,7 @@
                 ana/node-stall-time (fn [] (+ (h/current-time-millis) 60000))
                 at/gen-new-agent-id (fn [_] (h/random-uuid7-at-timestamp (h/current-time-millis)))]
 
-    (let [ipc (rtest/create-ipc)
-          _ (TopologyUtils/startSimTime)
+    (let [_ (TopologyUtils/startSimTime)
           now (System/currentTimeMillis)
           start-time (- now (* 35 24 60 60 1000))
           _ (TopologyUtils/advanceSimTime start-time)
@@ -194,10 +209,13 @@
 
       (aor/create-evaluator! agent-manager "numeric-eval" "numeric-score" {} "")
       (aor/create-evaluator! agent-manager "concise-eval" "conciseness" {} "")
+      (aor/create-evaluator! agent-manager "classifier-eval" "output-classifier" {} "")
       (ana/add-rule! global-actions-depot "numeric-rule" "MetricsGenAgent"
                      {:action-name "aor/eval", :action-params {"name" "numeric-eval"}, :filter (aor-types/->AndFilter []), :sampling-rate 1.0, :start-time-millis 0, :status-filter :success})
       (ana/add-rule! global-actions-depot "concise-rule" "MetricsGenAgent"
                      {:action-name "aor/eval", :action-params {"name" "concise-eval"}, :filter (aor-types/->AndFilter []), :sampling-rate 1.0, :start-time-millis 0, :status-filter :success})
+      (ana/add-rule! global-actions-depot "classifier-rule" "MetricsGenAgent"
+                     {:action-name "aor/eval", :action-params {"name" "classifier-eval"}, :filter (aor-types/->AndFilter []), :sampling-rate 1.0, :start-time-millis 0, :status-filter :success})
       (println "✓ Evaluators and rules created.")
 
       (println "\n📊 Generating historical and recent data...")
@@ -208,9 +226,9 @@
                       {:metadata {"user-tier" "enterprise", "region" "apac", "ab-test-group" "v1"}}]
 
             ;; Scaled-down declarative plan for faster setup
-            generation-plan [{:label "day", :duration-units :days, :duration 34, :invokes-per-unit 1}
-                             {:label "hour", :duration-units :hours, :duration 23, :invokes-per-unit 1}
-                             {:label "minute", :duration-units :minutes, :duration 59, :invokes-per-unit 1}]]
+            generation-plan [{:label "day", :duration-units :days, :duration 34, :invokes-per-unit 10}
+                             {:label "hour", :duration-units :hours, :duration 23, :invokes-per-unit 10}
+                             {:label "minute", :duration-units :minutes, :duration 59, :invokes-per-unit 10}]]
 
         (doseq [{:keys [label duration-units duration invokes-per-unit]} generation-plan]
           (let [time-advancer (case duration-units
@@ -256,6 +274,8 @@
         (println "   Data spans from bucket" start-bucket "to" end-bucket
                  "(" (- end-bucket start-bucket) "minute buckets).")
         (println "   Use the 'Split by' dropdown with 'user-tier', 'region', or 'ab-test-group'.")
-        (println "   Charts for evaluators 'numeric-eval' and 'concise-eval' are also available.")
+        (println "   Charts for evaluators 'numeric-eval', 'concise-eval', and 'classifier-eval' are also available.")
+        (println "   The 'classifier-eval' returns categorical values: 'verbosity' (terse/concise/moderate/verbose)")
+        (println "   and 'sentiment' (positive/neutral/negative) - perfect for testing categorical metrics!")
         (println "\n   Return value is the IPC handle. Call (.close ipc) when done."))
       ipc)))

@@ -56,7 +56,8 @@
   
   (do
     "flow for testing charts"
-    (def ipc (metrics-setup/setup-metrics-env))
+    (def ipc (rtest/create-ipc))
+    (metrics-setup/setup-metrics-env ipc)
     (start-repl ipc))
   
   (aor/stop-ui)
