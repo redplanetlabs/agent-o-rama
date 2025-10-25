@@ -4,6 +4,7 @@ import com.rpl.agentorama.*;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.*;
+import java.util.Scanner;
 
 /**
  * Example demonstrating the Research Agent Module.
@@ -17,46 +18,36 @@ public class ResearchAgentExample {
     System.out.println("Starting Research Agent Example...");
 
     try (InProcessCluster ipc = InProcessCluster.create();
-         AutoCloseable ui = UI.start(ipc)) {
-      // Launch the research agent module
+         AutoCloseable ui = UI.start(ipc);
+         Scanner scanner = new Scanner(System.in)) {
+
       ResearchAgentModule module = new ResearchAgentModule();
       ipc.launchModule(module, new LaunchConfig(4, 2));
 
-      // Get the agent manager and client
       String moduleName = module.getModuleName();
       AgentManager manager = AgentManager.create(ipc, moduleName);
       AgentClient researcher = manager.getAgentClient("researcher");
 
-      System.out.println("Research Agent Example");
-      System.out.println("=====================");
+      System.out.print("Enter a topic: ");
+      System.out.flush();
+      String topic = scanner.nextLine();
       System.out.println();
 
-      // Example research topic
-      String topic = "Artificial Intelligence in Healthcare";
-
-      System.out.println("Research Topic: " + topic);
-      System.out.println();
-
-
-      Map input = new HashMap();
+      Map<String, Object> input = new HashMap<>();
       input.put("topic", topic);
-      // Initiate the research process
       AgentInvoke invoke = researcher.initiate("", input);
 
-      // Process the research workflow
       Object step = researcher.nextStep(invoke);
       String finalResult = null;
       while (step != null) {
         if (step instanceof HumanInputRequest) {
           HumanInputRequest request = (HumanInputRequest) step;
-          System.out.println("Human Input Request:");
           System.out.println(request.getPrompt());
-          System.out.println();
+          System.out.print(">> ");
+          System.out.flush();
 
-          // Provide a simple response for demonstration
-          String response = "no"; // Default response for analyst feedback
+          String response = scanner.nextLine();
           researcher.provideHumanInput(request, response);
-          System.out.println("Response: " + response);
           System.out.println();
         } else {
           System.out.println("Final Research Report:");
