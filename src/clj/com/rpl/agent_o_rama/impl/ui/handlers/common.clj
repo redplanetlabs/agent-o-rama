@@ -68,6 +68,11 @@
            item))
    data))
 
+(comment
+  (def m (new dev.langchain4j.data.message.SystemMessage "test"))
+  (->ui-serializable m)
+  (->ui-serializable (into-array [m])))
+
 (defn from-ui-serializable
   [data]
   (walk/postwalk
