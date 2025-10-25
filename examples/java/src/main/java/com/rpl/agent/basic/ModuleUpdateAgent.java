@@ -7,7 +7,6 @@ import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.UpdateMode;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 
@@ -40,32 +39,27 @@ public class ModuleUpdateAgent {
       topology
           .newAgent("CounterAgent")
           .setUpdateMode(UpdateMode.CONTINUE)
-          .node("count", "count", new CountFunction());
+          .node("count", "count", (AgentNode agentNode, Integer currentCount) -> {
+            int newCount = (currentCount == null) ? 1 : currentCount + 1;
+            System.out.println("counting: " + newCount);
+
+            try {
+              Thread.sleep(200);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              agentNode.result("Interrupted at count: " + newCount);
+              return;
+            }
+
+            if (newCount < 50) {
+              agentNode.emit("count", newCount);
+            } else {
+              agentNode.result(newCount);
+            }
+          });
     }
   }
 
-  /** Node function that performs counting with recursive emit. */
-  public static class CountFunction implements RamaVoidFunction2<AgentNode, Integer> {
-    @Override
-    public void invoke(AgentNode agentNode, Integer currentCount) {
-      int newCount = (currentCount == null) ? 1 : currentCount + 1;
-      System.out.println("counting: " + newCount);
-
-      try {
-        Thread.sleep(200);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        agentNode.result("Interrupted at count: " + newCount);
-        return;
-      }
-
-      if (newCount < 50) {
-        agentNode.emit("count", newCount);
-      } else {
-        agentNode.result(newCount);
-      }
-    }
-  }
 
   /**
    * Demonstrates module update during agent execution.

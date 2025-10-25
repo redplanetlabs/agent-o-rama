@@ -14,7 +14,7 @@ import java.util.Map;
 import org.junit.Test;
 
 /**
- * Test class for PstateStoreAgent demonstrating complex path-based data structures.
+ * Test class for PStateStoreAgent demonstrating complex path-based data structures.
  *
  * <p>This test demonstrates:
  *
@@ -25,14 +25,14 @@ import org.junit.Test;
  *   <li>HashMap usage for request and response data structures
  * </ul>
  */
-public class PstateStoreAgentTest {
+public class PStateStoreAgentTest {
 
   @Test
-  public void testPstateStoreAgent() throws Exception {
+  public void testPStateStoreAgent() throws Exception {
     // Tests PState store operations with path-based queries using HashMap
     try (InProcessCluster ipc = InProcessCluster.create()) {
       // Deploy the agent module
-      PstateStoreAgent.PStateStoreModule module = new PstateStoreAgent.PStateStoreModule();
+      PStateStoreAgent.PStateStoreModule module = new PStateStoreAgent.PStateStoreModule();
       ipc.launchModule(module, new LaunchConfig(1, 1));
 
       // Get agent manager and client

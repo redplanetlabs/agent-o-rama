@@ -5,7 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.store.DocumentStore;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
@@ -55,81 +54,66 @@ public class DocumentStoreAgent {
 
       topology
           .newAgent("DocumentStoreAgent")
-          .node("update-profile", "read-profile", new UpdateProfileFunction())
-          .node("read-profile", null, new ReadProfileFunction());
+          .node("update-profile", "read-profile", (AgentNode agentNode, Map<String, Object> request) -> {
+            DocumentStore<String> profilesStore = agentNode.getStore("$$user-profiles");
+            String userId = (String) request.get("userId");
+            Map<String, Object> profileUpdates = (Map<String, Object>) request.get("profileUpdates");
+
+            // Update individual profile fields
+            if (profileUpdates.containsKey("name")) {
+              profilesStore.putDocumentField(userId, "name", profileUpdates.get("name"));
+            }
+
+            if (profileUpdates.containsKey("age")) {
+              profilesStore.putDocumentField(userId, "age", profileUpdates.get("age"));
+            }
+
+            if (profileUpdates.containsKey("preferences")) {
+              // Demonstrate field update with function
+              profilesStore.updateDocumentField(
+                  userId,
+                  "preferences",
+                  existing -> {
+                    Map<String, Object> existingPrefs =
+                        existing != null ? (Map<String, Object>) existing : new HashMap<>();
+                    Map<String, Object> newPrefs =
+                        (Map<String, Object>) profileUpdates.get("preferences");
+                    Map<String, Object> merged = new HashMap<>(existingPrefs);
+                    merged.putAll(newPrefs);
+                    return merged;
+                  });
+            }
+
+            // Emit to next node for reading
+            agentNode.emit("read-profile", userId);
+          })
+          .node("read-profile", null, (AgentNode agentNode, String userId) -> {
+            DocumentStore<String> profilesStore = agentNode.getStore("$$user-profiles");
+
+            // Check which fields exist
+            boolean hasName = profilesStore.containsDocumentField(userId, "name");
+            boolean hasAge = profilesStore.containsDocumentField(userId, "age");
+            boolean hasPrefs = profilesStore.containsDocumentField(userId, "preferences");
+
+            // Retrieve all profile fields
+            String name = hasName ? (String) profilesStore.getDocumentField(userId, "name") : null;
+            Long age = hasAge ? (Long) profilesStore.getDocumentField(userId, "age") : null;
+            Map<String, Object> preferences =
+                hasPrefs
+                    ? (Map<String, Object>) profilesStore.getDocumentField(userId, "preferences")
+                    : null;
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("userId", userId);
+            result.put("name", name);
+            result.put("age", age);
+            result.put("preferences", preferences);
+
+            agentNode.result(result);
+          });
     }
   }
 
-  /** Node function that creates or updates user profile. */
-  public static class UpdateProfileFunction
-      implements RamaVoidFunction2<AgentNode, Map<String, Object>> {
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public void invoke(AgentNode agentNode, Map<String, Object> request) {
-      DocumentStore<String> profilesStore = agentNode.getStore("$$user-profiles");
-      String userId = (String) request.get("userId");
-      Map<String, Object> profileUpdates = (Map<String, Object>) request.get("profileUpdates");
-
-      // Update individual profile fields
-      if (profileUpdates.containsKey("name")) {
-        profilesStore.putDocumentField(userId, "name", profileUpdates.get("name"));
-      }
-
-      if (profileUpdates.containsKey("age")) {
-        profilesStore.putDocumentField(userId, "age", profileUpdates.get("age"));
-      }
-
-      if (profileUpdates.containsKey("preferences")) {
-        // Demonstrate field update with function
-        profilesStore.updateDocumentField(
-            userId,
-            "preferences",
-            existing -> {
-              Map<String, Object> existingPrefs =
-                  existing != null ? (Map<String, Object>) existing : new HashMap<>();
-              Map<String, Object> newPrefs =
-                  (Map<String, Object>) profileUpdates.get("preferences");
-              Map<String, Object> merged = new HashMap<>(existingPrefs);
-              merged.putAll(newPrefs);
-              return merged;
-            });
-      }
-
-      agentNode.emit("read-profile", userId);
-    }
-  }
-
-  /** Node function that reads profile and returns result. */
-  public static class ReadProfileFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public void invoke(AgentNode agentNode, String userId) {
-      DocumentStore<String> profilesStore = agentNode.getStore("$$user-profiles");
-
-      // Check which fields exist
-      boolean hasName = profilesStore.containsDocumentField(userId, "name");
-      boolean hasAge = profilesStore.containsDocumentField(userId, "age");
-      boolean hasPrefs = profilesStore.containsDocumentField(userId, "preferences");
-
-      // Retrieve all profile fields
-      String name = hasName ? (String) profilesStore.getDocumentField(userId, "name") : null;
-      Long age = hasAge ? (Long) profilesStore.getDocumentField(userId, "age") : null;
-      Map<String, Object> preferences =
-          hasPrefs
-              ? (Map<String, Object>) profilesStore.getDocumentField(userId, "preferences")
-              : null;
-
-      Map<String, Object> result = new HashMap<>();
-      result.put("userId", userId);
-      result.put("name", name);
-      result.put("age", age);
-      result.put("preferences", preferences);
-
-      agentNode.result(result);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     try (InProcessCluster ipc = InProcessCluster.create()) {
@@ -155,7 +139,6 @@ public class DocumentStoreAgent {
       updates1.put("preferences", prefs1);
       request1.put("profileUpdates", updates1);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result1 = (Map<String, Object>) agent.invoke(request1);
       System.out.println("Profile created:");
       System.out.println("  Name: " + result1.get("name"));
@@ -173,7 +156,6 @@ public class DocumentStoreAgent {
       updates2.put("preferences", prefs2);
       request2.put("profileUpdates", updates2);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result2 = (Map<String, Object>) agent.invoke(request2);
       System.out.println("Profile updated:");
       System.out.println("  Name: " + result2.get("name"));
@@ -192,7 +174,6 @@ public class DocumentStoreAgent {
       updates3.put("preferences", prefs3);
       request3.put("profileUpdates", updates3);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result3 = (Map<String, Object>) agent.invoke(request3);
       System.out.println("Second profile created:");
       System.out.println("  Name: " + result3.get("name"));

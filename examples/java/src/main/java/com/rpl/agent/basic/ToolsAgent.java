@@ -5,7 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.agent.tool.Tool;
@@ -81,30 +80,24 @@ public class ToolsAgent {
       // Declare calculator tool
       topology.declareAgentObject("calculator", new Calculator());
 
-      topology.newAgent("ToolsAgent").node("chat-with-tools", null, new ChatWithToolsFunction());
+      topology.newAgent("ToolsAgent").node("chat-with-tools", null, (AgentNode agentNode, String prompt) -> {
+        ChatModel model = (ChatModel) agentNode.getAgentObject("openai-model");
+        Calculator calculator = (Calculator) agentNode.getAgentObject("calculator");
+
+        // Create AI service with tools
+        MathAssistant assistant =
+            AiServices.builder(MathAssistant.class)
+                .chatModel(model)
+                .tools(calculator)
+                .build();
+
+        // Process prompt and return response
+        String response = assistant.chat(prompt);
+        agentNode.result(response);
+      });
     }
   }
 
-  /** Node function that processes prompts using OpenAI with tools. */
-  public static class ChatWithToolsFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String prompt) {
-      ChatModel model = (ChatModel) agentNode.getAgentObject("openai-model");
-      Calculator calculator = (Calculator) agentNode.getAgentObject("calculator");
-
-      // Create AI service with tools
-      MathAssistant assistant =
-          AiServices.builder(MathAssistant.class)
-              .chatModel(model)
-              .tools(calculator)
-              .build();
-
-      // Process prompt and return response
-      String response = assistant.chat(prompt);
-      agentNode.result(response);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     String apiKey = System.getenv("OPENAI_API_KEY");

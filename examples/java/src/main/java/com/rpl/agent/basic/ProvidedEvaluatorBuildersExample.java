@@ -7,7 +7,6 @@ import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.CreateEvaluatorOptions;
 import com.rpl.agentorama.ExampleRun;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -55,45 +54,34 @@ public class ProvidedEvaluatorBuildersExample {
                   .build());
 
       // Simple agent that generates text of different lengths for testing
-      topology.newAgent("TextGenerator").node("generate", null, new GenerateTextFunction());
+      topology.newAgent("TextGenerator").node("generate", null, (AgentNode agentNode, String inputType) -> {
+        String result;
+        switch (inputType) {
+          case "short":
+            result = "Yes";
+            break;
+          case "medium":
+            result = "This is a medium-length response";
+            break;
+          case "long":
+            result =
+                "This is a much longer response that contains more detailed information and"
+                    + " explanations to demonstrate various length thresholds";
+            break;
+          case "positive":
+            result = "positive";
+            break;
+          case "negative":
+            result = "negative";
+            break;
+          default:
+            result = "default";
+        }
+        agentNode.result(result);
+      });
     }
   }
 
-  /**
-   * Node function that generates different types of text based on input type.
-   *
-   * <p>This function demonstrates a simple text generator that produces outputs of varying lengths
-   * and content for testing different evaluator builders.
-   */
-  public static class GenerateTextFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String inputType) {
-      String result;
-      switch (inputType) {
-        case "short":
-          result = "Yes";
-          break;
-        case "medium":
-          result = "This is a medium-length response";
-          break;
-        case "long":
-          result =
-              "This is a much longer response that contains more detailed information and"
-                  + " explanations to demonstrate various length thresholds";
-          break;
-        case "positive":
-          result = "positive";
-          break;
-        case "negative":
-          result = "negative";
-          break;
-        default:
-          result = "default";
-      }
-      agentNode.result(result);
-    }
-  }
 
   /**
    * Creates the three demo evaluators using provided builders.

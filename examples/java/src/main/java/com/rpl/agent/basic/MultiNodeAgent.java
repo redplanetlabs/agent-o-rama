@@ -5,8 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
-import com.rpl.agentorama.ops.RamaVoidFunction3;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 
@@ -40,64 +38,32 @@ public class MultiNodeAgent {
       topology
           .newAgent("MultiNodeAgent")
           // First node: receive user name from the invoke call and forward it
-          .node("receive", "personalize", new ReceiveFunction())
+          .node("receive", "personalize", (AgentNode agentNode, String userName) -> {
+            // Forward the user name to the personalize node
+            agentNode.emit("personalize", userName);
+          })
           // Second node: personalize the greeting message
-          .node("personalize", "finalize", new PersonalizeFunction())
+          .node("personalize", "finalize", (AgentNode agentNode, String userName) -> {
+            // Create a personalized greeting message
+            String greeting = "Hello, " + userName + "!";
+
+            // Emit both the user name and greeting to the finalize node
+            agentNode.emit("finalize", userName, greeting);
+          })
           // Final node: create complete welcome message
-          .node("finalize", null, new FinalizeFunction());
+          .node("finalize", null, (AgentNode agentNode, String userName, String greeting) -> {
+            // Create the complete welcome message
+            String result =
+                greeting + " Welcome to agent-o-rama! " + "Thanks for joining us, " + userName + ".";
+
+            // Return the final result
+            agentNode.result(result);
+          });
     }
   }
 
-  /**
-   * First node function that receives user name and forwards it to personalize node.
-   *
-   * <p>This function demonstrates receiving input from agent invocation and emitting to the next
-   * node.
-   */
-  public static class ReceiveFunction implements RamaVoidFunction2<AgentNode, String> {
 
-    @Override
-    public void invoke(AgentNode agentNode, String userName) {
-      // Forward the user name to the personalize node
-      agentNode.emit("personalize", userName);
-    }
-  }
 
-  /**
-   * Second node function that creates a personalized greeting and forwards it with the user name.
-   *
-   * <p>This function demonstrates processing data and emitting multiple values to the next node.
-   */
-  public static class PersonalizeFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String userName) {
-      // Create a personalized greeting message
-      String greeting = "Hello, " + userName + "!";
-
-      // Emit both the user name and greeting to the finalize node
-      agentNode.emit("finalize", userName, greeting);
-    }
-  }
-
-  /**
-   * Final node function that creates the complete welcome message and returns the result.
-   *
-   * <p>This function demonstrates receiving multiple values from the previous node and returning a
-   * final result.
-   */
-  public static class FinalizeFunction implements RamaVoidFunction3<AgentNode, String, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String userName, String greeting) {
-      // Create the complete welcome message
-      String result =
-          greeting + " Welcome to agent-o-rama! " + "Thanks for joining us, " + userName + ".";
-
-      // Return the final result
-      agentNode.result(result);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Multi-Node Agent Example...");

@@ -5,7 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 
@@ -37,28 +36,18 @@ public class BasicAgent {
 
     @Override
     protected void defineAgents(AgentTopology topology) {
-      topology.newAgent("BasicAgent").node("process", null, new ProcessFunction());
+      topology.newAgent("BasicAgent").node("process", null, (AgentNode agentNode, String userName) -> {
+        // Extract user name from arguments (corresponds to the value in agent-invoke)
+
+        // Create a welcome message for the user
+        String result = "Welcome to agent-o-rama, " + userName + "!";
+
+        // Return the final result
+        agentNode.result(result);
+      });
     }
   }
 
-  /**
-   * Node function that processes input and creates a welcome message.
-   *
-   * <p>This nested function demonstrates basic agent node processing logic.
-   */
-  public static class ProcessFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String userName) {
-      // Extract user name from arguments (corresponds to the value in agent-invoke)
-
-      // Create a welcome message for the user
-      String result = "Welcome to agent-o-rama, " + userName + "!";
-
-      // Return the final result
-      agentNode.result(result);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Basic Agent Example...");

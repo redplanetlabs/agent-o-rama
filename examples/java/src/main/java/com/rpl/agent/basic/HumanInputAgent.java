@@ -8,7 +8,6 @@ import com.rpl.agentorama.AgentStep;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.HumanInputRequest;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.model.chat.ChatModel;
@@ -50,47 +49,40 @@ public class HumanInputAgent {
             return OpenAiChatModel.builder().apiKey(apiKey).modelName("gpt-4o-mini").build();
           });
 
-      topology.newAgent("HumanInputAgent").node("chat", null, new ChatFunction());
+      topology.newAgent("HumanInputAgent").node("chat", null, (AgentNode agentNode, String userMessage) -> {
+        // NOTE you can not use OpenAiChatModel as the type here
+        ChatModel openai = (ChatModel) agentNode.getAgentObject("openai");
+
+        // Get AI response
+        String response = openai.chat(userMessage);
+
+        // Ask human if response was helpful
+        boolean helpful = isHumanHelpful(agentNode, response);
+
+        // Return result as HashMap
+        // Expected structure: {"response": String, "helpful": boolean}
+        Map<String, Object> result = new HashMap<>();
+        result.put("response", response);
+        result.put("helpful", helpful);
+        agentNode.result(result);
+      });
     }
   }
 
-  /** Node function that chats with AI and asks for human feedback. */
-  public static class ChatFunction implements RamaVoidFunction2<AgentNode, String> {
+  /** Ask user if the response was helpful and loop until valid y/n answer. */
+  private static boolean isHumanHelpful(AgentNode agentNode, String response) {
+    while (true) {
+      String input =
+          agentNode.getHumanInput(
+              String.format("AI Response: %s%n%nWas this response helpful? (y/n): ", response));
 
-    @Override
-    public void invoke(AgentNode agentNode, String userMessage) {
-      // NOTE you can not use OpenAiChatModel as the type here
-      ChatModel openai = (ChatModel) agentNode.getAgentObject("openai");
-
-      // Get AI response
-      String response = openai.chat(userMessage);
-
-      // Ask human if response was helpful
-      boolean helpful = isHumanHelpful(agentNode, response);
-
-      // Return result as HashMap
-      // Expected structure: {"response": String, "helpful": boolean}
-      Map<String, Object> result = new HashMap<>();
-      result.put("response", response);
-      result.put("helpful", helpful);
-      agentNode.result(result);
-    }
-
-    /** Ask user if the response was helpful and loop until valid y/n answer. */
-    private boolean isHumanHelpful(AgentNode agentNode, String response) {
-      while (true) {
-        String input =
-            agentNode.getHumanInput(
-                String.format("AI Response: %s%n%nWas this response helpful? (y/n): ", response));
-
-        if ("y".equals(input)) {
-          return true;
-        } else if ("n".equals(input)) {
-          return false;
-        } else {
-          // Loop again with clarification
-          input = agentNode.getHumanInput("Please answer 'y' or 'n'.");
-        }
+      if ("y".equals(input)) {
+        return true;
+      } else if ("n".equals(input)) {
+        return false;
+      } else {
+        // Loop again with clarification
+        input = agentNode.getHumanInput("Please answer 'y' or 'n'.");
       }
     }
   }

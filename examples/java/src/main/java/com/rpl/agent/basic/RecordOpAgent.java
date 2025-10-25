@@ -7,7 +7,6 @@ import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.NestedOpType;
 import com.rpl.agentorama.UI;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.HashMap;
@@ -40,44 +39,33 @@ public class RecordOpAgent {
 
     @Override
     protected void defineAgents(AgentTopology topology) {
-      topology.newAgent("RecordOpAgent").node("process", null, new ProcessFunction());
+      topology.newAgent("RecordOpAgent").node("process", null, (AgentNode agentNode, String userName) -> {
+        // Record timing of a custom operation
+        long startTime = System.currentTimeMillis();
+
+        // Simulate some work
+        String greeting = "Hello, " + userName + "!";
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+
+        long finishTime = System.currentTimeMillis();
+
+        // Record the operation in the agent trace
+        Map<String, Object> info = new HashMap<>();
+        info.put("operation", "generate-greeting");
+        info.put("input", userName);
+        info.put("output", greeting);
+
+        agentNode.recordNestedOp(NestedOpType.OTHER, startTime, finishTime, info);
+
+        agentNode.result(greeting);
+      });
     }
   }
 
-  /**
-   * Node function that records a custom operation in the agent trace.
-   *
-   * <p>This function demonstrates how to capture operation timing and metadata for visibility in
-   * the UI.
-   */
-  public static class ProcessFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String userName) {
-      // Record timing of a custom operation
-      long startTime = System.currentTimeMillis();
-
-      // Simulate some work
-      String greeting = "Hello, " + userName + "!";
-      try {
-        Thread.sleep(100);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-
-      long finishTime = System.currentTimeMillis();
-
-      // Record the operation in the agent trace
-      Map<String, Object> info = new HashMap<>();
-      info.put("operation", "generate-greeting");
-      info.put("input", userName);
-      info.put("output", greeting);
-
-      agentNode.recordNestedOp(NestedOpType.OTHER, startTime, finishTime, info);
-
-      agentNode.result(greeting);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting RecordOp Agent Example...");

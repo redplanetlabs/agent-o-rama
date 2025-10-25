@@ -6,7 +6,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 
@@ -32,30 +31,24 @@ public class AsyncAgent {
 
     @Override
     protected void defineAgents(AgentTopology topology) {
-      topology.newAgent("AsyncAgent").node("process", null, new ProcessFunction());
+      topology.newAgent("AsyncAgent").node("process", null, (AgentNode agentNode, String taskName) -> {
+        System.out.printf("Starting task '%s'%n", taskName);
+
+        // Simulate work
+        try {
+          Thread.sleep(500);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return;
+        }
+
+        System.out.printf("Completed task '%s'%n", taskName);
+
+        agentNode.result(String.format("Task '%s' completed successfully", taskName));
+      });
     }
   }
 
-  /** Node function that simulates work with processing time. */
-  public static class ProcessFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String taskName) {
-      System.out.printf("Starting task '%s'%n", taskName);
-
-      // Simulate work
-      try {
-        Thread.sleep(500);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return;
-      }
-
-      System.out.printf("Completed task '%s'%n", taskName);
-
-      agentNode.result(String.format("Task '%s' completed successfully", taskName));
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Async Agent Example...");

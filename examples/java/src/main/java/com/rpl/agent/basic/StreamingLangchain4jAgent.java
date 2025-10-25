@@ -6,7 +6,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.data.message.ChatMessage;
@@ -54,29 +53,23 @@ public class StreamingLangchain4jAgent {
 
       topology
           .newAgent("StreamingLangChain4jAgent")
-          .node("streaming-chat", null, new StreamingChatFunction());
+          .node("streaming-chat", null, (AgentNode agentNode, String userMessage) -> {
+            // Agent objects wrapping StreamingChatModel are returned as ChatModel
+            ChatModel model = (ChatModel) agentNode.getAgentObject("openai-streaming-model");
+
+            // Build chat request
+            ChatRequest request =
+                ChatRequest.builder().messages(List.<ChatMessage>of(new UserMessage(userMessage))).build();
+
+            // Send chat request - streaming happens automatically with agent-o-rama
+            ChatResponse response = model.chat(request);
+            String responseText = response.aiMessage().text();
+
+            agentNode.result(responseText);
+          });
     }
   }
 
-  /** Node function that sends user message to streaming OpenAI model. */
-  public static class StreamingChatFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String userMessage) {
-      // Agent objects wrapping StreamingChatModel are returned as ChatModel
-      ChatModel model = (ChatModel) agentNode.getAgentObject("openai-streaming-model");
-
-      // Build chat request
-      ChatRequest request =
-          ChatRequest.builder().messages(List.<ChatMessage>of(new UserMessage(userMessage))).build();
-
-      // Send chat request - streaming happens automatically with agent-o-rama
-      ChatResponse response = model.chat(request);
-      String responseText = response.aiMessage().text();
-
-      agentNode.result(responseText);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     String apiKey = System.getenv("OPENAI_API_KEY");

@@ -5,7 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.model.chat.ChatModel;
@@ -49,23 +48,17 @@ public class LangChain4jAgent {
               .build();
         });
 
-      topology.newAgent("LangChain4jAgent").node("chat", null, new ChatFunction());
+      topology.newAgent("LangChain4jAgent").node("chat", null, (AgentNode agentNode, String userMessage) -> {
+        ChatModel model = agentNode.getAgentObject("openai-model");
+
+        // Send chat request to OpenAI using simple API
+        String responseText = model.chat(userMessage);
+
+        agentNode.result(responseText);
+      });
     }
   }
 
-  /** Node function that sends user message to OpenAI and returns response. */
-  public static class ChatFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String userMessage) {
-      ChatModel model = agentNode.getAgentObject("openai-model");
-
-      // Send chat request to OpenAI using simple API
-      String responseText = model.chat(userMessage);
-
-      agentNode.result(responseText);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     String apiKey = System.getenv("OPENAI_API_KEY");

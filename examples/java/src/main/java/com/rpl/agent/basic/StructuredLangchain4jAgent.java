@@ -5,7 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import dev.langchain4j.model.chat.ChatModel;
@@ -60,32 +59,26 @@ public class StructuredLangchain4jAgent {
 
       topology
           .newAgent("StructuredLangChain4jAgent")
-          .node("analyze-question", null, new AnalyzeQuestionFunction());
+          .node("analyze-question", null, (AgentNode agentNode, String userQuestion) -> {
+            ChatModel model = (ChatModel) agentNode.getAgentObject("openai-model");
+
+            // Request structured output from OpenAI
+            String systemPrompt =
+                "You are an intelligent question analyzer. Analyze the user's question and provide a JSON"
+                    + " response with these fields: questionType (one of: factual, analytical, creative,"
+                    + " technical, personal), complexity (one of: simple, moderate, complex), mainTopics"
+                    + " (array of key topics), answer (direct answer to the question), confidence (one"
+                    + " of: high, medium, low).";
+
+            String fullPrompt = systemPrompt + "\n\nUser question: " + userQuestion;
+
+            String response = model.chat(fullPrompt);
+
+            agentNode.result(response);
+          });
     }
   }
 
-  /** Node function that analyzes user question and returns structured response. */
-  public static class AnalyzeQuestionFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String userQuestion) {
-      ChatModel model = (ChatModel) agentNode.getAgentObject("openai-model");
-
-      // Request structured output from OpenAI
-      String systemPrompt =
-          "You are an intelligent question analyzer. Analyze the user's question and provide a JSON"
-              + " response with these fields: questionType (one of: factual, analytical, creative,"
-              + " technical, personal), complexity (one of: simple, moderate, complex), mainTopics"
-              + " (array of key topics), answer (direct answer to the question), confidence (one"
-              + " of: high, medium, low).";
-
-      String fullPrompt = systemPrompt + "\n\nUser question: " + userQuestion;
-
-      String response = model.chat(fullPrompt);
-
-      agentNode.result(response);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     String apiKey = System.getenv("OPENAI_API_KEY");

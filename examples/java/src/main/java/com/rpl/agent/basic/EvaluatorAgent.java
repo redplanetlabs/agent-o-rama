@@ -7,7 +7,6 @@ import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.CreateEvaluatorOptions;
 import com.rpl.agentorama.ExampleRun;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.HashMap;
@@ -122,29 +121,23 @@ public class EvaluatorAgent {
           });
 
       // Simple agent that processes text
-      topology.newAgent("TextProcessor").node("process-text", null, new ProcessTextFunction());
+      topology.newAgent("TextProcessor").node("process-text", null, (AgentNode agentNode, String input) -> {
+        String response;
+        if (input.length() < 10) {
+          response = "short";
+        } else if (input.length() < 30) {
+          response = "good medium length";
+        } else {
+          response = "too long";
+        }
+
+        System.out.println("Processing input: " + input);
+        System.out.println("Generated response: " + response);
+        agentNode.result(response);
+      });
     }
   }
 
-  /** Node function that processes text and generates responses. */
-  public static class ProcessTextFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String input) {
-      String response;
-      if (input.length() < 10) {
-        response = "short";
-      } else if (input.length() < 30) {
-        response = "good medium length";
-      } else {
-        response = "too long";
-      }
-
-      System.out.println("Processing input: " + input);
-      System.out.println("Generated response: " + response);
-      agentNode.result(response);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Evaluator Example:");

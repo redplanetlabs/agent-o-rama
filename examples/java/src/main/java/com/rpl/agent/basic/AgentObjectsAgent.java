@@ -6,7 +6,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 
@@ -77,27 +76,21 @@ public class AgentObjectsAgent {
             return new MessageService(version);
           });
 
-      topology.newAgent("AgentObjectsAgent").node("use-service", null, new UseServiceFunction());
+      topology.newAgent("AgentObjectsAgent").node("use-service", null, (AgentNode agentNode, String input) -> {
+        MessageService service = (MessageService) agentNode.getAgentObject("message-service");
+        String sendTo = (String) agentNode.getAgentObject("send-to");
+
+        // Reset the thread-unsafe service for this new invocation
+        service.resetForNewInvocation();
+
+        // Use the thread-unsafe service (safe due to pooling)
+        String result = service.useService(input, sendTo);
+
+        agentNode.result(result);
+      });
     }
   }
 
-  /** Node function that uses shared agent objects including a thread-unsafe service. */
-  public static class UseServiceFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String input) {
-      MessageService service = (MessageService) agentNode.getAgentObject("message-service");
-      String sendTo = (String) agentNode.getAgentObject("send-to");
-
-      // Reset the thread-unsafe service for this new invocation
-      service.resetForNewInvocation();
-
-      // Use the thread-unsafe service (safe due to pooling)
-      String result = service.useService(input, sendTo);
-
-      agentNode.result(result);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Agent Objects Example...");

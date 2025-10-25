@@ -5,7 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.HashMap;
@@ -37,67 +36,42 @@ public class RouterAgent {
       topology
           .newAgent("RouterAgent")
           // Router node: decides which processing node to send to
-          .node("route", List.of("handle-urgent", "handle-default"), new RouteFunction())
+          .node("route", List.of("handle-urgent", "handle-default"), (AgentNode agentNode, String message) -> {
+            if (message.startsWith("urgent:")) {
+              agentNode.emit("handle-urgent", message);
+            } else {
+              agentNode.emit("handle-default", message);
+            }
+          })
           // Urgent message handler
-          .node("handle-urgent", "finalize", new HandleUrgentFunction())
+          .node("handle-urgent", "finalize", (AgentNode agentNode, String message) -> {
+            String content = message.substring(7); // remove "urgent:" prefix
+            Map<String, Object> processed = new HashMap<>();
+            processed.put("priority", "HIGH");
+            processed.put("message", content);
+            agentNode.emit("finalize", processed);
+          })
           // Default message handler
-          .node("handle-default", "finalize", new HandleDefaultFunction())
+          .node("handle-default", "finalize", (AgentNode agentNode, String message) -> {
+            Map<String, Object> processed = new HashMap<>();
+            processed.put("priority", "NORMAL");
+            processed.put("message", message);
+            agentNode.emit("finalize", processed);
+          })
           // Final node: creates the result
           // Both urgent and default handlers emit to this node - reconvergence point
-          .node("finalize", null, new FinalizeFunction());
+          .node("finalize", null, (AgentNode agentNode, Map<String, Object> processed) -> {
+            String priority = (String) processed.get("priority");
+            String message = (String) processed.get("message");
+            String result = String.format("[%s] %s", priority, message);
+            agentNode.result(result);
+          });
     }
   }
 
-  /** Router function that decides which processing node to send to. */
-  public static class RouteFunction implements RamaVoidFunction2<AgentNode, String> {
 
-    @Override
-    public void invoke(AgentNode agentNode, String message) {
-      if (message.startsWith("urgent:")) {
-        agentNode.emit("handle-urgent", message);
-      } else {
-        agentNode.emit("handle-default", message);
-      }
-    }
-  }
 
-  /** Urgent message handler that removes prefix and marks as high priority. */
-  public static class HandleUrgentFunction implements RamaVoidFunction2<AgentNode, String> {
 
-    @Override
-    public void invoke(AgentNode agentNode, String message) {
-      String content = message.substring(7); // remove "urgent:" prefix
-      Map<String, Object> processed = new HashMap<>();
-      processed.put("priority", "HIGH");
-      processed.put("message", content);
-      agentNode.emit("finalize", processed);
-    }
-  }
-
-  /** Default message handler that marks as normal priority. */
-  public static class HandleDefaultFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String message) {
-      Map<String, Object> processed = new HashMap<>();
-      processed.put("priority", "NORMAL");
-      processed.put("message", message);
-      agentNode.emit("finalize", processed);
-    }
-  }
-
-  /** Final node that creates the result from processed message. */
-  public static class FinalizeFunction
-      implements RamaVoidFunction2<AgentNode, Map<String, Object>> {
-
-    @Override
-    public void invoke(AgentNode agentNode, Map<String, Object> processed) {
-      String priority = (String) processed.get("priority");
-      String message = (String) processed.get("message");
-      String result = String.format("[%s] %s", priority, message);
-      agentNode.result(result);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Router Agent Example...");

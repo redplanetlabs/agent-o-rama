@@ -7,7 +7,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.agentorama.store.PStateStore;
 import com.rpl.rama.Path;
 import com.rpl.rama.PState;
@@ -42,7 +41,7 @@ import java.util.stream.Collectors;
  *       "averageSalary", "departmentCount", "allCompanyEmployeeNames", "queriedEmployee"
  * </ul>
  */
-public class PstateStoreAgent {
+public class PStateStoreAgent {
 
   /** Agent Module demonstrating PState store usage. */
   public static class PStateStoreModule extends AgentModule {
@@ -80,185 +79,167 @@ public class PstateStoreAgent {
 
       topology
           .newAgent("PStateStoreAgent")
-          .node("update-org", "query-data", new UpdateOrgFunction())
-          .node("query-data", "calculate-metrics", new QueryDataFunction())
-          .node("calculate-metrics", null, new CalculateMetricsFunction());
-    }
-  }
+          .node("update-org", "query-data", (AgentNode agentNode, Map<String, Object> request) -> {
+            PStateStore orgStore = agentNode.getStore("$$organizations");
+            String companyId = (String) request.get("companyId");
+            String companyName = (String) request.get("companyName");
+            String deptId = (String) request.get("deptId");
+            String deptName = (String) request.get("deptName");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> employee = (Map<String, Object>) request.get("employee");
 
-  /** Node function that initializes or updates organization data. */
-  public static class UpdateOrgFunction
-      implements RamaVoidFunction2<AgentNode, Map<String, Object>> {
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public void invoke(AgentNode agentNode, Map<String, Object> request) {
-      PStateStore orgStore = agentNode.getStore("$$organizations");
-      String companyId = (String) request.get("companyId");
-      String companyName = (String) request.get("companyName");
-      String deptId = (String) request.get("deptId");
-      String deptName = (String) request.get("deptName");
-      Map<String, Object> employee = (Map<String, Object>) request.get("employee");
-
-      // Initialize company if it doesn't exist
-      if (companyName != null) {
-        orgStore.transform(
-          companyId,
-          Path
-          .key(companyId, "name")
-          .term(existing -> existing != null ? existing : companyName));
-      }
-
-      // Initialize department if it doesn't exist
-      if (deptName != null) {
-        orgStore.transform(
-          companyId,
-          Path.key(companyId, "departments", deptId, "name")
-          .term(existing -> existing != null ? existing : deptName));
-      }
-
-      // Add or update employee
-      if (employee != null) {
-        String empId = (String) employee.get("id");
-        orgStore.transform(
-          companyId,
-          Path.key(companyId, "departments", deptId, "employees", empId)
-          .termVal(employee));
-      }
-
-      Map<String, Object> emitData = new HashMap<>();
-      emitData.put("companyId", companyId);
-      emitData.put("deptId", deptId);
-      emitData.put("employeeId", employee != null ? employee.get("id") : null);
-
-      agentNode.emit("query-data", emitData);
-    }
-  }
-
-  /** Node function that queries and analyzes data. */
-  public static class QueryDataFunction
-      implements RamaVoidFunction2<AgentNode, Map<String, Object>> {
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public void invoke(AgentNode agentNode, Map<String, Object> request) {
-      PStateStore orgStore = agentNode.getStore("$$organizations");
-      String companyId = (String) request.get("companyId");
-      String deptId = (String) request.get("deptId");
-      String employeeId = (String) request.get("employeeId");
-
-      // Query various data paths
-      String companyName =
-          (String) orgStore.selectOne(companyId, Path.key(companyId, "name"));
-
-      String deptName =
-          (String)
-          orgStore.selectOne(
-            companyId,
-            Path.key(companyId, "departments", deptId, "name"));
-
-      Map<String, Object> allEmployees =
-          (Map<String, Object>) orgStore.selectOne(
-            companyId,
-            Path.key(companyId, "departments", deptId, "employees"));
-
-      Map<String, Object> specificEmployee = null;
-      if (employeeId != null) {
-        specificEmployee =
-            (Map<String, Object>)
-                orgStore.selectOne(
+            // Initialize company if it doesn't exist
+            if (companyName != null) {
+              orgStore.transform(
                 companyId,
-                Path.key(companyId, "departments", deptId, "employees", employeeId));
-      }
+                Path
+                .key(companyId, "name")
+                .term(existing -> existing != null ? existing : companyName));
+            }
 
-      Map<String, Object> allDepartments =
-          (Map<String, Object>)
-          orgStore.selectOne(
-            companyId,
-            Path.key(companyId, "departments"));
+            // Initialize department if it doesn't exist
+            if (deptName != null) {
+              orgStore.transform(
+                companyId,
+                Path.key(companyId, "departments", deptId, "name")
+                .term(existing -> existing != null ? existing : deptName));
+            }
 
-      Map<String, Object> emitData = new HashMap<>();
-      emitData.put("companyId", companyId);
-      emitData.put("companyName", companyName);
-      emitData.put("deptId", deptId);
-      emitData.put("deptName", deptName);
-      emitData.put("allEmployees", allEmployees);
-      emitData.put("specificEmployee", specificEmployee);
-      emitData.put("allDepartments", allDepartments);
+            // Add or update employee
+            if (employee != null) {
+              String empId = (String) employee.get("id");
+              orgStore.transform(
+                companyId,
+                Path.key(companyId, "departments", deptId, "employees", empId)
+                .termVal(employee));
+            }
 
-      agentNode.emit("calculate-metrics", emitData);
+            Map<String, Object> emitData = new HashMap<>();
+            emitData.put("companyId", companyId);
+            emitData.put("deptId", deptId);
+            emitData.put("employeeId", employee != null ? employee.get("id") : null);
+
+            agentNode.emit("query-data", emitData);
+          })
+          .node("query-data", "calculate-metrics", (AgentNode agentNode, Map<String, Object> request) -> {
+            PStateStore orgStore = agentNode.getStore("$$organizations");
+            String companyId = (String) request.get("companyId");
+            String deptId = (String) request.get("deptId");
+            String employeeId = (String) request.get("employeeId");
+
+            // Query various data paths
+            String companyName =
+                (String) orgStore.selectOne(companyId, Path.key(companyId, "name"));
+
+            String deptName =
+                (String)
+                orgStore.selectOne(
+                  companyId,
+                  Path.key(companyId, "departments", deptId, "name"));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> allEmployees =
+                (Map<String, Object>) orgStore.selectOne(
+                  companyId,
+                  Path.key(companyId, "departments", deptId, "employees"));
+
+            Map<String, Object> specificEmployee = null;
+            if (employeeId != null) {
+              specificEmployee =
+                  (Map<String, Object>)
+                      orgStore.selectOne(
+                      companyId,
+                      Path.key(companyId, "departments", deptId, "employees", employeeId));
+            }
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> allDepartments =
+                (Map<String, Object>)
+                orgStore.selectOne(
+                  companyId,
+                  Path.key(companyId, "departments"));
+
+            Map<String, Object> emitData = new HashMap<>();
+            emitData.put("companyId", companyId);
+            emitData.put("companyName", companyName);
+            emitData.put("deptId", deptId);
+            emitData.put("deptName", deptName);
+            emitData.put("allEmployees", allEmployees);
+            emitData.put("specificEmployee", specificEmployee);
+            emitData.put("allDepartments", allDepartments);
+
+            agentNode.emit("calculate-metrics", emitData);
+          })
+          .node("calculate-metrics", null, (AgentNode agentNode, Map<String, Object> request) -> {
+            PStateStore orgStore = agentNode.getStore("$$organizations");
+            String companyId = (String) request.get("companyId");
+            String companyName = (String) request.get("companyName");
+            String deptId = (String) request.get("deptId");
+            String deptName = (String) request.get("deptName");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> allEmployees = (Map<String, Object>) request.get("allEmployees");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> specificEmployee = (Map<String, Object>) request.get("specificEmployee");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> allDepartments = (Map<String, Object>) request.get("allDepartments");
+
+            // Calculate department metrics
+            List<Map<String, Object>> employeeList = new ArrayList<>();
+            if (allEmployees != null) {
+              for (Object emp : allEmployees.values()) {
+                if (emp instanceof Map) {
+                  employeeList.add((Map<String, Object>) emp);
+                }
+              }
+            }
+
+            int totalEmployees = employeeList.size();
+            double avgSalary = 0;
+            if (!employeeList.isEmpty()) {
+              long sum = 0;
+              for (Map<String, Object> emp : employeeList) {
+                Long salary = (Long) emp.get("salary");
+                if (salary != null) {
+                  sum += salary;
+                }
+              }
+              avgSalary = (double) sum / totalEmployees;
+            }
+
+            int deptCount = allDepartments != null ? allDepartments.size() : 0;
+
+            // Demonstrate complex path querying - get all employee names across all departments
+            List<String> allCompanyEmployeeNames =
+                orgStore.select(
+                  companyId,
+                  Path.key(companyId, "departments")
+                  .mapVals()
+                  .key("employees")
+                  .mapVals()
+                  .key("name")).stream()
+              .map(obj -> (String) obj)
+              .collect(Collectors.toList());
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("action", "pstate-query");
+            result.put("companyId", companyId);
+            result.put("companyName", companyName);
+            result.put("deptId", deptId);
+            result.put("deptName", deptName);
+            result.put("employeeCount", totalEmployees);
+            result.put("averageSalary", avgSalary);
+            result.put("departmentCount", deptCount);
+            result.put("allCompanyEmployeeNames", allCompanyEmployeeNames);
+            result.put("queriedEmployee", specificEmployee);
+            result.put("processedAt", System.currentTimeMillis());
+
+            agentNode.result(result);
+          });
     }
   }
 
-  /** Final node function that calculates metrics and returns result. */
-  public static class CalculateMetricsFunction
-      implements RamaVoidFunction2<AgentNode, Map<String, Object>> {
 
-    @Override
-    @SuppressWarnings("unchecked")
-    public void invoke(AgentNode agentNode, Map<String, Object> request) {
-      PStateStore orgStore = agentNode.getStore("$$organizations");
-      String companyId = (String) request.get("companyId");
-      String companyName = (String) request.get("companyName");
-      String deptId = (String) request.get("deptId");
-      String deptName = (String) request.get("deptName");
-      Map<String, Object> allEmployees = (Map<String, Object>) request.get("allEmployees");
-      Map<String, Object> specificEmployee = (Map<String, Object>) request.get("specificEmployee");
-      Map<String, Object> allDepartments = (Map<String, Object>) request.get("allDepartments");
 
-      // Calculate department metrics
-      List<Map<String, Object>> employeeList = new ArrayList<>();
-      if (allEmployees != null) {
-        for (Object emp : allEmployees.values()) {
-          if (emp instanceof Map) {
-            employeeList.add((Map<String, Object>) emp);
-          }
-        }
-      }
-
-      int totalEmployees = employeeList.size();
-      double avgSalary = 0;
-      if (!employeeList.isEmpty()) {
-        long sum = 0;
-        for (Map<String, Object> emp : employeeList) {
-          Long salary = (Long) emp.get("salary");
-          if (salary != null) {
-            sum += salary;
-          }
-        }
-        avgSalary = (double) sum / totalEmployees;
-      }
-
-      int deptCount = allDepartments != null ? allDepartments.size() : 0;
-
-      // Demonstrate complex path querying - get all employee names across all departments
-      List<String> allCompanyEmployeeNames =
-          orgStore.select(
-            companyId,
-            Path.key(companyId, "departments")
-            .mapVals()
-            .key("employees")
-            .mapVals()
-            .key("name")).stream()
-        .map(obj -> (String) obj)
-        .collect(Collectors.toList());
-
-      Map<String, Object> result = new HashMap<>();
-      result.put("action", "pstate-query");
-      result.put("companyId", companyId);
-      result.put("companyName", companyName);
-      result.put("deptId", deptId);
-      result.put("deptName", deptName);
-      result.put("employeeCount", totalEmployees);
-      result.put("averageSalary", avgSalary);
-      result.put("departmentCount", deptCount);
-      result.put("allCompanyEmployeeNames", allCompanyEmployeeNames);
-      result.put("queriedEmployee", specificEmployee);
-      result.put("processedAt", System.currentTimeMillis());
-
-      agentNode.result(result);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     try (InProcessCluster ipc = InProcessCluster.create()) {

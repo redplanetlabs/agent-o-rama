@@ -6,9 +6,6 @@ import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.BuiltIn;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
-import com.rpl.agentorama.ops.RamaVoidFunction3;
-import com.rpl.rama.ops.RamaFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.ArrayList;
@@ -42,92 +39,68 @@ public class AggregationAgent {
       topology
           .newAgent("AggregationAgent")
           // Start aggregation by distributing work to parallel processors
-          .aggStartNode("distribute-work", "process-chunk", new DistributeWorkFunction())
+          .aggStartNode("distribute-work", "process-chunk", (AgentNode agentNode, Map<String, Object> request) -> {
+            @SuppressWarnings("unchecked")
+            List<Integer> data = (List<Integer>) request.get("data");
+            int chunkSize = (Integer) request.get("chunkSize");
+
+            // Create chunks from the data
+            List<List<Integer>> chunks = new ArrayList<>();
+            for (int i = 0; i < data.size(); i += chunkSize) {
+              int end = Math.min(i + chunkSize, data.size());
+              chunks.add(new ArrayList<>(data.subList(i, end)));
+            }
+
+            // Emit each chunk for parallel processing
+            for (List<Integer> chunk : chunks) {
+              agentNode.emit("process-chunk", chunk);
+            }
+
+            return null; // aggStartNode doesn't need to return meaningful data
+          })
           // Process individual chunks in parallel
-          .node("process-chunk", "collect-results", new ProcessChunkFunction())
+          .node("process-chunk", "collect-results", (AgentNode agentNode, List<Integer> chunk) -> {
+            // Transform the chunk data (square each value)
+            List<Integer> processedChunk = new ArrayList<>();
+            int chunkSum = 0;
+            for (Integer value : chunk) {
+              int squared = value * value;
+              processedChunk.add(squared);
+              chunkSum += squared;
+            }
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("originalChunk", chunk);
+            result.put("processedChunk", processedChunk);
+            result.put("chunkSum", chunkSum);
+
+            agentNode.emit("collect-results", result);
+          })
           // Aggregate all results using built-in vector aggregator
-          .aggNode("collect-results", null, BuiltIn.LIST_AGG, new CollectResultsFunction());
+          .aggNode("collect-results", null, BuiltIn.LIST_AGG, (AgentNode agentNode, List<Map<String, Object>> aggregatedResults, Object startNodeResult) -> {
+            // Sort chunks by their first element to ensure consistent order
+            List<Map<String, Object>> sortedResults = new ArrayList<>(aggregatedResults);
+            sortedResults.sort(
+                Comparator.comparing(result -> ((List<Integer>) result.get("originalChunk")).get(0)));
+
+            int totalSum = 0;
+            int totalItems = 0;
+            for (Map<String, Object> result : sortedResults) {
+              totalSum += (Integer) result.get("chunkSum");
+              totalItems += ((List<Integer>) result.get("originalChunk")).size();
+            }
+
+            Map<String, Object> finalResult = new HashMap<>();
+            finalResult.put("totalItems", totalItems);
+            finalResult.put("totalSum", totalSum);
+            finalResult.put("chunksProcessed", sortedResults.size());
+            finalResult.put("chunkResults", sortedResults);
+
+            agentNode.result(finalResult);
+          });
     }
   }
 
-  /** Aggregation start function that distributes work to parallel processors. */
-  public static class DistributeWorkFunction
-      implements RamaFunction2<AgentNode, Map<String, Object>, Object> {
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public Object invoke(AgentNode agentNode, Map<String, Object> request) {
-      List<Integer> data = (List<Integer>) request.get("data");
-      int chunkSize = (Integer) request.get("chunkSize");
-
-      // Create chunks from the data
-      List<List<Integer>> chunks = new ArrayList<>();
-      for (int i = 0; i < data.size(); i += chunkSize) {
-        int end = Math.min(i + chunkSize, data.size());
-        chunks.add(new ArrayList<>(data.subList(i, end)));
-      }
-
-      // Emit each chunk for parallel processing
-      for (List<Integer> chunk : chunks) {
-        agentNode.emit("process-chunk", chunk);
-      }
-
-      return null; // aggStartNode doesn't need to return meaningful data
-    }
-  }
-
-  /** Function that processes individual chunks in parallel. */
-  public static class ProcessChunkFunction implements RamaVoidFunction2<AgentNode, List<Integer>> {
-
-    @Override
-    public void invoke(AgentNode agentNode, List<Integer> chunk) {
-      // Transform the chunk data (square each value)
-      List<Integer> processedChunk = new ArrayList<>();
-      int chunkSum = 0;
-      for (Integer value : chunk) {
-        int squared = value * value;
-        processedChunk.add(squared);
-        chunkSum += squared;
-      }
-
-      Map<String, Object> result = new HashMap<>();
-      result.put("originalChunk", chunk);
-      result.put("processedChunk", processedChunk);
-      result.put("chunkSum", chunkSum);
-
-      agentNode.emit("collect-results", result);
-    }
-  }
-
-  /** Function that aggregates all results using built-in vector aggregator. */
-  public static class CollectResultsFunction
-      implements RamaVoidFunction3<AgentNode, List<Map<String, Object>>, Object> {
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public void invoke(
-        AgentNode agentNode, List<Map<String, Object>> aggregatedResults, Object startNodeResult) {
-      // Sort chunks by their first element to ensure consistent order
-      List<Map<String, Object>> sortedResults = new ArrayList<>(aggregatedResults);
-      sortedResults.sort(
-          Comparator.comparing(result -> ((List<Integer>) result.get("originalChunk")).get(0)));
-
-      int totalSum = 0;
-      int totalItems = 0;
-      for (Map<String, Object> result : sortedResults) {
-        totalSum += (Integer) result.get("chunkSum");
-        totalItems += ((List<Integer>) result.get("originalChunk")).size();
-      }
-
-      Map<String, Object> finalResult = new HashMap<>();
-      finalResult.put("totalItems", totalItems);
-      finalResult.put("totalSum", totalSum);
-      finalResult.put("chunksProcessed", sortedResults.size());
-      finalResult.put("chunkResults", sortedResults);
-
-      agentNode.result(finalResult);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Aggregation Agent Example...");

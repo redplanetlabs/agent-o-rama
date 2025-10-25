@@ -6,7 +6,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.ArrayList;
@@ -37,62 +36,54 @@ public class StreamingAgent {
 
     @Override
     protected void defineAgents(AgentTopology topology) {
-      topology.newAgent("StreamingAgent").node("process-data", null, new ProcessDataFunction());
+      topology.newAgent("StreamingAgent").node("process-data", null, (AgentNode agentNode, Map<String, Object> request) -> {
+        int dataSize = (Integer) request.get("dataSize");
+        int chunkSize = (Integer) request.get("chunkSize");
+        int totalChunks = (int) Math.ceil((double) dataSize / chunkSize);
+
+        System.out.printf("Processing %d items in chunks of %d%n", dataSize, chunkSize);
+
+        // Stream progress as we process chunks
+        for (int chunkNum = 0; chunkNum < totalChunks; chunkNum++) {
+          int startIdx = chunkNum * chunkSize;
+          int endIdx = Math.min(startIdx + chunkSize, dataSize);
+          List<Integer> items = new ArrayList<>();
+          for (int i = startIdx; i < endIdx; i++) {
+            items.add(i);
+          }
+          double progress = (double) (chunkNum + 1) / totalChunks;
+
+          // Simulate processing time
+          try {
+            Thread.sleep(100);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+
+          // Stream chunk progress
+          Map<String, Object> chunkData = new HashMap<>();
+          chunkData.put("chunkNumber", chunkNum);
+          chunkData.put("itemsProcessed", items.size());
+          chunkData.put("progress", progress);
+          chunkData.put("items", items);
+          agentNode.streamChunk(chunkData);
+
+          System.out.printf(
+              "Processed chunk %d/%d (%.1f%%)%n", chunkNum + 1, totalChunks, progress * 100.0);
+        }
+
+        // Return final result
+        Map<String, Object> result = new HashMap<>();
+        result.put("action", "data-processing");
+        result.put("totalItems", dataSize);
+        result.put("totalChunks", totalChunks);
+        result.put("chunkSize", chunkSize);
+        result.put("completedAt", System.currentTimeMillis());
+        agentNode.result(result);
+      });
     }
   }
 
-  /** Node function that processes data and streams progress updates. */
-  public static class ProcessDataFunction
-      implements RamaVoidFunction2<AgentNode, Map<String, Object>> {
-
-    @Override
-    public void invoke(AgentNode agentNode, Map<String, Object> request) {
-      int dataSize = (Integer) request.get("dataSize");
-      int chunkSize = (Integer) request.get("chunkSize");
-      int totalChunks = (int) Math.ceil((double) dataSize / chunkSize);
-
-      System.out.printf("Processing %d items in chunks of %d%n", dataSize, chunkSize);
-
-      // Stream progress as we process chunks
-      for (int chunkNum = 0; chunkNum < totalChunks; chunkNum++) {
-        int startIdx = chunkNum * chunkSize;
-        int endIdx = Math.min(startIdx + chunkSize, dataSize);
-        List<Integer> items = new ArrayList<>();
-        for (int i = startIdx; i < endIdx; i++) {
-          items.add(i);
-        }
-        double progress = (double) (chunkNum + 1) / totalChunks;
-
-        // Simulate processing time
-        try {
-          Thread.sleep(100);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          return;
-        }
-
-        // Stream chunk progress
-        Map<String, Object> chunkData = new HashMap<>();
-        chunkData.put("chunkNumber", chunkNum);
-        chunkData.put("itemsProcessed", items.size());
-        chunkData.put("progress", progress);
-        chunkData.put("items", items);
-        agentNode.streamChunk(chunkData);
-
-        System.out.printf(
-            "Processed chunk %d/%d (%.1f%%)%n", chunkNum + 1, totalChunks, progress * 100.0);
-      }
-
-      // Return final result
-      Map<String, Object> result = new HashMap<>();
-      result.put("action", "data-processing");
-      result.put("totalItems", dataSize);
-      result.put("totalChunks", totalChunks);
-      result.put("chunkSize", chunkSize);
-      result.put("completedAt", System.currentTimeMillis());
-      agentNode.result(result);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Streaming Agent Example...");

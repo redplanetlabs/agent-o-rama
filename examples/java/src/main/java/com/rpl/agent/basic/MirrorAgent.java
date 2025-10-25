@@ -5,7 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
 import com.rpl.agentorama.AgentModule;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 
@@ -34,19 +33,13 @@ public class MirrorAgent {
 
     @Override
     protected void defineAgents(AgentTopology topology) {
-      topology.newAgent("Greeter").node("greet", null, new GreetFunction());
+      topology.newAgent("Greeter").node("greet", null, (AgentNode agentNode, String name) -> {
+        String greeting = "Hello, " + name + "!";
+        agentNode.result(greeting);
+      });
     }
   }
 
-  /** Node function that creates a greeting message. */
-  public static class GreetFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String name) {
-      String greeting = "Hello, " + name + "!";
-      agentNode.result(greeting);
-    }
-  }
 
   /**
    * Module 2: Mirror agent that invokes Greeter from Module 1.
@@ -66,26 +59,20 @@ public class MirrorAgent {
       // Declare mirror reference to Greeter agent in GreeterModule
       topology.declareClusterAgent("GreeterMirror", greeterModuleName, "Greeter");
 
-      topology.newAgent("MirrorAgent").node("process", null, new ProcessFunction());
+      topology.newAgent("MirrorAgent").node("process", null, (AgentNode agentNode, String name) -> {
+        // Get client for the mirror agent
+        AgentClient greeterClient = agentNode.getAgentClient("GreeterMirror");
+
+        // Invoke the mirror agent (cross-module call)
+        String greeting = (String) greeterClient.invoke(name);
+
+        // Add prefix to result
+        String result = "Mirror says: " + greeting;
+        agentNode.result(result);
+      });
     }
   }
 
-  /** Node function that invokes the mirror agent and adds a prefix. */
-  public static class ProcessFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String name) {
-      // Get client for the mirror agent
-      AgentClient greeterClient = agentNode.getAgentClient("GreeterMirror");
-
-      // Invoke the mirror agent (cross-module call)
-      String greeting = (String) greeterClient.invoke(name);
-
-      // Add prefix to result
-      String result = "Mirror says: " + greeting;
-      agentNode.result(result);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Mirror Agent Example...");

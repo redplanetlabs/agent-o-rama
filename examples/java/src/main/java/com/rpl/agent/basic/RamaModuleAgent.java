@@ -4,7 +4,6 @@ import com.rpl.agentorama.AgentClient;
 import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.Depot;
 import com.rpl.rama.RamaModule;
 import com.rpl.rama.module.StreamTopology;
@@ -65,32 +64,21 @@ public class RamaModuleAgent {
       // Define a simple feedback agent
       topology
           .newAgent("FeedbackAgent")
-          .node("process-feedback", null, new ProcessFeedbackFunction());
+          .node("process-feedback", null, (AgentNode agentNode, String feedbackText) -> {
+            // Process feedback and return success response
+            HashMap<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Processed: " + feedbackText);
+            response.put("length", feedbackText.length());
+
+            agentNode.result(response);
+          });
 
       // Explicitly finalize agent definitions
       topology.define();
     }
   }
 
-  /**
-   * Node function that processes feedback and returns a response.
-   *
-   * <p>This function creates a structured response containing the status, processed message, and
-   * feedback length.
-   */
-  public static class ProcessFeedbackFunction implements RamaVoidFunction2<AgentNode, String> {
-
-    @Override
-    public void invoke(AgentNode agentNode, String feedbackText) {
-      // Process feedback and return success response
-      HashMap<String, Object> response = new HashMap<>();
-      response.put("status", "success");
-      response.put("message", "Processed: " + feedbackText);
-      response.put("length", feedbackText.length());
-
-      agentNode.result(response);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
     System.out.println("Starting Rama Module Agent Example...");
