@@ -160,8 +160,7 @@ public class ResearchAgentModule extends AgentModule {
 
   private static final HttpClient httpClient = HttpClient.newHttpClient();
   private static final ObjectMapper objectMapper = new ObjectMapper();
-  
-  // JSON Schema for analyst response (matching Clojure ANALYST-RESPONSE-SCHEMA)
+
   private static final JsonSchema ANALYST_RESPONSE_SCHEMA = JsonSchema.builder()
     .name("analysts")
     .rootElement(JsonObjectSchema.builder()
@@ -214,28 +213,24 @@ public class ResearchAgentModule extends AgentModule {
         String topic = (String) config.get("topic");
         Integer maxAnalysts = (Integer) config.get("max-analysts");
 
-        // Use non-streaming model for JSON schema support
         ChatModel openai = (ChatModel) agentNode.getAgentObject("openai-non-streaming");
 
         String instructions = String.format(ANALYST_INSTRUCTIONS, topic, humanFeedback, maxAnalysts);
 
-        // Create structured chat request with JSON response format
         List<ChatMessage> messages = Arrays.asList(new SystemMessage(instructions));
 
-        // Use ChatRequest with JSON response format to enforce schema at model level (matching Clojure)
         ResponseFormat responseFormat = ResponseFormat.builder()
           .type(ResponseFormatType.JSON)
           .jsonSchema(ANALYST_RESPONSE_SCHEMA)
           .build();
-        
+
         ChatRequest chatRequest = ChatRequest.builder()
           .messages(messages)
           .responseFormat(responseFormat)
           .build();
-        
+
         String response = openai.chat(chatRequest).aiMessage().text();
 
-        // Parse the JSON response to extract analysts
         List<Map<String, Object>> analysts = parseAnalystsResponse(response);
 
         agentNode.emit("feedback", analysts, config);
@@ -490,22 +485,12 @@ public class ResearchAgentModule extends AgentModule {
     chatMessages.add(new SystemMessage(SEARCH_INSTRUCTIONS));
     chatMessages.addAll(messages);
 
-    int maxAttempts = 3;
-    int attempts = 0;
-
-    while (attempts < maxAttempts) {
+    int iters = 0;
+    while (iters < 3) {
       String query = openai.chat(chatMessages).aiMessage().text();
-
-      if (query.length() <= 400) {
-        return query;
-      }
-
-      attempts++;
-      if (attempts >= maxAttempts) {
-        throw new RuntimeException("Failed to generate search query <= 400 chars");
-      }
-
-      chatMessages.add(new UserMessage("You last generated: " + query + "\nTry again and keep the query under 400 chars."));
+      if (query.length() <= 400) return query;
+      chatMessages.add(new UserMessage(String.format("You last generated: %s\nTry again and keep the query under 400 chars.", query)));
+      iters++;
     }
 
     throw new RuntimeException("Failed to generate search query <= 400 chars");
