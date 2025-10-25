@@ -133,7 +133,8 @@
            (fn [params]
              (fn [fetcher input ref-output output]
                {"score-a" (count (first input))
-                "score-b" (+ (count output) 0.5)}
+                "score-b" (+ (count output) 0.5)
+                "score-c" (if (<= (count (first input)) 3) "small" "large")}
              )))
           (aor/declare-agent-object-builder
            topology
@@ -434,6 +435,10 @@
                  1 {"_aor/default" {:count 2 :rest-sum 13.0}}}
                 (fetch-day [:eval :rule2 :score-b] nil))))
 
+       (is (= {0 {"small" {:count 2 :rest-sum 2}}
+               1 {"small" {:count 1 :rest-sum 1}
+                  "large" {:count 1 :rest-sum 1}}}
+              (fetch-day [:eval :rule2 :score-c] nil)))
 
        ;; verify all-agent-metrics topology
        (bind all-agent-metrics (:all-agent-metrics-query (aor-types/underlying-objects foo)))
@@ -445,6 +450,7 @@
                   (conj [:eval :rule1 :concise?])
                   (conj [:eval :rule2 :score-a])
                   (conj [:eval :rule2 :score-b])
+                  (conj [:eval :rule2 :score-c])
               )))
 
        (TopologyUtils/advanceSimTime (minute-millis 1))
