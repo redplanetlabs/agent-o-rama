@@ -46,9 +46,7 @@ public class MultiAggAgent {
               "distribute-data",
               List.of("process-numbers", "process-text"),
               (AgentNode agentNode, Map<String, Object> request) -> {
-                @SuppressWarnings("unchecked")
                 List<Integer> numbers = (List<Integer>) request.get("numbers");
-                @SuppressWarnings("unchecked")
                 List<String> text = (List<String>) request.get("text");
 
                 System.out.println("Distributing data for parallel processing");
@@ -105,9 +103,7 @@ public class MultiAggAgent {
                         return state;
                       }),
               (AgentNode agentNode, AggregationState aggregatedState, Object startNodeArg) -> {
-                @SuppressWarnings("unchecked")
                 List<Map<String, Object>> numbers = aggregatedState.numbers;
-                @SuppressWarnings("unchecked")
                 List<Map<String, Object>> textEntries = aggregatedState.text;
 
                 // Calculate statistics from numbers
@@ -170,7 +166,6 @@ public class MultiAggAgent {
       int size = in.readInt();
       byte[] ser = new byte[size];
       in.readFully(ser);
-      @SuppressWarnings("unchecked")
       Map<String, Object> data = (Map<String, Object>) com.rpl.agentorama.impl.AORHelpers.thaw(ser);
       this.fromMap(data);
     }
@@ -182,7 +177,6 @@ public class MultiAggAgent {
       return map;
     }
 
-    @SuppressWarnings("unchecked")
     private void fromMap(Map<String, Object> map) {
       this.numbers = (List<Map<String, Object>>) map.get("numbers");
       this.text = (List<Map<String, Object>>) map.get("text");
@@ -214,11 +208,9 @@ public class MultiAggAgent {
           new ArrayList(
               List.of("Hello world", "Multi-agg is powerful", "Parallel processing rocks")));
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result = (Map<String, Object>) agent.invoke(request);
 
       System.out.println("\nResults:");
-      @SuppressWarnings("unchecked")
       Map<String, Object> summary = (Map<String, Object>) result.get("summary");
       System.out.println("  Summary:");
       System.out.println("    Numbers processed: " + summary.get("numbersProcessed"));
@@ -229,11 +221,8 @@ public class MultiAggAgent {
       System.out.println("    Total words: " + summary.get("totalWords"));
       System.out.println("    Total characters: " + summary.get("totalCharacters"));
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> details = (Map<String, Object>) result.get("details");
-      @SuppressWarnings("unchecked")
       List<Map<String, Object>> numberDetails = (List<Map<String, Object>>) details.get("numbers");
-      @SuppressWarnings("unchecked")
       List<Map<String, Object>> textDetails = (List<Map<String, Object>>) details.get("text");
 
       System.out.println("\n  Sample detailed results:");

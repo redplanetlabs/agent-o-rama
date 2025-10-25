@@ -153,7 +153,6 @@ public class KeyValueStoreAgent {
 
       // Demonstrate different counter operations
       System.out.println("\n--- Setting initial counter value ---");
-      @SuppressWarnings("unchecked")
       Map<String, Object> result1 =
           (Map<String, Object>)
               agent.invoke(createCounterRequest("page-views", Operation.SET, 10L));
@@ -162,7 +161,6 @@ public class KeyValueStoreAgent {
           result1.get("action"), result1.get("counter"), result1.get("value"));
 
       System.out.println("\n--- Getting current counter value ---");
-      @SuppressWarnings("unchecked")
       Map<String, Object> result2 =
           (Map<String, Object>)
               agent.invoke(createCounterRequest("page-views", Operation.GET, null));
@@ -171,7 +169,6 @@ public class KeyValueStoreAgent {
           result2.get("action"), result2.get("counter"), result2.get("value"));
 
       System.out.println("\n--- Incrementing counter ---");
-      @SuppressWarnings("unchecked")
       Map<String, Object> result3 =
           (Map<String, Object>)
               agent.invoke(createCounterRequest("page-views", Operation.INCREMENT, null));
@@ -183,7 +180,6 @@ public class KeyValueStoreAgent {
           result3.get("newValue"));
 
       System.out.println("\n--- Updating counter by adding value ---");
-      @SuppressWarnings("unchecked")
       Map<String, Object> result4 =
           (Map<String, Object>)
               agent.invoke(createCounterRequest("page-views", Operation.UPDATE, 5L));
@@ -196,7 +192,6 @@ public class KeyValueStoreAgent {
           result4.get("newValue"));
 
       System.out.println("\n--- Working with different counter ---");
-      @SuppressWarnings("unchecked")
       Map<String, Object> result5 =
           (Map<String, Object>)
               agent.invoke(createCounterRequest("api-calls", Operation.INCREMENT, null));
@@ -208,11 +203,9 @@ public class KeyValueStoreAgent {
           result5.get("newValue"));
 
       System.out.println("\n--- Final state check ---");
-      @SuppressWarnings("unchecked")
       Map<String, Object> result6 =
           (Map<String, Object>)
               agent.invoke(createCounterRequest("page-views", Operation.GET, null));
-      @SuppressWarnings("unchecked")
       Map<String, Object> result7 =
           (Map<String, Object>)
               agent.invoke(createCounterRequest("api-calls", Operation.GET, null));

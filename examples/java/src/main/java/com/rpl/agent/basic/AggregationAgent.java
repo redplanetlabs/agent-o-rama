@@ -40,7 +40,6 @@ public class AggregationAgent {
           .newAgent("AggregationAgent")
           // Start aggregation by distributing work to parallel processors
           .aggStartNode("distribute-work", "process-chunk", (AgentNode agentNode, Map<String, Object> request) -> {
-            @SuppressWarnings("unchecked")
             List<Integer> data = (List<Integer>) request.get("data");
             int chunkSize = (Integer) request.get("chunkSize");
 
@@ -129,7 +128,6 @@ public class AggregationAgent {
       request1.put("data", testData);
       request1.put("chunkSize", 5);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result1 = (Map<String, Object>) agent.invoke(request1);
       System.out.println("Result 1:");
       System.out.println("  Total items: " + result1.get("totalItems"));
@@ -141,7 +139,6 @@ public class AggregationAgent {
       request2.put("data", testData);
       request2.put("chunkSize", 3);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result2 = (Map<String, Object>) agent.invoke(request2);
       System.out.println("Result 2:");
       System.out.println("  Total items: " + result2.get("totalItems"));

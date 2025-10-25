@@ -174,13 +174,10 @@ public class ProvidedEvaluatorBuildersExample {
 
       // Test aor/conciseness evaluator
       System.out.println("\n3. Testing aor/conciseness evaluator...");
-      @SuppressWarnings("unchecked")
       Map<String, Object> shortConcise =
           (Map<String, Object>) manager.tryEvaluator("brief-check", "test", "brief", shortOutput);
-      @SuppressWarnings("unchecked")
       Map<String, Object> mediumConcise =
           (Map<String, Object>) manager.tryEvaluator("brief-check", "test", "brief", mediumOutput);
-      @SuppressWarnings("unchecked")
       Map<String, Object> longConcise =
           (Map<String, Object>) manager.tryEvaluator("brief-check", "test", "brief", longOutput);
 
@@ -197,7 +194,6 @@ public class ProvidedEvaluatorBuildersExample {
               ExampleRun.create("input3", "positive", "positive"),
               ExampleRun.create("input4", "negative", "positive")); // This one is wrong
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> f1Result =
           (Map<String, Object>) manager.trySummaryEvaluator("sentiment-f1", examples);
 

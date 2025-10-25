@@ -85,7 +85,6 @@ public class PStateStoreAgent {
             String companyName = (String) request.get("companyName");
             String deptId = (String) request.get("deptId");
             String deptName = (String) request.get("deptName");
-            @SuppressWarnings("unchecked")
             Map<String, Object> employee = (Map<String, Object>) request.get("employee");
 
             // Initialize company if it doesn't exist
@@ -137,7 +136,6 @@ public class PStateStoreAgent {
                   companyId,
                   Path.key(companyId, "departments", deptId, "name"));
 
-            @SuppressWarnings("unchecked")
             Map<String, Object> allEmployees =
                 (Map<String, Object>) orgStore.selectOne(
                   companyId,
@@ -152,7 +150,6 @@ public class PStateStoreAgent {
                       Path.key(companyId, "departments", deptId, "employees", employeeId));
             }
 
-            @SuppressWarnings("unchecked")
             Map<String, Object> allDepartments =
                 (Map<String, Object>)
                 orgStore.selectOne(
@@ -176,11 +173,8 @@ public class PStateStoreAgent {
             String companyName = (String) request.get("companyName");
             String deptId = (String) request.get("deptId");
             String deptName = (String) request.get("deptName");
-            @SuppressWarnings("unchecked")
             Map<String, Object> allEmployees = (Map<String, Object>) request.get("allEmployees");
-            @SuppressWarnings("unchecked")
             Map<String, Object> specificEmployee = (Map<String, Object>) request.get("specificEmployee");
-            @SuppressWarnings("unchecked")
             Map<String, Object> allDepartments = (Map<String, Object>) request.get("allDepartments");
 
             // Calculate department metrics
@@ -269,7 +263,6 @@ public class PStateStoreAgent {
       emp1.put("metadata", meta1);
       request1.put("employee", emp1);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result1 = (Map<String, Object>) agent.invoke(request1);
       System.out.println("Result 1:");
       System.out.println("  Company: " + result1.get("companyName"));
@@ -292,7 +285,6 @@ public class PStateStoreAgent {
       emp2.put("metadata", meta2);
       request2.put("employee", emp2);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result2 = (Map<String, Object>) agent.invoke(request2);
       System.out.println("Result 2:");
       System.out.println("  Employee count: " + result2.get("employeeCount"));
@@ -315,7 +307,6 @@ public class PStateStoreAgent {
       emp3.put("metadata", meta3);
       request3.put("employee", emp3);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result3 = (Map<String, Object>) agent.invoke(request3);
       System.out.println("Result 3:");
       System.out.println("  Department count: " + result3.get("departmentCount"));

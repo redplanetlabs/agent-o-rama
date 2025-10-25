@@ -57,7 +57,7 @@ public class StreamingAgent {
           try {
             Thread.sleep(100);
           } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            throw new RuntimeException("Processing interrupted", e);
           }
 
           // Stream chunk progress
@@ -114,7 +114,6 @@ public class StreamingAgent {
           "process-data",
           (allChunks, newChunks, reset, complete) -> {
             for (Object chunkObj : newChunks) {
-              @SuppressWarnings("unchecked")
               Map<String, Object> chunk = (Map<String, Object>) chunkObj;
               chunksReceived.incrementAndGet();
               System.out.printf(
@@ -126,7 +125,6 @@ public class StreamingAgent {
           });
 
       // Wait for completion
-      @SuppressWarnings("unchecked")
       Map<String, Object> result = (Map<String, Object>) agent.result(invoke);
 
       System.out.println("\nFinal result:");

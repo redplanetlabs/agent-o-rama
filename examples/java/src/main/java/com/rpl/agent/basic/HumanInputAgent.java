@@ -147,7 +147,6 @@ public class HumanInputAgent {
       }
 
       // Get final result as HashMap
-      @SuppressWarnings("unchecked")
       Map<String, Object> result = (Map<String, Object>) agent.result(invoke);
       System.out.println("Final result:");
       System.out.println("Response: " + result.get("response"));
