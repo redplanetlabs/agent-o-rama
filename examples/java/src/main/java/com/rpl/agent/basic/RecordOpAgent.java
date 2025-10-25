@@ -70,9 +70,7 @@ public class RecordOpAgent {
   public static void main(String[] args) throws Exception {
     System.out.println("Starting RecordOp Agent Example...");
 
-    try (InProcessCluster ipc = InProcessCluster.create();
-        AutoCloseable ui = UI.start(ipc, UI.Options.noInputBeforeClose())) {
-
+    try (InProcessCluster ipc = InProcessCluster.create()) {
       // Launch the agent module
       RecordOpModule module = new RecordOpModule();
       ipc.launchModule(module, new LaunchConfig(1, 1));

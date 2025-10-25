@@ -96,7 +96,7 @@
       AutoCloseable
       (close [_this]
         (when-not (:no-input-before-close options)
-          (cljlogging/info "press enter to close the ui, default port is 1974")
+          (println "press enter to close the ui, default port is 1974")
           (read-line))
         (stop-ui)
         :closed)))))

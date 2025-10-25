@@ -56,29 +56,29 @@ public class ReActExample {
 
     System.out.println("Starting ReAct Agent Example...");
 
-    try (InProcessCluster ipc = InProcessCluster.create();
-         AutoCloseable ui = UI.start(ipc)) {
+    try (InProcessCluster ipc = InProcessCluster.create()) {
+      try (AutoCloseable ui = UI.start(ipc)) {
+        ReActModule module = new ReActModule();
+        ipc.launchModule(module, new LaunchConfig(1, 1));
 
-      ReActModule module = new ReActModule();
-      ipc.launchModule(module, new LaunchConfig(1, 1));
+        String moduleName = module.getModuleName();
+        AgentManager agentManager = AgentManager.create(ipc, moduleName);
+        AgentClient agent = agentManager.getAgentClient("ReActAgent");
 
-      String moduleName = module.getModuleName();
-      AgentManager agentManager = AgentManager.create(ipc, moduleName);
-      AgentClient agent = agentManager.getAgentClient("ReActAgent");
+        System.out.println("This agent can search the web to answer your questions.");
+        System.out.println();
+        System.out.print("Ask your question (agent has web search access): ");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String userInput = reader.readLine();
+        List messages =
+            Arrays.asList(
+                SystemMessage.from(String.format(SYSTEM_PROMPT, Instant.now())),
+                UserMessage.from(userInput));
+        Object result = agent.invoke(messages);
 
-      System.out.println("This agent can search the web to answer your questions.");
-      System.out.println();
-      System.out.print("Ask your question (agent has web search access): ");
-      BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-      String userInput = reader.readLine();
-      List messages =
-          Arrays.asList(
-              SystemMessage.from(String.format(SYSTEM_PROMPT, Instant.now())),
-              UserMessage.from(userInput));
-      Object result = agent.invoke(messages);
-
-      System.out.println("\nAgent: " + result);
-      System.out.println();
+        System.out.println("\nAgent: " + result);
+        System.out.println();
+      }
     }
   }
 }

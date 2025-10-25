@@ -18,45 +18,45 @@ public class ResearchAgentExample {
     System.out.println("Starting Research Agent Example...");
 
     try (InProcessCluster ipc = InProcessCluster.create();
-         AutoCloseable ui = UI.start(ipc);
          Scanner scanner = new Scanner(System.in)) {
+      try (AutoCloseable ui = UI.start(ipc)) {
+        ResearchAgentModule module = new ResearchAgentModule();
+        ipc.launchModule(module, new LaunchConfig(4, 2));
 
-      ResearchAgentModule module = new ResearchAgentModule();
-      ipc.launchModule(module, new LaunchConfig(4, 2));
+        String moduleName = module.getModuleName();
+        AgentManager manager = AgentManager.create(ipc, moduleName);
+        AgentClient researcher = manager.getAgentClient("researcher");
 
-      String moduleName = module.getModuleName();
-      AgentManager manager = AgentManager.create(ipc, moduleName);
-      AgentClient researcher = manager.getAgentClient("researcher");
+        System.out.print("Enter a topic: ");
+        System.out.flush();
+        String topic = scanner.nextLine();
+        System.out.println();
 
-      System.out.print("Enter a topic: ");
-      System.out.flush();
-      String topic = scanner.nextLine();
-      System.out.println();
+        Map<String, Object> input = new HashMap<>();
+        input.put("topic", topic);
+        AgentInvoke invoke = researcher.initiate("", input);
 
-      Map<String, Object> input = new HashMap<>();
-      input.put("topic", topic);
-      AgentInvoke invoke = researcher.initiate("", input);
+        Object step = researcher.nextStep(invoke);
+        String finalResult = null;
+        while (step != null) {
+          if (step instanceof HumanInputRequest) {
+            HumanInputRequest request = (HumanInputRequest) step;
+            System.out.println(request.getPrompt());
+            System.out.print(">> ");
+            System.out.flush();
 
-      Object step = researcher.nextStep(invoke);
-      String finalResult = null;
-      while (step != null) {
-        if (step instanceof HumanInputRequest) {
-          HumanInputRequest request = (HumanInputRequest) step;
-          System.out.println(request.getPrompt());
-          System.out.print(">> ");
-          System.out.flush();
+            String response = scanner.nextLine();
+            researcher.provideHumanInput(request, response);
+            System.out.println();
+          } else {
+            System.out.println("Final Research Report:");
+            System.out.println("====================");
+            System.out.println(((AgentComplete) step).getResult());
+            break;
+          }
 
-          String response = scanner.nextLine();
-          researcher.provideHumanInput(request, response);
-          System.out.println();
-        } else {
-          System.out.println("Final Research Report:");
-          System.out.println("====================");
-          System.out.println(((AgentComplete) step).getResult());
-          break;
+          step = researcher.nextStep(invoke);
         }
-
-        step = researcher.nextStep(invoke);
       }
     }
   }
