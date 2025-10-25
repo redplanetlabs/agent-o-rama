@@ -2,6 +2,8 @@
 
 VERSION=$(cat VERSION)
 
+[[ "$(java -version 2>&1 | awk -F[\".] '/version/ {print $2}')" == "21" ]] || { echo "Error: Java 21 required" >&2; exit 1; }
+
 rm -rf _release
 rm -rf target
 mkdir _release

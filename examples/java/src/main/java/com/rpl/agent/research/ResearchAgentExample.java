@@ -4,7 +4,9 @@ import com.rpl.agentorama.*;
 import com.rpl.rama.test.InProcessCluster;
 import com.rpl.rama.test.LaunchConfig;
 import java.util.*;
-import java.util.Scanner;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.IOException;
 
 /**
  * Example demonstrating the Research Agent Module.
@@ -18,7 +20,7 @@ public class ResearchAgentExample {
     System.out.println("Starting Research Agent Example...");
 
     try (InProcessCluster ipc = InProcessCluster.create();
-         Scanner scanner = new Scanner(System.in)) {
+         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in))) {
       try (AutoCloseable ui = UI.start(ipc)) {
         ResearchAgentModule module = new ResearchAgentModule();
         ipc.launchModule(module, new LaunchConfig(4, 2));
@@ -29,7 +31,7 @@ public class ResearchAgentExample {
 
         System.out.print("Enter a topic: ");
         System.out.flush();
-        String topic = scanner.nextLine();
+        String topic = reader.readLine();
         System.out.println();
 
         Map<String, Object> input = new HashMap<>();
@@ -45,7 +47,7 @@ public class ResearchAgentExample {
             System.out.print(">> ");
             System.out.flush();
 
-            String response = scanner.nextLine();
+            String response = reader.readLine();
             researcher.provideHumanInput(request, response);
             System.out.println();
           } else {

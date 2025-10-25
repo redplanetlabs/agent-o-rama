@@ -96,7 +96,9 @@
       AutoCloseable
       (close [_this]
         (when-not (:no-input-before-close options)
-          (println "press enter to close the ui, default port is 1974")
+          (print "press enter to close the ui, default port is 1974")
+          ;; this flush is necessary for Java API, not for Clojure API
+          (flush)
           (read-line))
         (stop-ui)
         :closed)))))
