@@ -41,7 +41,6 @@ public class KeyValueStoreAgentTest {
       Map<String, Object> setRequest =
           KeyValueStoreAgent.createCounterRequest(
               "test-counter", KeyValueStoreAgent.Operation.SET, 42L);
-      @SuppressWarnings("unchecked")
       Map<String, Object> setResult = (Map<String, Object>) agent.invoke(setRequest);
 
       assertNotNull("Set result should not be null", setResult);
@@ -53,7 +52,6 @@ public class KeyValueStoreAgentTest {
       Map<String, Object> getRequest =
           KeyValueStoreAgent.createCounterRequest(
               "test-counter", KeyValueStoreAgent.Operation.GET, null);
-      @SuppressWarnings("unchecked")
       Map<String, Object> getResult = (Map<String, Object>) agent.invoke(getRequest);
 
       assertNotNull("Get result should not be null", getResult);

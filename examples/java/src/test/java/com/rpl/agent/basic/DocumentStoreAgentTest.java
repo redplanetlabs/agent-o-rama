@@ -51,7 +51,6 @@ public class DocumentStoreAgentTest {
       updates.put("preferences", prefs);
       request.put("profileUpdates", updates);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result = (Map<String, Object>) agent.invoke(request);
 
       assertNotNull("Result should not be null", result);
@@ -59,7 +58,6 @@ public class DocumentStoreAgentTest {
       assertEquals("Name should match", "Test User", result.get("name"));
       assertEquals("Age should match", 30L, result.get("age"));
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> resultPrefs = (Map<String, Object>) result.get("preferences");
       assertNotNull("Preferences should not be null", resultPrefs);
       assertEquals("Theme should match", "dark", resultPrefs.get("theme"));

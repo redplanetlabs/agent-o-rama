@@ -50,7 +50,6 @@ public class AggregationAgentTest {
       request.put("data", testData);
       request.put("chunkSize", 3);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result = (Map<String, Object>) agent.invoke(request);
 
       assertNotNull("Result should not be null", result);

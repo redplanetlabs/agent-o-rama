@@ -59,7 +59,6 @@ public class StreamingAgentTest {
           "process-data",
           (allChunks, newChunks, reset, complete) -> {
             for (Object chunkObj : newChunks) {
-              @SuppressWarnings("unchecked")
               Map<String, Object> chunk = (Map<String, Object>) chunkObj;
               receivedChunks.add(chunk);
               chunksReceived.incrementAndGet();
@@ -67,7 +66,6 @@ public class StreamingAgentTest {
           });
 
       // Get final result
-      @SuppressWarnings("unchecked")
       Map<String, Object> result = (Map<String, Object>) agent.result(invoke);
 
       // Verify streaming chunks were emitted

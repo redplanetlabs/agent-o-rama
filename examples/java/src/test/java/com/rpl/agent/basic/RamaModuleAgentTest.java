@@ -45,7 +45,6 @@ public class RamaModuleAgentTest {
       AgentClient agent = manager.getAgentClient("FeedbackAgent");
 
       // Test first feedback processing
-      @SuppressWarnings("unchecked")
       HashMap<String, Object> result1 = (HashMap<String, Object>) agent.invoke("Great product!");
       assertNotNull("Agent should return a result", result1);
       assertEquals("success", result1.get("status"));
@@ -53,7 +52,6 @@ public class RamaModuleAgentTest {
       assertEquals(14, result1.get("length"));
 
       // Test second feedback processing
-      @SuppressWarnings("unchecked")
       HashMap<String, Object> result2 = (HashMap<String, Object>) agent.invoke("Needs work");
       assertNotNull("Agent should return a result", result2);
       assertEquals("success", result2.get("status"));

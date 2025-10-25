@@ -53,7 +53,6 @@ public class ToolsFactory {
    * @param arguments The tool arguments containing search terms
    * @return Search results as concatenated text
    */
-  @SuppressWarnings("unchecked")
   private static String executeTavilySearch(
       AgentNode agentNode, Object unused, Map<String, Object> arguments) {
     try {

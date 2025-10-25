@@ -53,7 +53,6 @@ public class PStateStoreAgentTest {
       employee.put("metadata", new HashMap<>());
       request.put("employee", employee);
 
-      @SuppressWarnings("unchecked")
       Map<String, Object> result = (Map<String, Object>) agent.invoke(request);
 
       assertNotNull("Result should not be null", result);
@@ -64,7 +63,6 @@ public class PStateStoreAgentTest {
       assertTrue(
           "Average salary should be 80000", ((Double) result.get("averageSalary")) == 80000.0);
 
-      @SuppressWarnings("unchecked")
       List<String> allEmployees = (List<String>) result.get("allCompanyEmployeeNames");
       assertNotNull("All employees list should not be null", allEmployees);
       assertTrue("Should contain test employee", allEmployees.contains("Test Employee"));
