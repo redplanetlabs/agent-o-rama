@@ -480,6 +480,10 @@
       (into {} (take *limit *items) :> *res)
     )))
 
+(defn multi-keypath
+  [l]
+  (apply multi-path (mapv keypath l)))
+
 ;; returns map from example-id -> all example info
 (defn declare-multi-examples-query-topology
   [topologies]
@@ -488,7 +492,7 @@
       (multi-examples-name)
       [*dataset-id *snapshot *example-ids :> *res]
       (|hash *dataset-id)
-      (apply multi-path (mapv keypath *example-ids) :> *examples-nav)
+      (multi-keypath *example-ids :> *examples-nav)
       (local-select>
        [(keypath *dataset-id :snapshots *snapshot)
         (subselect *examples-nav)]
@@ -576,6 +580,9 @@
   [v item]
   (vswap! v conj item))
 
+(defn dissoc-all
+  [m ks]
+  (apply dissoc m ks))
 
 (defn next-search-key
   [m reverse?]
@@ -609,7 +616,7 @@
       (%filter *id *info :> *assoc-map *dissoc-keys)
       (<<if (some? *assoc-map)
         (conj-vol! *results
-                   (merge (into {} (apply dissoc *info *dissoc-keys))
+                   (merge (into {} (dissoc-all *info *dissoc-keys))
                           *assoc-map))))
     (<<cond
      (case> (< (count *m) *limit))
@@ -829,6 +836,7 @@
      ))
     cf))
 
+
 ;; - returns {:items [{<all the info in values of :experiments in datasets
 ;; PState, with
 ;; examples
@@ -888,7 +896,7 @@
           (:> *m)
          (else>)
           (first *chunks :> *chunk)
-          (apply multi-path (mapv keypath *chunk) :> *example-paths)
+          (multi-keypath *chunk :> *example-paths)
           (path> (keypath *dataset-id :snapshots *snapshot)
                  (subselect *example-paths)
                  :> *query-path)

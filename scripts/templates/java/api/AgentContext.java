@@ -14,7 +14,7 @@ public interface AgentContext {
    * Creates an empty AgentContext
    */
   static Impl create() {
-    return (Impl) AORHelpers.MAKE_AGENT_CONTEXT.invoke(args);
+    return (Impl) AORHelpers.MAKE_AGENT_CONTEXT.invoke();
   }
   <% (dofor [[name ret args] AGENT-CONTEXT-METHODS] (str %>
   static <%= ret %> <%= name %>(<%= (args-declaration-str args) %>) {

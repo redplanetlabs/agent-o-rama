@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.tools :as tools]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.tools-impl :as tools-impl]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
@@ -21,10 +22,10 @@
 
 (deftest openai-tools-agent-test
   (let [options-vol (volatile! [])]
-    (with-redefs [tools/hook:new-tools-agent-options (fn [name options]
-                                                       (vswap! options-vol
-                                                               conj
-                                                               [name options]))]
+    (with-redefs [tools-impl/hook:new-tools-agent-options (fn [name options]
+                                                            (vswap! options-vol
+                                                                    conj
+                                                                    [name options]))]
       (when (some? (System/getenv "OPENAI_API_KEY"))
         (is (= {"a" "8" "m" "54"} (TestModules/runBasicToolsOpenAIAgent)))
         (is (= 2 (count @options-vol)))

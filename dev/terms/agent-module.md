@@ -25,7 +25,7 @@ Top-level container defining complete agent systems. Encapsulates all resources 
 ## Key Java API
 - Primary functions: `define()`, `build()`
 - Creation: Via `AgentTopology`
-- Access: `AgentsModule` class
+- Access: `AgentModule` class
 
 ## Relationships
 - Uses: [Agents Topology](agents-topology.md), [Agent Graph](agent-graph.md)

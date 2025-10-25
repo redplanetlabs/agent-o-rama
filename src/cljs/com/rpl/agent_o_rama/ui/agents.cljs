@@ -362,13 +362,13 @@
        ($ :form {:onSubmit handle-submit}
           ($ :div.text-sm.font-medium.text-gray-600.mb-4 "Manually Run Agent")
           ($ :div.flex.gap-3.justify-between
-             ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
+             ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.placeholder-gray-400.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
                 {:placeholder "[arg1, arg2, arg3, ...] (json)"
                  :value args
                  :onChange #(update-field :args (.. % -target -value))
                  :rows 3
                  :disabled loading?})
-             ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
+             ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.placeholder-gray-400.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
                 {:placeholder "Metadata (JSON map, optional)"
                  :value metadata-args
                  :onChange #(update-field :metadata-args (.. % -target -value))
@@ -395,8 +395,8 @@
        ($ :div.flex
           ($ :div {:className "w-1/2"} ($ agent-graph))
           ($ :div {:className "w-1/2"}
-             ($ stats-summary {:module-id module-id :agent-name agent-name})
-             ($ alerts {:module-id module-id :agent-name agent-name})))
+             #_($ stats-summary {:module-id module-id :agent-name agent-name})
+             #_($ alerts {:module-id module-id :agent-name agent-name})))
        ($ :div.p-4.flex.gap-1
           ($ :div
              {:style {:flex-grow "1"}}

@@ -1,6 +1,6 @@
 (ns com.rpl.agent-o-rama.impl.ui.sente
   (:require
-   [clojure.tools.logging :as log]
+   [clojure.tools.logging :as cljlogging]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common] ;; <-- Add this require
    [taoensso.sente :as sente]
    [taoensso.sente.packers.transit :as sente-transit]
@@ -29,15 +29,15 @@
 
         ;; The rest of the function now operates on the processed message
         {:keys [id ?reply-fn ?data uid]} processed-ev-msg
-        handler-fn (get-method -event-msg-handler id)]
+        handler-fn       (get-method -event-msg-handler id)]
 
     ;; Check if we found a specific handler or just the default
     (if (= handler-fn (get-method -event-msg-handler :default))
       ;; This is an unhandled event, use the default logic
       (do
-        (log/warn "Unhandled Sente event:" id)
+        (cljlogging/warn "Unhandled Sente event:" id)
         (when ?reply-fn
-          (?reply-fn {:success false, :error (str "No handler for event: " id)})))
+          (?reply-fn {:success false :error (str "No handler for event: " id)})))
 
       ;; A specific handler was found, so we wrap it and call it
       (try
@@ -47,9 +47,9 @@
           (when ?reply-fn
             (?reply-fn {:success true :data serializable-result})))
         (catch Exception e
-          (.printStackTrace e) ; Helpful for server-side debugging
+          (cljlogging/error e "Error executing handler")
           (when ?reply-fn
-            (?reply-fn {:success false, :error (.getMessage e)})))))))
+            (?reply-fn {:success false :error (.getMessage e)})))))))
 
 ;; A more robust default handler
 (defmethod -event-msg-handler :default [_])

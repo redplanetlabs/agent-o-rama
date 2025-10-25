@@ -1,6 +1,9 @@
-(defproject com.rpl/agent-o-rama "0.9.0-SNAPSHOT"
+(def VERSION (.trim (slurp "VERSION")))
+
+(defproject com.rpl/agent-o-rama VERSION
   :source-paths ["src/clj" "src/cljs" "resource"]
   :java-source-paths ["src/java"]
+  :aot [com.rpl.agent-o-rama.impl.ui.launch]
   :test-paths ["test/clj"]
   :jvm-opts ["-Xss6m"
              "-Xms6g"
@@ -17,7 +20,7 @@
              ;; for java 25
              "--enable-native-access=ALL-UNNAMED"]
   :repl-options {:port 7888}
-  :dependencies [[com.rpl/rama-helpers "0.10.0"]
+  :dependencies [[com.rpl/rama-helpers "0.10.0" :exclusions [org.clojure/clojure]]
                  [com.github.f4b6a3/uuid-creator "6.1.1"]
                  [dev.langchain4j/langchain4j
                   "1.4.0"
@@ -34,17 +37,17 @@
                   "2.9.0"
                   :exclusions
                   [org.slf4j/slf4j-api]]
-                 [expound "0.9.0"]
-                 [http-kit "2.8.0"]
+                 [expound "0.9.0" :exclusions [org.clojure/clojure]]
+                 [http-kit "2.8.0" :exclusions [org.clojure/clojure]]
 
                  ;; ui dependencies
-                 [ring/ring-core "1.9.5"]
-                 [ring/ring-codec "1.2.0"]
-                 [com.taoensso/sente "1.20.0"]
-                 [ring/ring-defaults "0.4.0"]
-                 [ring-cors/ring-cors "0.1.13"]
-                 [com.cognitect/transit-clj "1.0.333"]
-                 [com.cognitect/transit-cljs "0.8.280"]]
+                 [ring/ring-core "1.9.5" :exclusions [org.clojure/clojure]]
+                 [ring/ring-codec "1.2.0" :exclusions [org.clojure/clojure]]
+                 [com.taoensso/sente "1.20.0" :exclusions [org.clojure/clojure]]
+                 [ring/ring-defaults "0.4.0" :exclusions [org.clojure/clojure]]
+                 [ring-cors/ring-cors "0.1.13" :exclusions [org.clojure/clojure]]
+                 [com.cognitect/transit-clj "1.0.333" :exclusions [org.clojure/clojure]]
+                 [com.cognitect/transit-cljs "0.8.280" :exclusions [org.clojure/clojure]]]
   :test-selectors
   {:default (complement #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (:ns %))))
    :ui      #(re-find #"^com\.rpl\.agent\-o\-rama\.ui" (str (:ns %)))
@@ -66,8 +69,7 @@
                                             "-Xms6g"
                                             "-Xmx6g"]
                         :dependencies
-                        [[org.clojure/clojure "1.12.2"]
-                         [meander/epsilon "0.0.650"]
+                        [[meander/epsilon "0.0.650"]
                          [dev.langchain4j/langchain4j-open-ai "1.4.0"]
                          [dev.langchain4j/langchain4j-web-search-engine-tavily
                           "1.3.0-beta9"]
@@ -78,8 +80,8 @@
                          [clj-kondo "2025.09.22"]]}
              :examples {:test-paths   ["examples/clj/test"]
                         :source-paths ["examples/clj/src"]}
-             :provided {:dependencies
-                        [[com.rpl/rama "1.2.0"]]}
+             :provided {:dependencies [[com.rpl/rama "1.2.0"]
+                                       [org.clojure/clojure "1.12.2"]]}
              :gen      {:prep-tasks   []
                         :source-paths ["scripts"]
                         :dependencies [[comb "0.1.1"]
@@ -102,7 +104,9 @@
           :output-path  "target/doc"
           :namespaces   [com.rpl.agent-o-rama
                          com.rpl.agent-o-rama.langchain4j
+                         com.rpl.agent-o-rama.langchain4j.json
                          com.rpl.agent-o-rama.store
+                         com.rpl.agent-o-rama.throttled-logging
                          com.rpl.agent-o-rama.tools]}
   :aliases {"test-all" ["with-profile" "+examples" "test"]}
   :plugins [[lein-exec "0.3.7"]

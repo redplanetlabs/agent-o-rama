@@ -1,6 +1,6 @@
 # UI Data IDs
 
-This document describes the `data-id` attributes used in the Agent-o-Rama UI for testing and element identification.
+This document describes the `data-id` attributes used in the Agent-o-rama UI for testing and element identification.
 
 ## Agent Trace Display Panels
 

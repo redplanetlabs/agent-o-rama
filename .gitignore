@@ -1,7 +1,8 @@
-pom.xml
+/pom.xml
 pom.xml.asc
 *.jar
 *.class
+/*zip
 /lib/
 /classes/
 target/
@@ -20,6 +21,7 @@ target/
 .project
 scripts/code-format
 .on-save.json
+.vscode
 
 # frontend
 .shadow-cljs/

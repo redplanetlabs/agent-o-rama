@@ -148,11 +148,11 @@
              :style {:background-color "rgba(0, 0, 0, 0.02)"}}
        (for [[idx item] (map-indexed vector displayed-items)]
          ($ :div {:key idx
-                  :className (common/cn "flex items-start gap-2")}
+                  :className (common/cn "flex items-start gap-2 min-w-0")}
             ($ :span {:className (str "text-" color "-400 text-xs flex-shrink-0")}
                (str (inc idx) "."))
             ;; Recursively render each item using the generic viewer
-            ($ :div {:className (common/cn "flex-1")}
+            ($ :div {:className (common/cn "flex-1 min-w-0 overflow-hidden")}
                ($ generic-data-viewer {:data item
                                        :color color
                                        :truncate-length truncate-length
@@ -213,10 +213,10 @@
                :style {:background-color "rgba(0, 0, 0, 0.02)"}}
          (for [[k v] (sort-by (comp str key) data)]
            ($ :div {:key (str k)}
-              ($ :div {:className "flex items-start gap-1"}
-                 ($ :span {:className "text-gray-500 font-medium"} (str (name k) ":"))
+              ($ :div {:className "flex items-start gap-1 min-w-0"}
+                 ($ :span {:className "text-gray-500 font-medium flex-shrink-0"} (str (name k) ":"))
            ;; Wrap value in a div with flex constraints to enable truncation
-                 ($ :div {:className "flex-1 min-w-0"}
+                 ($ :div {:className "flex-1 min-w-0 overflow-hidden"}
                     ($ generic-data-viewer {:data v
                                             :color color
                                             :truncate-length truncate-length
@@ -309,7 +309,7 @@
      ;; Add to Dataset button for individual node
      ($ :div {:className "mt-3"}
         ($ :button
-           {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
+           {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-white text-black hover:bg-indigo-200 cursor-pointer"
             :onClick (fn [e]
                        (.stopPropagation e)
                        (let [raw-node-data (get graph-data node-id)
@@ -325,10 +325,10 @@
 
 (defui node-result-panel [{:keys [result]}]
   (when result
-    ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4"}
-       ($ :div {:className "text-sm font-medium text-blue-700 mb-1"} "Result")
+    ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
+       ($ :div {:className "text-sm font-medium text-indigo-700 mb-1"} "Result")
        ($ generic-data-viewer {:data result
-                               :color "blue"
+                               :color "indigo"
                                :truncate-length 100
                                :depth 0}))))
 
@@ -354,36 +354,36 @@
 
 (defui node-timing-panel [{:keys [start-time finish-time duration]}]
   (when (and start-time finish-time)
-    ($ :div {:className "bg-yellow-50 p-3 rounded-md mt-4"}
-       ($ :div {:className "text-sm font-medium text-yellow-700 mb-2"} "Timing")
+    ($ :div {:className "p-3 bg-indigo-50 rounded-md mt-4"}
+       ($ :div {:className "text-sm font-medium text-indigo-700 mb-2"} "Timing")
        ($ :div {:className "space-y-1"}
           ($ :div {:className "flex justify-between"}
-             ($ :span {:className "text-xs text-yellow-600"} "Duration")
-             ($ :span {:className "text-xs text-yellow-600 font-mono"
+             ($ :span {:className "text-xs text-indigo-700"} "Duration")
+             ($ :span {:className "text-xs font-mono text-indigo-600"
                        :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))}
                 (str duration "ms")))
           ($ :div {:className "flex justify-between"}
-             ($ :span {:className "text-xs text-yellow-600"} "Started")
-             ($ :span {:className "text-xs text-yellow-600 font-mono"}
+             ($ :span {:className "text-xs text-indigo-700"} "Started")
+             ($ :span {:className "text-xs font-mono text-indigo-600"}
                 (format-ms start-time)))
           ($ :div {:className "flex justify-between"}
-             ($ :span {:className "text-xs text-yellow-600"} "Finished")
-             ($ :span {:className "text-xs text-yellow-600 font-mono"}
+             ($ :span {:className "text-xs text-indigo-700"} "Finished")
+             ($ :span {:className "text-xs font-mono text-indigo-600"}
                 (format-ms finish-time)))))))
 
 (defui node-input-panel [{:keys [input]}]
   (when input
-    ($ :div {:className "bg-green-50 p-3 rounded-md mt-4"}
-       ($ :div {:className "text-sm font-medium text-green-700 mb-1"} "Input")
+    ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
+       ($ :div {:className "text-sm font-medium text-indigo-700 mb-1"} "Input")
        ($ generic-data-viewer {:data input
-                               :color "green"
+                               :color "indigo"
                                :truncate-length 100
                                :depth 0}))))
 
 (defui node-operations-panel [{:keys [data]}]
   (when (not (empty? (:nested-ops data)))
-    ($ :div {:className "bg-sky-50 p-3 rounded-md mt-4"}
-       ($ :div {:className "text-sm font-medium text-sky-700 mb-2"}
+    ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
+       ($ :div {:className "text-sm font-medium text-indigo-700 mb-2"}
           (str "Operations (" (count (:nested-ops data)) ")"))
        ($ :div {:className "space-y-2"}
           (for [op (:nested-ops data)]
@@ -394,20 +394,20 @@
                   duration (when (and start-time finish-time)
                              (str (- finish-time start-time)))]
               ($ :div {:key (str (str start-time) "-" (str finish-time))
-                       :className "bg-white p-3 rounded border border-sky-200"}
+                       :className "bg-white p-3 rounded border border-indigo-200"}
 
                  ;; Header
                  ($ :div {:className (common/cn "flex justify-between items-start mb-2")}
                     ($ :div {:className "flex-1"}
                        ($ :div {:className "flex items-center gap-2"}
-                          ($ :span {:className "text-sm font-medium text-sky-800 bg-sky-100 px-2 py-1 rounded"}
+                          ($ :span {:className "text-sm font-medium text-indigo-800 bg-indigo-100 px-2 py-1 rounded"}
                              op-type)
                           (when (:objectName info)
-                            ($ :span {:className "text-sm font-mono text-sky-700"}
+                            ($ :span {:className "text-sm font-mono text-indigo-700"}
                                (:objectName info)))))
                     ($ :div {:className "flex items-center gap-2"}
                        (when duration
-                         ($ :div {:className "text-xs text-sky-500 font-mono"
+                         ($ :div {:className "text-xs text-indigo-500 font-mono"
                                   :title (str "Started: " (format-ms start-time) "\nFinished: " (format-ms finish-time))}
                             (str duration "ms")))
                        ;; Add navigation button for agent-call operations
@@ -431,21 +431,21 @@
                                 ($ ArrowTopRightOnSquareIcon {:className "h-3 w-3"})))))))
 
                  ;; Body
-                 ($ :div {:className "text-xs text-sky-600 mt-1"}
-                    ($ generic-data-viewer {:data info :color "sky" :depth 0})))))))))
+                 ($ :div {:className "text-xs text-indigo-600 mt-1"}
+                    ($ generic-data-viewer {:data info :color "indigo" :depth 0})))))))))
 
 (defui node-emits-panel [{:keys [emits graph-data flow-nodes on-select-node on-paginate-node]}]
   (when (and emits (> (count emits) 0))
-    ($ :div {:className "mt-4 bg-purple-50 p-3 rounded-md"}
-       ($ :div {:className "text-sm font-medium text-purple-700 mb-2"}
+    ($ :div {:className "mt-4 bg-indigo-50 p-3 rounded-md"}
+       ($ :div {:className "text-sm font-medium text-indigo-700 mb-2"}
           (str "Emits (" (count emits) ")"))
        ($ :div {:className "space-y-2"}
           (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
             (let [emit-id (str (:invoke-id emit))
                   is-loaded (contains? graph-data (:invoke-id emit))
-                  border-class (if is-loaded "border-purple-200" "border-dashed border-purple-300")
+                  border-class (if is-loaded "border-indigo-200" "border-dashed border-indigo-300")
                   cursor-class "cursor-pointer"
-                  bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-purple-50")]
+                  bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-indigo-50")]
               ($ :div {:key (str "emit-" idx)
                        :className (str bg-class " p-2 rounded border " border-class " " cursor-class " transition-colors")
                        :onClick (fn [e]
@@ -461,14 +461,14 @@
                                     ;; Load the unloaded node
                                     (when on-paginate-node
                                       (on-paginate-node emit-id))))}
-                 ($ :div {:className "text-xs text-purple-600"}
+                 ($ :div {:className "text-xs text-indigo-600"}
                     ($ :div (str "→ " (:node-name emit)))
                     (when (:args emit)
                       ($ generic-data-viewer {:data (:args emit)
-                                              :color "purple"
+                                              :color "indigo"
                                               :truncate-length 60
                                               :depth 0}))
-                    ($ :div {:className "text-purple-400 mt-1 font-mono text-xs"}
+                    ($ :div {:className "text-indigo-400 mt-1 font-mono text-xs"}
                        (str "ID: " emit-id))))))))))
 
 (defui node-details-info-panel [{:keys [data hr hr-invoke-id hitl-response submitting? module-id agent-name invoke-id

@@ -230,7 +230,7 @@
 (defaorrecord AgentCompleteImpl
   [result :- s/Any]
   AgentComplete
-  (getResult [this] val))
+  (getResult [this] result))
 
 
 (defaorrecord AgentNode

@@ -821,7 +821,7 @@
                MAP-VALS
                (fn [v]
                  [(cond
-                    (string? v) {:type :categorical :values #{v}}
+                    (string? v) {:type :categorical :values {v 1}}
                     (boolean? v) {:type :numeric :values [(if v 1 0)]}
                     (number? v) {:type :numeric :values [v]}
                     :else (throw (h/ex-info "Unexpected eval value" {:value v :type (class v)}))

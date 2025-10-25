@@ -14,5 +14,5 @@ javadoc -d $target \
         -sourcepath src/java \
         -subpackages com \
         -exclude com.rpl.agentorama.impl \
-        -windowTitle "Agent-o-Rama Javadocs" \
+        -windowTitle "Agent-o-rama Javadocs" \
         com.rpl.agentorama

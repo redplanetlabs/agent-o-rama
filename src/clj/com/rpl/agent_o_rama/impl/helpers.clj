@@ -288,7 +288,7 @@
 
 (defn list-spec
   [v]
-  (when-not (instance? java.util.List v)
+  (when-not (or (nil? v) (instance? java.util.List v))
     "value must be a list"))
 
 (defn any-spec
@@ -296,7 +296,7 @@
 
 (defn map-spec
   [v]
-  (when-not (instance? java.util.Map v)
+  (when-not (or (nil? v) (instance? java.util.Map v))
     "value must be a map"))
 
 (defn string-spec

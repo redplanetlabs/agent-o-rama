@@ -19,7 +19,7 @@ import java.util.*;
 
 
 public class TestModules {
-  public static class BasicToolsOpenAIAgent extends AgentsModule {
+  public static class BasicToolsOpenAIAgent extends AgentModule {
     public static List<ToolInfo> TOOLS = Arrays.asList(
       ToolInfo.create(
         ToolSpecification.builder()

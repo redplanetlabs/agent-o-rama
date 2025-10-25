@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# Agent-o-rama UI launcher script
+# Usage: ./aor --rama <path-to-rama-release> [--port <port>]
+
+set -e
+
+# Default port
+PORT=1974
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --rama)
+      RAMA_ROOT="$2"
+      shift 2
+      ;;
+    --port)
+      PORT="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: $0 --rama <path-to-rama-release> [--port <port>]"
+      echo ""
+      echo "Options:"
+      echo "  --rama <path>    Path to Rama release root (required)"
+      echo "  --port <port>    Port for the UI (default: 1974)"
+      echo "  -h, --help       Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Use --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
+# Check if --rama flag was provided
+if [[ -z "$RAMA_ROOT" ]]; then
+  echo "Error: --rama flag is required"
+  echo "Usage: $0 --rama <path-to-rama-release> [--port <port>]"
+  exit 1
+fi
+
+# Check if Rama root directory exists
+if [[ ! -d "$RAMA_ROOT" ]]; then
+  echo "Error: Rama root directory does not exist: $RAMA_ROOT"
+  exit 1
+fi
+
+# Check if Rama root contains expected files
+if [[ ! -f "$RAMA_ROOT/rama.jar" ]]; then
+  echo "Error: rama.jar not found in Rama root directory: $RAMA_ROOT"
+  exit 1
+fi
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Build classpath
+CLASSPATH=""
+
+# Add current directory (where script is located)
+CLASSPATH="$SCRIPT_DIR/*"
+CLASSPATH="$CLASSPATH:$SCRIPT_DIR"
+
+# Add lib/ directory from script location
+CLASSPATH="$CLASSPATH:$SCRIPT_DIR/lib/*"
+
+# Add Rama release root
+CLASSPATH="$CLASSPATH:$RAMA_ROOT/rama.jar"
+
+# Add Rama release lib/ directory
+CLASSPATH="$CLASSPATH:$RAMA_ROOT/lib/*"
+
+# Check if Java is available
+if ! command -v java &> /dev/null; then
+  echo "Error: Java is not installed or not in PATH"
+  exit 1
+fi
+
+# Launch the UI
+echo "Starting Agent-o-rama UI on port $PORT..."
+echo "Rama root: $RAMA_ROOT"
+echo ""
+java -cp "$CLASSPATH" com.rpl.agent_o_rama.impl.ui.launch "$PORT"
