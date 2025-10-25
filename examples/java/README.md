@@ -2,12 +2,10 @@
 
 This directory contains example implementations of AI agents using Agent-o-rama.
 
-Agents can be run from the REPL like so:
+Here's an example of running an agent from this directory:
 
 ```
-lein repl
-user=> (require '[com.rpl.agent.react :as react])
-user=> (react/run-agent)
+./run-example com.rpl.agent.react.ReActExample
 ```
 
 This will prompt for an input to the agent and then print the result. It also opens the UI at http://localhost:1974, which will remain open for viewing traces, performing more invokes, and other exploration until you press enter in the terminal.

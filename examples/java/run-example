@@ -1,0 +1,7 @@
+#!/bin/sh
+
+
+mvn clean compile dependency:build-classpath -Dmdep.scope=compile -Dmdep.outputFile=cp.txt
+CLASSPATH=$(cat /tmp/cp.txt)
+rm cp.txt
+java -cp "target/classes:$CLASSPATH" $1

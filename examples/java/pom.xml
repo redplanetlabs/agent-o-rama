@@ -6,12 +6,12 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.rpl.agent</groupId>
-  <artifactId>basic-example</artifactId>
+  <artifactId>java-examples</artifactId>
   <version>1.0.0</version>
   <packaging>jar</packaging>
 
-  <name>Basic Agent Examples</name>
-  <description>Java implementations of basic and multi-node agents using agent-o-rama framework</description>
+  <name>Agent Examples</name>
+  <description>Java implementations of agents using Agent-o-rama framework</description>
 
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
@@ -27,31 +27,18 @@
   </repositories>
 
   <dependencies>
-    <!-- Agent-O-Rama Framework -->
     <dependency>
       <groupId>com.rpl</groupId>
       <artifactId>agent-o-rama</artifactId>
-      <version>0.9.0-SNAPSHOT</version>
+      <!-- TODO: update this version -->
+      <version>0.5.0-SNAPSHOT</version>
     </dependency>
-
-    <!-- Rama Framework -->
     <dependency>
       <groupId>com.rpl</groupId>
       <artifactId>rama</artifactId>
-      <version>0.0.6-SNAPSHOT</version>
-      <exclusions>
-	<exclusion>
-	  <groupId>org.javassist</groupId>
-	  <artifactId>javassist</artifactId>
-	</exclusion>
-	<exclusion>
-	  <groupId>org.apache.yetus</groupId>
-	  <artifactId>audience-annotations</artifactId>
-	</exclusion>
-      </exclusions>
+      <version>1.2.0</version>
+      <scope>provided</scope>
     </dependency>
-
-    <!-- LangChain4j -->
     <dependency>
       <groupId>dev.langchain4j</groupId>
       <artifactId>langchain4j-open-ai</artifactId>
@@ -59,25 +46,9 @@
     </dependency>
     <dependency>
       <groupId>dev.langchain4j</groupId>
-      <artifactId>langchain4j</artifactId>
-      <version>1.4.0</version>
+      <artifactId>langchain4j-web-search-engine-tavily</artifactId>
+      <version>1.4.0-beta10</version>
     </dependency>
-
-    <!-- Jackson Scala module for LangChain4j tools -->
-    <dependency>
-      <groupId>com.fasterxml.jackson.module</groupId>
-      <artifactId>jackson-module-scala_2.13</artifactId>
-      <version>2.13.0</version>
-    </dependency>
-
-    <!-- Logging -->
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j18-impl</artifactId>
-      <version>2.16.0</version>
-    </dependency>
-
-    <!-- Testing -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
@@ -95,18 +66,9 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.11.0</version>
-	<configuration>
-	  <proc>none</proc>
-	</configuration>
-      </plugin>
-
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>exec-maven-plugin</artifactId>
-        <version>3.1.0</version>
-        <configuration>
-          <mainClass>com.rpl.agent.basic.BasicAgent</mainClass>
-        </configuration>
+      	<configuration>
+      	  <proc>none</proc>
+      	</configuration>
       </plugin>
     </plugins>
   </build>
