@@ -250,6 +250,18 @@
        :score-name (name score-name)
        :metric-id metric-id})))
 
+(defn- detect-categories
+  "Detect categories in telemetry data.
+  Returns nil for numeric data (only _aor/default), or vector of category names for categorical."
+  [telemetry-data]
+  (when (seq telemetry-data)
+    (let [;; Get all category keys from all buckets
+          all-keys (set (mapcat keys (vals telemetry-data)))
+          ;; Filter out _aor/default
+          category-keys (disj all-keys "_aor/default")]
+      (when (seq category-keys)
+        (vec (sort category-keys))))))
+
 (defn- create-eval-chart-config
   "Create a chart configuration for an eval metric.
   
@@ -577,7 +589,20 @@
                          :end-time-millis (:end-time-millis time-window)
                          :metrics-set metrics-set
                          :metadata-key metadata-key}]
-          :enabled? (boolean (and module-id agent-name))})]
+          :enabled? (boolean (and module-id agent-name))})
+        
+        ;; Detect if data is categorical and adjust config accordingly
+        categories (uix/use-memo
+                    (fn [] (detect-categories data))
+                    [data])
+        
+        ;; Dynamically adjust variant for categorical data
+        actual-variant (if categories :multi-category variant)
+        actual-variant-opts (if categories
+                              {:categories categories
+                               :metric-key :rest-sum}
+                              variant-opts)
+        actual-y-label (if categories "Count" y-label)]
 
     ($ :div.bg-white.p-6.rounded-lg.shadow-md.border.border-gray-200
        ($ :h3.text-lg.font-medium.text-gray-700.mb-2 title)
@@ -600,10 +625,10 @@
              :end-time-millis (:end-time-millis time-window)
              :height 300
              :title nil
-             :y-label y-label
+             :y-label actual-y-label
              :color color
-             :variant variant
-             :variant-opts variant-opts})))))
+             :variant actual-variant
+             :variant-opts actual-variant-opts})))))
 
 (defui analytics-page []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])

@@ -245,7 +245,18 @@
                         start-time-millis
                         end-time-millis
                         (vec metrics-set)
-                        "region"))
+                        "region")
+  (ana/select-telemetry telemetry-pstate
+                        decoded-agent-name
+                        granularity
+                        [:eval :classifier-rule :verbosity]
+                        start-time-millis
+                        end-time-millis
+                        (vec metrics-set)
+                        nil)
+  
+  
+  )
 
 (defmethod sente/-event-msg-handler :analytics/fetch-all-metrics
   [{:keys [manager decoded-agent-name]} uid]
