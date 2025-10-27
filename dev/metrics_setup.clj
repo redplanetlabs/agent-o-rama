@@ -237,8 +237,8 @@
                       {:metadata {"user-tier" "enterprise", "region" "apac", "ab-test-group" "v1"}}]
 
             ;; Scaled-down declarative plan for faster setup
-            generation-plan [{:label "day", :duration-units :days, :duration 34, :invokes-per-unit 10}
-                             {:label "hour", :duration-units :hours, :duration 23, :invokes-per-unit 10}
+            generation-plan [{:label "day", :duration-units :days, :duration 34, :invokes-per-unit 0}
+                             {:label "hour", :duration-units :hours, :duration 23, :invokes-per-unit 0}
                              {:label "minute", :duration-units :minutes, :duration 59, :invokes-per-unit 10}]]
 
         (doseq [{:keys [label duration-units duration invokes-per-unit]} generation-plan]
@@ -303,7 +303,6 @@
   (def ipc (rtest/create-ipc))
   (setup-metrics-env ipc)
   (start-repl ipc)
-  (def module-name "dev.metrics-setup/anon-module80074")
   (def ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
   (foreign-append! ana-depot nil)
   (rtest/resume-microbatch-topology! ipc module-name aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
