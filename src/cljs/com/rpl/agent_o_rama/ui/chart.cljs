@@ -241,19 +241,13 @@
         [{:path path :metadata-val nil :value-fn scale-fn}]))
 
     :multi-category
-    (let [{:keys [metric-key categories]} variant-opts
-          specs (if metadata-values
-                  (vec (for [category categories, mv metadata-values]
-                         {:path [category metric-key] :metadata-val mv :value-fn identity}))
-                  (mapv (fn [category]
-                          {:path [category metric-key] :metadata-val nil :value-fn identity})
-                        categories))]
-      (println "[build-series-specs :multi-category]")
-      (println "  metric-key:" metric-key)
-      (println "  categories:" categories)
-      (println "  metadata-values:" metadata-values)
-      (println "  specs:" specs)
-      specs)
+    (let [{:keys [metric-key categories]} variant-opts]
+      (if metadata-values
+        (vec (for [category categories, mv metadata-values]
+               {:path [category metric-key] :metadata-val mv :value-fn identity}))
+        (mapv (fn [category]
+                {:path [category metric-key] :metadata-val nil :value-fn identity})
+              categories)))
 
     :computed-percentage
     (let [{:keys [metric-key]} variant-opts
@@ -277,25 +271,13 @@
     ;; Computed series: call compute-fn for each bucket
     (mapv #((:compute-fn spec) telemetry-data % (:metadata-val spec)) sorted-buckets)
     ;; Simple series: navigate path and apply value-fn
-    (let [result (mapv (fn [bucket]
-                         (let [full-path (vec (concat [bucket]
-                                                      (when (:metadata-val spec) [(:metadata-val spec)])
-                                                      (:path spec)))
-                               value (select-one full-path telemetry-data)
-                               result-val ((:value-fn spec) value)]
-                           result-val))
-                       sorted-buckets)]
-      (when (and (:path spec) (= "terse" (first (:path spec))))
-        (println "[evaluate-series-spec] path:" (:path spec))
-        (println "  first bucket:" (first sorted-buckets))
-        (println "  sample full-path:" (vec (concat [(first sorted-buckets)]
-                                                    (when (:metadata-val spec) [(:metadata-val spec)])
-                                                    (:path spec))))
-        (println "  sample value:" (select-one (vec (concat [(first sorted-buckets)]
-                                                            (when (:metadata-val spec) [(:metadata-val spec)])
-                                                            (:path spec))) telemetry-data))
-        (println "  first 3 results:" (take 3 result)))
-      result)))
+    (mapv (fn [bucket]
+            (let [full-path (vec (concat [bucket]
+                                         (when (:metadata-val spec) [(:metadata-val spec)])
+                                         (:path spec)))
+                  value (select-one full-path telemetry-data)]
+              ((:value-fn spec) value)))
+          sorted-buckets)))
 
 (defn- prepare-chart-data
   "Universal data preparation for all chart variants using series specs.
@@ -314,20 +296,10 @@
           series-specs (build-series-specs variant variant-opts metadata-values)
 
           ;; Phase 3: Evaluate each spec to produce time series
-          series-data (mapv #(evaluate-series-spec % sorted-buckets telemetry-data) series-specs)
-          
-          result {:data (into [timestamps] series-data)
-                  :metadata-values metadata-values}]
-      
-      (when (= variant :multi-category)
-        (println "[prepare-chart-data :multi-category]")
-        (println "  variant-opts:" variant-opts)
-        (println "  bucket count:" (count sorted-buckets))
-        (println "  series count:" (count series-data))
-        (println "  first series has" (count (first series-data)) "values")
-        (println "  first 3 values of first series:" (take 3 (first series-data))))
-      
-      result)
+          series-data (mapv #(evaluate-series-spec % sorted-buckets telemetry-data) series-specs)]
+
+      {:data (into [timestamps] series-data)
+       :metadata-values metadata-values})
 
     ;; Empty data - generate 60 evenly-spaced timestamps to match bucket structure
     ;; This ensures consistent x-axis rendering with charts that have data
@@ -449,13 +421,14 @@
                                          :spanGaps true})
                                       metadata-values))
                        categories))
-          ;; Single series per category
-          (mapv (fn [cat]
+          ;; Single series per category - use series-colors array by index
+          (mapv (fn [idx cat]
                   {:label (str/capitalize cat)
-                   :stroke (get category-colors cat "#6b7280")
+                   :stroke (get series-colors idx "#6b7280")
                    :width 2
                    :points {:show true :size 4}
                    :spanGaps true})
+                (range)
                 categories)))
 
       :computed-percentage

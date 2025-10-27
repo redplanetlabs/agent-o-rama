@@ -258,13 +258,9 @@
     (let [;; Get all category keys from all buckets
           all-keys (set (mapcat keys (vals telemetry-data)))
           ;; Filter out _aor/default
-          category-keys (disj all-keys "_aor/default")
-          result (when (seq category-keys)
-                   (vec (sort category-keys)))]
-      (println "[detect-categories] all-keys:" all-keys)
-      (println "[detect-categories] category-keys:" category-keys)
-      (println "[detect-categories] returning:" result)
-      result)))
+          category-keys (disj all-keys "_aor/default")]
+      (when (seq category-keys)
+        (vec (sort category-keys))))))
 
 (defn- create-eval-chart-config
   "Create a chart configuration for an eval metric.
@@ -597,9 +593,7 @@
         
         ;; Detect if data is categorical and adjust config accordingly
         categories (uix/use-memo
-                    (fn [] 
-                      (println "[eval-chart-card] Raw data sample:" (take 2 (seq data)))
-                      (detect-categories data))
+                    (fn [] (detect-categories data))
                     [data])
         
         ;; Dynamically adjust variant for categorical data
@@ -608,13 +602,7 @@
                               {:categories categories
                                :metric-key :count}
                               variant-opts)
-        actual-y-label (if categories "Count" y-label)
-        
-        _ (println "[eval-chart-card]" title)
-        _ (println "  categories:" categories)
-        _ (println "  actual-variant:" actual-variant)
-        _ (println "  actual-variant-opts:" actual-variant-opts)
-        _ (println "  data keys count:" (count (keys data)))]
+        actual-y-label (if categories "Count" y-label)]
 
     ($ :div.bg-white.p-6.rounded-lg.shadow-md.border.border-gray-200
        ($ :h3.text-lg.font-medium.text-gray-700.mb-2 title)
