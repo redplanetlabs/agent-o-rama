@@ -252,15 +252,39 @@
 
 (defn- detect-categories
   "Detect categories in telemetry data.
-  Returns nil for numeric data (only _aor/default), or vector of category names for categorical."
-  [telemetry-data]
+  Returns nil for numeric data (only _aor/default), or vector of category names for categorical.
+  
+  Handles both structures:
+  - Without metadata: {bucket {category {stats}}} or {bucket {:stats}}
+  - With metadata: {bucket {metadata-val {category {stats}}}} or {bucket {metadata-val {:stats}}}"
+  [telemetry-data metadata-key]
   (when (seq telemetry-data)
-    (let [;; Get all category keys from all buckets
-          all-keys (set (mapcat keys (vals telemetry-data)))
+    (let [;; Get sample data to check structure
+          sample-bucket-data (val (first telemetry-data))
+          sample-inner (if metadata-key
+                         (val (first sample-bucket-data))
+                         sample-bucket-data)
+          
+          ;; Check if we have categories by seeing if the inner values are maps (stats)
+          ;; vs actual numbers/values
+          first-inner-val (val (first sample-inner))
+          is-categorical? (map? first-inner-val)
+          
+          ;; Get all category keys from all buckets (if categorical)
+          all-keys (when is-categorical?
+                     (if metadata-key
+                       ;; With metadata: bucket -> metadata-val -> category
+                       (set (mapcat (fn [bucket-data]
+                                      (mapcat keys (vals bucket-data)))
+                                    (vals telemetry-data)))
+                       ;; Without metadata: bucket -> category
+                       (set (mapcat keys (vals telemetry-data)))))
+          
           ;; Filter out _aor/default
           category-keys (disj all-keys "_aor/default")]
       (when (seq category-keys)
-        (vec (sort category-keys))))))
+        ;; Sort only strings to avoid comparing mixed types
+        (vec (sort (filter string? category-keys)))))))
 
 (defn- create-eval-chart-config
   "Create a chart configuration for an eval metric.
@@ -593,8 +617,8 @@
         
         ;; Detect if data is categorical and adjust config accordingly
         categories (uix/use-memo
-                    (fn [] (detect-categories data))
-                    [data])
+                    (fn [] (detect-categories data metadata-key))
+                    [data metadata-key])
         
         ;; Dynamically adjust variant for categorical data
         actual-variant (if categories :multi-category variant)
