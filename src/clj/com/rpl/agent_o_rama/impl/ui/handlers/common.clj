@@ -71,9 +71,10 @@
 (comment
   (def m (new dev.langchain4j.data.message.SystemMessage "test"))
   (->ui-serializable m)
-  {"text" "test", "_aor-type" "dev.langchain4j.data.message.SystemMessage"}
+  ; {"text" "test", "_aor-type" "dev.langchain4j.data.message.SystemMessage"}
   (->ui-serializable (into-array [m]))
-  #object["[Ldev.langchain4j.data.message.SystemMessage;" 0x1f52c9ee "[Ldev.langchain4j.data.message.SystemMessage;@1f52c9ee"])
+  ; #object["[Ldev.langchain4j.data.message.SystemMessage;" 0x1f52c9ee "[Ldev.langchain4j.data.message.SystemMessage;@1f52c9ee"]
+  )
 
 (defn from-ui-serializable
   [data]

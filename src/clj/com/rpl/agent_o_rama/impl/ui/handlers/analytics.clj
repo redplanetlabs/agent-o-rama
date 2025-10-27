@@ -249,7 +249,7 @@
   (distinct (select [MAP-VALS MAP-KEYS] (ana/select-telemetry telemetry-pstate
                                                               decoded-agent-name
                                                               granularity
-                                                              [:eval :classifier-rule :sentiment]
+                                                              [:eval :classifier-rule :verbosity]
                                                               start-time-millis
                                                               end-time-millis
                                                               (vec metrics-set)
