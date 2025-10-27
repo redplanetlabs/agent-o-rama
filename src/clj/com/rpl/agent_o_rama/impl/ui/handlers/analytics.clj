@@ -218,16 +218,6 @@
   [{:keys [manager decoded-agent-name granularity metric-id start-time-millis end-time-millis metrics-set metadata-key]} uid]
   (let [agent-client (aor/agent-client manager decoded-agent-name)
         {:keys [telemetry-pstate]} (aor-types/underlying-objects agent-client)]
-    (def metadata-key metadata-key)
-    (def telemetry-pstate telemetry-pstate)
-    (def decoded-agent-name decoded-agent-name)
-    (def granularity granularity)
-    (def start-time-millis start-time-millis)
-    (def end-time-millis end-time-millis)
-    (def metrics-set metrics-set)
-    (def metadata-key metadata-key)
-    (def metric-id metric-id)
-    (println metric-id)
     (ana/select-telemetry telemetry-pstate
                           decoded-agent-name
                           granularity
@@ -236,28 +226,6 @@
                           end-time-millis
                           (vec metrics-set)
                           metadata-key)))
-
-(comment
-  (ana/select-telemetry telemetry-pstate
-                        decoded-agent-name
-                        granularity
-                        [:agent :success-rate]
-                        start-time-millis
-                        end-time-millis
-                        (vec metrics-set)
-                        "region")
-  (distinct (select [MAP-VALS MAP-KEYS] (ana/select-telemetry telemetry-pstate
-                                                              decoded-agent-name
-                                                              granularity
-                                                              [:eval :classifier-rule :verbosity]
-                                                              start-time-millis
-                                                              end-time-millis
-                                                              (vec metrics-set)
-                                                              nil)))
-  
-  
-  
-  )
 
 (defmethod sente/-event-msg-handler :analytics/fetch-all-metrics
   [{:keys [manager decoded-agent-name]} uid]
