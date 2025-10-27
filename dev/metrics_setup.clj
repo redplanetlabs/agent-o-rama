@@ -31,7 +31,9 @@
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
    [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.test :as rtest]
-   [com.rpl.test-common :as tc])
+   [com.rpl.test-common :as tc]
+   [shadow.cljs.devtools.api :as shadow]
+   [shadow.cljs.devtools.server])
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:import
@@ -117,9 +119,9 @@
         (let [output-str (str output)
               length (count output-str)]
           {"verbosity" (cond
-                         (< length 15) "terse"
-                         (< length 30) "concise"
-                         (< length 50) "moderate"
+                         (< length 14) "terse"
+                         (< length 18) "concise"
+                         (< length 25) "moderate"
                          :else "verbose")
            "sentiment" (cond
                          (re-find #"Success|success" output-str) "positive"
@@ -163,7 +165,15 @@
 
             (if should-fail?
               (throw (ex-info "Intentional test failure" {}))
-              (aor/result! agent-node (str "Success: " input)))))))))
+              ;; Vary output text to create different sentiments and verbosity levels
+              (let [rand-val (rand)
+                    output (cond
+                             (< rand-val 0.5) (str "Success: " input)              ; 14-16 chars = concise/positive
+                             (< rand-val 0.7) (str "Completed task for " input)    ; 24 chars = moderate/neutral
+                             (< rand-val 0.85) (str "Error handled for " input)    ; 23 chars = moderate/negative
+                             (< rand-val 0.95) (str "Result: " input)              ; 13 chars = terse/neutral
+                             :else (str "Successfully processed and validated " input))] ; 42+ chars = verbose/positive
+                (aor/result! agent-node output)))))))))
 
 ;; =============================================================================
 ;; Main Setup Function
@@ -202,6 +212,7 @@
                    (reset! *ticks* 0)
                    (foreign-append! ana-depot nil)
                    (Thread/sleep 500) ; Wait for analytics to process
+                   (def module-name module-name)
                    (rtest/pause-microbatch-topology! ipc module-name aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
                    (rtest/resume-microbatch-topology! ipc module-name aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME))]
 
@@ -275,7 +286,25 @@
                  "(" (- end-bucket start-bucket) "minute buckets).")
         (println "   Use the 'Split by' dropdown with 'user-tier', 'region', or 'ab-test-group'.")
         (println "   Charts for evaluators 'numeric-eval', 'concise-eval', and 'classifier-eval' are also available.")
-        (println "   The 'classifier-eval' returns categorical values: 'verbosity' (terse/concise/moderate/verbose)")
-        (println "   and 'sentiment' (positive/neutral/negative) - perfect for testing categorical metrics!")
+        (println "   The 'classifier-eval' returns categorical values:")
+        (println "     - 'verbosity': terse (~13 chars), concise (14-17), moderate (18-24), verbose (25+)")
+        (println "     - 'sentiment': positive (Success), negative (Error), neutral (other)")
+        (println "   Perfect for testing categorical metrics with multiple categories!")
         (println "\n   Return value is the IPC handle. Call (.close ipc) when done."))
       ipc)))
+
+(defn start-repl
+  [ipc & {:keys [port build-id] :or {port 1974 build-id :frontend}}]
+  (shadow.cljs.devtools.server/start!)
+  (shadow/watch build-id)
+  (aor/start-ui ipc {:port port}))
+
+(comment
+  (def ipc (rtest/create-ipc))
+  (setup-metrics-env ipc)
+  (start-repl ipc)
+  (def module-name "dev.metrics-setup/anon-module80074")
+  (def ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+  (foreign-append! ana-depot nil)
+  (rtest/resume-microbatch-topology! ipc module-name aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+  (rtest/pause-microbatch-topology! ipc module-name aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME))

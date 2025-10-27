@@ -9,8 +9,7 @@
    [shadow.cljs.devtools.server]
    [com.rpl.agent.basic.basic-agent :as basic-agent]
    [com.rpl.agent.research-agent :as research-agent]
-   [com.rpl.agent.e2e-test-agent :as e2e-test-agent]
-   [dev.metrics-setup :as metrics-setup])
+   [com.rpl.agent.e2e-test-agent :as e2e-test-agent])
   (:import
    [dev.langchain4j.data.message
     SystemMessage
@@ -53,12 +52,6 @@
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (def ipc (rtest/create-ipc))
   (launch-for-playwright ipc)
-  
-  (do
-    "flow for testing charts"
-    (def ipc (rtest/create-ipc))
-    (metrics-setup/setup-metrics-env ipc)
-    (start-repl ipc))
   
   (aor/stop-ui)
 
