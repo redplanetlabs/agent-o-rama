@@ -21,7 +21,7 @@
 
 (defui ExpandableContentModal [{:keys [title content]}]
   ($ :div.p-6.space-y-4
-     ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
+     ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono.whitespace-pre-wrap.break-words
         content)))
 
 (defui ExceptionDetailModal [{:keys [title content]}]
