@@ -420,9 +420,9 @@
 ;; NEW MODAL AND FORM INTEGRATION EVENTS
 ;; =============================================================================
 
+;; Initialize a form without showing a modal. Useful for persistent forms on pages.
 (state/reg-event
  :form/initialize
- "Initialize a form without showing a modal. Useful for persistent forms on pages."
  (fn [db form-id props]
    (let [form-spec (get @form-specs form-id)]
      (if-not form-spec
