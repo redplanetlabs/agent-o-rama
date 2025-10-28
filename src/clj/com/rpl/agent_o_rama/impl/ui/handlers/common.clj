@@ -90,7 +90,8 @@
         (or (boolean? item)
             (number? item)
             (char? item)
-            (keyword? item))
+            (keyword? item)
+            (uuid? item))
         item
         
         :else
