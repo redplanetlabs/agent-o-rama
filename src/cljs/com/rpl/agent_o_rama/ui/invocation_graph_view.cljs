@@ -105,16 +105,10 @@
                 :success ($ :div {:className (common/cn "w-3 h-3 bg-green-500 rounded-full")})
                 nil)))))))
 
-(defn pretty-format [item]
-  "Format data structure with proper indentation and formatting using pprint"
-  (if (string? item)
-    item
-    (with-out-str (clojure.pprint/pprint item))))
-
 (defui expandable-item-component [{:keys [item color title truncate-length]
                                    :or {truncate-length 50}}]
   (let [item-str (if (string? item) item (pr-str item))
-        pretty-str (pretty-format item)
+        pretty-str (common/pretty-format item)
         is-long? (> (count item-str) truncate-length)
         truncated-str (if is-long?
                         (str (subs item-str 0 (- truncate-length 3)) "...")

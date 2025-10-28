@@ -47,6 +47,13 @@
   "Converts a ClojureScript data structure to a pretty-printed JSON string."
   (js/JSON.stringify (clj->js x) nil 2))
 
+(defn pretty-format [item]
+  "Format data structure with proper indentation and formatting using pprint.
+  Strings are returned as-is to preserve their actual newlines and whitespace."
+  (if (string? item)
+    item
+    (with-out-str (cljs.pprint/pprint item))))
+
 (defn format-timestamp [ms]
   (if (number? ms)
     (let [date (js/Date. ms)
@@ -263,7 +270,7 @@
 ;; A reusable component for displaying truncated content that expands into a modal.
 (defui ExpandableContent [{:keys [content truncate-length modal-title color on-expand]
                            :or {truncate-length 150}}]
-  (let [content-str (pp-json content) ; Use pretty-printed JSON string
+  (let [content-str (pretty-format content) ; Use pretty-format to preserve string whitespace
         is-long? (> (count content-str) truncate-length)
         truncated-str (if is-long?
                         (str (subs content-str 0 truncate-length) "...")

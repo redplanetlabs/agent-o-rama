@@ -387,8 +387,9 @@
                     :onChange #((:on-change args-field) (.. % -target -value))
                     :rows 3
                     :disabled (:submitting? form)})
-                (when (:error args-field)
-                  ($ :p.text-sm.text-red-600.mt-1 (:error args-field))))
+                ;; Always render error container to prevent layout shift
+                ($ :div.text-sm.text-red-600.mt-1 {:style {:min-height "1.25rem"}}
+                   (or (:error args-field) "")))
              
              ;; Metadata textarea with live validation
              ($ :div.flex-1.flex.flex-col
@@ -402,8 +403,9 @@
                     :onChange #((:on-change metadata-field) (.. % -target -value))
                     :rows 3
                     :disabled (:submitting? form)})
-                (when (:error metadata-field)
-                  ($ :p.text-sm.text-red-600.mt-1 (:error metadata-field))))
+                ;; Always render error container to prevent layout shift
+                ($ :div.text-sm.text-red-600.mt-1 {:style {:min-height "1.25rem"}}
+                   (or (:error metadata-field) "")))
              
              ;; Submit button
              ($ :button
