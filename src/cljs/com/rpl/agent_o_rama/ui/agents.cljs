@@ -10,7 +10,58 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.forms :as forms]
    [clojure.string :as str]))
+
+;; =============================================================================
+;; FORM REGISTRATION - Manual Run Agent
+;; =============================================================================
+
+(forms/reg-form
+ :manual-run-agent
+ {:steps [:main]
+  :main {:initial-fields (fn [props]
+                           {:args ""
+                            :metadata-args ""
+                            :module-id (:module-id props)
+                            :agent-name (:agent-name props)})
+         :validators {:args [forms/required forms/valid-json]
+                      :metadata-args [forms/valid-json]}
+         :modal-props {:title "Manual Run Agent"}}
+  :on-submit (fn [db form-state]
+               (let [{:keys [args metadata-args module-id agent-name]} form-state
+                     parsed-args (try (js->clj (js/JSON.parse args)) (catch js/Error _ nil))
+                     parsed-metadata (try (if (str/blank? metadata-args)
+                                            {}
+                                            (js->clj (js/JSON.parse metadata-args)))
+                                       (catch js/Error _ {}))]
+                 
+                 ;; Mark as submitting
+                 (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] true])
+                 
+                 ;; Make the Sente request
+                 (sente/request!
+                  [:invocations/run-agent {:module-id module-id
+                                           :agent-name agent-name
+                                           :args parsed-args
+                                           :metadata parsed-metadata}]
+                  5000
+                  (fn [reply]
+                    (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] false])
+                    (if (:success reply)
+                      (let [data (:data reply)]
+                        ;; Clear the form fields on success
+                        (state/dispatch [:form/update-field (:form-id form-state) :args ""])
+                        (state/dispatch [:form/update-field (:form-id form-state) :metadata-args ""])
+                        ;; Navigate to the trace
+                        (rfe/push-state :agent/invocation-detail 
+                                        {:module-id module-id
+                                         :agent-name agent-name
+                                         :invoke-id (str (:task-id data) "-" (:invoke-id data))}))
+                      ;; Set error on failure
+                      (state/dispatch [:db/set-value 
+                                       [:forms (:form-id form-state) :error]
+                                       (str "Error: " (or (:error reply) "Unknown error"))]))))))})
 
 (defui result-badge [{:keys [result human-request?]}]
   (cond
@@ -311,84 +362,77 @@
                                 :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 :clipRule "evenodd"})))))))))
 
-(defui manual-run [{:keys [module-id agent-name]}]
-  (let [;; Subscribe to state from app-db
-        manual-run-state (state/use-sub [:ui :manual-run module-id agent-name])
-        args (or (:args manual-run-state) "")
-        metadata-args (or (:metadata-args manual-run-state) "")
-        loading? (or (:loading? manual-run-state) false)
-        error-msg (:error-msg manual-run-state)
-
-        ;; State update helper
-        update-field (fn [field value]
-                       (state/dispatch [:db/set-value [:ui :manual-run module-id agent-name field] value]))
-
+(defui manual-run [{:keys [form-id]}]
+  (let [form (forms/use-form form-id)
+        args-field (forms/use-form-field form-id :args)
+        metadata-field (forms/use-form-field form-id :metadata-args)
+        
         handle-submit (fn [e]
                         (.preventDefault e)
-                        (update-field :error-msg nil)
-                        (update-field :loading? true)
-
-                        ;; Parse both arguments and metadata
-                        (let [parsed-args (try (js->clj (js/JSON.parse args)) (catch js/Error e nil))
-                              parsed-metadata (try (if (str/blank? metadata-args) {} (js->clj (js/JSON.parse metadata-args))) (catch js/Error e nil))]
-                          (cond
-                            (not parsed-args)
-                            (do (update-field :loading? false)
-                                (update-field :error-msg "Error: Invalid JSON format for arguments"))
-
-                            (not parsed-metadata)
-                            (do (update-field :loading? false)
-                                (update-field :error-msg "Error: Invalid JSON format for metadata"))
-
-                            :else
-                            ;; Make Sente request with new metadata field
-                            (sente/request!
-                             [:invocations/run-agent {:module-id module-id
-                                                      :agent-name agent-name
-                                                      :args parsed-args
-                                                      :metadata parsed-metadata}]
-                             5000
-                             (fn [reply]
-                               (update-field :loading? false)
-                               (if (:success reply)
-                                 (let [data (:data reply)
-                                       trace-url (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" (:task-id data) "-" (:invoke-id data))]
-                                   (update-field :args "") ;; Clear args on success
-                                   (update-field :metadata-args "") ;; Clear metadata on success
-                                   (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id (str (:task-id data) "-" (:invoke-id data))}))
-                                 (update-field :error-msg (str "Error: " (or (:error reply) "Unknown error")))))))))]
+                        ((:submit! form)))]
 
     ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6
        ($ :form {:onSubmit handle-submit}
           ($ :div.text-sm.font-medium.text-gray-600.mb-4 "Manually Run Agent")
           ($ :div.flex.gap-3.justify-between
-             ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.placeholder-gray-400.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
-                {:placeholder "[arg1, arg2, arg3, ...] (json)"
-                 :value args
-                 :onChange #(update-field :args (.. % -target -value))
-                 :rows 3
-                 :disabled loading?})
-             ($ :textarea.flex-1.p-3.border.border-gray-300.rounded-md.text-sm.placeholder-gray-400.focus:ring-2.focus:ring-blue-500.focus:border-blue-500.transition-colors.duration-150
-                {:placeholder "Metadata (JSON map, optional)"
-                 :value metadata-args
-                 :onChange #(update-field :metadata-args (.. % -target -value))
-                 :rows 3
-                 :disabled loading?})
+             ;; Arguments textarea with live validation
+             ($ :div.flex-1.flex.flex-col
+                ($ :textarea
+                   {:className (str "flex-1 p-3 border rounded-md text-sm placeholder-gray-400 focus:ring-2 transition-colors duration-150 "
+                                    (if (:error args-field)
+                                      "border-red-300 focus:ring-red-500 focus:border-red-500"
+                                      "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
+                    :placeholder "[arg1, arg2, arg3, ...] (json)"
+                    :value (or (:value args-field) "")
+                    :onChange #((:on-change args-field) (.. % -target -value))
+                    :rows 3
+                    :disabled (:submitting? form)})
+                (when (:error args-field)
+                  ($ :p.text-sm.text-red-600.mt-1 (:error args-field))))
+             
+             ;; Metadata textarea with live validation
+             ($ :div.flex-1.flex.flex-col
+                ($ :textarea
+                   {:className (str "flex-1 p-3 border rounded-md text-sm placeholder-gray-400 focus:ring-2 transition-colors duration-150 "
+                                    (if (:error metadata-field)
+                                      "border-red-300 focus:ring-red-500 focus:border-red-500"
+                                      "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
+                    :placeholder "Metadata (JSON map, optional)"
+                    :value (or (:value metadata-field) "")
+                    :onChange #((:on-change metadata-field) (.. % -target -value))
+                    :rows 3
+                    :disabled (:submitting? form)})
+                (when (:error metadata-field)
+                  ($ :p.text-sm.text-red-600.mt-1 (:error metadata-field))))
+             
+             ;; Submit button
              ($ :button
                 {:type "submit"
-                 :disabled loading?
-                 :className (if loading?
+                 :disabled (or (not (:valid? form)) (:submitting? form))
+                 :className (if (or (not (:valid? form)) (:submitting? form))
                               "w-32 h-20 text-white px-4 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-semibold cursor-not-allowed transition-colors duration-150 bg-gray-400"
                               "w-32 h-20 text-white px-4 rounded-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-sm font-semibold cursor-pointer transition-colors duration-150 bg-blue-600 hover:bg-blue-700")}
-                (if loading? "Running..." "Submit"))))
+                (if (:submitting? form) "Running..." "Submit"))))
 
-       ;; Show errors only (success navigates to trace)
-       (when error-msg
+       ;; Show form-level errors only (success navigates to trace)
+       (when (:error form)
          ($ :div.mt-4.p-3.rounded-md.bg-red-50.border.border-red-200
-            ($ :div.text-red-700.text-sm error-msg))))))
+            ($ :div.text-red-700.text-sm (:error form)))))))
 
 (defui agent []
-  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])]
+  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+        ;; Create a unique form-id for this agent's manual run form
+        form-id [:manual-run-agent module-id agent-name]]
+
+    ;; Initialize the form when the component mounts or when module-id/agent-name changes
+    (uix/use-effect
+     (fn []
+       (state/dispatch [:form/initialize form-id {:module-id module-id
+                                                   :agent-name agent-name}])
+       ;; Cleanup: Clear the form when the component unmounts
+       (fn []
+         (state/dispatch [:form/clear form-id])))
+     [module-id agent-name])
 
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
@@ -400,7 +444,7 @@
        ($ :div.p-4.flex.gap-1
           ($ :div
              {:style {:flex-grow "1"}}
-             ($ manual-run {:module-id module-id :agent-name agent-name})))
+             ($ manual-run {:form-id form-id})))
 
        ($ :div.p-4
           ($ mini-invocations)))))

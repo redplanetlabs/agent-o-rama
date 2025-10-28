@@ -191,7 +191,7 @@
                      :onClick (:submit! form)
                      :data-id "form-submit"
                      :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
-                                             (if (or (not (:valid? form)) (:submitting? form) (:error form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                                     (if (or (not (:valid? form)) (:submitting? form) (:error form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                     (when (:submitting? form) ($ common/spinner {:size :medium}))
                     (:submit-text modal-data "Submit")))))))))
 
@@ -419,6 +419,40 @@
 ;; =============================================================================
 ;; NEW MODAL AND FORM INTEGRATION EVENTS
 ;; =============================================================================
+
+(state/reg-event
+ :form/initialize
+ "Initialize a form without showing a modal. Useful for persistent forms on pages."
+ (fn [db form-id props]
+   (let [form-spec (get @form-specs form-id)]
+     (if-not form-spec
+       (do (js/console.error "No form spec registered for" form-id) nil)
+       (let [initial-step (first (:steps form-spec))
+             step-spec (get form-spec initial-step)
+             initial-fields-fn (:initial-fields step-spec)
+             initial-fields (if (fn? initial-fields-fn)
+                              (initial-fields-fn props)
+                              (or initial-fields-fn {}))
+             validators (:validators step-spec)
+
+             ;; Create initial form state with metadata
+             initial-form-state (merge initial-fields
+                                       (when (:steps form-spec)
+                                         {:steps (:steps form-spec)
+                                          :current-step initial-step}))
+
+             ;; Validate the initial form state
+             {:keys [valid? errors]} (validate-form-fields initial-form-state validators)
+
+             ;; Construct the full state for the form
+             form-state (assoc initial-form-state
+                               :field-errors errors
+                               :valid? valid?
+                               :submitting? false
+                               :error nil)]
+
+         ;; Return path to initialize form state
+         [:forms form-id (s/terminal-val form-state)])))))
 
 (state/reg-event
  :modal/show-form
