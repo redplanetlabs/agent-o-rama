@@ -19,11 +19,6 @@
    ["@dagrejs/dagre" :as Dagre]
    ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon PencilIcon XMarkIcon]]))
 
-(defui ExpandableContentModal [{:keys [title content]}]
-  ($ :div.p-6.space-y-4
-     ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono.whitespace-pre-wrap.break-words
-        content)))
-
 (defui ExceptionDetailModal [{:keys [title content]}]
   ($ :div.p-6.space-y-4
      ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
@@ -130,7 +125,7 @@
                             (.stopPropagation e)
                             (state/dispatch [:modal/show :expandable-content
                                              {:title title
-                                              :component ($ ExpandableContentModal {:title title :content pretty-str})}]))
+                                              :component ($ common/ContentDetailModal {:title title :content pretty-str})}]))
                  :title "Click to expand"}
           truncated-str))))
 
