@@ -47,9 +47,9 @@
 ;; Handler to get all global configs
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/get-all-global
   [{:keys [manager]} uid]
-  (let [client-objects (aor-types/underlying-objects manager)
+  (let [manager-objects (aor-types/underlying-objects manager)
         ;; Use the global config PState
-        config-pstate (:global-config-pstate client-objects)
+        config-pstate (:global-config-pstate manager-objects)
         current-config-map (or (foreign-select-one STAY config-pstate {:pkey 0}) {})]
     ;; Read from ALL-GLOBAL-CONFIGS instead of ALL-CONFIGS
     (for [[key config-def] aor-types/ALL-GLOBAL-CONFIGS]
@@ -63,9 +63,9 @@
 ;; Handler to set a global config
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/set-global
   [{:keys [manager key value]} uid]
-  (let [client-objects (aor-types/underlying-objects manager)
+  (let [manager-objects (aor-types/underlying-objects manager)
         ;; Use the global actions depot to send the config change
-        global-actions-depot (:global-actions-depot client-objects)
+        global-actions-depot (:global-actions-depot manager-objects)
         config-def (get aor-types/ALL-GLOBAL-CONFIGS key)]
     (when-not config-def
       (throw (ex-info "Unknown global configuration key" {:key key})))

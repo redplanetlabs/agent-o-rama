@@ -1168,7 +1168,11 @@ Example:\n
         experiments-results-query (foreign-query
                                    cluster
                                    module-name
-                                   (queries/experiment-results-name))]
+                                   (queries/experiment-results-name))
+        global-config-pstate      (foreign-pstate
+                                   cluster
+                                   module-name
+                                   (po/agent-global-config-task-global-name))]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -1702,6 +1706,7 @@ Example:\n
         :search-experiments-query  search-experiments-query
         :search-datasets-query     datasets-search-query
         :experiments-results-query experiments-results-query
+        :global-config-pstate      global-config-pstate
        }))))
 
 (defn agent-client
