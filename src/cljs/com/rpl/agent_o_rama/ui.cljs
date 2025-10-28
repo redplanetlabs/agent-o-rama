@@ -6,6 +6,7 @@
 
    [com.rpl.agent-o-rama.ui.agents :as agents]
    [com.rpl.agent-o-rama.ui.config-page :as config-page]
+   [com.rpl.agent-o-rama.ui.global-config-page :as global-config-page]
    [com.rpl.agent-o-rama.ui.datasets :as datasets]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.module-page :as module-page]
@@ -51,6 +52,7 @@
        ["/comparative-experiments" {:name :module/dataset-detail.comparative-experiments, :views [comparative-experiments/index]}]
        ["/comparative-experiments/:experiment-id" {:name :module/dataset-detail.comparative-experiment-detail, :views [comparative-experiments-detail/detail-page]}]]]
      ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
+     ["/global-config" {:name :module/global-config, :views [global-config-page/page]}]
      ["/agent/:agent-name"
       ["" {:name :agent/detail, :views [agents/agent]}]
       ["/invocations"
@@ -144,9 +146,9 @@
           (when-not collapsed? ($ :span.ml-3 "Rules/Actions")))
 
        ($ nav-link {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/config")
-                    :location location :collapsed? collapsed? :title "Config"}
+                    :location location :collapsed? collapsed? :title "Agent Config"}
           ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
-          (when-not collapsed? ($ :span.ml-3 "Config"))))))
+          (when-not collapsed? ($ :span.ml-3 "Agent Config"))))))
 
 ;; Module-specific navigation component
 (defui module-context-nav [{:keys [module-id collapsed?]}]
@@ -170,6 +172,12 @@
                     :location location :collapsed? collapsed? :title "Evaluations"}
           ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Evaluators")))
+
+       ($ nav-link {:href (rfe/href :module/global-config {:module-id module-id})
+                    :location location :collapsed? collapsed? :title "Global Config"}
+          ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Global Config")))
+
 
        ;; Module-specific agents list
        (cond

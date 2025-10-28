@@ -287,6 +287,26 @@
                             (when on-error (on-error (:error reply))))))))
                    nil))
 
+(state/reg-event :config/submit-global-change
+                 (fn [db {:keys [module-id key value on-success on-error]}]
+                   (let [state-path [:ui :global-config-page (keyword key)]]
+                     ;; Set loading state for this specific config item
+                     (state/dispatch [:db/set-value state-path {:submitting? true :error nil}])
+
+                     (sente/request!
+                      [:config/set-global {:module-id module-id :key key :value value}]
+                      10000 ;; 10 second timeout
+                      (fn [reply]
+                        (if (:success reply)
+                          (do
+                            (println "Global config update success for" key)
+                            (state/dispatch [:db/set-value state-path {:submitting? false :error nil}]))
+                          (do
+                            (js/console.error "Global config update failed:" (:error reply))
+                            (state/dispatch [:db/set-value state-path {:submitting? false :error (:error reply)}])
+                            (when on-error (on-error (:error reply))))))))
+                   nil))
+
  ;; =============================================================================
 ;; DATASET FORM EVENTS
 ;; =============================================================================
