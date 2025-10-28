@@ -421,15 +421,15 @@
 
 (defui agent []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
-        ;; Create a unique form-id for this agent's manual run form
-        form-id [:manual-run-agent module-id agent-name]]
+        ;; Use a simple keyword for the form-id (schema expects Keyword, not vector)
+        form-id :manual-run-agent]
 
     ;; Initialize the form when the component mounts or when module-id/agent-name changes
     (uix/use-effect
      (fn []
        (state/dispatch [:form/initialize form-id {:module-id module-id
                                                    :agent-name agent-name}])
-       ;; Cleanup: Clear the form when the component unmounts
+       ;; Cleanup: Clear the form when the component unmounts or agent changes
        (fn []
          (state/dispatch [:form/clear form-id])))
      [module-id agent-name])
