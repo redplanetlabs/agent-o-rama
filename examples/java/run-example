@@ -2,6 +2,6 @@
 
 
 mvn clean compile dependency:build-classpath -Dmdep.scope=compile -Dmdep.outputFile=cp.txt
-CLASSPATH=$(cat /tmp/cp.txt)
+CLASSPATH=$(cat cp.txt)
 rm cp.txt
 java -cp "target/classes:src/test/resources:$CLASSPATH" $1
