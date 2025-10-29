@@ -315,7 +315,12 @@
         [ref-output-str set-ref-output-str] (uix/use-state #(common/pp-json (or (:reference-output example) "")))
         [output-str set-output-str] (uix/use-state "") ; For :regular type
 
-        [model-outputs-input set-model-outputs-input] (uix/use-state [{:id (random-uuid) :value ""}]) ; For :comparative type user input
+        ;; NEW: Error states for JSON validation
+        [input-error set-input-error] (uix/use-state nil)
+        [ref-output-error set-ref-output-error] (uix/use-state nil)
+        [output-error set-output-error] (uix/use-state nil)
+
+        [model-outputs-input set-model-outputs-input] (uix/use-state [{:id (random-uuid) :value "" :error nil}]) ; For :comparative type user input
         [evaluation-result set-evaluation-result] (uix/use-state nil) ; For evaluator results
         [error set-error] (uix/use-state nil)
         [loading? set-loading] (uix/use-state false)
@@ -351,6 +356,20 @@
         show-input-path? (get builder-options :input-path? true)
         show-output-path? (get builder-options :output-path? true)
         show-ref-output-path? (get builder-options :reference-output-path? true)
+
+        ;; NEW: Validation handlers for JSON fields
+        validate-input (fn [value]
+                         (set-input-error (forms/valid-json value)))
+        validate-ref-output (fn [value]
+                              (set-ref-output-error (forms/valid-json value)))
+        validate-output (fn [value]
+                          (set-output-error (forms/valid-json value)))
+
+        ;; NEW: Check if there are any validation errors
+        has-validation-errors? (or input-error
+                                   ref-output-error
+                                   output-error
+                                   (some :error model-outputs-input))
 
         handle-run (fn []
                      (when selected-evaluator
@@ -448,7 +467,10 @@
              :type :textarea
              :rows 4
              :value input-str
-             :on-change set-input-str}))
+             :on-change (fn [value]
+                          (set-input-str value)
+                          (validate-input value))
+             :error input-error}))
 
        ;; 3. Reference Output (conditionally rendered) - only for single mode
        (when (and (= mode :single) show-ref-output-path?)
@@ -457,7 +479,10 @@
              :type :textarea
              :rows 4
              :value ref-output-str
-             :on-change set-ref-output-str}))
+             :on-change (fn [value]
+                          (set-ref-output-str value)
+                          (validate-ref-output value))
+             :error ref-output-error}))
 
        ;; 4. Dynamic UI based on selection and mode
        (when selected-evaluator
@@ -469,29 +494,41 @@
                  :type :textarea
                  :rows 4
                  :value output-str
-                 :on-change set-output-str
-                 :placeholder "{\"result\": \"...\"}"}))
+                 :on-change (fn [value]
+                              (set-output-str value)
+                              (validate-output value))
+                 :placeholder "{\"result\": \"...\"}"
+                 :error output-error}))
 
            :comparative
            (when show-output-path?
              ($ :div
                 ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Model Outputs (One valid JSON per line)")
                 (doall (for [output-item model-outputs-input]
-                         ($ :div.flex.items-center.gap-2.mb-2 {:key (:id output-item)}
-                            ($ :textarea.flex-1.p-2.border.border-gray-300.rounded-md.font-mono.text-xs
-                               {:rows 1
-                                :value (:value output-item)
-                                :onChange #(set-model-outputs-input
-                                            (mapv (fn [item]
-                                                    (if (= (:id item) (:id output-item))
-                                                      (assoc item :value (.. % -target -value))
-                                                      item))
-                                                  model-outputs-input))})
-                            ($ :button.text-red-500.hover:text-red-700
-                               {:onClick #(set-model-outputs-input
-                                           (filterv (fn [item] (not= (:id item) (:id output-item))) model-outputs-input))}
-                               ($ XMarkIcon {:className "h-4 w-4"})))))
-                ($ :button.text-sm.text-blue-600.hover:underline {:onClick #(set-model-outputs-input (conj model-outputs-input {:id (random-uuid) :value ""}))} "Add another output")))
+                         ($ :div.space-y-1 {:key (:id output-item)}
+                            ($ :div.flex.items-center.gap-2.mb-2
+                               ($ :textarea.flex-1.p-2.border.rounded-md.font-mono.text-xs
+                                  {:className (if (:error output-item)
+                                                "border-red-300 focus:ring-red-500 focus:border-red-500"
+                                                "border-gray-300 focus:ring-blue-500 focus:border-blue-500")
+                                   :rows 1
+                                   :value (:value output-item)
+                                   :onChange (fn [e]
+                                               (let [new-value (.. e -target -value)
+                                                     validation-error (forms/valid-json new-value)]
+                                                 (set-model-outputs-input
+                                                  (mapv (fn [item]
+                                                          (if (= (:id item) (:id output-item))
+                                                            (assoc item :value new-value :error validation-error)
+                                                            item))
+                                                        model-outputs-input))))})
+                               ($ :button.text-red-500.hover:text-red-700
+                                  {:onClick #(set-model-outputs-input
+                                              (filterv (fn [item] (not= (:id item) (:id output-item))) model-outputs-input))}
+                                  ($ XMarkIcon {:className "h-4 w-4"})))
+                            (when (:error output-item)
+                              ($ :p.text-sm.text-red-600.ml-1 (:error output-item))))))
+                ($ :button.text-sm.text-blue-600.hover:underline {:onClick #(set-model-outputs-input (conj model-outputs-input {:id (random-uuid) :value "" :error nil}))} "Add another output")))
 
            :summary
            (if (zero? (count selected-example-ids))
@@ -511,6 +548,7 @@
              {:onClick handle-run
               :disabled (or (not selected-evaluator)
                             loading?
+                            has-validation-errors?
                             (and (= evaluator-type :summary)
                                  (zero? (count selected-example-ids))))}
              (if loading? "Running..." "Run Evaluator")))
