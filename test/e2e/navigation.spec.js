@@ -54,7 +54,7 @@ test.describe('Dataset crud', () => {
 
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.e2e-test-agent.*E2ETestAgentModule.*\/datasets.*/i);
     console.log('Successfully verified datasets page.');
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
@@ -139,7 +139,7 @@ test.describe('Dataset example crud', () => {
 
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.e2e-test-agent.*E2ETestAgentModule.*\/datasets.*/i);
     console.log('Successfully verified datasets page.');
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
@@ -367,7 +367,7 @@ test.describe('Dataset snapshot dropdown', () => {
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.e2e-test-agent.*E2ETestAgentModule.*\/datasets.*/i);
 
     const newDatasetButton = page.getByRole('button', { name: 'Create Dataset' }).first();
     await expect(newDatasetButton).toBeVisible({ timeout: 30000 });
@@ -475,7 +475,7 @@ test.describe('Form Validation and Error Handling', () => {
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
     await datasetsLink.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*\/datasets.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.e2e-test-agent.*E2ETestAgentModule.*\/datasets.*/i);
     console.log('Successfully navigated to datasets page.');
 
     // 2. ACTION: Open the modal and submit an invalid form
