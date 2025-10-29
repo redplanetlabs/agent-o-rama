@@ -41,6 +41,8 @@ const otherEvaluator = {
 const examples = [
   {
     input: {
+      "run-id": `ex1-${uniqueId}`,
+      "output-value": "example 1 output",
       target1_output: 'short',
       target2_output: 'this is the longest output and should be the winner for example 1',
       target3_output: 'medium length',
@@ -49,6 +51,8 @@ const examples = [
   },
   {
     input: {
+      "run-id": `ex2-${uniqueId}`,
+      "output-value": "example 2 output",
       target1_output: 'this is the longest output and should be the winner for example 2',
       target2_output: 'short',
       target3_output: 'medium length',
@@ -57,6 +61,8 @@ const examples = [
   },
   {
     input: {
+      "run-id": `ex3-${uniqueId}`,
+      "output-value": "example 3 output",
       target1_output: 'short',
       target2_output: 'medium length',
       target3_output: 'this is the longest output and should be the winner for example 3',
