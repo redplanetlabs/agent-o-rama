@@ -474,23 +474,23 @@
                          :graph-data graph-data
                          :module-id module-id})
 
-     ($ node-result-panel {:result result})
-
      ($ node-exceptions-panel {:exceptions exceptions})
-
-     ($ node-timing-panel {:start-time start-time
-                           :finish-time finish-time
-                           :duration duration})
 
      ($ node-input-panel {:input input})
 
      ($ node-operations-panel {:data data})
 
+     ($ node-result-panel {:result result})
+
      ($ node-emits-panel {:emits emits
                           :graph-data graph-data
                           :flow-nodes flow-nodes
                           :on-select-node on-select-node
-                          :on-paginate-node on-paginate-node})))
+                          :on-paginate-node on-paginate-node})
+
+     ($ node-timing-panel {:start-time start-time
+                           :finish-time finish-time
+                           :duration duration})))
 
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
