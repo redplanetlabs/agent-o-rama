@@ -250,7 +250,7 @@
                                           #{:model :store-read :store-write :db-read :db-write})))
        (is (= "...!?"
               (aor/agent-invoke-with-context foo
-                                             {:metadata {"m1" "a" "m2" "A"}}
+                                             {:metadata {"m1" "a" "m2" 1}}
                                              "..."
                                              #{:model :store-read :db-read})))
        (is (thrown? Exception
@@ -261,7 +261,7 @@
        (is (= "abc!?"
               (aor/agent-invoke foo "abc" #{:store-write :db-read :db-write})))
        (is (= "eeeee!?"
-              (aor/agent-invoke-with-context foo {:metadata {"m2" "B"}} "eeeee" #{:model})))
+              (aor/agent-invoke-with-context foo {:metadata {"m2" 2}} "eeeee" #{:model})))
 
        (TopologyUtils/advanceSimTime (minute-millis 1))
        (is (thrown? Exception (aor/agent-invoke foo "fail-model" #{:model})))
@@ -298,8 +298,8 @@
                  {"a" {"_aor/default" {:count 2 :rest-sum 2}}
                   "b" {"_aor/default" {:count 1 :rest-sum 0}}}}
                 (fetch-day [:agent :success-rate] "m1")))
-         (is (= {0 {"A" {"_aor/default" {:count 1 :rest-sum 1}}}
-                 1 {"B" {"_aor/default" {:count 1 :rest-sum 1}}}}
+         (is (= {0 {1 {"_aor/default" {:count 1 :rest-sum 1}}}
+                 1 {2 {"_aor/default" {:count 1 :rest-sum 1}}}}
                 (fetch-day [:agent :success-rate] "m2"))))
 
        ;; check agent latency
@@ -318,8 +318,8 @@
                  {"a" {"_aor/default" {:count 2 :rest-sum 1096}}
                   "b" {"_aor/default" {:count 1 :rest-sum 3}}}}
                 (fetch-day [:agent :latency] "m1")))
-         (is (= {0 {"A" {"_aor/default" {:count 1 :rest-sum 532}}}
-                 1 {"B" {"_aor/default" {:count 1 :rest-sum 503}}}}
+         (is (= {0 {1 {"_aor/default" {:count 1 :rest-sum 532}}}
+                 1 {2 {"_aor/default" {:count 1 :rest-sum 503}}}}
                 (fetch-day [:agent :latency] "m2"))))
 
        (testing "agent model call count"
@@ -341,8 +341,8 @@
                  {"a" {"_aor/default" {:count 2 :rest-sum 4}}
                   "b" {"_aor/default" {:count 1 :rest-sum 0}}}}
                 (fetch-day [:agent :model-call-count] "m1")))
-         (is (= {0 {"A" {"_aor/default" {:count 1 :rest-sum 2}}}
-                 1 {"B" {"_aor/default" {:count 1 :rest-sum 2}}}}
+         (is (= {0 {1 {"_aor/default" {:count 1 :rest-sum 2}}}
+                 1 {2 {"_aor/default" {:count 1 :rest-sum 2}}}}
                 (fetch-day [:agent :model-call-count] "m2"))))
 
        (testing "token counts"
