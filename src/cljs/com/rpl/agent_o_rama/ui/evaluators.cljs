@@ -297,10 +297,10 @@
            (do
              (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
              (state/dispatch [:modal/hide])
-             (let [decoded-module-id (when module-id (common/url-decode module-id))]
-               (state/dispatch [:query/invalidate
-                                {:query-key-pattern
-                                 [:evaluator-instances decoded-module-id]}]))
+             ;; Don't decode module-id - use it as-is since query keys use the encoded version
+             (state/dispatch [:query/invalidate
+                              {:query-key-pattern
+                               [:evaluator-instances module-id]}])
              (state/dispatch [:form/clear form-id]))
            (do
              (println "Setting error and stopping spinner in form:" (:error reply) form-id)
