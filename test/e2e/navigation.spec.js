@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getResearchAgentRow } from './helpers.js';
+import { getE2ETestAgentRow } from './helpers.js';
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -20,12 +20,12 @@ test.describe('research agent module exists', () => {
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
     // Step 3: Get the agent row using the helper function.
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
 
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.e2e-test-agent.*E2ETestAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
   });
 });
@@ -40,12 +40,12 @@ test.describe('Dataset crud', () => {
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
     // Step 3: Get the agent row using the helper function.
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
 
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.e2e-test-agent.*E2ETestAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
 
     const datasetsLink = page.getByText('Datasets & Experiments');
@@ -125,12 +125,12 @@ test.describe('Dataset example crud', () => {
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
     // Step 3: Get the agent row using the helper function.
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
 
     // Step 4: Click the agent row to navigate.
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.e2e-test-agent.*E2ETestAgentModule.*/i);
     console.log('Successfully verified agent detail page.');
 
     const datasetsLink = page.getByText('Datasets & Experiments');
@@ -264,7 +264,7 @@ test.describe('Inline editing validation', () => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
 
     const datasetsLink = page.getByText('Datasets & Experiments');
@@ -358,10 +358,10 @@ test.describe('Dataset snapshot dropdown', () => {
 
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
 
-    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.research-agent.*ResearchAgentModule.*/i);
+    await expect(page).toHaveURL(/\/agents\/.*com\.rpl\.agent\.e2e-test-agent.*E2ETestAgentModule.*/i);
 
     const datasetsLink = page.getByText('Datasets & Experiments');
     await expect(datasetsLink).toBeVisible({ timeout: 30000 });
@@ -468,7 +468,7 @@ test.describe('Form Validation and Error Handling', () => {
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
     // Find the agent using the helper function
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
 
     const datasetsLink = page.getByText('Datasets & Experiments');

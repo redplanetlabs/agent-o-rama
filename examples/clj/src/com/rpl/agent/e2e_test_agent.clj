@@ -111,6 +111,23 @@
          {"index" random-index
           "explanation" (str "Randomly selected output " random-index)}))))
 
+  ;; Two evaluators that both produce a "score" metric for disambiguation testing.
+  (aor/declare-evaluator-builder
+   topology
+   "score-by-length"
+   "Returns the length of the output string as 'score'."
+   (fn [params]
+     (fn [fetcher input ref-output output]
+       {"score" (count (str output))})))
+
+  (aor/declare-evaluator-builder
+   topology
+   "score-by-vowel-count"
+   "Returns the number of vowels in the output string as 'score'."
+   (fn [params]
+     (fn [fetcher input ref-output output]
+       {"score" (count (re-seq #"[aeiouAEIOU]" (str output)))})))
+
   ;; --- The E2E Test Agent Definition ---
   (-> topology
       (aor/new-agent "E2ETestAgent")

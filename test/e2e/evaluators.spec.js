@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getResearchAgentRow, createEvaluator, addExample } from './helpers.js';
+import { getE2ETestAgentRow, createEvaluator, addExample } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE
@@ -19,9 +19,9 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   await page.goto('/');
   await expect(page).toHaveTitle(/Agent-o-rama/);
 
-  const agentRow = await getResearchAgentRow(page);
+  const agentRow = await getE2ETestAgentRow(page);
   await agentRow.click();
-  await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.research-agent.*ResearchAgentModule`));
+  await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.e2e-test-agent.*E2ETestAgentModule`));
   console.log('--- Test Setup Complete ---');
 
   // 1. SETUP PHASE: Create evaluators and a dataset with examples
@@ -79,10 +79,10 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   await expect(page.getByRole('heading', { name: datasetName })).toBeVisible();
 
   // Create examples with unique identifiers
-  await addExample(page, { input: { text: "short", id: `ex1-${uniqueId}` }, output: "out" }); // For conciseness test
-  await addExample(page, { input: { value: 5, id: `ex2-${uniqueId}` }, output: 10 });         // For comparative test (input < output)
-  await addExample(page, { input: { symbol: "+", id: `ex3-${uniqueId}` }, output: "+" });      // For summary F1 test
-  await addExample(page, { input: { symbol: "-", id: `ex4-${uniqueId}` }, output: "-" });      // For summary F1 test
+  await addExample(page, { input: { "run-id": `ex1-${uniqueId}`, "output-value": "out", text: "short", id: `ex1-${uniqueId}` }, output: "out" }); // For conciseness test
+  await addExample(page, { input: { "run-id": `ex2-${uniqueId}`, "output-value": "10", value: 5, id: `ex2-${uniqueId}` }, output: "10" });         // For comparative test
+  await addExample(page, { input: { "run-id": `ex3-${uniqueId}`, "output-value": "+", symbol: "+", id: `ex3-${uniqueId}` }, output: "+" });      // For summary F1 test
+  await addExample(page, { input: { "run-id": `ex4-${uniqueId}`, "output-value": "-", symbol: "-", id: `ex4-${uniqueId}` }, output: "-" });      // For summary F1 test
 
   console.log('--- Evaluator and Dataset Creation Complete ---');
 
@@ -222,9 +222,9 @@ test('should test evaluators from the evaluators page with conditional field ren
   await page.goto('/');
   await expect(page).toHaveTitle(/Agent-o-rama/);
 
-  const agentRow = await getResearchAgentRow(page);
+  const agentRow = await getE2ETestAgentRow(page);
   await agentRow.click();
-  await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.research-agent.*ResearchAgentModule`));
+  await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.e2e-test-agent.*E2ETestAgentModule`));
   console.log('--- Test Setup Complete ---');
 
   const testUniqueId = randomUUID().substring(0, 8);

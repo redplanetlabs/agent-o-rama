@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getResearchAgentRow, addExample } from './helpers.js';
+import { getE2ETestAgentRow, addExample } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE
@@ -19,11 +19,11 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
 
     await page.getByText('Datasets & Experiments').click();
-    await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.research-agent.*ResearchAgentModule.*/datasets`));
+    await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.e2e-test-agent.*E2ETestAgentModule.*/datasets`));
 
     // Create a new dataset
     await page.getByRole('button', { name: 'Create Dataset' }).first().click();
@@ -43,17 +43,17 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
 
     // --- 2. CREATE EXAMPLES ---
     console.log('--- Creating Examples ---');
-    const example1 = { input: { id: `ex1-${uniqueId}` }, output: { res: 1 } };
-    const example2 = { input: { id: `ex2-${uniqueId}` }, output: { res: 2 } };
-    const example3 = { input: { id: `ex3-${uniqueId}` }, output: { res: 3 } };
+    const example1 = { input: { "run-id": `ex1-${uniqueId}`, "output-value": "output for example 1" }, output: "output for example 1" };
+    const example2 = { input: { "run-id": `ex2-${uniqueId}`, "output-value": "output for example 2" }, output: "output for example 2" };
+    const example3 = { input: { "run-id": `ex3-${uniqueId}`, "output-value": "output for example 3" }, output: "output for example 3" };
 
     await addExample(page, example1);
     await addExample(page, example2);
     await addExample(page, example3);
 
-    const row1 = page.locator('table tbody tr').filter({ hasText: example1.input.id });
-    const row2 = page.locator('table tbody tr').filter({ hasText: example2.input.id });
-    const row3 = page.locator('table tbody tr').filter({ hasText: example3.input.id });
+    const row1 = page.locator('table tbody tr').filter({ hasText: example1.input["run-id"] });
+    const row2 = page.locator('table tbody tr').filter({ hasText: example2.input["run-id"] });
+    const row3 = page.locator('table tbody tr').filter({ hasText: example3.input["run-id"] });
     console.log('--- Examples Created ---');
 
 

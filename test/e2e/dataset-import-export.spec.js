@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
 import { unlinkSync, existsSync } from 'fs';
-import { getResearchAgentRow, createDataset, deleteDataset, addExample } from './helpers.js';
+import { getE2ETestAgentRow, createDataset, deleteDataset, addExample } from './helpers.js';
 
 // =============================================================================
 // TEST CONSTANTS
@@ -88,7 +88,7 @@ test.describe('Dataset Import/Export Round-trip', () => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Agent-o-rama/);
 
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
 
     await page.getByText('Datasets & Experiments').click();
@@ -107,6 +107,13 @@ test.describe('Dataset Import/Export Round-trip', () => {
     const complexExamples = [
       { 
         input: { 
+          "run-id": `complex-1-${uniqueId}`,
+          "output-value": JSON.stringify({
+            answer: "Paris",
+            confidence: 0.95,
+            reasoning: "Paris is the well-known capital and largest city of France.",
+            sources: ["encyclopedia", "atlas"]
+          }),
           id: `complex-1-${uniqueId}`,
           type: "question-answer",
           question: "What is the capital of France?",
@@ -122,6 +129,12 @@ test.describe('Dataset Import/Export Round-trip', () => {
       },
       { 
         input: { 
+          "run-id": `complex-2-${uniqueId}`,
+          "output-value": JSON.stringify({
+            answer: 78.54,
+            formula: "π * r²",
+            steps: ["r = 5", "π ≈ 3.14159", "Area = 3.14159 * 5² = 78.54"]
+          }),
           id: `complex-2-${uniqueId}`,
           type: "math-problem",
           problem: "Calculate the area of a circle with radius 5",
@@ -136,6 +149,11 @@ test.describe('Dataset Import/Export Round-trip', () => {
       },
       { 
         input: { 
+          "run-id": `complex-3-${uniqueId}`,
+          "output-value": JSON.stringify({
+            code: "function reverseString(str) {\n  if (!str) return '';\n  let result = '';\n  for (let i = str.length - 1; i >= 0; i--) {\n    result += str[i];\n  }\n  return result;\n}",
+            explanation: "This function iterates through the string backwards and builds the reversed result."
+          }),
           id: `complex-3-${uniqueId}`,
           type: "code-generation",
           language: "javascript",
@@ -357,7 +375,7 @@ test.describe('Dataset Import/Export Round-trip', () => {
     
     // Setup
     await page.goto('/');
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
     await page.getByText('Datasets & Experiments').click();
     
@@ -429,7 +447,7 @@ test.describe('Dataset Import/Export Round-trip', () => {
     
     // Setup
     await page.goto('/');
-    const agentRow = await getResearchAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
     await page.getByText('Datasets & Experiments').click();
     
@@ -443,7 +461,7 @@ test.describe('Dataset Import/Export Round-trip', () => {
     
     // Add one example first
     await addExample(page, { 
-      input: { id: `readonly-test-${uniqueId}` }, 
+      input: { "run-id": `readonly-test-${uniqueId}`, "output-value": "test output" }, 
       output: "test output" 
     });
     
