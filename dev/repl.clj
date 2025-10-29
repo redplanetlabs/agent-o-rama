@@ -41,10 +41,6 @@
 
   (rtest/launch-module!
    ipc
-   research-agent/ResearchAgentModule
-   {:tasks 1 :threads 1})
-  (rtest/launch-module!
-   ipc
    e2e-test-agent/E2ETestAgentModule
    {:tasks 1 :threads 1}))
 
