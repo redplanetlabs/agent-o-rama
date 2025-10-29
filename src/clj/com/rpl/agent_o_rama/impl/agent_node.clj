@@ -87,13 +87,17 @@
   ^StreamingRecorder
   [agent-task-id agent-id node invoke-id retry-num streaming-depot]
   (let [index-vol (volatile! 0)
+        lock      (java.util.concurrent.locks.ReentrantLock.)
         outstanding-queue-vol (volatile! clojure.lang.PersistentQueue/EMPTY)]
     (reify
      StreamingRecorder
      (streamChunk [this chunk]
-       ;; crucial to lock so that appends on this depot happen in order of
+       ;; - crucial to lock so that appends on this depot happen in order of
        ;; indexes
-       (locking index-vol
+       ;; - note that on Java 21, using synchronized/locking is not safe on virtual threads and
+       ;; will prevent it from unmounting if doing a blocking operation inside
+       (.lock lock)
+       (try
          (let [streaming-index @index-vol
                _ (vswap! index-vol inc)
                cf (foreign-append-async!
@@ -112,7 +116,9 @@
                (let [cf (peek @outstanding-queue-vol)]
                  (vswap! outstanding-queue-vol pop)
                  (verify-successful-cf! cf)
-               )))
+               ))))
+         (finally
+           (.unlock lock)
          )))
      StreamingRecorderInternal
      (waitFinish [this]
