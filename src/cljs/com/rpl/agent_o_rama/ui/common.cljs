@@ -3,7 +3,54 @@
    [cognitect.transit :as t]
    [clojure.string :as str]
    [uix.core :as uix :refer [defhook defui $]]
-   ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
+   ["@heroicons/react/24/outline" :refer [ChevronDownIcon InformationCircleIcon]]))
+
+;; =============================================================================
+;; TOOLTIP COMPONENT
+;; =============================================================================
+
+(defui InfoTooltip [{:keys [content]}]
+  (let [[open? set-open!] (uix/use-state false)
+        [timeout-id set-timeout-id!] (uix/use-state nil)
+        hovering-ref (uix/use-ref false)
+
+        clear-close! (fn []
+                       (when timeout-id
+                         (js/clearTimeout timeout-id)
+                         (set-timeout-id! nil)))
+
+        schedule-close (fn schedule-close []
+                         (clear-close!)
+                         (let [new-timeout (js/setTimeout (fn []
+                                                            (if (.-current hovering-ref)
+                                                              (schedule-close)
+                                                              (do (set-open! false)
+                                                                  (set-timeout-id! nil))))
+                                                          100)]
+                           (set-timeout-id! new-timeout)))]
+
+    ($ :div.relative.inline-flex.items-center
+       ($ InformationCircleIcon {:className "h-4 w-4 text-gray-400 hover:text-blue-500 cursor-help"
+                                 :onClick (fn [] (set-open! (not open?)))
+                                 :tabIndex 0
+                                 :onMouseEnter (fn []
+                                                 (set! (.-current hovering-ref) true)
+                                                 (clear-close!)
+                                                 (set-open! true))
+                                 :onMouseLeave (fn []
+                                                 (set! (.-current hovering-ref) false)
+                                                 (schedule-close))})
+       (when open?
+         ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
+            {:onMouseEnter (fn []
+                             (set! (.-current hovering-ref) true)
+                             (clear-close!))
+             :onMouseLeave (fn []
+                             (set! (.-current hovering-ref) false)
+                             (schedule-close))}
+            content)))))
+
+;; =============================================================================
 
 (defn url-decode [s]
   "Decode URL-encoded string using standard browser decoding"

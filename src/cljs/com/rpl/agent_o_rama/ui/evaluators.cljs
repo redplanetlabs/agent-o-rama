@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.evaluators
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon InformationCircleIcon MagnifyingGlassIcon PlayIcon]]
+   ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon MagnifyingGlassIcon PlayIcon]]
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
@@ -81,54 +81,13 @@
 ;; JSONPATH TOOLTIP COMPONENT
 ;; =============================================================================
 
-(defui InfoTooltip [{:keys [content]}]
-  (let [[open? set-open!] (uix/use-state false)
-        [timeout-id set-timeout-id!] (uix/use-state nil)
-        hovering-ref (uix/use-ref false)
-
-        clear-close! (fn []
-                       (when timeout-id
-                         (js/clearTimeout timeout-id)
-                         (set-timeout-id! nil)))
-
-        schedule-close (fn schedule-close []
-                         (clear-close!)
-                         (let [new-timeout (js/setTimeout (fn []
-                                                            (if (.-current hovering-ref)
-                                                              (schedule-close)
-                                                              (do (set-open! false)
-                                                                  (set-timeout-id! nil))))
-                                                          100)]
-                           (set-timeout-id! new-timeout)))]
-
-    ($ :div.relative.inline-flex.items-center
-       ($ InformationCircleIcon {:className "h-4 w-4 text-gray-400 hover:text-blue-500 cursor-help"
-                                 :onClick (fn [] (set-open! (not open?)))
-                                 :tabIndex 0
-                                 :onMouseEnter (fn []
-                                                 (set! (.-current hovering-ref) true)
-                                                 (clear-close!)
-                                                 (set-open! true))
-                                 :onMouseLeave (fn []
-                                                 (set! (.-current hovering-ref) false)
-                                                 (schedule-close))})
-       (when open?
-         ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
-            {:onMouseEnter (fn []
-                             (set! (.-current hovering-ref) true)
-                             (clear-close!))
-             :onMouseLeave (fn []
-                             (set! (.-current hovering-ref) false)
-                             (schedule-close))}
-            content)))))
-
 (defui JsonPathTooltip []
-  ($ InfoTooltip {:content ($ :div
-                              "A JSONPath expression to extract a value from the JSON object."
-                              ($ :br)
-                              ($ :a.text-blue-300.hover:underline.cursor-pointer
-                                 {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
-                                 "Learn more on Wikipedia."))}))
+  ($ common/InfoTooltip {:content ($ :div
+                                     "A JSONPath expression to extract a value from the JSON object."
+                                     ($ :br)
+                                     ($ :a.text-blue-300.hover:underline.cursor-pointer
+                                        {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
+                                        "Learn more on Wikipedia."))}))
 
 ;; =============================================================================
 
@@ -222,7 +181,7 @@
                     :label ($ :div.flex.items-center.gap-2
                               (str (name param-key))
                               (when param-description
-                                ($ InfoTooltip {:content param-description})))
+                                ($ common/InfoTooltip {:content param-description})))
                     :type (if has-newlines? :textarea :text)
                     :rows (when has-newlines? 6)
                     :value value-str
