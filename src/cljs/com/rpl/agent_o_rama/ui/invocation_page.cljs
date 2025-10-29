@@ -55,11 +55,7 @@
            (fn []
              (when (and graph-data (not selected-node-id))
                ;; Find the first node - prioritize starter nodes, then fall back to any node
-               (let [first-node-id (or
-                                    ;; Fall back to the root-invoke-id if available
-                                    root-invoke-id
-                                    ;; Otherwise just pick the first node
-                                    (first (keys graph-data)))]
+               (let [first-node-id (or root-invoke-id)]
                  (when first-node-id
                    (state/dispatch [:db/set-value [:ui :selected-node-id] first-node-id])))))
            [graph-data root-invoke-id selected-node-id])
