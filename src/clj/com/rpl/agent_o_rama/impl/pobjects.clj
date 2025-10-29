@@ -347,7 +347,7 @@
       {:overall leaf-schema
        :by-meta (map-schema
                  String ; metadata key
-                 {String ; metadata value
+                 {Object ; metadata value
                   leaf-schema}
                  {:subindex? true})
       })

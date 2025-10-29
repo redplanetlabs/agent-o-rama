@@ -986,7 +986,6 @@
 
   (|hash [*agent-name *granularity *metric-id])
   (po/agent-telemetry-task-global *agent-name :> $$telemetry)
-
   (local-transform>
    [(keypath *granularity *metric-id *bucket)
     (term (stats-updater *metadata *category-values))]
