@@ -70,8 +70,9 @@ test.describe('Invocation Trace Page Rendering', () => {
 
     // 3c. Verify the content of the final result panel.
     // The result is displayed in the generic-data-viewer, which renders the content as text.
-    // We look for any element that contains our expected output text.
-    await expect(page.getByText(expectedResult)).toBeVisible();
+    // We scope the search to the Final Result panel and check the <pre> element specifically.
+    const finalResultPanel = page.locator('div').filter({ hasText: 'Final Result' });
+    await expect(finalResultPanel.locator('pre').filter({ hasText: expectedResult })).toBeVisible();
     console.log('Final Result content is correct.');
 
     // 3d. Additionally, check for the "Success" badge to be sure.
