@@ -270,9 +270,8 @@
                param-name
                (when required? ($ :span.text-red-500.ml-1 "*")))
             (when (and description (not show-description-below?))
-              ($ :span.text-gray-400.text-xs.cursor-help
-                 {:title description}
-                 "[?]")))
+              ($ common/InfoTooltip {:content description
+                                     :html? true})))
 
          ($ :input
             (cond-> {:type "text"

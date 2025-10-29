@@ -9,7 +9,7 @@
 ;; TOOLTIP COMPONENT
 ;; =============================================================================
 
-(defui InfoTooltip [{:keys [content]}]
+(defui InfoTooltip [{:keys [content html?]}]
   (let [[open? set-open!] (uix/use-state false)
         [timeout-id set-timeout-id!] (uix/use-state nil)
         hovering-ref (uix/use-ref false)
@@ -41,14 +41,25 @@
                                                  (set! (.-current hovering-ref) false)
                                                  (schedule-close))})
        (when open?
-         ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
-            {:onMouseEnter (fn []
-                             (set! (.-current hovering-ref) true)
-                             (clear-close!))
-             :onMouseLeave (fn []
-                             (set! (.-current hovering-ref) false)
-                             (schedule-close))}
-            content)))))
+         (if html?
+           ;; Render as HTML using dangerouslySetInnerHTML
+           ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
+              {:onMouseEnter (fn []
+                               (set! (.-current hovering-ref) true)
+                               (clear-close!))
+               :onMouseLeave (fn []
+                               (set! (.-current hovering-ref) false)
+                               (schedule-close))
+               :dangerouslySetInnerHTML {:__html content}})
+           ;; Render as React elements/children
+           ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
+              {:onMouseEnter (fn []
+                               (set! (.-current hovering-ref) true)
+                               (clear-close!))
+               :onMouseLeave (fn []
+                               (set! (.-current hovering-ref) false)
+                               (schedule-close))}
+              content))))))
 
 ;; =============================================================================
 

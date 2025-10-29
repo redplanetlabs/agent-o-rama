@@ -181,7 +181,8 @@
                     :label ($ :div.flex.items-center.gap-2
                               (str (name param-key))
                               (when param-description
-                                ($ common/InfoTooltip {:content param-description})))
+                                ($ common/InfoTooltip {:content param-description
+                                                       :html? true})))
                     :type (if has-newlines? :textarea :text)
                     :rows (when has-newlines? 6)
                     :value value-str

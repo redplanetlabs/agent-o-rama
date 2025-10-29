@@ -231,11 +231,11 @@
               {"datasetId" {:description "Dataset to add to"}
                "inputJsonPathTemplate"
                {:description
-                "JSON path template to translate input of a run to dataset example input"
+                "<a class=\"text-blue-600 hover:underline\" href=\"https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates\"> JSON path template </a> to translate input of a run to dataset example input " 
                 :default     "$"}
                "outputJsonPathTemplate"
                {:description
-                "JSON path template to translate output of a run to dataset example output"
+                "<a class=\"text-blue-600 hover:underline\" href=\"https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates\"> JSON path template </a> to translate output of a run to dataset example output"
                 :default     "$"}}
              }}
    "aor/webhook"
