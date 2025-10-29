@@ -262,13 +262,17 @@
             ($ :p.text-sm.text-red-600.mt-1 (:error metadata-field))))
 
        ($ :div.mt-4
-          ($ :label.block.text-sm.font-medium.text-gray-700 "Input Mappings")
-          ($ :p.text-xs.text-gray-500.mb-2 "Map dataset input fields to agent/node arguments using JSONPath.")
+          ($ :label.block.text-sm.font-medium.text-gray-700 "Input Arguments")
+          ($ :p.text-xs.text-gray-500.mb-2
+            "Specify arguments for the target with "
+            ($ :a.text-blue-600.hover:underline {:href "https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates" :target "_blank"} "JSON Path templates") ".")
           (if (empty? input-mappings)
-            ($ :div.text-xs.text-gray-500.italic.py-2 "No mappings yet. Add one to provide arguments.")
+            ($ :div.text-xs.text-gray-500.italic.py-2 "No arguments yet. Add one to provide arguments.")
             ($ :div.space-y-2
                (for [[i {:keys [id value]}] (map-indexed vector input-mappings)]
                  ($ :div.flex.items-center.gap-2 {:key id}
+                    ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
+                       (str "Arg " (inc i)))
                     ($ :input.flex-1.p-1.border.border-gray-300.rounded-md.font-mono.text-sm
                        {:value value
                         :on-change (fn [e] (state/dispatch [:form/update-field form-id (conj path :input->args i :value) (.. e -target -value)]))})
@@ -279,7 +283,7 @@
           ($ :button.mt-2.text-sm.text-blue-600.hover:underline
              {:type "button"
               :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings {:id (random-uuid) :value "$"})]))}
-             "Add Mapping")))))
+             "Add Argument")))))
 
 (defui CreateExperimentForm [{:keys [form-id]}]
   (let [{:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
