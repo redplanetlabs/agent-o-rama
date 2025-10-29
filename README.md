@@ -12,8 +12,11 @@ Agent-o-rama is a library for building scalable and stateful AI agents on the JV
   <img src="readme/fork.png" width="30%" alt="Forking">
   <img src="readme/create-llm-judge.png" width="30%" alt="Create LLM judge evaluator">
 </p>
-
-TODO: add telemetry image here
+<p align="center">
+  <img src="readme/telemetry1.png" width="30%" alt="Telemetry 1">
+  <img src="readme/telemetry2.png" width="30%" alt="Telemetry 2">
+  <img src="readme/telemetry3.png" width="30%" alt="Telemetry 3">
+</p>
 
 - [Overview](#overview)
 - [Key similarities and differences with LangGraph/LangSmith](#-key-similarities-with-langgraphlangsmith)
@@ -348,5 +351,12 @@ See [this page](https://github.com/redplanetlabs/agent-o-rama/wiki/Actions,-rule
 
 ### Time-series telemetry
 
-TODO
-- split by metadata
+Agent-o-rama automatically tracks time-series telemetry for all aspects of agent execution.
+
+![Metrics dashboards 1](readme/telemetry1.png)
+![Metrics dashboards 2](readme/telemetry2.png)
+![Metrics dashboards 3](readme/telemetry3.png)
+
+You can also attach metadata to any agent invoke, and all time-series telemetry can be split by the values for each metadata key. So if one of your metadata keys is the choice of model to use, you can see how invokes, token counts, latencies, and everything else vary by choice of model.
+
+![Metrics dashboards 1](readme/telemetry-metadata.png)
