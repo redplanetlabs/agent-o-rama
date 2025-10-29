@@ -2,6 +2,7 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [cognitect.transit :as transit]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [com.rpl.agent-o-rama.impl.json-serialize :as jser]
@@ -9,7 +10,8 @@
    [clojure.string :as str])
   (:import
    [java.net URLEncoder URLDecoder]
-   [java.util UUID]))
+   [java.util UUID]
+   [java.io ByteArrayOutputStream]))
 
 (defn url-encode [s]
   "Encode string for safe use in URLs using standard URL encoding"
@@ -54,6 +56,14 @@
                      :invoke-id]
                     #(get implicit->real % %)))))
 
+(defn transit-serializable? [x]
+  (try
+    (with-open [out (ByteArrayOutputStream.)]
+      (let [w (transit/writer out :json)]
+        (transit/write w x))
+      true)
+    (catch Exception _ false)))
+
 (defn ->ui-serializable
   [item]
   (cond (nil? item)
@@ -91,9 +101,11 @@
             (number? item)
             (char? item)
             (keyword? item)
-            (uuid? item))
+            (uuid? item)
+            (instance? java.util.regex.Pattern item)
+            (transit-serializable? item))
         item
-        
+
         :else
         (str item)))
 
