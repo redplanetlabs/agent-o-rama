@@ -491,20 +491,25 @@
                                                :on-expand #(state/dispatch [:modal/show :content-detail
                                                                             {:title "Input"
                                                                              :component ($ ContentModal {:content % :title "Input"})}])})
-                               (when duration-ms
-                                 ($ TimeCapsule {:key "time"
-                                                 :duration-ms duration-ms}))
-                                ;; Render time capsule if duration is available
-                               (when (and token-info
-                                          (or (:total-token-count token-info)
-                                              (:input-token-count token-info)
-                                              (:output-token-count token-info)))
-                                 ($ TokenCountCapsule
-                                    {:key "tokens"
-                                     :input-token-count (:input-token-count token-info)
-                                     :output-token-count (:output-token-count token-info)
-                                     :total-token-count (:total-token-count token-info)}))
-                                ;; Render token count capsule if token info is available
+                               (when (or duration-ms
+                                         (and token-info
+                                              (or (:total-token-count token-info)
+                                                  (:input-token-count token-info)
+                                                  (:output-token-count token-info))))
+                                 ($ :div.flex.flex-wrap.gap-1
+                                    (when duration-ms
+                                      ($ TimeCapsule {:key "time"
+                                                      :duration-ms duration-ms}))
+                                    (when (and token-info
+                                               (or (:total-token-count token-info)
+                                                   (:input-token-count token-info)
+                                                   (:output-token-count token-info)))
+                                      ($ TokenCountCapsule
+                                         {:key "tokens"
+                                          :input-token-count (:input-token-count token-info)
+                                          :output-token-count (:output-token-count token-info)
+                                          :total-token-count (:total-token-count token-info)}))))
+                               ;; Render time and token capsules on the same row
                                (when target-initiate
                                  ($ TraceLinkCapsule {:module-id module-id
                                                       :target-initiate target-initiate})))))
