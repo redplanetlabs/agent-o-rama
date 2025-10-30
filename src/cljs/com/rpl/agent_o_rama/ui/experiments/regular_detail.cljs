@@ -278,36 +278,25 @@
        ($ TokenCountSingleCapsule {:key "total" :label "total" :token-count total-token-count}))))
 
 (defui EvaluatorCapsulesContainer [{:keys [run module-id columns-metadata]}]
-  (let [;; Calculate duration from agent-results
-        duration-ms (when-let [agent-results (:agent-results run)]
-                      (when-let [result (first (vals agent-results))]
-                        (when (and (:start-time-millis result)
-                                   (:finish-time-millis result))
-                          (unchecked-subtract (:finish-time-millis result)
-                                              (:start-time-millis result)))))]
-    ($ :div.mt-2.flex.flex-wrap.gap-1
-       ;; Render capsules for successful evaluations
-       (for [[eval-name metrics] (:evals run)
-             [metric-key metric-value] metrics]
-         ($ EvaluatorCapsule {:key (str eval-name metric-key)
-                              :eval-name eval-name
-                              :metric-key metric-key
-                              :metric-value metric-value
-                              :eval-invoke (get-in run [:eval-initiates eval-name])
-                              :module-id module-id
-                              :columns-metadata columns-metadata}))
-       ;; Render capsules for failed evaluations
-       (for [[eval-name failure-info] (:eval-failures run)]
-         ($ EvaluatorCapsule {:key (str eval-name "-failure")
-                              :eval-name eval-name
-                              :eval-failure failure-info
-                              :eval-invoke (get-in run [:eval-initiates eval-name])
-                              :module-id module-id
-                              :columns-metadata columns-metadata}))
-       ;; Render time capsule if duration is available
-       (when duration-ms
-         ($ TimeCapsule {:key "time"
-                         :duration-ms duration-ms})))))
+  ($ :div.mt-2.flex.flex-wrap.gap-1
+     ;; Render capsules for successful evaluations
+     (for [[eval-name metrics] (:evals run)
+           [metric-key metric-value] metrics]
+       ($ EvaluatorCapsule {:key (str eval-name metric-key)
+                            :eval-name eval-name
+                            :metric-key metric-key
+                            :metric-value metric-value
+                            :eval-invoke (get-in run [:eval-initiates eval-name])
+                            :module-id module-id
+                            :columns-metadata columns-metadata}))
+     ;; Render capsules for failed evaluations
+     (for [[eval-name failure-info] (:eval-failures run)]
+       ($ EvaluatorCapsule {:key (str eval-name "-failure")
+                            :eval-name eval-name
+                            :eval-failure failure-info
+                            :eval-invoke (get-in run [:eval-initiates eval-name])
+                            :module-id module-id
+                            :columns-metadata columns-metadata}))))
 
 (defui CellContent [{:keys [content truncated? on-expand]}]
   (let [content-str (common/pp content)
@@ -484,24 +473,28 @@
                         :let [evaluator-metadata (evaluators/collect-column-metadata (:evals run))
                               target-initiate (-> run :agent-initiates vals first)]]
                     ($ :tr.border-b {:key (str (:example-id run) "-" idx)}
-                       (println "run" run "target-initiate" target-initiate)
                        ;; Input Cell
                        ($ :td {:className (:td common/table-classes)}
                           (let [agent-result (get-in run [:agent-results 0])
                                 token-info (when agent-result
                                              {:input-token-count (:input-token-count agent-result)
                                               :output-token-count (:output-token-count agent-result)
-                                              :total-token-count (:total-token-count agent-result)})]
+                                              :total-token-count (:total-token-count agent-result)})
+                                duration-ms (when agent-result
+                                              (when (and (:start-time-millis agent-result)
+                                                         (:finish-time-millis agent-result))
+                                                (unchecked-subtract (:finish-time-millis agent-result)
+                                                                    (:start-time-millis agent-result))))]
                             ($ :div.flex.flex-col.items-start.gap-2
                                ($ CellContent {:content (:input run)
                                                :truncated? (not show-full-text?)
                                                :on-expand #(state/dispatch [:modal/show :content-detail
                                                                             {:title "Input"
                                                                              :component ($ ContentModal {:content % :title "Input"})}])})
-                               (when target-initiate
-                                 ($ TraceLinkCapsule {:module-id module-id
-                                                      :target-initiate target-initiate}))
-                                ;; Render token count capsule if token info is available
+                               (when duration-ms
+                                 ($ TimeCapsule {:key "time"
+                                                 :duration-ms duration-ms}))
+                                ;; Render time capsule if duration is available
                                (when (and token-info
                                           (or (:total-token-count token-info)
                                               (:input-token-count token-info)
@@ -510,7 +503,11 @@
                                     {:key "tokens"
                                      :input-token-count (:input-token-count token-info)
                                      :output-token-count (:output-token-count token-info)
-                                     :total-token-count (:total-token-count token-info)})))))
+                                     :total-token-count (:total-token-count token-info)}))
+                                ;; Render token count capsule if token info is available
+                               (when target-initiate
+                                 ($ TraceLinkCapsule {:module-id module-id
+                                                      :target-initiate target-initiate})))))
                        ;; Reference Output Cell
                        ($ :td {:className (:td common/table-classes)}
                           ($ CellContent {:content (:reference-output run)
