@@ -105,10 +105,10 @@
   [{:keys [module-id selected-evaluators on-change allowed-types use-remote?]}]
   (let [[remote-eval-name set-remote-eval-name] (uix/use-state "")
 
-        ;; Fetch all evaluators to get info for display
+        ;; Fetch all evaluators to get info for display - use distinct query key
         {:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id]
+         {:query-key [:evaluator-instances-list module-id]
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)})
         all-evaluators (or (:items data) [])
@@ -264,8 +264,8 @@
        ($ :div.mt-4
           ($ :label.block.text-sm.font-medium.text-gray-700 "Input Arguments")
           ($ :p.text-xs.text-gray-500.mb-2
-            "Specify arguments for the target with "
-            ($ :a.text-blue-600.hover:underline {:href "https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates" :target "_blank"} "JSON Path templates") ".")
+             "Specify arguments for the target with "
+             ($ :a.text-blue-600.hover:underline {:href "https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates" :target "_blank"} "JSON Path templates") ".")
           (if (empty? input-mappings)
             ($ :div.text-xs.text-gray-500.italic.py-2 "No arguments yet. Add one to provide arguments.")
             ($ :div.space-y-2
@@ -462,7 +462,7 @@
                  :on-change #(state/dispatch [:form/update-field form-id :num-repetitions (js/parseInt %)])
                  :placeholder "1"})
              ($ forms/form-field
-                {:label "Concurrency Level"
+                {:label "Concurrency"
                  :type :number
                  :value (or (get form :concurrency) 1)
                  :on-change #(state/dispatch [:form/update-field form-id :concurrency (js/parseInt %)])

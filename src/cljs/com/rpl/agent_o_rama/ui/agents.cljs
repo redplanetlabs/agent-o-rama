@@ -34,11 +34,11 @@
                      parsed-metadata (try (if (str/blank? metadata-args)
                                             {}
                                             (js->clj (js/JSON.parse metadata-args)))
-                                       (catch js/Error _ {}))]
-                 
+                                          (catch js/Error _ {}))]
+
                  ;; Mark as submitting
                  (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] true])
-                 
+
                  ;; Make the Sente request
                  (sente/request!
                   [:invocations/run-agent {:module-id module-id
@@ -54,12 +54,12 @@
                         (state/dispatch [:form/update-field (:form-id form-state) :args ""])
                         (state/dispatch [:form/update-field (:form-id form-state) :metadata-args ""])
                         ;; Navigate to the trace
-                        (rfe/push-state :agent/invocation-detail 
+                        (rfe/push-state :agent/invocation-detail
                                         {:module-id module-id
                                          :agent-name agent-name
                                          :invoke-id (str (:task-id data) "-" (:invoke-id data))}))
                       ;; Set error on failure
-                      (state/dispatch [:db/set-value 
+                      (state/dispatch [:db/set-value
                                        [:forms (:form-id form-state) :error]
                                        (str "Error: " (or (:error reply) "Unknown error"))]))))))})
 
@@ -118,7 +118,7 @@
 
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
-                  ($ :div.text-gray-500 "Loading agents via Sente..."))
+                  ($ :div.text-gray-500 "Loading agents..."))
       error ($ :div.flex.justify-center.items-center.py-8
                ($ :div.text-red-500 "Error loading agents: " error))
       (empty? data) ($ :div.flex.justify-center.items-center.py-8
@@ -156,64 +156,29 @@
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
 
-        ;; Subscribe to invocations state from app-db
-        all-invokes (state/use-sub [:invocations :all-invokes])
-        pagination-params (state/use-sub [:invocations :pagination-params])
-        has-more? (state/use-sub [:invocations :has-more?])
-        loading? (state/use-sub [:invocations :loading?])
-        connected? (state/use-sub [:sente :connected?])
-
-        ;; Fetch function that handles the entire flow - memoized with use-callback
-        fetch-invocations (uix/use-callback
-                           (fn [pagination append?]
-                             (state/dispatch [:invocations/set-loading true])
-                             (sente/request!
-                              [:invocations/get-page {:module-id module-id
-                                                      :agent-name agent-name
-                                                      :pagination pagination}]
-                              5000
-                              (fn [reply]
-                                (state/dispatch [:invocations/set-loading false])
-                                (when (:success reply)
-                                  (let [data (:data reply)
-                                        new-invokes (:agent-invokes data)
-                                        new-pagination (:pagination-params data)
-                                        has-more? (and new-pagination
-                                                       (not (empty? new-pagination))
-                                                       (some (fn [[_ item-id]] (not (nil? item-id)))
-                                                             new-pagination))]
-                                    (if append?
-                                      (state/dispatch [:invocations/append new-invokes])
-                                      (state/dispatch [:db/set-value [:invocations :all-invokes] new-invokes]))
-                                    (state/dispatch [:invocations/set-pagination
-                                                     {:pagination-params (when has-more? new-pagination)
-                                                      :has-more? has-more?}]))))))
-                            ;; Dependencies for use-callback - only recreate when module-id or agent-name changes
-                           [module-id agent-name])
-
-        ;; Initial load - fetch first page when connected
-        _ (uix/use-effect
-           (fn []
-             (when connected?
-               (println "🔄 Initial load for invocations (connected)")
-               (state/dispatch [:invocations/reset])
-               (fetch-invocations {} false))
-             (constantly nil))
-           ;; Simplified dependencies - fetch-invocations is now stable and will change when module-id/agent-name change
-           [fetch-invocations connected?])
-
-        load-more (fn []
-                    (when (and has-more? (not loading?) pagination-params)
-                      (println "🔄 Loading more with params:" pagination-params)
-                      (fetch-invocations pagination-params true)))]
+        ;; Use the new paginated query hook
+        {:keys [data isLoading isFetchingMore hasMore loadMore error]}
+        (queries/use-paginated-query
+         {:query-key [:invocations module-id agent-name]
+          :sente-event [:invocations/get-page {:module-id module-id
+                                               :agent-name agent-name}]
+          :page-size 20
+          :enabled? (boolean (and module-id agent-name))})]
 
     (cond
-      ;; Still loading initial data
-      (and loading? (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
-                                             ($ :div.text-gray-500 "Loading invocations via Sente..."))
-      ;; No data returned
-      (and (not loading?) (empty? all-invokes)) ($ :div.flex.justify-center.items-center.py-8
-                                                   ($ :div.text-gray-500 "No invocations found"))
+      ;; Use isLoading for the initial loading state
+      (and isLoading (empty? data))
+      ($ :div.flex.justify-center.items-center.py-8
+         ($ :div.text-gray-500 "Loading invocations..."))
+
+      error
+      ($ :div.flex.justify-center.items-center.py-8
+         ($ :div.text-red-500 "Error loading invocations: " error))
+
+      (empty? data)
+      ($ :div.flex.justify-center.items-center.py-8
+         ($ :div.text-gray-500 "No invocations found"))
+
       :else
       ($ :div.p-4
          ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm
@@ -226,22 +191,22 @@
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
                ($ :tbody.divide-y.divide-gray-200
-                  (for [invoke all-invokes]
+                  (for [invoke data]
                     ($ invocation-row {:key (str (:task-id invoke) "-" (:agent-id invoke))
                                        :invoke invoke
                                        :module-id module-id
                                        :agent-name agent-name
                                        :on-click (fn [url] (set! (.-href (.-location js/window)) url))})))
 
-            ;; Load More button
-               (when has-more?
+               ;; Load More button
+               (when hasMore
                  ($ :tfoot.bg-gray-50.border-t.border-gray-200
                     ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                       {:onClick (when (not loading?) load-more)}
+                       {:onClick (when-not isFetchingMore loadMore)}
                        ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
                           ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
-                             ($ :span.mr-2.text-sm.font-medium (if loading? "Loading..." "Load More"))
-                             (when (not loading?)
+                             ($ :span.mr-2.text-sm.font-medium (if isFetchingMore "Loading..." "Load More"))
+                             (when-not isFetchingMore
                                ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
                                   ($ :path {:fillRule "evenodd"
                                             :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
@@ -257,7 +222,7 @@
                                   :refetch-interval-ms 2000})]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
-                  ($ :div.text-gray-500 "Loading invocations via Sente..."))
+                  ($ :div.text-gray-500 "Loading invocations..."))
       error ($ :div.flex.justify-center.items-center.py-8
                ($ :div.text-red-500 "Error loading invocations: " error))
       (not data) ($ :div.flex.justify-center.items-center.py-8
@@ -307,7 +272,7 @@
                                   :refetch-interval-ms 2000})]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
-                  ($ :div.text-gray-500 "Loading graph via Sente..."))
+                  ($ :div.text-gray-500 "Loading graph..."))
       error ($ :div.flex.justify-center.items-center.py-8
                ($ :div.text-red-500 "Error loading graph: " error))
       :else ($ agent-graph/graph {:initial-data data
@@ -366,10 +331,11 @@
   (let [form (forms/use-form form-id)
         args-field (forms/use-form-field form-id :args)
         metadata-field (forms/use-form-field form-id :metadata-args)
-        
+
         handle-submit (fn [e]
                         (.preventDefault e)
-                        ((:submit! form)))]
+                        ((:submit! form)))
+        is-blank (str/blank? (:value args-field))]
 
     ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6
        ($ :form {:onSubmit handle-submit}
@@ -378,8 +344,8 @@
              ;; Arguments textarea with live validation
              ($ :div.flex-1.flex.flex-col
                 ($ :textarea
-                   {:className (str "flex-1 p-3 border rounded-md text-sm placeholder-gray-400 focus:ring-2 transition-colors duration-150 "
-                                    (if (:error args-field)
+                   {:className (str "flex-1 p-3 border rounded-md text-sm placeholder-gray-400 focus:ring-2 transition-colors duration-150 resize-none "
+                                    (if (and (not is-blank) (:error args-field))
                                       "border-red-300 focus:ring-red-500 focus:border-red-500"
                                       "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
                     :placeholder "[arg1, arg2, arg3, ...] (json)"
@@ -389,12 +355,14 @@
                     :disabled (:submitting? form)})
                 ;; Always render error container to prevent layout shift
                 ($ :div.text-sm.text-red-600.mt-1 {:style {:min-height "1.25rem"}}
-                   (or (:error args-field) "")))
-             
+                   (if is-blank
+                     ""
+                     (or (:error args-field) ""))))
+
              ;; Metadata textarea with live validation
              ($ :div.flex-1.flex.flex-col
                 ($ :textarea
-                   {:className (str "flex-1 p-3 border rounded-md text-sm placeholder-gray-400 focus:ring-2 transition-colors duration-150 "
+                   {:className (str "flex-1 p-3 border rounded-md text-sm placeholder-gray-400 focus:ring-2 transition-colors duration-150 resize-none "
                                     (if (:error metadata-field)
                                       "border-red-300 focus:ring-red-500 focus:border-red-500"
                                       "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
@@ -406,7 +374,7 @@
                 ;; Always render error container to prevent layout shift
                 ($ :div.text-sm.text-red-600.mt-1 {:style {:min-height "1.25rem"}}
                    (or (:error metadata-field) "")))
-             
+
              ;; Submit button
              ($ :button
                 {:type "submit"
@@ -430,7 +398,7 @@
     (uix/use-effect
      (fn []
        (state/dispatch [:form/initialize form-id {:module-id module-id
-                                                   :agent-name agent-name}])
+                                                  :agent-name agent-name}])
        ;; Cleanup: Clear the form when the component unmounts or agent changes
        (fn []
          (state/dispatch [:form/clear form-id])))

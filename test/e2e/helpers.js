@@ -1,25 +1,6 @@
 import { expect } from '@playwright/test';
 
 /**
- * Gets the agent row for the research agent module.
- * @param {import('@playwright/test').Page} page - The Playwright page object.
- * @returns {Promise<import('@playwright/test').Locator>} The agent row locator.
- */
-export async function getResearchAgentRow(page) {
-  const moduleNs = 'com.rpl.agent.research-agent';
-  const moduleName = 'ResearchAgentModule';
-  const agentName = 'researcher';
-
-  const agentRow = page.locator('table tbody tr').filter({ hasText: moduleNs }).filter({ hasText: moduleName }).filter({ hasText: agentName });
-  
-  // Wait up to 30 seconds for the agent to appear. The first load can be slow.
-  await expect(agentRow).toBeVisible({ timeout: 30000 });
-  console.log(`Found agent: ${moduleNs}/${moduleName}:${agentName}`);
-  
-  return agentRow;
-}
-
-/**
  * Gets the agent row for the BasicAgentModule.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @returns {Promise<import('@playwright/test').Locator>} The agent row locator.
@@ -99,7 +80,20 @@ export async function createEvaluator(page, { name, builderName, description, pa
   await modal.getByRole('button', { name: 'Submit' }).click();
 
   await expect(modal).not.toBeVisible({ timeout: 15000 });
-  await expect(page.locator('table tbody tr').filter({ hasText: name })).toBeVisible();
+  
+  // Verify evaluator was created by searching for it (in case it's not on the first page)
+  const searchInput = page.getByPlaceholder('Search evaluators...');
+  if (await searchInput.isVisible()) {
+    await searchInput.fill(name);
+    await page.waitForTimeout(500); // Wait for debounced search
+    await expect(page.locator('table tbody tr').filter({ hasText: name })).toBeVisible();
+    await searchInput.clear();
+    await page.waitForTimeout(500); // Wait for search to clear
+  } else {
+    // If no search box, just verify it appears somewhere (might need to load more)
+    await expect(page.locator('table tbody tr').filter({ hasText: name })).toBeVisible();
+  }
+  
   console.log(`Successfully created evaluator: ${name}`);
 }
 
@@ -189,7 +183,20 @@ export async function createDataset(page, name) {
   await modal.getByRole('button', { name: 'Create Dataset' }).click();
   
   await expect(modal).not.toBeVisible();
-  await expect(page.getByText(name)).toBeVisible();
+  
+  // Verify dataset was created by searching for it (in case it's not on the first page)
+  const searchInput = page.getByPlaceholder('Search datasets...');
+  if (await searchInput.isVisible()) {
+    await searchInput.fill(name);
+    await page.waitForTimeout(500); // Wait for debounced search
+    await expect(page.getByText(name)).toBeVisible();
+    await searchInput.clear();
+    await page.waitForTimeout(500); // Wait for search to clear
+  } else {
+    // If no search box, just verify it appears somewhere
+    await expect(page.getByText(name)).toBeVisible();
+  }
+  
   console.log(`Successfully created dataset: ${name}`);
 }
 
@@ -201,9 +208,31 @@ export async function createDataset(page, name) {
  */
 export async function deleteDataset(page, name) {
   console.log(`Deleting dataset: ${name}`);
+  
+  // Set up dialog handler before clicking delete (only if not already handled)
+  let dialogHandled = false;
+  const dialogHandler = async (dialog) => {
+    if (!dialogHandled) {
+      dialogHandled = true;
+      console.log(`Accepting confirmation dialog: ${dialog.message()}`);
+      try {
+        await dialog.accept();
+      } catch (e) {
+        // Dialog already handled by another handler (e.g., test-level handler)
+        console.log(`Dialog already handled: ${e.message}`);
+      }
+    }
+  };
+  page.once('dialog', dialogHandler);
+  
   const datasetRow = page.locator('table tbody tr').filter({ hasText: name });
   await datasetRow.getByRole('button', { name: 'Delete' }).click();
-  await expect(datasetRow).not.toBeVisible();
+  
+  // Wait a bit for dialog to appear and be handled
+  await page.waitForTimeout(500);
+  
+  // Wait for the row to disappear after deletion
+  await expect(datasetRow).not.toBeVisible({ timeout: 10000 });
   console.log(`Successfully deleted dataset: ${name}`);
 }
 
@@ -215,9 +244,45 @@ export async function deleteDataset(page, name) {
  */
 export async function deleteEvaluator(page, name) {
   console.log(`Deleting evaluator: ${name}`);
+  
+  // Search for the evaluator first to ensure it's visible
+  const searchInput = page.getByPlaceholder('Search evaluators...');
+  if (await searchInput.isVisible()) {
+    await searchInput.fill(name);
+    await page.waitForTimeout(500); // Wait for debounced search
+  }
+  
+  // Set up dialog handler before clicking delete (only if not already handled)
+  let dialogHandled = false;
+  const dialogHandler = async (dialog) => {
+    if (!dialogHandled) {
+      dialogHandled = true;
+      console.log(`Accepting confirmation dialog: ${dialog.message()}`);
+      try {
+        await dialog.accept();
+      } catch (e) {
+        // Dialog already handled by another handler (e.g., test-level handler)
+        console.log(`Dialog already handled: ${e.message}`);
+      }
+    }
+  };
+  page.once('dialog', dialogHandler);
+  
   const evalRow = page.locator('table tbody tr').filter({ hasText: name });
   await evalRow.getByRole('button', { name: 'Delete' }).click();
-  await expect(evalRow).not.toBeVisible();
+  
+  // Wait a bit for dialog to appear and be handled
+  await page.waitForTimeout(500);
+  
+  // Wait for the row to disappear after deletion
+  await expect(evalRow).not.toBeVisible({ timeout: 10000 });
+  
+  // Clear search if it was used
+  if (await searchInput.isVisible()) {
+    await searchInput.clear();
+    await page.waitForTimeout(300);
+  }
+  
   console.log(`Successfully deleted evaluator: ${name}`);
 }
 

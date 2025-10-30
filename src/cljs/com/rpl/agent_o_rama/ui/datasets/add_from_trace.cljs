@@ -6,10 +6,10 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.rules-forms :refer [DatasetCombobox]]
    [clojure.string :as str]
    ["react" :refer [useEffect]]
-   ["use-debounce" :refer [useDebounce]]
-   ["@heroicons/react/24/outline" :refer [ChevronDownIcon]]))
+   ["use-debounce" :refer [useDebounce]]))
 
 (defn parse-json->cljs [s]
   (try
@@ -28,7 +28,6 @@
         {:keys [module-id source-args source-result source-emits error]} props
 
         ;; Local state
-        [dropdown-open? set-dropdown-open] (uix/use-state false)
         [validation-state set-validation-state] (uix/use-state nil)
         [is-validating set-is-validating] (uix/use-state false)
 
@@ -37,12 +36,11 @@
         [debounced-input-data, _] (useDebounce (:value input-data-field) 500)
         [debounced-output-data, _] (useDebounce (:value output-data-field) 500)
 
-        ;; Fetch available datasets
-
-        ;; Fetch available datasets
+        ;; Fetch dataset schemas for the selected dataset
         {:keys [data loading?]} (queries/use-sente-query
                                  {:query-key [:datasets module-id]
-                                  :sente-event [:datasets/get-all {:module-id module-id}]})]
+                                  :sente-event [:datasets/get-all {:module-id module-id}]
+                                  :enabled? (some? (:value dataset-id-field))})]
 
     (useEffect
      (fn []
@@ -81,44 +79,11 @@
        ($ forms/form
           ($ :div {:className "space-y-6"}
              ;; Dataset Selection
-             ($ :div {:className "space-y-1"}
-                ($ :label {:className "block text-sm font-medium text-gray-700"}
-                   "Target Dataset"
-                   ($ :span {:className "text-red-500 ml-1"} "*"))
-                ($ :div {:className "relative"}
-                   ($ :button {:type "button"
-                               :className (str "inline-flex items-center justify-between w-full px-3 py-2 text-sm bg-white border rounded-md shadow-sm hover:bg-gray-50 "
-                                               (if (:error dataset-id-field)
-                                                 "border-red-300 focus:ring-red-500 focus:border-red-500"
-                                                 "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
-                               :onClick #(set-dropdown-open (not dropdown-open?))
-                               :disabled loading?}
-                      ($ :span {:className "truncate"}
-                         (cond
-                           loading? "Loading datasets..."
-                           (str/blank? (:value dataset-id-field)) "Select a dataset..."
-                           :else (some-> (:datasets data)
-                                         (->> (filter #(= (:dataset-id %) (:value dataset-id-field)))
-                                              (first)
-                                              (:name)))))
-                      ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
-                   (when dropdown-open?
-                     ($ :div {:className "origin-top-right absolute right-0 mt-1 w-full rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
-                              :onClick #(.stopPropagation %)}
-                        ($ :div {:className "py-1"}
-                           (if (seq (:datasets data))
-                             (for [ds (:datasets data)]
-                               ($ common/DropdownRow {:key (:dataset-id ds)
-                                                      :label (:name ds)
-                                                      :selected? (= (:dataset-id ds) (:value dataset-id-field))
-                                                      :on-select #(do
-                                                                    ((:on-change dataset-id-field) (:dataset-id ds))
-                                                                    (set-dropdown-open false))
-                                                      :delete-button nil}))
-                             ($ :div {:className "px-4 py-2 text-sm text-gray-500"} "No datasets available"))))))
-                (if (:error dataset-id-field)
-                  ($ :p {:className "text-sm text-red-600 mt-1"} (:error dataset-id-field))
-                  ($ :div {:className "mt-1 h-5"})))
+             ($ DatasetCombobox {:module-id module-id
+                                 :value (:value dataset-id-field)
+                                 :on-change (:on-change dataset-id-field)
+                                 :error (:error dataset-id-field)
+                                 :required? true})
 
              ;; Schema display (place right after the dataset dropdown block)
              (let [selected-ds (some->> (:datasets data)
@@ -242,4 +207,4 @@
            :input parsed-input
            :output parsed-output}])))
    :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
-                            {:query-key-pattern [:dataset-examples module-id (s/kepyath dataset-id)]})}})
+                            {:query-key-pattern [:dataset-examples module-id (s/keypath dataset-id)]})}})

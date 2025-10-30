@@ -51,11 +51,19 @@
    :loading? s/Bool})
 
 (s/defschema QueryStateSchema
-  {:status (s/enum :loading :success :error)
+  {:status (s/enum :idle :loading :success :error)
 
    (s/optional-key :data) s/Any ;; any server data
    (s/optional-key :error) s/Any ;; any server data
-   :fetching? s/Bool
+
+   ;; Regular query keys
+   (s/optional-key :fetching?) s/Bool
+
+   ;; Paginated query keys
+   (s/optional-key :pagination-params) s/Any
+   (s/optional-key :has-more?) s/Bool
+   (s/optional-key :fetching-more?) s/Bool
+
    (s/optional-key :should-refetch?) s/Bool})
 
 ;; Forward declaration for recursive reference
@@ -64,8 +72,8 @@
 (def QueriesCacheSchema
   "A schema for the nested query cache. It's a recursive map where
    leaf nodes must match QueryStateSchema."
-   ;; Keys can be keywords, strings, numbers (for granularity), or UUIDs (module-ids, dataset-ids, etc.)
-  {(s/cond-pre s/Keyword s/Str s/Num s/Uuid)
+   ;; Keys can be keywords, strings, numbers (for granularity), symbols (for module-ids), or UUIDs (dataset-ids, etc.)
+  {(s/cond-pre s/Keyword s/Str s/Num s/Symbol s/Uuid)
    (s/conditional
     ;; Predicate: if the value is a map containing :status, treat it as a
     ;; leaf (QueryStateSchema)

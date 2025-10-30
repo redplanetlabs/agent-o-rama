@@ -52,7 +52,7 @@
              (hash-map :datasets)))
       ;; Otherwise, use the existing page query
       (let [datasets-page-query (:datasets-page-query underlying-objects)
-            result (foreign-invoke-query datasets-page-query 1000 pagination)]
+            result (foreign-invoke-query datasets-page-query 25 pagination)]
         ;; Process datasets to add remote flags
         (update result :datasets mark-remote-datasets)))))
 
