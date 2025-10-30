@@ -260,7 +260,10 @@
              ;; Don't decode module-id - use it as-is since query keys use the encoded version
              (state/dispatch [:query/invalidate
                               {:query-key-pattern
-                               [:evaluator-instances module-id]}])
+                               (fn [query-key]
+                                 (and (>= (count query-key) 2)
+                                      (#{:evaluator-instances :evaluator-instances-modal :evaluator-instances-list :evaluator-instances-search} (first query-key))
+                                      (= module-id (second query-key))))}])
              (state/dispatch [:form/clear form-id]))
            (do
              (println "Setting error and stopping spinner in form:" (:error reply) form-id)
@@ -286,10 +289,10 @@
         [loading? set-loading] (uix/use-state false)
         [dropdown-open? set-dropdown-open] (uix/use-state false)
 
-        ;; Fetch all evaluator instances
+        ;; Fetch all evaluator instances - use distinct query key to avoid conflicts
         {:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id]
+         {:query-key [:evaluator-instances-modal module-id]
           :sente-event [:evaluators/get-all-instances {:module-id module-id}]
           :enabled? (boolean module-id)})
 
@@ -534,7 +537,9 @@
                                     :pre-selected-evaluator evaluator ;; Pre-select the evaluator
                                     :example nil ;; nil example means "start from scratch"
                                     :dataset-id nil
-                                    :selected-example-ids nil})}])))
+                                    :selected-example-ids nil})}])
+   ;; Return nil to indicate no direct state change (the dispatched event handles it)
+   nil))
 
  ;; =============================================================================
 ;; MAIN PAGE COMPONENT
@@ -549,9 +554,9 @@
         ;; Add state for type filter
         [selected-type set-selected-type] (useState "all")
 
-        ;; Update the query to use the debounced search term and type filter
-        {:keys [data loading? error refetch]}
-        (queries/use-sente-query
+        ;; Use the new paginated query hook
+        {:keys [data isLoading isFetchingMore hasMore loadMore error refetch]}
+        (queries/use-paginated-query
          {:query-key [:evaluator-instances
                       module-id
                       debounced-search-term
@@ -564,11 +569,8 @@
 
                                     (not= selected-type "all")
                                     (assoc :types #{(keyword selected-type)}))}]
-          :enabled? (boolean module-id)
-          :refetch-interval-ms 5000})
-
-       ;; Destructure the response from the query
-        evaluators (get data :items [])
+          :page-size 20
+          :enabled? (boolean module-id)})
 
         handle-delete (uix/use-callback
                        (fn [evaluator-name]
@@ -615,7 +617,7 @@
 
       ;; Content
        (cond
-         loading?
+         (and isLoading (empty? data))
          ($ :div.flex.justify-center.items-center.h-64
             ($ common/spinner {:size :large}))
 
@@ -623,7 +625,7 @@
          ($ :div.text-red-500.text-center.py-8
             "Error loading evaluators: " error)
 
-         (empty? evaluators)
+         (empty? data)
          ($ :div.text-center.py-12
             ($ BeakerIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No evaluators yet")
@@ -645,7 +647,7 @@
                      ($ :th {:className (:th common/table-classes)} "Actions")))
                ($ :tbody
                   (into []
-                        (for [spec evaluators]
+                        (for [spec data]
                           (let [evaluator-name (:name spec)
                                 type (:type spec)
                                 description (:description spec)
@@ -670,4 +672,18 @@
                                                  (.stopPropagation e) ; Prevent row click
                                                  (handle-delete evaluator-name))}
                                      ($ TrashIcon {:className "h-4 w-4 mr-1"})
-                                     "Delete")))))))))))))
+                                     "Delete")))))))
+
+               ;; Load More button
+               (when hasMore
+                 ($ :tfoot.bg-gray-50.border-t.border-gray-200
+                    ($ :tr.hover:bg-gray-100.transition-colors.duration-150
+                       {:onClick (when-not isFetchingMore loadMore)}
+                       ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
+                          ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
+                             ($ :span.mr-2.text-sm.font-medium (if isFetchingMore "Loading..." "Load More"))
+                             (when-not isFetchingMore
+                               ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                                  ($ :path {:fillRule "evenodd"
+                                            :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                            :clipRule "evenodd"}))))))))))))))

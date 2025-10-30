@@ -111,7 +111,7 @@
        ($ :div {:ref target-ref}))))
 
 (defn- sort-metrics
-  "Sort metrics in display order: min, percentiles (ascending), max"
+  "Sort metrics in display order: min, percentiles (ascending), mean, max"
   [metrics]
   (let [metric-order {:min 0
                       0.25 0.5
@@ -119,6 +119,7 @@
                       0.75 1.5
                       0.9 2
                       0.99 3
+                      :mean 3.5
                       :max 4}]
     (sort-by (fn [k]
                (get metric-order k 999)) ; Unknown metrics go to end
@@ -474,7 +475,10 @@
         ;; For multi-metric charts with metadata split, allow metric selection
         all-metrics (when (and (= variant :multi-metric) metadata-key)
                       (:metrics variant-opts))
-        [selected-metrics set-selected-metrics] (uix/use-state (when all-metrics #{0.5}))
+        ;; Default to first metric in sorted order (not hard-coded 0.5)
+        default-metric (when all-metrics
+                         (first (sort-metrics all-metrics)))
+        [selected-metrics set-selected-metrics] (uix/use-state (when default-metric #{default-metric}))
 
         ;; Determine final variant options (with selected metrics if applicable)
         final-variant-opts (if (and all-metrics selected-metrics)
@@ -483,13 +487,13 @@
 
         ;; Transform data - returns both data and metadata-values used
         prepared (uix/use-memo
-                  (fn [] 
+                  (fn []
                     (prepare-chart-data data granularity metadata-key
                                         start-time-millis end-time-millis
                                         variant final-variant-opts))
                   [data granularity metadata-key start-time-millis end-time-millis
                    variant final-variant-opts])
-        
+
         chart-data (:data prepared)
         metadata-values (:metadata-values prepared)
 

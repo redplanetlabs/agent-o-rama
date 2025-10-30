@@ -15,11 +15,12 @@
   (foreign-invoke-query (:all-eval-builders-query (aor-types/underlying-objects manager))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-instances
-  [{:keys [manager module-id filters]} uid]
+  [{:keys [manager pagination module-id filters]} uid]
   (let [underlying-objects (aor-types/underlying-objects manager)
         search-query (:search-evals-query underlying-objects)
         search-string (get filters :search-string)
-        types (get filters :types)]
+        types (get filters :types)
+        query-limit 20]
     ;; Invoke the search query with optional search string and types filters
     (foreign-invoke-query search-query
                           (cond-> {}
@@ -28,9 +29,8 @@
 
                             (seq types)
                             (assoc :types types))
-                          1000 ; limit
-                          nil ; no pagination key
-                          )))
+                          query-limit
+                          pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/create
   [{:keys [manager module-id builder-name name description params input-json-path output-json-path reference-output-json-path]} uid]

@@ -91,7 +91,7 @@
                         {:query-key [:datasets module-id]
                          :sente-event [:datasets/get-all {:module-id module-id}]})
         evaluators-query (queries/use-sente-query
-                          {:query-key [:evaluator-instances module-id]
+                          {:query-key [:evaluator-instances-list module-id]
                            :sente-event [:evaluators/get-all-instances {:module-id module-id}]})]
 
     ($ :div.p-6.space-y-8

@@ -132,7 +132,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     await expModal.getByLabel('Experiment Name').fill(experimentName);
     await expModal.getByTestId('agent-name-dropdown').click();
     await expModal.getByText(agentToRun, { exact: true }).click();
-    await expModal.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('$');
+    await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
     await addEvaluatorToExperiment(page, expModal, randomFloatEvaluator.name);
     await addEvaluatorToExperiment(page, expModal, failingEvaluator.name);
     

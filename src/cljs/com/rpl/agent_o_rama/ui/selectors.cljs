@@ -84,7 +84,7 @@
 
         {:keys [data loading? error query-error]}
         (queries/use-sente-query
-         {:query-key [:evaluator-instances module-id filter-key]
+         {:query-key [:evaluator-instances-search module-id filter-key]
           :sente-event [:evaluators/get-all-instances
                         {:module-id module-id
                          :filters {:search-string debounced-search

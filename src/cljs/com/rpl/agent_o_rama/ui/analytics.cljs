@@ -242,7 +242,7 @@
 (defn- parse-eval-metric-id
   "Parse an eval metric ID like [:eval :numeric-rule :score] into component parts."
   [metric-id]
-  (when (and (vector? metric-id) 
+  (when (and (vector? metric-id)
              (= 3 (count metric-id))
              (= :eval (first metric-id)))
     (let [[_ rule-name score-name] metric-id]
@@ -264,12 +264,12 @@
           sample-inner (if metadata-key
                          (val (first sample-bucket-data))
                          sample-bucket-data)
-          
+
           ;; Check if we have categories by seeing if the inner values are maps (stats)
           ;; vs actual numbers/values
           first-inner-val (val (first sample-inner))
           is-categorical? (map? first-inner-val)
-          
+
           ;; Get all category keys from all buckets (if categorical)
           all-keys (when is-categorical?
                      (if metadata-key
@@ -279,7 +279,7 @@
                                     (vals telemetry-data)))
                        ;; Without metadata: bucket -> category
                        (set (mapcat keys (vals telemetry-data)))))
-          
+
           ;; Filter out _aor/default
           category-keys (disj all-keys "_aor/default")]
       (when (seq category-keys)
@@ -289,16 +289,18 @@
 (defn- create-eval-chart-config
   "Create a chart configuration for an eval metric.
   
-  Spec: Use options [:count :min 0.5 0.9 0.99 :max]
-  If there are categories besides _aor/default, only display count for each category."
+  Spec: For numeric data (only _aor/default category), display :mean, 0.99, and :max.
+  If there are categories besides _aor/default, only display count for each category.
+  
+  We request both :mean/:max/0.99 and :count so the data is available for both cases."
   [{:keys [rule-name score-name metric-id]}]
   {:id (keyword (str "eval-" rule-name "-" score-name))
    :title (str "Evaluator score " rule-name "/" score-name)
    :description (str "Score distribution for " rule-name "/" score-name)
    :variant :multi-metric
    :metric-id metric-id
-   :metrics-set #{:count :min 0.5 0.9 0.99 :max}
-   :variant-opts {:metrics #{:count :min 0.5 0.9 0.99 :max}}
+   :metrics-set #{:mean 0.99 :max :count}
+   :variant-opts {:metrics #{:mean 0.99 :max}}
    :y-label "Score"
    :eval-metric? true})
 
@@ -592,7 +594,7 @@
   - :refresh-counter - Refresh counter for live mode"
   [{:keys [config module-id agent-name granularity-config time-window metadata-key refresh-counter]}]
   (let [{:keys [title description variant variant-opts y-label color metric-id metrics-set]} config
-        
+
         ;; Fetch data for this eval metric
         {:keys [data loading? error]}
         (queries/use-sente-query
@@ -614,12 +616,12 @@
                          :metrics-set metrics-set
                          :metadata-key metadata-key}]
           :enabled? (boolean (and module-id agent-name))})
-        
+
         ;; Detect if data is categorical and adjust config accordingly
         categories (uix/use-memo
                     (fn [] (detect-categories data metadata-key))
                     [data metadata-key])
-        
+
         ;; Dynamically adjust variant for categorical data
         actual-variant (if categories :multi-category variant)
         actual-variant-opts (if categories

@@ -90,7 +90,7 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
     await expModal.getByText('E2ETestAgent', { exact: true }).click();
     
     // Configure input mappings (E2ETestAgent expects a map, so we use $ to pass the whole input)
-    await expModal.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('$');
+    await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
     console.log('Agent experiment configured for E2ETestAgent.');
 
     // Select both evaluators

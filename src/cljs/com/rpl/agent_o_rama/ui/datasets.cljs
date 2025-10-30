@@ -632,18 +632,16 @@
         [search-term set-search-term] (useState "")
         [debounced-search-term] (useDebounce search-term 300)
 
-        ;; Update the query to use the debounced search term
-        {:keys [data loading? error]}
-        (queries/use-sente-query
+        ;; Use the new paginated query hook
+        {:keys [data isLoading isFetchingMore hasMore loadMore error]}
+        (queries/use-paginated-query
          {:query-key [:datasets module-id debounced-search-term]
           :sente-event [:datasets/get-all
                         {:module-id module-id
-                         :pagination nil
                          :filters (when-not (str/blank? debounced-search-term)
                                     {:search-string debounced-search-term})}]
-          :enabled? (boolean module-id)})
-
-        datasets (:datasets data)]
+          :page-size 3
+          :enabled? (boolean module-id)})]
 
     ($ :div.p-6
        ;; Header with search input
@@ -669,9 +667,13 @@
 
        ;; Content
        (cond
-         loading? ($ :div.flex.items-center.justify-center.h-full ($ :div "Loading datasets..."))
-         error ($ :div.flex.items-center.justify-center.h-full ($ :div.text-red-500 "Error loading datasets"))
-         (empty? datasets)
+         (and isLoading (empty? data))
+         ($ :div.flex.items-center.justify-center.h-full ($ :div "Loading datasets..."))
+
+         error
+         ($ :div.flex.items-center.justify-center.h-full ($ :div.text-red-500 "Error loading datasets"))
+
+         (empty? data)
          ($ :div.text-center.py-12
             ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No datasets yet")
@@ -680,6 +682,7 @@
                {:onClick #(state/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
                ($ PlusIcon {:className "h-5 w-5 mr-2"})
                "Create Dataset"))
+
          :else
          ($ :div {:className (:container common/table-classes)}
             ($ :table {:className (:table common/table-classes)}
@@ -692,7 +695,7 @@
                      ($ :th {:className (:th common/table-classes)} "Actions")))
                ($ :tbody
                   (into []
-                        (for [dataset datasets
+                        (for [dataset data
                               :let [is-remote? (:remote? dataset)
                                     name (:name dataset)
                                     desc (:description dataset)
@@ -763,7 +766,21 @@
                                                          (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
                                                          (js/alert (str "Error deleting dataset: " (:error reply))))))))}
                                       ($ TrashIcon {:className "h-4 w-4 mr-1"})
-                                      "Delete")))))))))))))
+                                      "Delete")))))))
+
+               ;; Load More button
+               (when hasMore
+                 ($ :tfoot.bg-gray-50.border-t.border-gray-200
+                    ($ :tr.hover:bg-gray-100.transition-colors.duration-150
+                       {:onClick (when-not isFetchingMore loadMore)}
+                       ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
+                          ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
+                             ($ :span.mr-2.text-sm.font-medium (if isFetchingMore "Loading..." "Load More"))
+                             (when-not isFetchingMore
+                               ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                                  ($ :path {:fillRule "evenodd"
+                                            :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                            :clipRule "evenodd"}))))))))))))))
 
 ;; =============================================================================
 ;; PRETTY PRINT UTILITY
@@ -982,7 +999,7 @@
                               ($ :div "Loading examples..."))
                   error ($ :div.flex.items-center.justify-center.h-full
                            ($ :div.text-red-500 "Error loading examples."))
-                  (empty? examples) ($ :div.flex.items-center.justify-center.h-full
+                  (empty? examples) ($ :div.flex.items-start.justify-center.h-screen
                                        ($ :div.text-center.text-gray-500
                                           ($ :p "No examples yet.")
                                           ($ :p.text-sm.mt-1 "Click 'Add Example' to get started.")))

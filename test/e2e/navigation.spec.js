@@ -10,7 +10,7 @@ import { getE2ETestAgentRow } from './helpers.js';
 // TEST SUITE
 // =============================================================================
 
-test.describe('research agent module exists', () => {
+test.describe('e2e test agent module exists', () => {
 
   test('should load the homepage and navigate to an agent detail page', async ({ page }) => {
     // Step 1: Go to the application's base URL
