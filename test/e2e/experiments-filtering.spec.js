@@ -110,7 +110,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
   // Configure Target Agent
   await modal.getByTestId('agent-name-dropdown').click();
   await modal.getByText(agentToRun, { exact: true }).click();
-  await modal.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('$');
+  await modal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
   
   // Select Evaluator
   await addEvaluatorToExperiment(page, modal, evaluatorName);

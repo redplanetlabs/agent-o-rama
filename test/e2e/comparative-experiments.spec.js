@@ -125,13 +125,13 @@ test.describe('Comparative Experiment Flow', () => {
     const target0 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 1' }).first();
     await target0.getByTestId('agent-name-dropdown').click();
     await target0.getByText(agentToRun, { exact: true }).click();
-    await target0.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('{"output-value": "$.target1_output"}');
+    await target0.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target1_output"}');
 
     // Configure Target 2
     const target1 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 2' }).first();
     await target1.getByTestId('agent-name-dropdown').click();
     await target1.getByText(agentToRun, { exact: true }).click();
-    await target1.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('{"output-value": "$.target2_output"}');
+    await target1.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target2_output"}');
     
     // Add and Configure Target 3
     await expModal.getByRole('button', { name: 'Add Another Target' }).click();
@@ -139,7 +139,7 @@ test.describe('Comparative Experiment Flow', () => {
     await expect(target2).toBeVisible();
     await target2.getByTestId('agent-name-dropdown').click();
     await target2.getByText(agentToRun, { exact: true }).click();
-    await target2.locator('div').filter({ hasText: /^Input Mappings/ }).getByRole('textbox').fill('{"output-value": "$.target3_output"}');
+    await target2.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target3_output"}');
     console.log('Configured 3 targets for the experiment.');
 
     // Configure Evaluators (only 1 selector + 1 non-selector for first run)
