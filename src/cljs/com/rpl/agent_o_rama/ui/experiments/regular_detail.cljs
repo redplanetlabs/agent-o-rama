@@ -262,6 +262,27 @@
        {:title title-text}
        ($ :span.font-mono duration-text))))
 
+(defui TokenCountCapsule [{:keys [input-token-count output-token-count total-token-count]}]
+  (let [input-count (or input-token-count 0)
+        output-count (or output-token-count 0)
+        total-count (or total-token-count (+ input-count output-count))]
+    ($ :div.inline-flex.items-center.gap-1.5
+       ;; Input tokens
+       ($ :div.inline-flex.flex-col.items-center.px-2.py-1.rounded-sm.bg-gray-50.border.border-gray-200
+          ($ :span.text-xs.text-gray-500.uppercase.tracking-wide "input")
+          ($ :span.text-sm.font-semibold.text-gray-900.font-mono
+             (common/format-number input-count)))
+       ;; Output tokens
+       ($ :div.inline-flex.flex-col.items-center.px-2.py-1.rounded-sm.bg-gray-50.border.border-gray-200
+          ($ :span.text-xs.text-gray-500.uppercase.tracking-wide "output")
+          ($ :span.text-sm.font-semibold.text-gray-900.font-mono
+             (common/format-number output-count)))
+       ;; Total tokens
+       ($ :div.inline-flex.flex-col.items-center.px-2.py-1.rounded-sm.bg-blue-50.border.border-blue-200
+          ($ :span.text-xs.text-blue-600.uppercase.tracking-wide "total")
+          ($ :span.text-sm.font-semibold.text-blue-900.font-mono
+             (common/format-number total-count))))))
+
 (defui EvaluatorCapsulesContainer [{:keys [run module-id columns-metadata]}]
   (let [;; Calculate duration from agent-results
         duration-ms (when-let [agent-results (:agent-results run)]
@@ -269,7 +290,13 @@
                         (when (and (:start-time-millis result)
                                    (:finish-time-millis result))
                           (unchecked-subtract (:finish-time-millis result)
-                                              (:start-time-millis result)))))]
+                                              (:start-time-millis result)))))
+        ;; Extract token counts from agent-results
+        token-info (when-let [agent-results (:agent-results run)]
+                     (when-let [result (first (vals agent-results))]
+                       {:input-token-count (:input-token-count result)
+                        :output-token-count (:output-token-count result)
+                        :total-token-count (:total-token-count result)}))]
     ($ :div.mt-2.flex.flex-wrap.gap-1
        ;; Render capsules for successful evaluations
        (for [[eval-name metrics] (:evals run)
@@ -289,10 +316,19 @@
                               :eval-invoke (get-in run [:eval-initiates eval-name])
                               :module-id module-id
                               :columns-metadata columns-metadata}))
-       ;; Render time capsule last if duration is available
+       ;; Render time capsule if duration is available
        (when duration-ms
          ($ TimeCapsule {:key "time"
-                         :duration-ms duration-ms})))))
+                         :duration-ms duration-ms}))
+       ;; Render token count capsule if token info is available
+       (when (and token-info
+                  (or (:total-token-count token-info)
+                      (:input-token-count token-info)
+                      (:output-token-count token-info)))
+         ($ TokenCountCapsule {:key "tokens"
+                               :input-token-count (:input-token-count token-info)
+                               :output-token-count (:output-token-count token-info)
+                               :total-token-count (:total-token-count token-info)})))))
 
 (defui CellContent [{:keys [content truncated? on-expand]}]
   (let [content-str (common/pp content)
@@ -493,6 +529,7 @@
                                                                         :component ($ ContentModal {:content % :title "Reference Output"})}])}))
                        ;; Output Cell with evaluator capsules
                        (let [agent-result (get-in run [:agent-results 0])]
+                         (println "agent-result" agent-result)
                          ($ :td {:key "output-cell" :className (:td common/table-classes)}
                             (if agent-result
                               ;; If results exist, render the content (success or failure)
