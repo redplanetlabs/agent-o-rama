@@ -262,13 +262,12 @@
        {:title title-text}
        ($ :span.font-mono duration-text))))
 
-
 (defui TokenCountSingleCapsule [{:keys [token-count label]}]
   (let [format-num (fn [n] (.toLocaleString n "en-US"))]
     ($ :div.inline-flex.items-center.gap-1.5.bg-gray-100.rounded-sm.px-2.py-1
-      ($ :<>
-       ($ :span.text-sm.text-gray-900
-          (format-num token-count)))
+       ($ :<>
+          ($ :span.text-sm.text-gray-900
+             (format-num token-count)))
        ($ :span.text-xs.text-gray-500tracking-wide label))))
 
 (defui TokenCountCapsule [{:keys [input-token-count output-token-count total-token-count]}]
@@ -285,13 +284,7 @@
                         (when (and (:start-time-millis result)
                                    (:finish-time-millis result))
                           (unchecked-subtract (:finish-time-millis result)
-                                              (:start-time-millis result)))))
-        ;; Extract token counts from agent-results
-        token-info (when-let [agent-results (:agent-results run)]
-                     (when-let [result (first (vals agent-results))]
-                       {:input-token-count (:input-token-count result)
-                        :output-token-count (:output-token-count result)
-                        :total-token-count (:total-token-count result)}))]
+                                              (:start-time-millis result)))))]
     ($ :div.mt-2.flex.flex-wrap.gap-1
        ;; Render capsules for successful evaluations
        (for [[eval-name metrics] (:evals run)
@@ -314,16 +307,7 @@
        ;; Render time capsule if duration is available
        (when duration-ms
          ($ TimeCapsule {:key "time"
-                         :duration-ms duration-ms}))
-       ;; Render token count capsule if token info is available
-       (when (and token-info
-                  (or (:total-token-count token-info)
-                      (:input-token-count token-info)
-                      (:output-token-count token-info)))
-         ($ TokenCountCapsule {:key "tokens"
-                               :input-token-count (:input-token-count token-info)
-                               :output-token-count (:output-token-count token-info)
-                               :total-token-count (:total-token-count token-info)})))))
+                         :duration-ms duration-ms})))))
 
 (defui CellContent [{:keys [content truncated? on-expand]}]
   (let [content-str (common/pp content)
@@ -341,12 +325,8 @@
 (defui TraceLinkCapsule [{:keys [module-id target-initiate]}]
   (let [target-agent-name (:agent-name target-initiate)
         target-invoke (:agent-invoke target-initiate)
-        task-id (or (:task-id target-invoke)
-                    (:taskId target-invoke)
-                    (when target-invoke (.-taskId target-invoke)))
-        invoke-id (or (:agent-invoke-id target-invoke)
-                      (:agentInvokeId target-invoke)
-                      (when target-invoke (.-agentInvokeId target-invoke)))
+        task-id (:task-id target-invoke)
+        invoke-id (:agent-invoke-id target-invoke)
         invoke-fragment (when (and task-id invoke-id)
                           (str task-id "-" invoke-id))
         trace-url (when invoke-fragment
@@ -504,17 +484,33 @@
                         :let [evaluator-metadata (evaluators/collect-column-metadata (:evals run))
                               target-initiate (-> run :agent-initiates vals first)]]
                     ($ :tr.border-b {:key (str (:example-id run) "-" idx)}
+                       (println "run" run "target-initiate" target-initiate)
                        ;; Input Cell
                        ($ :td {:className (:td common/table-classes)}
-                          ($ :div.flex.flex-col.items-start.gap-2
-                             ($ CellContent {:content (:input run)
-                                             :truncated? (not show-full-text?)
-                                             :on-expand #(state/dispatch [:modal/show :content-detail
-                                                                          {:title "Input"
-                                                                           :component ($ ContentModal {:content % :title "Input"})}])})
-                             (when target-initiate
-                               ($ TraceLinkCapsule {:module-id module-id
-                                                    :target-initiate target-initiate}))))
+                          (let [agent-result (get-in run [:agent-results 0])
+                                token-info (when agent-result
+                                             {:input-token-count (:input-token-count agent-result)
+                                              :output-token-count (:output-token-count agent-result)
+                                              :total-token-count (:total-token-count agent-result)})]
+                            ($ :div.flex.flex-col.items-start.gap-2
+                               ($ CellContent {:content (:input run)
+                                               :truncated? (not show-full-text?)
+                                               :on-expand #(state/dispatch [:modal/show :content-detail
+                                                                            {:title "Input"
+                                                                             :component ($ ContentModal {:content % :title "Input"})}])})
+                               (when target-initiate
+                                 ($ TraceLinkCapsule {:module-id module-id
+                                                      :target-initiate target-initiate}))
+                                ;; Render token count capsule if token info is available
+                               (when (and token-info
+                                          (or (:total-token-count token-info)
+                                              (:input-token-count token-info)
+                                              (:output-token-count token-info)))
+                                 ($ TokenCountCapsule
+                                    {:key "tokens"
+                                     :input-token-count (:input-token-count token-info)
+                                     :output-token-count (:output-token-count token-info)
+                                     :total-token-count (:total-token-count token-info)})))))
                        ;; Reference Output Cell
                        ($ :td {:className (:td common/table-classes)}
                           ($ CellContent {:content (:reference-output run)
