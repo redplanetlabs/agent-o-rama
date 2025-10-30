@@ -273,9 +273,9 @@
 (defui TokenCountCapsule [{:keys [input-token-count output-token-count total-token-count]}]
   (let []
     ($ :div.inline-flex.items-center.gap-1.5
-       ($ TokenCountSingleCapsule {:key "input" :label "input" :token-count input-token-count})
-       ($ TokenCountSingleCapsule {:key "output" :label "output" :token-count output-token-count})
-       ($ TokenCountSingleCapsule {:key "total" :label "total" :token-count total-token-count}))))
+       ($ TokenCountSingleCapsule {:key "input" :label "input tokens" :token-count input-token-count})
+       ($ TokenCountSingleCapsule {:key "output" :label "output tokens" :token-count output-token-count})
+       ($ TokenCountSingleCapsule {:key "total" :label "total tokens" :token-count total-token-count}))))
 
 (defui EvaluatorCapsulesContainer [{:keys [run module-id columns-metadata]}]
   ($ :div.mt-2.flex.flex-wrap.gap-1
