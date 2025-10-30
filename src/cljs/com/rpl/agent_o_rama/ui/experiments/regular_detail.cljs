@@ -262,26 +262,21 @@
        {:title title-text}
        ($ :span.font-mono duration-text))))
 
+
+(defui TokenCountSingleCapsule [{:keys [token-count label]}]
+  (let [format-num (fn [n] (.toLocaleString n "en-US"))]
+    ($ :div.inline-flex.items-center.gap-1.5.bg-gray-100.rounded-sm.px-2.py-1
+      ($ :<>
+       ($ :span.text-sm.text-gray-900
+          (format-num token-count)))
+       ($ :span.text-xs.text-gray-500tracking-wide label))))
+
 (defui TokenCountCapsule [{:keys [input-token-count output-token-count total-token-count]}]
-  (let [input-count (or input-token-count 0)
-        output-count (or output-token-count 0)
-        total-count (or total-token-count (+ input-count output-count))]
+  (let []
     ($ :div.inline-flex.items-center.gap-1.5
-       ;; Input tokens
-       ($ :div.inline-flex.flex-col.items-center.px-2.py-1.rounded-sm.bg-gray-50.border.border-gray-200
-          ($ :span.text-xs.text-gray-500.uppercase.tracking-wide "input")
-          ($ :span.text-sm.font-semibold.text-gray-900.font-mono
-             (common/format-number input-count)))
-       ;; Output tokens
-       ($ :div.inline-flex.flex-col.items-center.px-2.py-1.rounded-sm.bg-gray-50.border.border-gray-200
-          ($ :span.text-xs.text-gray-500.uppercase.tracking-wide "output")
-          ($ :span.text-sm.font-semibold.text-gray-900.font-mono
-             (common/format-number output-count)))
-       ;; Total tokens
-       ($ :div.inline-flex.flex-col.items-center.px-2.py-1.rounded-sm.bg-blue-50.border.border-blue-200
-          ($ :span.text-xs.text-blue-600.uppercase.tracking-wide "total")
-          ($ :span.text-sm.font-semibold.text-blue-900.font-mono
-             (common/format-number total-count))))))
+       ($ TokenCountSingleCapsule {:key "input" :label "input" :token-count input-token-count})
+       ($ TokenCountSingleCapsule {:key "output" :label "output" :token-count output-token-count})
+       ($ TokenCountSingleCapsule {:key "total" :label "total" :token-count total-token-count}))))
 
 (defui EvaluatorCapsulesContainer [{:keys [run module-id columns-metadata]}]
   (let [;; Calculate duration from agent-results
