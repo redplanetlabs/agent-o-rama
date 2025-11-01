@@ -147,10 +147,7 @@
          (foreign-pstate ipc
                          module-name
                          (po/agent-root-task-global-name "all-methods")))
-       (bind all-methods-trace
-         (foreign-query ipc
-                        module-name
-                        (queries/tracing-query-name "all-methods")))
+       (bind all-methods-trace (:tracing-query (aor-types/underlying-objects all-methods)))
 
        (bind fib-inv (aor/agent-initiate fib 5))
        (is (= 8 (aor/agent-result fib fib-inv)))

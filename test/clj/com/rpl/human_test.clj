@@ -69,11 +69,7 @@
                        module-name
                        (po/agent-root-task-global-name "foo")))
      (bind invokes-page-query (:invokes-page-query (aor-types/underlying-objects foo)))
-     (bind traces-query
-       (foreign-query ipc
-                      module-name
-                      (queries/tracing-query-name "foo")))
-
+     (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
      (bind inv1 (aor/agent-initiate foo 0))
      (bind inv2 (aor/agent-initiate foo 10))
 

@@ -25,8 +25,8 @@
     CompletableFuture]))
 
 (defn tracing-query-name
-  [agent-name]
-  (str "_agent-get-trace-page-" agent-name))
+  []
+  "_agent-get-trace-page")
 
 (defn agent-get-names-query-name
   []
@@ -137,14 +137,13 @@
   (.getHumanRequest node-exec invoke-id))
 
 (defn declare-tracing-query-topology
-  [topologies agent-name]
-  (let [topo-name    (tracing-query-name agent-name)
-        scratch-sym  (symbol (str "$$" topo-name "$$"))
-        nodes-pstate (symbol (po/agent-node-task-global-name agent-name))
-        node-exec    (symbol (po/agent-node-executor-name))]
+  [topologies]
+  (let [topo-name   (tracing-query-name)
+        scratch-sym (symbol (str "$$" topo-name "$$"))
+        node-exec   (symbol (po/agent-node-executor-name))]
     (<<query-topology topologies
       topo-name
-      [*agent-task-id *task-invoke-pairs *limit :> *res]
+      [*agent-name *agent-task-id *task-invoke-pairs *limit :> *res]
       (|direct *agent-task-id)
       (loop<- [*invokes-map {}
                *task-invoke-pairs (to-pqueue *task-invoke-pairs)
@@ -166,8 +165,9 @@
                                       :m  *invokes-map})
                             scratch-sym)
           (|direct *task-id)
+          (po/agent-node-task-global *agent-name :> $$nodes)
           (local-select> (keypath *invoke-id)
-                         nodes-pstate
+                         $$nodes
                          :> *all-invoke-info)
           (pending-human-request node-exec *invoke-id :> *human-request)
           (to-trace-invoke-info (into {} *all-invoke-info)

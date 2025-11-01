@@ -699,6 +699,9 @@
          )))
      (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
      (bind module-name (get-module-name module))
+     (bind manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client manager "foo"))
+     (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
      (bind depot
        (foreign-depot ipc
                       module-name
@@ -707,10 +710,6 @@
        (foreign-pstate ipc
                        module-name
                        (po/agent-root-task-global-name "foo")))
-     (bind traces-query
-       (foreign-query ipc
-                      module-name
-                      (queries/tracing-query-name "foo")))
      (bind affected-aggs-query
        (foreign-query ipc
                       module-name
@@ -1270,12 +1269,9 @@
          (foreign-pstate ipc
                          module-name
                          (po/agent-root-task-global-name "foo")))
-       (bind traces-query
-         (foreign-query ipc
-                        module-name
-                        (queries/tracing-query-name "foo")))
 
        (bind foo (aor/agent-client agent-manager "foo"))
+       (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
        (bind get-exceptions
          (fn [{:keys [task-id agent-invoke-id]}]
            (foreign-select-one [(keypath agent-invoke-id) :exception-summaries]

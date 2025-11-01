@@ -196,11 +196,7 @@
           (foreign-pstate ipc
                           module-name
                           (po/agent-root-task-global-name "foo")))
-        (bind traces-query
-          (foreign-query ipc
-                         module-name
-                         (queries/tracing-query-name "foo")))
-
+        (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
         (bind get-trace
           (fn [^AgentInvoke inv]
             (let [agent-task-id  (.getTaskId inv)
@@ -629,11 +625,7 @@
             (foreign-pstate ipc
                             module-name
                             (po/agent-root-task-global-name "foo")))
-          (bind traces-query
-            (foreign-query ipc
-                           module-name
-                           (queries/tracing-query-name "foo")))
-
+          (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
           (bind get-trace
             (fn [^AgentInvoke inv]
               (let [agent-task-id  (.getTaskId inv)

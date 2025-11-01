@@ -141,10 +141,7 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-stream-shared-task-global-name "foo")))
-         (bind traces-query
-           (foreign-query ipc
-                          module-name
-                          (queries/tracing-query-name "foo")))
+         (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
          (bind assert-gc-state-empty!
            (fn []
              (let [elems (reduce concat
@@ -342,11 +339,7 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-mb-shared-task-global-name "foo")))
-         (bind traces-query
-           (foreign-query ipc
-                          module-name
-                          (queries/tracing-query-name "foo")))
-
+         (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
          (bind all-agent-invs
            (all-agent-invs-fn root-pstate 4))
          (bind all-node-ids (all-node-ids-fn node-pstate 4))
@@ -498,10 +491,7 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-node-task-global-name "foo")))
-         (bind traces-query
-           (foreign-query ipc
-                          module-name
-                          (queries/tracing-query-name "foo")))
+         (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
 
          (bind all-agent-invs
            (all-agent-invs-fn root-pstate 4))

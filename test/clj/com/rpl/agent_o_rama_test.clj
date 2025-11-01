@@ -1356,6 +1356,9 @@
            ))
          (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
+         (bind manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client manager "foo"))
+         (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
          (bind depot
            (foreign-depot ipc
                           module-name
@@ -1364,10 +1367,6 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-root-task-global-name "foo")))
-         (bind traces-query
-           (foreign-query ipc
-                          module-name
-                          (queries/tracing-query-name "foo")))
          (bind [agent-task-id agent-id]
            (invoke-agent-and-wait! depot root-pstate []))
          (bind root-invoke-id
@@ -1853,6 +1852,9 @@
             )))
          (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
+         (bind manager (aor/agent-manager ipc module-name))
+         (bind bar (aor/agent-client manager "bar"))
+         (bind bar-traces-query (:tracing-query (aor-types/underlying-objects bar)))
          (bind depot
            (foreign-depot ipc
                           module-name
@@ -1888,10 +1890,6 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-node-task-global-name "bar")))
-         (bind bar-traces-query
-           (foreign-query ipc
-                          module-name
-                          (queries/tracing-query-name "bar")))
 
          (bind [agent-task-id agent-id]
            (invoke-agent-and-wait! bar-depot bar-root-pstate []))
@@ -2718,10 +2716,7 @@
          (foreign-pstate ipc
                          module-name
                          (po/agent-root-task-global-name "foo")))
-       (bind traces-query
-         (foreign-query ipc
-                        module-name
-                        (queries/tracing-query-name "foo")))
+       (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
 
        (bind inv (aor/agent-initiate foo))
        (bind [agent-task-id agent-id] (tc/extract-invoke inv))
@@ -3185,10 +3180,7 @@
          (foreign-pstate ipc
                          module-name
                          (po/agent-root-task-global-name "foo")))
-       (bind traces-query
-         (foreign-query ipc
-                        module-name
-                        (queries/tracing-query-name "foo")))
+       (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
 
        (bind expected-results-fn
          (fn [m]

@@ -386,10 +386,7 @@
        (foreign-pstate ipc
                        module-name
                        (po/agent-root-task-global-name "foo")))
-     (bind traces-query
-       (foreign-query ipc
-                      module-name
-                      (queries/tracing-query-name "foo")))
+     (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
 
      (bind inv (aor/agent-initiate foo "chat1" "Hello"))
      (bind [agent-task-id agent-id] (tc/extract-invoke inv))
