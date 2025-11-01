@@ -1109,86 +1109,89 @@ Example:\n
                               {:module-name module-name}))
           ))
 
-        datasets-depot            (foreign-depot cluster
-                                                 module-name
-                                                 (po/datasets-depot-name))
+        datasets-depot             (foreign-depot cluster
+                                                  module-name
+                                                  (po/datasets-depot-name))
 
-        agent-edit-depot          (foreign-depot cluster module-name (po/agent-edit-depot-name))
-        datasets-pstate           (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/datasets-task-global-name))
-        datasets-page-query       (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/get-datasets-page-query-name))
-        datasets-search-query     (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/search-datasets-name))
+        agent-edit-depot           (foreign-depot cluster module-name (po/agent-edit-depot-name))
+        datasets-pstate            (foreign-pstate
+                                    cluster
+                                    module-name
+                                    (po/datasets-task-global-name))
+        datasets-page-query        (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/get-datasets-page-query-name))
+        datasets-search-query      (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/search-datasets-name))
 
-        search-examples-query     (foreign-query cluster
-                                                 module-name
-                                                 (queries/search-examples-name))
-        multi-examples-query      (foreign-query cluster
-                                                 module-name
-                                                 (queries/multi-examples-name))
+        search-examples-query      (foreign-query cluster
+                                                  module-name
+                                                  (queries/search-examples-name))
+        multi-examples-query       (foreign-query cluster
+                                                  module-name
+                                                  (queries/multi-examples-name))
 
-        global-actions-depot      (foreign-depot cluster
-                                                 module-name
-                                                 (po/global-actions-depot-name))
-        evals-pstate              (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/evaluators-task-global-name))
+        global-actions-depot       (foreign-depot cluster
+                                                  module-name
+                                                  (po/global-actions-depot-name))
+        evals-pstate               (foreign-pstate
+                                    cluster
+                                    module-name
+                                    (po/evaluators-task-global-name))
 
-        try-eval-query            (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/try-evaluator-name))
+        try-eval-query             (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/try-evaluator-name))
 
-        all-eval-builders-query   (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/all-evaluator-builders-name))
+        all-eval-builders-query    (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/all-evaluator-builders-name))
 
-        all-action-builders-query (foreign-query
-                                   cluster
-                                   module-name
-                                   (ana/all-action-builders-name))
+        all-action-builders-query  (foreign-query
+                                    cluster
+                                    module-name
+                                    (ana/all-action-builders-name))
 
-        search-evals-query        (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/search-evaluators-name))
-        search-experiments-query  (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/search-experiments-name))
-        experiments-results-query (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/experiment-results-name))
-        global-config-pstate      (foreign-pstate
-                                   cluster
-                                   module-name
-                                   (po/agent-global-config-task-global-name))
+        search-evals-query         (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/search-evaluators-name))
+        search-experiments-query   (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/search-experiments-name))
+        experiments-results-query  (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/experiment-results-name))
+        global-config-pstate       (foreign-pstate
+                                    cluster
+                                    module-name
+                                    (po/agent-global-config-task-global-name))
 
-        base-invokes-page-query   (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/agent-get-invokes-page-query-name))
-        base-tracing-query        (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/tracing-query-name))
-        base-current-graph-query  (foreign-query
-                                   cluster
-                                   module-name
-                                   (queries/agent-get-current-graph-name))
-        base-action-log-query     (foreign-query cluster
-                                                 module-name
-                                                 (queries/action-log-page-name))
+        base-invokes-page-query    (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/agent-get-invokes-page-query-name))
+        base-tracing-query         (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/tracing-query-name))
+        base-current-graph-query   (foreign-query
+                                    cluster
+                                    module-name
+                                    (queries/agent-get-current-graph-name))
+        base-action-log-query      (foreign-query cluster
+                                                  module-name
+                                                  (queries/action-log-page-name))
+        base-search-metadata-query (foreign-query cluster
+                                                  module-name
+                                                  (queries/search-metadata-name))
         ;; TODO: <<<<>>>> add base queries here
        ]
     (reify
@@ -1234,9 +1237,7 @@ Example:\n
              invokes-page-query      (i/delegating-query agentName base-invokes-page-query)
              current-graph-query     (i/delegating-query agentName base-current-graph-query)
              action-log-query        (i/delegating-query agentName base-action-log-query)
-             search-metadata-query   (foreign-query cluster
-                                                    module-name
-                                                    (queries/search-metadata-name agentName))
+             search-metadata-query   (i/delegating-query agentName base-search-metadata-query)
              all-agent-metrics-query (foreign-query cluster
                                                     module-name
                                                     (queries/all-agent-metrics-name agentName))

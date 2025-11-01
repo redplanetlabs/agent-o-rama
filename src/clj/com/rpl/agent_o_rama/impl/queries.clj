@@ -54,8 +54,8 @@
   "_agent-get-action-log-page")
 
 (defn search-metadata-name
-  [agent-name]
-  (str "_agent-search-metadata-" agent-name))
+  []
+  "_agent-search-metadata")
 
 (defn all-agent-metrics-name
   [agent-name]
@@ -979,35 +979,35 @@
 
 ;; returns {:metadata [{:name ... :examples #{...}} ...] :pagination-params ...}
 (defn declare-search-metadata-topology
-  [topologies agent-name]
-  (let [shared-streaming-sym (symbol (po/agent-stream-shared-task-global-name agent-name))]
-    (<<query-topology topologies
-      (search-metadata-name agent-name)
-      [*search-string *limit *next-key :> *res]
-      (|direct 0)
-      (str/lower-case *search-string :> *search-string-lower)
-      (<<ramafn %filter
-        [*name _]
-        (<<cond
-         (case> (not (h/contains-string? (str/lower-case (str *name)) *search-string-lower)))
-          (:> nil nil)
+  [topologies]
+  (<<query-topology topologies
+    (search-metadata-name)
+    [*agent-name *search-string *limit *next-key :> *res]
+    (|direct 0)
+    (str/lower-case *search-string :> *search-string-lower)
+    (<<ramafn %filter
+      [*name _]
+      (<<cond
+       (case> (not (h/contains-string? (str/lower-case (str *name)) *search-string-lower)))
+        (:> nil nil)
 
-         (default>)
-          (:> {:name *name} nil)))
-      (search-loop shared-streaming-sym
-                   (path> :metadata)
-                   %filter
-                   *limit
-                   *next-key
-                   false
-                   :> *items *page-key)
-      (|origin)
-      (hash-map :metadata
-                (add-implicit-metadata *items *search-string-lower)
-                :pagination-params
-                *page-key
-                :> *res)
-    )))
+       (default>)
+        (:> {:name *name} nil)))
+    (po/agent-stream-shared-task-global *agent-name :> $$shared-streaming)
+    (search-loop $$shared-streaming
+                 (path> :metadata)
+                 %filter
+                 *limit
+                 *next-key
+                 false
+                 :> *items *page-key)
+    (|origin)
+    (hash-map :metadata
+              (add-implicit-metadata *items *search-string-lower)
+              :pagination-params
+              *page-key
+              :> *res)
+  ))
 
 (defn declare-all-agent-metrics-topology
   [topologies agent-name]
