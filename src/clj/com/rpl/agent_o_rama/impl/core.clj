@@ -159,7 +159,6 @@
      po/AGENT-TELEMETRY-PSTATE-SCHEMA)
 
     (retries/declare-check-impl mb-topology agent-name)
-    (queries/declare-all-agent-metrics-topology topologies agent-name)
 
     (<<sources stream-topology
      (source> agent-config-depot-sym {:retry-mode :all-after} :> *data)
@@ -352,7 +351,7 @@
   (queries/declare-tracing-query-topology topologies)
   (queries/declare-get-action-log-page-topology topologies)
   (queries/declare-search-metadata-topology topologies)
-  ;; TODO: <<<<>>>> define base queries here
+  (queries/declare-all-agent-metrics-topology topologies)
 
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name

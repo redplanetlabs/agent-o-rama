@@ -58,8 +58,8 @@
   "_agent-search-metadata")
 
 (defn all-agent-metrics-name
-  [agent-name]
-  (str "_agent-all-metrics-" agent-name))
+  []
+  "_agent-all-metrics")
 
 (defn get-datasets-page-query-name
   []
@@ -1010,20 +1010,20 @@
   ))
 
 (defn declare-all-agent-metrics-topology
-  [topologies agent-name]
-  (let [telemetry-sym (symbol (po/agent-telemetry-task-global-name agent-name))]
-    (<<query-topology topologies
-      (all-agent-metrics-name agent-name)
-      [:> *res]
-      (|all)
-      (local-select>
-       [(keypath 60) MAP-KEYS]
-       telemetry-sym
-       {:allow-yield? true}
-       :> *metric-id)
-      (|origin)
-      (aggs/+set-agg *metric-id :> *res)
-    )))
+  [topologies]
+  (<<query-topology topologies
+    (all-agent-metrics-name)
+    [*agent-name :> *res]
+    (|all)
+    (po/agent-telemetry-task-global *agent-name :> $$telemetry)
+    (local-select>
+     [(keypath 60) MAP-KEYS]
+     $$telemetry
+     {:allow-yield? true}
+     :> *metric-id)
+    (|origin)
+    (aggs/+set-agg *metric-id :> *res)
+  ))
 
 ;; direct queries on PStates
 
