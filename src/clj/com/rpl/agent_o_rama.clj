@@ -1172,7 +1172,14 @@ Example:\n
         global-config-pstate      (foreign-pstate
                                    cluster
                                    module-name
-                                   (po/agent-global-config-task-global-name))]
+                                   (po/agent-global-config-task-global-name))
+
+        base-invokes-page-query   (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/agent-get-invokes-page-query-name))
+        ;; TODO: <<<<>>>> add base queries here
+       ]
     (reify
      AgentManager
      (getAgentNames [this]
@@ -1216,10 +1223,7 @@ Example:\n
                                       cluster
                                       module-name
                                       (queries/tracing-query-name agentName))
-             invokes-page-query      (foreign-query
-                                      cluster
-                                      module-name
-                                      (queries/agent-get-invokes-page-query-name agentName))
+             invokes-page-query      (i/delegating-query agentName base-invokes-page-query)
              current-graph-query     (foreign-query
                                       cluster
                                       module-name

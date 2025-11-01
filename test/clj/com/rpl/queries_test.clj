@@ -146,10 +146,7 @@
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
-     (bind q
-       (foreign-query ipc
-                      module-name
-                      (queries/agent-get-invokes-page-query-name "foo")))
+     (bind q (:invokes-page-query (aor-types/underlying-objects foo)))
 
 
      ;; this would be much faster if did agent-initiate-async and then resolved

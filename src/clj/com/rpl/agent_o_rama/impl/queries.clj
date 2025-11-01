@@ -37,8 +37,8 @@
   "_agent-get-fork-affected-aggs")
 
 (defn agent-get-invokes-page-query-name
-  [agent-name]
-  (str "_agent-get-invokes-page-" agent-name))
+  []
+  "_agent-get-invokes-page")
 
 (defn fork-affected-aggs-query-task-global
   []
@@ -330,8 +330,7 @@
   (let [task-id-sym (gen-anyvar "task-id")
         end-id-sym (gen-anyvar "end-id")
         task-page-sym (gen-anyvar "task-page")
-        pages-map-sym (gen-anyvar "pages-map")
-        pstate-sym (symbol pstate-name)]
+        pages-map-sym (gen-anyvar "pages-map")]
     [[|all]
      [ops/current-task-id :> task-id-sym]
      [get pagination-params task-id-sym (seg# max-key-fn) :> end-id-sym]
@@ -344,7 +343,7 @@
                                    {:inclusive? true
                                     :max-amt    (seg# adjust-page-size page-size)})
          (seg# transformed MAP-VALS info-transformer)]
-        pstate-sym
+        (seg# this-module-pobject-task-global pstate-name)
         :> task-page-sym]]
      [|origin]
      [aggs/+map-agg task-id-sym task-page-sym :> pages-map-sym]
@@ -375,12 +374,30 @@
                            STAY)
   ))
 
+
+;; like declare-get-distributed-page-topology, but for agent-specific PStates
+(defn declare-get-agent-distributed-page-topology
+  [topologies query-name pstate-name-fn info-transformer page-result-fn max-key-fn]
+  (<<query-topology topologies
+    query-name
+    [*agent-name *page-size *pagination-params :> *res]
+    (pstate-name-fn *agent-name :> *pstate-name)
+    (get-distributed-page* *page-size
+                           *pagination-params
+                           *pstate-name
+                           *res
+                           info-transformer
+                           page-result-fn
+                           max-key-fn
+                           STAY)
+  ))
+
 (defn declare-get-invokes-page-topology
-  [topologies agent-name]
-  (declare-get-distributed-page-topology
+  [topologies]
+  (declare-get-agent-distributed-page-topology
    topologies
-   (agent-get-invokes-page-query-name agent-name)
-   (po/agent-root-task-global-name agent-name)
+   (agent-get-invokes-page-query-name)
+   po/agent-root-task-global-name
    relevant-invoke-submap
    to-invokes-page-result
    h/max-uuid))

@@ -68,10 +68,7 @@
        (foreign-pstate ipc
                        module-name
                        (po/agent-root-task-global-name "foo")))
-     (bind invokes-page-query
-       (foreign-query ipc
-                      module-name
-                      (queries/agent-get-invokes-page-query-name "foo")))
+     (bind invokes-page-query (:invokes-page-query (aor-types/underlying-objects foo)))
      (bind traces-query
        (foreign-query ipc
                       module-name

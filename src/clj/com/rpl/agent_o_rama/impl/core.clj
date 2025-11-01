@@ -33,6 +33,8 @@
     ExperimentEvent
     NodeOp
     RuleEvent]
+   [com.rpl.rama
+    QueryTopologyClient]
    [java.util.concurrent
     CompletableFuture]))
 
@@ -158,7 +160,6 @@
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
-    (queries/declare-get-invokes-page-topology topologies agent-name)
     (queries/declare-get-current-graph topologies agent-name)
     (queries/declare-get-action-log-page-topology topologies agent-name)
     (queries/declare-search-metadata-topology topologies agent-name)
@@ -350,6 +351,9 @@
   (queries/declare-experiment-results-query-topology topologies)
 
   (queries/declare-fork-affected-aggs-query-topology topologies)
+  (queries/declare-get-invokes-page-topology topologies)
+  ;; TODO: <<<<>>>> define base queries here
+
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name
                    setup
@@ -437,3 +441,15 @@
         )))
      ret
    )))
+
+
+(defn delegating-query
+  [agent-name delegate]
+  (reify
+   QueryTopologyClient
+   (invoke [this args]
+     (let [new-args (cons agent-name args)]
+       (apply foreign-invoke-query delegate new-args)))
+   (invokeAsync [this args]
+     (let [new-args (cons agent-name args)]
+       (apply foreign-invoke-query-async delegate new-args)))))
