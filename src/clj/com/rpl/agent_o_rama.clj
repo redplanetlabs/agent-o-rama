@@ -1186,6 +1186,9 @@ Example:\n
                                    cluster
                                    module-name
                                    (queries/agent-get-current-graph-name))
+        base-action-log-query     (foreign-query cluster
+                                                 module-name
+                                                 (queries/action-log-page-name))
         ;; TODO: <<<<>>>> add base queries here
        ]
     (reify
@@ -1230,9 +1233,7 @@ Example:\n
              tracing-query           (i/delegating-query agentName base-tracing-query)
              invokes-page-query      (i/delegating-query agentName base-invokes-page-query)
              current-graph-query     (i/delegating-query agentName base-current-graph-query)
-             action-log-query        (foreign-query cluster
-                                                    module-name
-                                                    (queries/action-log-page-name agentName))
+             action-log-query        (i/delegating-query agentName base-action-log-query)
              search-metadata-query   (foreign-query cluster
                                                     module-name
                                                     (queries/search-metadata-name agentName))

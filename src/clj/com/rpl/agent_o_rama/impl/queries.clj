@@ -50,8 +50,8 @@
   "_agent-get-current-graph")
 
 (defn action-log-page-name
-  [agent-name]
-  (str "_agent-get-action-log-page-" agent-name))
+  []
+  "_agent-get-action-log-page")
 
 (defn search-metadata-name
   [agent-name]
@@ -953,11 +953,11 @@
 ;;    ...]
 ;;  :pagination-params {task-id end-id}}
 (defn declare-get-action-log-page-topology
-  [topologies agent-name]
+  [topologies]
   (let [pstate-name (po/action-log-task-global-name)]
     (<<query-topology topologies
-      (action-log-page-name agent-name)
-      [*rule-name *page-size *pagination-params :> *res]
+      (action-log-page-name)
+      [*agent-name *rule-name *page-size *pagination-params :> *res]
       (get-distributed-page* *page-size
                              *pagination-params
                              pstate-name
@@ -965,7 +965,7 @@
                              action-log-info
                              to-action-log-page-result
                              h/max-uuid
-                             (keypath agent-name *rule-name))
+                             (keypath *agent-name *rule-name))
     )))
 
 (defn add-implicit-metadata
