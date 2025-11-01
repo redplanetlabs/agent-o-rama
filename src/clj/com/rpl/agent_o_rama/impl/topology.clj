@@ -386,14 +386,15 @@
    [$$root (po/agent-root-task-global *agent-name)
     $$stream-shared (po/agent-stream-shared-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)
-    %affected-aggs (queries/fork-affected-aggs-query-task-global *agent-name)]
+    %affected-aggs (queries/fork-affected-aggs-query-task-global)]
    (local-select> (keypath *agent-id)
                   $$root
                   :> {:keys [*root-invoke-id *invoke-args *graph-version *metadata]})
    (<<if (nil? *invoke-args)
      (throw! (h/ex-info "Forked agent ID does not exist"
                         {:agent-id *agent-id})))
-   (%affected-aggs *agent-task-id
+   (%affected-aggs *agent-name
+                   *agent-task-id
                    *agent-id
                    (-> *invoke-id->new-args
                        keys

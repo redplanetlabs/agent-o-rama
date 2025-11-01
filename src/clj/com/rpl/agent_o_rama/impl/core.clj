@@ -158,7 +158,6 @@
 
     (retries/declare-check-impl mb-topology agent-name)
     (queries/declare-tracing-query-topology topologies agent-name)
-    (queries/declare-fork-affected-aggs-query-topology topologies agent-name)
     (queries/declare-get-invokes-page-topology topologies agent-name)
     (queries/declare-get-current-graph topologies agent-name)
     (queries/declare-get-action-log-page-topology topologies agent-name)
@@ -349,6 +348,8 @@
   (queries/declare-search-evaluators-query-topology topologies)
   (queries/declare-search-experiments-query-topology topologies)
   (queries/declare-experiment-results-query-topology topologies)
+
+  (queries/declare-fork-affected-aggs-query-topology topologies)
   (doseq [[agent-name agent-graph] agent-graphs]
     (define-agent! agent-name
                    setup

@@ -714,7 +714,7 @@
      (bind affected-aggs-query
        (foreign-query ipc
                       module-name
-                      (queries/agent-get-fork-affected-aggs-query-name "foo")))
+                      (queries/agent-get-fork-affected-aggs-query-name)))
 
      (bind [agent-task-id agent-id]
        (invoke-agent-and-wait! depot root-pstate []))
@@ -740,29 +740,34 @@
 
      (is (= #{start2 start3}
             (foreign-invoke-query affected-aggs-query
+                                  "foo"
                                   agent-task-id
                                   agent-id
                                   #{(inv-id "b2")})))
 
      (is (= #{start2}
             (foreign-invoke-query affected-aggs-query
+                                  "foo"
                                   agent-task-id
                                   agent-id
                                   #{(inv-id "b3")})))
 
      (is (empty?
           (foreign-invoke-query affected-aggs-query
+                                "foo"
                                 agent-task-id
                                 agent-id
                                 #{(inv-id "b4")})))
 
      (is (empty?
           (foreign-invoke-query affected-aggs-query
+                                "foo"
                                 agent-task-id
                                 agent-id
                                 #{(inv-id "start")})))
      (is (empty?
           (foreign-invoke-query affected-aggs-query
+                                "foo"
                                 agent-task-id
                                 agent-id
                                 #{(inv-id "b4") (inv-id "node1")
@@ -770,36 +775,42 @@
 
      (is (= #{start2}
             (foreign-invoke-query affected-aggs-query
+                                  "foo"
                                   agent-task-id
                                   agent-id
                                   #{start2})))
 
      (is (= #{start2 start3}
             (foreign-invoke-query affected-aggs-query
+                                  "foo"
                                   agent-task-id
                                   agent-id
                                   #{start3})))
 
      (is (empty?
           (foreign-invoke-query affected-aggs-query
+                                "foo"
                                 agent-task-id
                                 agent-id
                                 #{(inv-id "agg")})))
 
      (is (empty?
           (foreign-invoke-query affected-aggs-query
+                                "foo"
                                 agent-task-id
                                 agent-id
                                 #{(inv-id "agg3")})))
 
      (is (= #{start2}
             (foreign-invoke-query affected-aggs-query
+                                  "foo"
                                   agent-task-id
                                   agent-id
                                   #{(inv-id "agg2")})))
 
      (is (= #{start1 start2}
             (foreign-invoke-query affected-aggs-query
+                                  "foo"
                                   agent-task-id
                                   agent-id
                                   #{(inv-id "a1") (inv-id "b1")})))

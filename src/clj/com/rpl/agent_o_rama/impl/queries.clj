@@ -33,17 +33,17 @@
   "_agents-get-names")
 
 (defn agent-get-fork-affected-aggs-query-name
-  [agent-name]
-  (str "_agent-get-fork-affected-aggs-" agent-name))
+  []
+  "_agent-get-fork-affected-aggs")
 
 (defn agent-get-invokes-page-query-name
   [agent-name]
   (str "_agent-get-invokes-page-" agent-name))
 
 (defn fork-affected-aggs-query-task-global
-  [agent-name]
+  []
   (this-module-query-topology-task-global
-   (agent-get-fork-affected-aggs-query-name agent-name)))
+   (agent-get-fork-affected-aggs-query-name)))
 
 (defn agent-get-current-graph-name
   [agent-name]
@@ -194,47 +194,47 @@
     )))
 
 (defn declare-fork-affected-aggs-query-topology
-  [topologies agent-name]
-  (let [root-sym  (symbol (po/agent-root-task-global-name agent-name))
-        nodes-sym (symbol (po/agent-node-task-global-name agent-name))]
-    (<<query-topology topologies
-      (agent-get-fork-affected-aggs-query-name agent-name)
-      [*agent-task-id *agent-id *forked-invoke-ids-set :> *res]
-      (|direct *agent-task-id)
-      (local-select> [(keypath *agent-id) :root-invoke-id]
-                     root-sym
-                     :> *root-invoke-id)
-      (loop<- [*invoke-id *root-invoke-id
-               *agg-context #{}
-               :> *agg-context]
-        (local-select> (keypath *invoke-id)
-                       nodes-sym
-                       :> {:keys [*started-agg? *emits *agg-invoke-id *node]})
-        (<<if *started-agg?
-          (conj *agg-context *invoke-id :> *curr-agg-context)
-         (else>)
-          (identity *agg-context :> *curr-agg-context))
-        (<<if (contains? *forked-invoke-ids-set *invoke-id)
-          (:> *curr-agg-context))
-        (anchor> <root>)
-        (<<if *started-agg?
-          (identity *agg-invoke-id :> *next-invoke-id)
-          (identity *agg-context :> *next-agg-context)
-          (anchor> <agg>))
-        (hook> <root>)
-        (ops/explode *emits
-                     :> {*next-invoke-id :invoke-id
-                         *task-id        :target-task-id})
-        (identity *curr-agg-context :> *next-agg-context)
-        (|direct *task-id)
-        (anchor> <reg>)
+  [topologies]
+  (<<query-topology topologies
+    (agent-get-fork-affected-aggs-query-name)
+    [*agent-name *agent-task-id *agent-id *forked-invoke-ids-set :> *res]
+    (|direct *agent-task-id)
+    (po/agent-root-task-global *agent-name :> $$root)
+    (local-select> [(keypath *agent-id) :root-invoke-id]
+                   $$root
+                   :> *root-invoke-id)
+    (loop<- [*invoke-id *root-invoke-id
+             *agg-context #{}
+             :> *agg-context]
+      (po/agent-node-task-global *agent-name :> $$nodes)
+      (local-select> (keypath *invoke-id)
+                     $$nodes
+                     :> {:keys [*started-agg? *emits *agg-invoke-id *node]})
+      (<<if *started-agg?
+        (conj *agg-context *invoke-id :> *curr-agg-context)
+       (else>)
+        (identity *agg-context :> *curr-agg-context))
+      (<<if (contains? *forked-invoke-ids-set *invoke-id)
+        (:> *curr-agg-context))
+      (anchor> <root>)
+      (<<if *started-agg?
+        (identity *agg-invoke-id :> *next-invoke-id)
+        (identity *agg-context :> *next-agg-context)
+        (anchor> <agg>))
+      (hook> <root>)
+      (ops/explode *emits
+                   :> {*next-invoke-id :invoke-id
+                       *task-id        :target-task-id})
+      (identity *curr-agg-context :> *next-agg-context)
+      (|direct *task-id)
+      (anchor> <reg>)
 
-        (unify> <agg> <reg>)
-        (continue> *next-invoke-id *next-agg-context))
-      (ops/explode *agg-context :> *invoke-id)
-      (|origin)
-      (aggs/+set-agg *invoke-id :> *res)
-    )))
+      (unify> <agg> <reg>)
+      (continue> *next-invoke-id *next-agg-context))
+    (ops/explode *agg-context :> *invoke-id)
+    (|origin)
+    (aggs/+set-agg *invoke-id :> *res)
+  ))
 
 (defn- items-pqueue
   ^PriorityQueue [item-compare-extractor]
