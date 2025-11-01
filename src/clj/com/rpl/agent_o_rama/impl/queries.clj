@@ -46,8 +46,8 @@
    (agent-get-fork-affected-aggs-query-name)))
 
 (defn agent-get-current-graph-name
-  [agent-name]
-  (str "_agent-get-current-graph-" agent-name))
+  []
+  "_agent-get-current-graph")
 
 (defn action-log-page-name
   [agent-name]
@@ -411,12 +411,12 @@
     (identity agent-names :> *res)))
 
 (defn declare-get-current-graph
-  [topologies agent-name]
+  [topologies]
   (<<query-topology topologies
-    (agent-get-current-graph-name agent-name)
-    [:> *res]
+    (agent-get-current-graph-name)
+    [*agent-name :> *res]
     (|origin)
-    (graph/graph->historical-graph-info (po/agent-graph-task-global agent-name)
+    (graph/graph->historical-graph-info (po/agent-graph-task-global *agent-name)
                                         :> *res)
   ))
 

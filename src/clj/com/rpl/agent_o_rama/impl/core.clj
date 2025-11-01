@@ -159,7 +159,6 @@
      po/AGENT-TELEMETRY-PSTATE-SCHEMA)
 
     (retries/declare-check-impl mb-topology agent-name)
-    (queries/declare-get-current-graph topologies agent-name)
     (queries/declare-get-action-log-page-topology topologies agent-name)
     (queries/declare-search-metadata-topology topologies agent-name)
     (queries/declare-all-agent-metrics-topology topologies agent-name)
@@ -350,6 +349,7 @@
   (queries/declare-experiment-results-query-topology topologies)
 
   (queries/declare-fork-affected-aggs-query-topology topologies)
+  (queries/declare-get-current-graph topologies)
   (queries/declare-get-invokes-page-topology topologies)
   (queries/declare-tracing-query-topology topologies)
   ;; TODO: <<<<>>>> define base queries here

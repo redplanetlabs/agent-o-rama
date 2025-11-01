@@ -767,6 +767,9 @@
             )))
          (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
          (bind module-name (get-module-name module))
+         (bind manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client manager "foo"))
+         (bind current-graph-query (:current-graph-query (aor-types/underlying-objects foo)))
          (bind depot
            (foreign-depot ipc
                           module-name
@@ -779,10 +782,6 @@
            (foreign-pstate ipc
                            module-name
                            (po/agent-stream-shared-task-global-name "foo")))
-         (bind current-graph-query
-           (foreign-query ipc
-                          module-name
-                          (queries/agent-get-current-graph-name "foo")))
 
          (dotimes [_ 10]
            (let [{[agent-task-id agent-id] "_agent-topology"}

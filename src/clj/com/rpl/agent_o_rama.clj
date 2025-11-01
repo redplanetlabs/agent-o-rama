@@ -1182,6 +1182,10 @@ Example:\n
                                    cluster
                                    module-name
                                    (queries/tracing-query-name))
+        base-current-graph-query  (foreign-query
+                                   cluster
+                                   module-name
+                                   (queries/agent-get-current-graph-name))
         ;; TODO: <<<<>>>> add base queries here
        ]
     (reify
@@ -1225,10 +1229,7 @@ Example:\n
                                       (po/agent-telemetry-task-global-name agentName))
              tracing-query           (i/delegating-query agentName base-tracing-query)
              invokes-page-query      (i/delegating-query agentName base-invokes-page-query)
-             current-graph-query     (foreign-query
-                                      cluster
-                                      module-name
-                                      (queries/agent-get-current-graph-name agentName))
+             current-graph-query     (i/delegating-query agentName base-current-graph-query)
              action-log-query        (foreign-query cluster
                                                     module-name
                                                     (queries/action-log-page-name agentName))
