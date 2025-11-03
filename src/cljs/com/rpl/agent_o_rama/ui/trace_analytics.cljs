@@ -185,7 +185,6 @@
                   :value (str (.toLocaleString total-tokens))}]})))
 
        ;; Other operations (expandable)
-       (.log js/console "STATS" (pr-str basic-stats))
        (when (has-operations?
               basic-stats
               [:tool-call :agent-call :human-input :other])

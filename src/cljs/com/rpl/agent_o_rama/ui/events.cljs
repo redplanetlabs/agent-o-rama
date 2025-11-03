@@ -17,7 +17,6 @@
    It builds the set of reachable nodes, real edges, and implicit edges in a single pass."
   [raw-nodes root-invoke-id historical-graph]
   (if (or (empty? raw-nodes) (not (get raw-nodes root-invoke-id)))
-    ;; We can't start drawing until the root node is available.
     {:nodes {} :edges [] :implicit-edges []}
     (loop [to-visit #{root-invoke-id}
            drawable-nodes {}
@@ -25,13 +24,11 @@
            implicit-edges []
            visited #{}]
       (if (empty? to-visit)
-        ;; Traversal complete
         {:nodes drawable-nodes :edges real-edges :implicit-edges implicit-edges}
         (let [current-id (first to-visit)
               remaining-to-visit (disj to-visit current-id)]
 
           (if (visited current-id)
-            ;; Already processed, skip
             (recur remaining-to-visit drawable-nodes real-edges implicit-edges visited)
 
             (let [node-data (get raw-nodes current-id)
@@ -41,18 +38,26 @@
                   ;; 1. FIND REAL EDGES & CHILDREN
                   emitted-ids (set (map :invoke-id (:emits node-data)))
                   drawable-children (filter #(contains? raw-nodes %) emitted-ids)
+
+                  ;; DEBUG: Log if we're adding nodes that look like agg-invoke nodes
+                  _ (when (seq drawable-children)
+                      (doseq [child-id drawable-children]
+                        (let [child-node (get raw-nodes child-id)
+                              child-name (:node child-node)]
+                          (when (and child-name (str/includes? (str child-name) "agg-invoke"))
+                            (println "[WARN] Adding agg-invoke node to drawable:" child-id child-name
+                                     "from node:" node-name
+                                     "has invoked-agg-invoke-id?" (:invoked-agg-invoke-id child-node))))))
+
                   new-real-edges (for [child-id drawable-children]
                                    {:id (str "real-" current-id "-" child-id)
                                     :source (str current-id)
                                     :target (str child-id)})
 
                   ;; 2. FIND IMPLICIT EDGES (for aggregation contexts)
-                  ;; Only create implicit edges if node is an agg-start-node (no node-task-id)
-                  ;; and has an agg-context relationship
                   agg-context (:agg-context static-info)
                   is-agg-start? (and agg-context (not (:node-task-id node-data)))
 
-                  ;; SIMPLIFIED: Collect implicit edges and nodes to visit together
                   {implicit-targets :targets
                    implicit-edge-list :edges}
                   (if-not is-agg-start?
@@ -65,9 +70,8 @@
                            (if (and is-agg-node?
                                     agg-node-invoke-id
                                     (contains? raw-nodes agg-node-invoke-id)
-                                    ;; FIX: Always create implicit edge for agg-start nodes
-                                    ;; Don't condition on absence of explicit emits (incomplete data)
-                                    (not (contains? visited agg-node-invoke-id)))
+                                    (not (contains? visited agg-node-invoke-id))
+                                    (not (contains? emitted-ids agg-node-invoke-id)))
                              {:targets (conj (:targets acc) agg-node-invoke-id)
                               :edges (conj (:edges acc)
                                            {:id (str "implicit-" current-id "-" agg-node-invoke-id)
@@ -78,7 +82,6 @@
                        {:targets [] :edges []}
                        (or potential-outputs []))))]
 
-              ;; 3. RECURSE with both real and implicit edges
               (recur (into remaining-to-visit (concat drawable-children implicit-targets))
                      (assoc drawable-nodes current-id node-data)
                      (into real-edges new-real-edges)

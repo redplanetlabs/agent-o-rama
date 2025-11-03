@@ -15,7 +15,6 @@
   "Check if a map represents a LangChain4j chat message.
   Handles both string and keyword keys."
   [m]
-  (.log js/console "chat-meesage?" (pr-str m))
   (boolean
    (and (map? m)
         (let [aor-type (get-flexible m "_aor-type")]
@@ -28,7 +27,6 @@
 (defn conversation?
   "Check if data is a conversation (vector of chat messages)"
   [data]
-  (.log js/console "conversation?" (pr-str data))
   (and (sequential? data)
        (seq data)
        (every? chat-message? data)))

@@ -13,7 +13,7 @@
   (s/pred
    (fn [value]
      (when (some? value)
-       (println "SPY |" label "|" (type value) "|" value))
+       #_(println "SPY |" label "|" (type value) "|" value))
      true)
    'spy-schema))
 
