@@ -26,99 +26,85 @@
      :invoke-id (.getAgentInvokeId inv)}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph-page
-  [{:keys [client invoke-pair leaves initial?]} _uid] ; Renamed uid to _uid as
-  ; it's unused
+  [{:keys [client invoke-pair]} _uid]
   (when client
-    (let [;; Correctly get all underlying objects from the agent-specific client
-          client-objects           (aor-types/underlying-objects client)
-          tracing-query            (:tracing-query client-objects)
-          root-pstate              (:root-pstate client-objects) ; <-- FIX: Use client-objects
-          stream-shared-pstate     (:stream-shared-pstate client-objects) ; <-- FIX: Use
-                                                                          ; client-objects
+    (let [;; Get all underlying objects from the agent-specific client
+          client-objects (aor-types/underlying-objects client)
+          tracing-query (:tracing-query client-objects)
+          root-pstate (:root-pstate client-objects)
+          stream-shared-pstate (:stream-shared-pstate client-objects)
 
           [agent-task-id agent-id] invoke-pair
-          is-initial-load?         (boolean initial?)
 
-          ;; This query is now safe because root-pstate is correctly sourced
-          summary-info-raw         (foreign-select-one
-                                    [(keypath agent-id)
-                                     (submap
-                                      [:result :start-time-millis :finish-time-millis :graph-version
-                                       :retry-num :fork-of :exception-summaries :invoke-args :stats
-                                       :feedback :metadata])]
-                                    root-pstate
-                                    {:pkey agent-task-id})
+          ;; Fetch summary info - always needed
+          summary-info-raw (foreign-select-one
+                            [(keypath agent-id)
+                             (submap
+                              [:result :start-time-millis :finish-time-millis :graph-version
+                               :retry-num :fork-of :exception-summaries :invoke-args :stats
+                               :feedback :metadata])]
+                            root-pstate
+                            {:pkey agent-task-id})
 
           ;; Add aggregated stats to the stats object
-          summary-info             (merge
-                                    {:forks (foreign-select-one
-                                             [(keypath agent-id) :forks
-                                              (sorted-set-range-to-end 100)]
+          summary-info (merge
+                        {:forks (foreign-select-one
+                                 [(keypath agent-id) :forks
+                                  (sorted-set-range-to-end 100)]
+                                 root-pstate
+                                 {:pkey agent-task-id})}
+                        (->> summary-info-raw
+                             (transform
+                              [:feedback :results ALL :source :source]
+                              aor-types/source-string)
+                             (transform [:feedback :actions MAP-KEYS] name))
+                        (when-let [stats (:stats summary-info-raw)]
+                          {:stats (merge {:aggregated-stats
+                                          (stats/aggregated-basic-stats stats)}
+                                         stats)}))
+
+          ;; Always fetch root invoke ID
+          root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                              root-pstate
-                                             {:pkey agent-task-id})}
-                                    (->> summary-info-raw
-                                         (transform
-                                          [:feedback :results ALL :source :source]
-                                          aor-types/source-string)
-                                         (transform [:feedback :actions MAP-KEYS] name))
-                                    (when-let [stats (:stats summary-info-raw)]
-                                      {:stats (merge {:aggregated-stats
-                                                      (stats/aggregated-basic-stats stats)}
-                                                     stats)}))
+                                             {:pkey agent-task-id})
 
-          root-invoke-id           (when is-initial-load?
-                                     (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                                         root-pstate
-                                                         {:pkey agent-task-id}))
+          ;; Always fetch historical graph (static topology)
+          historical-graph (when-let [graph-version (:graph-version summary-info)]
+                             (foreign-select-one [:history (keypath graph-version)]
+                                                 stream-shared-pstate
+                                                 {:pkey 0}))
 
-          historical-graph         (when is-initial-load?
-                                     (when-let [graph-version (:graph-version summary-info)]
-                                       (foreign-select-one [:history (keypath graph-version)]
-                                                           stream-shared-pstate
-                                                           {:pkey 0})))
+          ;; SIMPLIFIED: Always query from root with reasonable page limit
+          dynamic-trace (foreign-invoke-query tracing-query
+                                              agent-task-id
+                                              [[agent-task-id root-invoke-id]]
+                                              500)
 
-          start-pairs              (if is-initial-load?
-                                     [[agent-task-id root-invoke-id]]
-                                     leaves)
+          cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
+                          (->> m
+                               common/remove-implicit-nodes
+                               (transform
+                                [MAP-VALS :feedback :results ALL :source :source]
+                                aor-types/source-string)
+                               (transform
+                                [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
+                                name)
+                               (transform
+                                [MAP-VALS :feedback :actions MAP-KEYS]
+                                name)))
 
-          page-limit               (if is-initial-load? 1000 100)
+          ;; Determine completion from the summary data
+          agent-is-complete? (boolean (or (:finish-time-millis summary-info)
+                                          (:result summary-info)))]
 
-          dynamic-trace            (when (seq start-pairs)
-                                     (foreign-invoke-query tracing-query
-                                                           agent-task-id
-                                                           start-pairs
-                                                           page-limit))
-
-          cleaned-nodes            (when-let [m (:invokes-map dynamic-trace)]
-                                     (->> m
-                                          common/remove-implicit-nodes
-                                          (transform
-                                           [MAP-VALS :feedback :results ALL :source :source]
-                                           aor-types/source-string)
-                                          (transform
-                                           [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
-                                           name)
-                                          (transform
-                                           [MAP-VALS :feedback :actions MAP-KEYS]
-                                           name)))
-
-          next-leaves              (:next-task-invoke-pairs dynamic-trace)
-
-          ;; Determine completion from the summary data we already fetched
-          ;; to avoid race condition between two separate queries
-          agent-is-complete?       (boolean (or (:finish-time-millis summary-info)
-                                                (:result summary-info)))]
-
-      (cond-> {:is-complete agent-is-complete?}
-        (seq cleaned-nodes) (assoc :nodes cleaned-nodes)
-        (seq next-leaves) (assoc :next-leaves next-leaves)
-        true (assoc :summary
-              summary-info :task-id
-              agent-task-id :agent-id
-              agent-id)
-        is-initial-load? (assoc :root-invoke-id
-                          root-invoke-id :historical-graph
-                          historical-graph)))))
+      ;; Simplified response - always return same structure
+      {:is-complete agent-is-complete?
+       :nodes cleaned-nodes
+       :summary summary-info
+       :task-id agent-task-id
+       :agent-id agent-id
+       :root-invoke-id root-invoke-id
+       :historical-graph historical-graph})))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/execute-fork
   [{:keys [client invoke-pair changed-nodes]} uid]

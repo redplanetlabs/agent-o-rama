@@ -14,7 +14,7 @@
 
         invocation-state (state/use-sub [:invocations-data invoke-id])
 
-        {:keys [status graph summary next-leaves is-complete implicit-edges
+        {:keys [status graph summary is-complete implicit-edges
                 root-invoke-id task-id forks fork-of error]}
         (or invocation-state {:status :loading})
 

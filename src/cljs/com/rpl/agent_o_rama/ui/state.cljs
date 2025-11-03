@@ -182,28 +182,6 @@
     value))
 
 ;; =============================================================================
-;; SELECTORS
-;; =============================================================================
-
-(defn get-unfinished-leaves
-  "Find all unfinished leaf nodes for a given invoke-id.
-   Returns a vector of unique [task-id node-id] pairs that can be used for pagination."
-  [db invoke-id]
-  (let [nodes-map (s/select-one [:invocations-data invoke-id :graph :nodes] db)]
-    (->> (s/select [s/ALL ;; Use ALL to get [key value] pairs
-                    (s/selected? s/LAST ;; Check the value (node-data)
-                                 (s/must :node-task-id)
-                                 (s/pred #(not (:finish-time-millis %))))
-                    (s/view (fn [[node-id node-data]] ;; Destructure [key value]
-                              [(:node-task-id node-data)
-                               (or (:invoke-id node-data) ;; Use invoke-id from data
-                                   node-id)]))] ;; Or the map key as fallback
-                   (or nodes-map {}))
-         ;; Remove duplicates
-         distinct
-         vec)))
-
-;; =============================================================================
 ;; CORE EVENT HANDLERS
 ;; =============================================================================
 

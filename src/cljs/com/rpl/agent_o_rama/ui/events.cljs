@@ -97,9 +97,7 @@
                    (state/dispatch [:invocation/fetch-graph-page
                                     {:invoke-id invoke-id
                                      :module-id module-id
-                                     :agent-name agent-name
-                                     :leaves []
-                                     :initial? true}])
+                                     :agent-name agent-name}])
                    nil))
 
 ;; =============================================================================
@@ -108,14 +106,12 @@
 
 ;; Kick off or continue fetching a page of graph data
 (state/reg-event :invocation/fetch-graph-page
-                 (fn [db {:keys [invoke-id module-id agent-name leaves initial?]}]
+                 (fn [db {:keys [invoke-id module-id agent-name]}]
                    (sente/request!
                     [:invocations/get-graph-page
                      {:invoke-id invoke-id
                       :module-id module-id
-                      :agent-name agent-name
-                      :leaves (or leaves [])
-                      :initial? (boolean initial?)}]
+                      :agent-name agent-name}]
                     10000
                     (fn [reply]
                       (if (:success reply)
@@ -131,7 +127,7 @@
 
 (state/reg-event :invocation/process-graph-page
                  (fn [db invoke-id page-data]
-                   (let [{:keys [nodes next-leaves summary historical-graph root-invoke-id
+                   (let [{:keys [nodes summary historical-graph root-invoke-id
                                  task-id is-complete]} page-data
                          current-invocation (get-in db [:current-invocation])]
 
@@ -158,52 +154,14 @@
                      (when (and nodes (seq nodes))
                        (state/dispatch [:invocation/merge-nodes invoke-id nodes root-invoke-id]))
 
-                     ;; Now, decide on the next action based on the server response.
-                     ;; Define a more robust completion condition.
-                     ;; An agent is only *truly* finished from the UI's perspective
-                     ;; when the backend says it's complete AND the final result
-                     ;; is present in the summary.
-                     (let [summary-has-result? (some? (:result summary))
-                           is-truly-complete? (and is-complete summary-has-result?)]
-
-                       (cond
-                         ;; If the agent is truly complete, stop.
-                         is-truly-complete?
-                         (do
-                           ;; Make sure to set the final is-complete flag to true in the DB
-                           ;; in case the initial `is-complete` was a false positive.
-                           (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] true])
-                           (println "[POLLING-STATEFUL] Loop ended (truly complete).")
-                           nil)
-
-                         ;; If there are immediate next leaves, fast-poll.
-                         (seq next-leaves)
-                         (do
-                           (println "[POLLING-STATEFUL] Fast pagination: continuing...")
-                           (state/dispatch [:invocation/fetch-graph-page
-                                            (assoc current-invocation :leaves (vec next-leaves) :initial? false)]))
-
-                         ;; Otherwise (including the race condition case), schedule a slow poll.
-                         :else
-                         (do
-                           (println "[POLLING-STATEFUL] Scheduling delayed re-poll (race condition or idle).")
-                           (js/setTimeout
-                            (fn []
-                              (let [current-db @state/app-db
-                                    ;; Check the robust completion flag again before re-polling
-                                    is-still-incomplete? (not (and (get-in current-db [:invocations-data invoke-id :is-complete])
-                                                                   (get-in current-db [:invocations-data invoke-id :summary :result])))
-                                    current-leaves (state/get-unfinished-leaves current-db invoke-id)]
-
-                                (if-not is-still-incomplete?
-                                  (println "[POLLING-STATEFUL] Delayed re-poll cancelled (agent completed).")
-                                  (do
-                                    (state/dispatch [:db/update-value [:invocations-data invoke-id :idle-polls] (fnil inc 0)])
-                                    (println "[POLLING-STATEFUL] Delayed re-poll executing.")
-                                    (state/dispatch [:invocation/fetch-graph-page
-                                                     (assoc current-invocation :leaves current-leaves :initial? false)])))))
-                            ;; Use a slightly shorter poll interval to resolve the race condition quickly.
-                            500))))
+                     ;; SIMPLIFIED POLLING: If not complete, schedule a simple poll
+                     (when-not is-complete
+                       (js/setTimeout
+                        (fn []
+                          (when-not (get-in @state/app-db [:invocations-data invoke-id :is-complete])
+                            (println "[POLLING-SIMPLIFIED] Polling for updates...")
+                            (state/dispatch [:invocation/fetch-graph-page current-invocation])))
+                        1000))
 
                      nil)))
 
