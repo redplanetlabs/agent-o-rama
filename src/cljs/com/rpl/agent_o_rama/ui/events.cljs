@@ -18,20 +18,20 @@
   [raw-nodes root-invoke-id historical-graph]
   (if (or (empty? raw-nodes) (not (get raw-nodes root-invoke-id)))
     ;; We can't start drawing until the root node is available.
-    {:nodes {} :real-edges [] :implicit-edges []}
-    (loop [to-visit #{root-invoke-id} ; A queue of nodes to process
-           drawable-nodes {} ; The final map of nodes to render
-           real-edges [] ; The final list of real edges
-           implicit-edges [] ; The final list of implicit edges
+    {:nodes {} :edges [] :implicit-edges []}
+    (loop [to-visit #{root-invoke-id}
+           drawable-nodes {}
+           real-edges []
+           implicit-edges []
            visited #{}]
       (if (empty? to-visit)
-        ;; The traversal is complete.
+        ;; Traversal complete
         {:nodes drawable-nodes :edges real-edges :implicit-edges implicit-edges}
         (let [current-id (first to-visit)
               remaining-to-visit (disj to-visit current-id)]
 
           (if (visited current-id)
-            ;; If we've already processed this node, skip it.
+            ;; Already processed, skip
             (recur remaining-to-visit drawable-nodes real-edges implicit-edges visited)
 
             (let [node-data (get raw-nodes current-id)
@@ -41,42 +41,48 @@
                   ;; 1. FIND REAL EDGES & CHILDREN
                   emitted-ids (set (map :invoke-id (:emits node-data)))
                   drawable-children (filter #(contains? raw-nodes %) emitted-ids)
-                  new-real-edges (map (fn [child-id]
-                                        {:id (str "real-" current-id "-" child-id)
-                                         :source (str current-id)
-                                         :target (str child-id)})
-                                      drawable-children)
+                  new-real-edges (for [child-id drawable-children]
+                                   {:id (str "real-" current-id "-" child-id)
+                                    :source (str current-id)
+                                    :target (str child-id)})
 
-                  ;; 2. FIND IMPLICIT EDGES
+                  ;; 2. FIND IMPLICIT EDGES (for aggregation contexts)
+                  ;; Only create implicit edges if node is an agg-start-node (no node-task-id)
+                  ;; and has an agg-context relationship
                   agg-context (:agg-context static-info)
-                  potential-outputs (:output-nodes static-info)
-                  extra-visits-vol (volatile! #{})
-                  new-implicit-edges (when (and agg-context
-                                                (not (contains? node-data :node-task-id)))
-                                       (->> potential-outputs
-                                            (filter #(= :agg-node (get-in historical-graph [:node-map % :node-type])))
-                                            (mapcat (fn [out-agg-node-name]
-                                                      (let [agg-node-invoke-id (:agg-invoke-id node-data)]
-                                                        ;; Check if a real emit to this agg node already exists
-                                                        (when (and agg-node-invoke-id
-                                                                   (not (contains? emitted-ids agg-node-invoke-id))
-                                                                   (contains? raw-nodes agg-node-invoke-id))
+                  is-agg-start? (and agg-context (not (:node-task-id node-data)))
 
-                                                          (when (not (contains? visited agg-node-invoke-id))
-                                                            (vswap! extra-visits-vol conj agg-node-invoke-id))
+                  ;; SIMPLIFIED: Collect implicit edges and nodes to visit together
+                  {implicit-targets :targets
+                   implicit-edge-list :edges}
+                  (if-not is-agg-start?
+                    {:targets [] :edges []}
+                    (let [potential-outputs (:output-nodes static-info)
+                          agg-node-invoke-id (:agg-invoke-id node-data)]
+                      (reduce
+                       (fn [acc out-node-name]
+                         (let [is-agg-node? (= :agg-node (get-in historical-graph [:node-map out-node-name :node-type]))]
+                           (if (and is-agg-node?
+                                    agg-node-invoke-id
+                                    (contains? raw-nodes agg-node-invoke-id)
+                                    ;; FIX: Always create implicit edge for agg-start nodes
+                                    ;; Don't condition on absence of explicit emits (incomplete data)
+                                    (not (contains? visited agg-node-invoke-id)))
+                             {:targets (conj (:targets acc) agg-node-invoke-id)
+                              :edges (conj (:edges acc)
+                                           {:id (str "implicit-" current-id "-" agg-node-invoke-id)
+                                            :source (str current-id)
+                                            :target (str agg-node-invoke-id)
+                                            :implicit? true})}
+                             acc)))
+                       {:targets [] :edges []}
+                       (or potential-outputs []))))]
 
-                                                          [{:id (str "implicit-" current-id "-" agg-node-invoke-id)
-                                                            :source (str current-id)
-                                                            :target (str agg-node-invoke-id)
-                                                            :implicit? true}]))))
-                                            (filter some?)
-                                            (vec)))]
-
-              ;; 3. RECURSE
-              (recur (into remaining-to-visit (concat drawable-children @extra-visits-vol))
+              ;; 3. RECURSE with both real and implicit edges
+              (recur (into remaining-to-visit (concat drawable-children implicit-targets))
                      (assoc drawable-nodes current-id node-data)
                      (into real-edges new-real-edges)
-                     (into implicit-edges (or new-implicit-edges []))
+                     (into implicit-edges implicit-edge-list)
                      (conj visited current-id)))))))))
 
 ;; =============================================================================
