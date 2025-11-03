@@ -137,10 +137,9 @@
                                  task-id is-complete]} page-data
                          current-invocation (get-in db [:current-invocation])]
 
-                     ;; Always update the summary and completion status first.
+                     ;; Update summary data
                      (when summary
                        (let [{:keys [forks fork-of]} summary
-                             ;; Build key-value pairs conditionally
                              kvps (cond-> [[[:invocations-data invoke-id :summary] summary]
                                            [[:invocations-data invoke-id :task-id] task-id]
                                            [[:invocations-data invoke-id :forks] forks]
@@ -153,12 +152,18 @@
                                     (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
                          (state/dispatch (into [:db/set-values] kvps))))
 
-                     (when (contains? page-data :is-complete)
-                       (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
-
-                     ;; Then merge the new nodes into the existing graph.
+                     ;; ATOMIC UPDATE: Merge nodes AND set is-complete in single dispatch
+                     ;; This prevents React from rendering between updates
                      (when (and nodes (seq nodes))
-                       (state/dispatch [:invocation/merge-nodes invoke-id nodes root-invoke-id]))
+                       (state/dispatch [:invocation/merge-nodes-and-complete
+                                        invoke-id
+                                        nodes
+                                        root-invoke-id
+                                        is-complete]))
+
+                     ;; If no nodes but we have is-complete, update it
+                     (when (and (not (seq nodes)) (contains? page-data :is-complete))
+                       (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
 
                      ;; SIMPLIFIED POLLING: If not complete, schedule a simple poll
                      (when-not is-complete
@@ -189,6 +194,26 @@
                        [:graph :nodes (s/terminal-val nodes)]
                        [:graph :edges (s/terminal-val edges)]
                        [:implicit-edges (s/terminal-val implicit-edges)])])))
+
+(state/reg-event :invocation/merge-nodes-and-complete
+                 (fn [db invoke-id new-nodes-map root-invoke-id-from-payload is-complete]
+                   (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
+                         current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
+                         merged-raw-nodes (merge current-raw-nodes new-nodes-map)
+                         root-invoke-id (or root-invoke-id-from-payload
+                                            (get-in db [:invocations-data invoke-id :root-invoke-id]))
+
+                         {:keys [nodes edges implicit-edges]}
+                         (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
+
+                     ;; ATOMIC: Update both graph nodes AND is-complete in single transformation
+                     [:invocations-data invoke-id
+                      (s/multi-path
+                       [:graph :raw-nodes (s/terminal-val merged-raw-nodes)]
+                       [:graph :nodes (s/terminal-val nodes)]
+                       [:graph :edges (s/terminal-val edges)]
+                       [:implicit-edges (s/terminal-val implicit-edges)]
+                       [:is-complete (s/terminal-val is-complete)])])))
 
 (state/reg-event :invocation/cleanup
                  (fn [db {:keys [invoke-id]}]
