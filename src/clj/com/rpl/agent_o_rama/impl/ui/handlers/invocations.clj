@@ -25,21 +25,40 @@
     {:task-id (.getTaskId inv)
      :invoke-id (.getAgentInvokeId inv)}))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph-page
-  [{:keys [client invoke-pair leaves initial?]} _uid] ; Renamed uid to _uid as
-  ; it's unused
+;; Old get-graph-page handler removed - replaced with simplified get-graph handler
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/execute-fork
+  [{:keys [client invoke-pair changed-nodes]} uid]
+  (let [[task-id agent-invoke-id] invoke-pair
+        json-parsed-nodes (transform [MAP-VALS] #(j/read-value %) changed-nodes)
+        rehydrated-nodes (common/from-ui-serializable json-parsed-nodes)
+        ^AgentInvoke result (aor/agent-initiate-fork
+                             client
+                             (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
+                             rehydrated-nodes)]
+    {:agent-invoke-id (:agentInvokeId (bean result))
+     :task-id (:taskId (bean result))}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/provide-human-input
+  [{:keys [client request response]} uid]
+  (let [{:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
+        req (aor-types/->NodeHumanInputRequest agent-task-id agent-id node node-task-id invoke-id prompt uuid)]
+    (aor/provide-human-input client req response)
+    {:ok true}))
+
+;; Simplified: Always fetch from root, no leaves/horizon tracking
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph
+  [{:keys [client invoke-pair]} _uid]
   (when client
-    (let [;; Correctly get all underlying objects from the agent-specific client
+    (let [;; Get all underlying objects from the agent-specific client
           client-objects           (aor-types/underlying-objects client)
           tracing-query            (:tracing-query client-objects)
-          root-pstate              (:root-pstate client-objects) ; <-- FIX: Use client-objects
-          stream-shared-pstate     (:stream-shared-pstate client-objects) ; <-- FIX: Use
-                                                                          ; client-objects
+          root-pstate              (:root-pstate client-objects)
+          stream-shared-pstate     (:stream-shared-pstate client-objects)
 
           [agent-task-id agent-id] invoke-pair
-          is-initial-load?         (boolean initial?)
 
-          ;; This query is now safe because root-pstate is correctly sourced
+          ;; Fetch summary info
           summary-info-raw         (foreign-select-one
                                     [(keypath agent-id)
                                      (submap
@@ -66,28 +85,22 @@
                                                       (stats/aggregated-basic-stats stats)}
                                                      stats)}))
 
-          root-invoke-id           (when is-initial-load?
-                                     (foreign-select-one [(keypath agent-id) :root-invoke-id]
-                                                         root-pstate
-                                                         {:pkey agent-task-id}))
+          ;; Always fetch root and historical graph
+          root-invoke-id           (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                                       root-pstate
+                                                       {:pkey agent-task-id})
 
-          historical-graph         (when is-initial-load?
-                                     (when-let [graph-version (:graph-version summary-info)]
-                                       (foreign-select-one [:history (keypath graph-version)]
-                                                           stream-shared-pstate
-                                                           {:pkey 0})))
+          historical-graph         (when-let [graph-version (:graph-version summary-info)]
+                                     (foreign-select-one [:history (keypath graph-version)]
+                                                         stream-shared-pstate
+                                                         {:pkey 0}))
 
-          start-pairs              (if is-initial-load?
-                                     [[agent-task-id root-invoke-id]]
-                                     leaves)
-
-          page-limit               (if is-initial-load? 1000 100)
-
-          dynamic-trace            (when (seq start-pairs)
+          ;; Always query from root with fixed reasonable limit
+          dynamic-trace            (when root-invoke-id
                                      (foreign-invoke-query tracing-query
                                                            agent-task-id
-                                                           start-pairs
-                                                           page-limit))
+                                                           [[agent-task-id root-invoke-id]]
+                                                           500))
 
           cleaned-nodes            (when-let [m (:invokes-map dynamic-trace)]
                                      (->> m
@@ -102,49 +115,18 @@
                                            [MAP-VALS :feedback :actions MAP-KEYS]
                                            name)))
 
-          next-leaves              (:next-task-invoke-pairs dynamic-trace)
-
-          ;; Determine completion from the summary data we already fetched
-          ;; to avoid race condition between two separate queries
+          ;; Determine completion from the summary data
           agent-is-complete?       (boolean (or (:finish-time-millis summary-info)
                                                 (:result summary-info)))]
 
-      (cond-> {:is-complete agent-is-complete?}
-        (seq cleaned-nodes) (assoc :nodes cleaned-nodes)
-        (seq next-leaves) (assoc :next-leaves next-leaves)
-        true (assoc :summary
-              summary-info :task-id
-              agent-task-id :agent-id
-              agent-id)
-        is-initial-load? (assoc :root-invoke-id
-                          root-invoke-id :historical-graph
-                          historical-graph)))))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/execute-fork
-  [{:keys [client invoke-pair changed-nodes]} uid]
-  (let [[task-id agent-invoke-id] invoke-pair
-        json-parsed-nodes (transform [MAP-VALS] #(j/read-value %) changed-nodes)
-        rehydrated-nodes (common/from-ui-serializable json-parsed-nodes)
-        ^AgentInvoke result (aor/agent-initiate-fork
-                             client
-                             (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
-                             rehydrated-nodes)]
-    {:agent-invoke-id (:agentInvokeId (bean result))
-     :task-id (:taskId (bean result))}))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/provide-human-input
-  [{:keys [client request response]} uid]
-  (let [{:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
-        req (aor-types/->NodeHumanInputRequest agent-task-id agent-id node node-task-id invoke-id prompt uuid)]
-    (aor/provide-human-input client req response)
-    {:ok true}))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph
-  [{:keys [client]} uid]
-  (when client
-    {:graph (foreign-invoke-query
-             (:current-graph-query
-              (aor-types/underlying-objects client)))}))
+      ;; Simple response structure - no next-leaves, no conditionals
+      {:is-complete agent-is-complete?
+       :nodes cleaned-nodes
+       :summary summary-info
+       :task-id agent-task-id
+       :agent-id agent-id
+       :root-invoke-id root-invoke-id
+       :historical-graph historical-graph})))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/set-metadata
   [{:keys [client invoke-id key value-str]} uid]
