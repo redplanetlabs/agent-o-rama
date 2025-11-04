@@ -78,7 +78,7 @@
           dynamic-trace (foreign-invoke-query tracing-query
                                               agent-task-id
                                               [[agent-task-id root-invoke-id]]
-                                              500)
+                                              10000)
 
           cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
                           (->> m
