@@ -63,10 +63,10 @@
   (cond-> {}
     (not= granularity :minute)
     (assoc :granularity granularity)
-    
+
     (not= time-offset 0)
     (assoc :timeOffset time-offset)
-    
+
     (some? metadata-key)
     (assoc :metadataKey metadata-key)))
 
@@ -498,9 +498,7 @@
                                  {:key (:id g)
                                   :label (:label g)
                                   :selected? (= (:id g) granularity)
-                                  :on-select #(do
-                                                (set-granularity (:id g))
-                                                (set-time-offset 0))})
+                                  :on-select #(set-granularity (:id g) 0 metadata-key)})
                                granularities)]
 
     ($ :div.bg-white.p-4.rounded-lg.shadow-sm.border.border-gray-200.mb-6
@@ -689,49 +687,38 @@
         time-offset (or (:timeOffset coerced-params) 0)
         metadata-key (:metadataKey coerced-params)
 
-        ;; Use refs to avoid stale closures when callbacks are recreated
-        granularity-ref (uix/use-ref granularity)
-        time-offset-ref (uix/use-ref time-offset)
-        metadata-key-ref (uix/use-ref metadata-key)
-
-        _ (do
-            (set! (.-current granularity-ref) granularity)
-            (set! (.-current time-offset-ref) time-offset)
-            (set! (.-current metadata-key-ref) metadata-key))
-
-        ;; Setters that update URL only - state flows back through query params
+        ;; Setters that update URL - accept optional overrides for when multiple values change at once
         set-granularity (uix/use-callback
-                         (fn [new-granularity]
-                           (let [current-granularity (.-current granularity-ref)
-                                 current-time-offset (.-current time-offset-ref)
-                                 current-metadata-key (.-current metadata-key-ref)
-                                 final-value (if (fn? new-granularity)
-                                               (new-granularity current-granularity)
-                                               new-granularity)]
-                             (update-analytics-url module-id agent-name final-value current-time-offset current-metadata-key)))
-                         [module-id agent-name])
+                         (fn
+                           ([new-granularity] (set-granularity new-granularity nil nil))
+                           ([new-granularity override-time-offset override-metadata-key]
+                            (let [final-granularity (if (fn? new-granularity)
+                                                      (new-granularity granularity)
+                                                      new-granularity)
+                                  final-time-offset (if (some? override-time-offset)
+                                                      override-time-offset
+                                                      time-offset)
+                                  final-metadata-key (if (some? override-metadata-key)
+                                                       override-metadata-key
+                                                       metadata-key)]
+                              (update-analytics-url module-id agent-name final-granularity final-time-offset final-metadata-key))))
+                         [module-id agent-name granularity time-offset metadata-key])
 
         set-time-offset (uix/use-callback
                          (fn [new-offset]
-                           (let [current-granularity (.-current granularity-ref)
-                                 current-time-offset (.-current time-offset-ref)
-                                 current-metadata-key (.-current metadata-key-ref)
-                                 final-value (if (fn? new-offset)
-                                               (new-offset current-time-offset)
+                           (let [final-value (if (fn? new-offset)
+                                               (new-offset time-offset)
                                                new-offset)]
-                             (update-analytics-url module-id agent-name current-granularity final-value current-metadata-key)))
-                         [module-id agent-name])
+                             (update-analytics-url module-id agent-name granularity final-value metadata-key)))
+                         [module-id agent-name granularity time-offset metadata-key])
 
         set-metadata-key (uix/use-callback
                           (fn [new-key]
-                            (let [current-granularity (.-current granularity-ref)
-                                  current-time-offset (.-current time-offset-ref)
-                                  current-metadata-key (.-current metadata-key-ref)
-                                  final-value (if (fn? new-key)
-                                                (new-key current-metadata-key)
+                            (let [final-value (if (fn? new-key)
+                                                (new-key metadata-key)
                                                 new-key)]
-                              (update-analytics-url module-id agent-name current-granularity current-time-offset final-value)))
-                          [module-id agent-name])
+                              (update-analytics-url module-id agent-name granularity time-offset final-value)))
+                          [module-id agent-name granularity time-offset metadata-key])
 
         ;; Get granularity config and calculate time window
         granularity-config (first (filter #(= (:id %) granularity) granularities))
