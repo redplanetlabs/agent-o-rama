@@ -40,7 +40,8 @@
    [dev.langchain4j.service
     Result]
    [dev.langchain4j.service.tool
-    ToolExecution]
+    ToolExecution
+    ToolExecutionResult]
    [dev.langchain4j.store.embedding
     EmbeddingMatch
     EmbeddingSearchResult]
@@ -479,9 +480,9 @@
 (defmethod json-thaw* (.getName ToolExecution)
   [m]
   (-> (ToolExecution/builder)
-      (.request (maybe-json-thaw* (get m "request")))
-      (.result (get m "result"))
-      .build))
+      (.request ^ToolExecutionRequest (maybe-json-thaw* (get m "request")))
+      (.result ^ToolExecutionResult (get m "result"))
+      (.build)))
 
 (extend-protocol JSONFreeze
   ContainsString
