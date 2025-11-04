@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.chart :as chart]
+   [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [clojure.set :as set]
    ["use-debounce" :refer [useDebounce]]
@@ -54,6 +55,27 @@
                                          #js {:month "short"
                                               :day "numeric"
                                               :year "numeric"}))}])
+
+;; Query parameter helpers for analytics page
+(defn- build-query-params [granularity time-offset metadata-key]
+  "Build query params map from analytics state.
+   Omits default values to keep URLs clean. Reitit coercion handles encoding."
+  (cond-> {}
+    (not= granularity :minute)
+    (assoc :granularity granularity)
+    
+    (not= time-offset 0)
+    (assoc :timeOffset time-offset)
+    
+    (some? metadata-key)
+    (assoc :metadataKey metadata-key)))
+
+(defn- update-analytics-url [module-id agent-name granularity time-offset metadata-key]
+  "Update the URL with current analytics parameters using replace-state.
+   Reitit coercion automatically encodes keyword/int values to strings."
+  (rfe/replace-state :agent/analytics
+                     {:module-id module-id :agent-name agent-name}
+                     (build-query-params granularity time-offset metadata-key)))
 
 ;; Chart configurations for all static analytics charts
 (def chart-configs
@@ -658,12 +680,58 @@
 
 (defui analytics-page []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+        ;; Get coerced parameters from Reitit - these are already typed correctly
+        coerced-params (state/use-sub [:route :parameters :query])
         decoded-agent-name (common/url-decode agent-name)
 
-        ;; Global control state
-        [granularity set-granularity] (uix/use-state :minute)
-        [time-offset set-time-offset] (uix/use-state 0) ;; 0 = live, negative = back in time
-        [metadata-key set-metadata-key] (uix/use-state nil)
+        ;; Use coerced values with defaults - Reitit handles type conversion for us
+        granularity (or (:granularity coerced-params) :minute)
+        time-offset (or (:timeOffset coerced-params) 0)
+        metadata-key (:metadataKey coerced-params)
+
+        ;; Use refs to avoid stale closures when callbacks are recreated
+        granularity-ref (uix/use-ref granularity)
+        time-offset-ref (uix/use-ref time-offset)
+        metadata-key-ref (uix/use-ref metadata-key)
+
+        _ (do
+            (set! (.-current granularity-ref) granularity)
+            (set! (.-current time-offset-ref) time-offset)
+            (set! (.-current metadata-key-ref) metadata-key))
+
+        ;; Setters that update URL only - state flows back through query params
+        set-granularity (uix/use-callback
+                         (fn [new-granularity]
+                           (let [current-granularity (.-current granularity-ref)
+                                 current-time-offset (.-current time-offset-ref)
+                                 current-metadata-key (.-current metadata-key-ref)
+                                 final-value (if (fn? new-granularity)
+                                               (new-granularity current-granularity)
+                                               new-granularity)]
+                             (update-analytics-url module-id agent-name final-value current-time-offset current-metadata-key)))
+                         [module-id agent-name])
+
+        set-time-offset (uix/use-callback
+                         (fn [new-offset]
+                           (let [current-granularity (.-current granularity-ref)
+                                 current-time-offset (.-current time-offset-ref)
+                                 current-metadata-key (.-current metadata-key-ref)
+                                 final-value (if (fn? new-offset)
+                                               (new-offset current-time-offset)
+                                               new-offset)]
+                             (update-analytics-url module-id agent-name current-granularity final-value current-metadata-key)))
+                         [module-id agent-name])
+
+        set-metadata-key (uix/use-callback
+                          (fn [new-key]
+                            (let [current-granularity (.-current granularity-ref)
+                                  current-time-offset (.-current time-offset-ref)
+                                  current-metadata-key (.-current metadata-key-ref)
+                                  final-value (if (fn? new-key)
+                                                (new-key current-metadata-key)
+                                                new-key)]
+                              (update-analytics-url module-id agent-name current-granularity current-time-offset final-value)))
+                          [module-id agent-name])
 
         ;; Get granularity config and calculate time window
         granularity-config (first (filter #(= (:id %) granularity) granularities))

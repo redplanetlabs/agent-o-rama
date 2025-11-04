@@ -58,7 +58,12 @@
       ["/invocations"
        ["" {:name :agent/invocations, :views [agents/invocations]}]
        ["/:invoke-id" {:name :agent/invocation-detail, :views [agents/invoke]}]]
-      ["/analytics" {:name :agent/analytics, :views [analytics/analytics-page]}]
+      ["/analytics" {:name :agent/analytics
+                     :views [analytics/analytics-page]
+                     :parameters {:query [:map
+                                          [:granularity {:optional true} :keyword]
+                                          [:timeOffset {:optional true} :int]
+                                          [:metadataKey {:optional true} :string]]}}]
       ["/rules"
        ["" {:name :agent/rules, :views [rules/rules-page]}]
        ["/:rule-name/action-log" {:name :agent/action-log, :views [action-log/action-log-page]}]]
@@ -178,8 +183,7 @@
           ($ Cog6ToothIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Global Config")))
 
-
-       ;; Module-specific agents list
+;; Module-specific agents list
        (cond
          ;; Show loading state
          loading?

@@ -75,6 +75,7 @@
                                ;; - The agg node exists and is complete (has :node field)
                                ;; - We haven't visited it yet
                                ;; - There's no explicit emit to it already
+
                                (if (and is-agg-node?
                                         agg-node-invoke-id
                                         agg-node-data
