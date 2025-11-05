@@ -21,6 +21,12 @@ This namespace provides Clojure-friendly functions for building JSON schemas use
    [java.util
     List]))
 
+(def ^:private unsupported-schema-features
+  "JSON schema features not yet supported by the from-json-string parser."
+  [:minimum :maximum :minLength :maxLength
+   :pattern :format :allOf :oneOf
+   :not :const :default])
+
 (defn any-of
   "Creates a JSON schema that accepts any of the provided schema types.\n
 \n
@@ -281,15 +287,12 @@ Example:\n
 (defn- check-unsupported-features!
   "Throws exception if schema contains unsupported features."
   [schema path]
-  (let [unsupported-keys [:minimum :maximum :minLength :maxLength
-                          :pattern :format :allOf :oneOf
-                          :not :const :default]]
-    (doseq [k unsupported-keys]
-      (when (contains? schema k)
-        (throw (ex-info (str "Unsupported JSON schema feature: " (name k) " at " path)
-                        {:feature k
-                         :path path
-                         :schema schema}))))))
+  (doseq [k unsupported-schema-features]
+    (when (contains? schema k)
+      (throw (ex-info (str "Unsupported JSON schema feature: " (name k) " at " path)
+                      {:feature k
+                       :path path
+                       :schema schema})))))
 
 (defn- extend-path
   "Extends a schema path with a key or index segment.
