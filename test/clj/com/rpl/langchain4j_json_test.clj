@@ -15,7 +15,12 @@
     JsonStringSchema]))
 
 (deftest from-json-string-test
-  ;; Test parsing simple object schemas with primitive types
+  ;; Tests that from-json-string correctly parses JSON Schema strings into
+  ;; JsonObjectSchema instances, supporting all schema features used in the
+  ;; codebase: object types with properties/required/additionalProperties,
+  ;; primitive types (string/integer/number/boolean), nested objects, arrays,
+  ;; enums, $ref references, and anyOf. Also verifies error handling for
+  ;; invalid JSON and unsupported schema features.
   (testing "from-json-string"
     (testing "parses simple object with string property"
       (let [^JsonObjectSchema schema (lj/from-json-string
