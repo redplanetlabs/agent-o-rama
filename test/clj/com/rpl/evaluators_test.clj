@@ -33,6 +33,11 @@
    [dev.langchain4j.model.chat.response
     ChatResponse$Builder]))
 
+(defn schema->json-string
+  "Convert a JsonSchema to its JSON string representation."
+  [schema]
+  (.toString schema))
+
 (defrecord MockChatModel []
   ChatModel
   (doChat [this request]
@@ -43,11 +48,11 @@
           (.aiMessage (AiMessage. (j/write-value-as-string
                                    {"temperature"  (.temperature request)
                                     "message"      (.singleText m)
-                                    "outputSchema" (-> request
-                                                       .responseFormat
-                                                       .jsonSchema
-                                                       .rootElement
-                                                       .toString)
+                                    "outputSchema" (schema->json-string
+                                                    (-> request
+                                                        .responseFormat
+                                                        .jsonSchema
+                                                        .rootElement))
                                    })))
           .build))))
 
@@ -366,7 +371,7 @@
                                   "EF")]
        (is (= {"message" "1 AB 2 CD 3 EF 4 AB" "temperature" 1.2}
               (select-keys result ["message" "temperature"])))
-       (let [expected-schema-str (.toString (lj/from-json-string os))]
+       (let [expected-schema-str (schema->json-string (lj/from-json-string os))]
         (is (= expected-schema-str (get result "outputSchema")))))
 
      (try
