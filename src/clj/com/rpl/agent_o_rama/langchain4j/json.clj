@@ -291,6 +291,13 @@ Example:\n
                          :path path
                          :schema schema}))))))
 
+(defn- extend-path
+  "Extends a schema path with a key or index segment.
+
+  Converts keyword keys to strings."
+  [path segment]
+  (str path "/" (if (keyword? segment) (name segment) segment)))
+
 (defn- parse-schema
   "Recursively converts a JSON schema map to a JsonSchema object.
 
@@ -321,7 +328,7 @@ Example:\n
       any-of-schemas
       (let [parsed-schemas (vec (map-indexed
                                   (fn [idx schema]
-                                    (parse-schema schema (str path "/anyOf[" idx "]")))
+                                    (parse-schema schema (extend-path path (str "anyOf[" idx "]"))))
                                   any-of-schemas))]
         (any-of description parsed-schemas))
 
@@ -341,9 +348,8 @@ Example:\n
          opts
          (into {}
                (map (fn [[k v]]
-                      ;; Convert keyword keys to strings for Java API
-                      [(if (keyword? k) (name k) k)
-                       (parse-schema v (str path "/" (if (keyword? k) (name k) k)))])
+                      (let [k-str (if (keyword? k) (name k) k)]
+                        [k-str (parse-schema v (extend-path path k))]))
                     properties))))
 
       (= schema-type "array")
@@ -352,8 +358,8 @@ Example:\n
           (throw (ex-info (str "Array schema missing 'items' at " path)
                           {:path path :schema schema})))
         (if (string? description)
-          (array description (parse-schema items (str path "/items")))
-          (array (parse-schema items (str path "/items")))))
+          (array description (parse-schema items (extend-path path "items")))
+          (array (parse-schema items (extend-path path "items")))))
 
       (= schema-type "string")
       (if (string? description)
