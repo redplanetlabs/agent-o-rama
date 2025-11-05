@@ -711,3 +711,58 @@
           ]
           nil))
     )))
+
+(deftest llm-judge-with-default-schema-test
+  ;; Tests llm-judge evaluator using the default output schema.
+  ;; Verifies that when outputSchema parameter is omitted,
+  ;; DEFAULT-LLM-OUTPUT-SCHEMA is applied and response matches expected format.
+  (when (some? (System/getenv "OPENAI_API_KEY"))
+    (with-open [ipc (rtest/create-ipc)]
+      (let [module (aor/agentmodule
+                    [topology]
+                    (aor/declare-agent-object-builder
+                     topology
+                     "openai"
+                     (fn [setup]
+                       (-> (dev.langchain4j.model.openai.OpenAiChatModel/builder)
+                           (.apiKey (System/getenv "OPENAI_API_KEY"))
+                           (.modelName "gpt-4o-mini")
+                           .build)))
+                    (-> topology
+                        (aor/new-agent "foo")
+                        (aor/node
+                         "start"
+                         nil
+                         (fn [agent-node]
+                           (aor/result! agent-node "done")))))]
+        (rtest/launch-module! ipc module {:tasks 1 :threads 1})
+        (let [module-name (get-module-name module)
+              manager (aor/agent-manager ipc module-name)]
+
+          (testing "llm-judge evaluator"
+            (testing "creates evaluator with default output schema"
+              (aor/create-evaluator! manager
+                                     "test-judge"
+                                     "aor/llm-judge"
+                                     {"model"        "openai"
+                                      "temperature"  "0.0"
+                                      "prompt"       evals/DEFAULT-LLM-PROMPT
+                                      "outputSchema" evals/DEFAULT-LLM-OUTPUT-SCHEMA}
+                                     "test"))
+
+            (testing "evaluates with default schema"
+              (let [result (aor/try-evaluator manager
+                                              "test-judge"
+                                              "2+2"
+                                              "4"
+                                              "4")]
+
+                (testing "returns score key"
+                  (is (contains? result "score")))
+
+                (testing "score is an integer"
+                  (is (integer? (get result "score"))))
+
+                (testing "score is in valid range"
+                  (let [score (get result "score")]
+                    (is (<= 0 score 10))))))))))))
