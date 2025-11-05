@@ -366,7 +366,8 @@
                                   "EF")]
        (is (= {"message" "1 AB 2 CD 3 EF 4 AB" "temperature" 1.2}
               (select-keys result ["message" "temperature"])))
-       (is (string? (get result "outputSchema"))))
+       (let [expected-schema-str (.toString (lj/from-json-string os))]
+        (is (= expected-schema-str (get result "outputSchema")))))
 
      (try
        (aor/create-evaluator! manager
