@@ -39,8 +39,7 @@
    [dev.langchain4j.service
     Result]
    [dev.langchain4j.service.tool
-    ToolExecution
-    ToolExecutionResult]
+    ToolExecution]
    [dev.langchain4j.store.embedding
     EmbeddingMatch
     EmbeddingSearchResult]
@@ -409,7 +408,7 @@
  [in]
  (-> (ToolExecution/builder)
      (.request ^ToolExecutionRequest (nippy/thaw-from-in! in))
-     (.result ^ToolExecutionResult (nippy/thaw-from-in! in))
+     (.result ^String (nippy/thaw-from-in! in))
      .build))
 
 (ser/extend-8-byte-freeze
