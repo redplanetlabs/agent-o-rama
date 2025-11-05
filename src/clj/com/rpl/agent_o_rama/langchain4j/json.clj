@@ -301,7 +301,13 @@ Example:\n
 (defn- parse-schema
   "Recursively converts a JSON schema map to a JsonSchema object.
 
-  Path is used for error reporting."
+  Path is used for error reporting.
+
+  Note: This implementation intentionally deviates from the JSON Schema spec
+  for additionalProperties. When additionalProperties is undefined (nil), this
+  function defaults to false (reject additional properties) rather than true
+  (allow additional properties) as specified in JSON Schema. This provides a
+  more restrictive and safer default behavior."
   [schema path]
   (when-not (map? schema)
     (throw (ex-info (str "Schema must be a map at " path)
