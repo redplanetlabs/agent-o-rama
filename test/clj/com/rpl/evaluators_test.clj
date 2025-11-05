@@ -346,15 +346,7 @@
                           (UserMessage. "......."))))
 
 
-     (bind os
-       "{
- \"type\": \"object\",
- \"properties\": {
-   \"aaa\": { \"type\": \"string\" }
- },
- \"required\": [\"aaa\"],
- \"additionalProperties\": false
-}")
+     (bind os "{\"type\":\"object\",\"properties\":{\"aaa\":{\"type\":\"string\"}},\"required\":[\"aaa\"],\"additionalProperties\":false}")
 
      (aor/create-evaluator! manager
                             "ajudge"
