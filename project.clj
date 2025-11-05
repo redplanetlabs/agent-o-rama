@@ -19,7 +19,6 @@
              "-Djdk.attach.allowAttachSelf"
              ;; for java 25
              "--enable-native-access=ALL-UNNAMED"]
-  :repl-options {:port 7888}
   :dependencies [[com.rpl/rama-helpers "0.10.0" :exclusions [org.clojure/clojure]]
                  [com.github.f4b6a3/uuid-creator "6.1.1"]
                  [dev.langchain4j/langchain4j
@@ -57,48 +56,49 @@
   [["releases"
     {:id  "maven-releases"
      :url "https://nexus.redplanetlabs.com/repository/maven-public-releases"}]]
-  :profiles {:dev      {:resource-paths    ["test/resources/"]
-                        :source-paths      ["src/clj"
-                                            "src/cljs"
-                                            "resource"
-                                            "dev"
-                                            "examples/clj/src"
-                                            "examples/clj/test"]
-                        :java-source-paths ["src/java" "test/java"]
-                        :jvm-opts          ["-Xss6m"
-                                            "-Xms6g"
-                                            "-Xmx6g"]
-                        :dependencies
-                        [[meander/epsilon "0.0.650"]
-                         [dev.langchain4j/langchain4j-open-ai "1.8.0"]
-                         [dev.langchain4j/langchain4j-web-search-engine-tavily
-                          "1.8.0-beta15"]
-                         [thheller/shadow-cljs "3.1.7"]
-                         [etaoin "1.1.43"]
-                         [clj-test-containers/clj-test-containers "0.7.4"]
-                         [org.testcontainers/testcontainers "1.20.4"]
-                         [clj-kondo "2025.09.22"]]}
-             :examples {:test-paths   ["examples/clj/test"]
-                        :source-paths ["examples/clj/src"]}
-             :provided {:dependencies [[com.rpl/rama "1.2.0"]
-                                       [org.clojure/clojure "1.12.2"]]}
-             :gen      {:prep-tasks   []
-                        :source-paths ["scripts"]
-                        :dependencies [[comb "0.1.1"]
-                                       [org.clojure/clojure "1.12.2"]]}
-             :ui       {:source-paths ["test/cljs"]
-                        :dependencies [[com.rpl/specter "1.1.4"] ;; only cljs
-                                       [com.pitch/uix.core "1.4.3"]
-                                       [com.pitch/uix.dom "1.4.3"]
-                                       [thheller/shadow-cljs "3.1.7"]
-                                       [cider/cider-nrepl "0.57.0"]
-                                       [metosin/reitit-frontend "0.7.2"]
-                                       [metosin/reitit-malli "0.7.2"]
-                                       ;; to fix dynlink error on arm macs
-                                       [net.java.dev.jna/jna "5.17.0"]
-                                       [org.clojure/clojure "1.12.2"]
-                                       [prismatic/schema "1.4.1"]]}
-             :test     {:jvm-opts ["-Daor.test.runner=1"]}}
+  :profiles {:dev        {:resource-paths    ["test/resources/"]
+                          :source-paths      ["src/clj"
+                                              "src/cljs"
+                                              "resource"
+                                              "dev"
+                                              "examples/clj/src"
+                                              "examples/clj/test"]
+                          :java-source-paths ["src/java" "test/java"]
+                          :jvm-opts          ["-Xss6m"
+                                              "-Xms6g"
+                                              "-Xmx6g"]
+                          :dependencies
+                          [[meander/epsilon "0.0.650"]
+                           [dev.langchain4j/langchain4j-open-ai "1.8.0"]
+                           [dev.langchain4j/langchain4j-web-search-engine-tavily
+                            "1.8.0-beta15"]
+                           [thheller/shadow-cljs "3.1.7"]
+                           [etaoin "1.1.43"]
+                           [clj-test-containers/clj-test-containers "0.7.4"]
+                           [org.testcontainers/testcontainers "1.20.4"]
+                           [clj-kondo "2025.09.22"]]}
+             :examples   {:test-paths   ["examples/clj/test"]
+                          :source-paths ["examples/clj/src"]}
+             :provided   {:dependencies [[com.rpl/rama "1.2.0"]
+                                         [org.clojure/clojure "1.12.2"]]}
+             :gen        {:prep-tasks   []
+                          :source-paths ["scripts"]
+                          :dependencies [[comb "0.1.1"]
+                                         [org.clojure/clojure "1.12.2"]]}
+             :ui         {:source-paths ["test/cljs"]
+                          :dependencies [[com.rpl/specter "1.1.4"] ;; only cljs
+                                         [com.pitch/uix.core "1.4.3"]
+                                         [com.pitch/uix.dom "1.4.3"]
+                                         [thheller/shadow-cljs "3.1.7"]
+                                         [cider/cider-nrepl "0.57.0"]
+                                         [metosin/reitit-frontend "0.7.2"]
+                                         [metosin/reitit-malli "0.7.2"]
+                                         ;; to fix dynlink error on arm macs
+                                         [net.java.dev.jna/jna "5.17.0"]
+                                         [org.clojure/clojure "1.12.2"]
+                                         [prismatic/schema "1.4.1"]]}
+             :test       {:jvm-opts ["-Daor.test.runner=1"]}
+             :nrepl-port {:repl-options {:port 7888}}}
   :codox {:source-paths ["src/clj"]
           :metadata     {:doc/format :markdown}
           :output-path  "target/doc"

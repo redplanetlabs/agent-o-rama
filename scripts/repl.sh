@@ -1,2 +1,1 @@
-lein with-profile +ui repl
-
+lein with-profile +ui,+nrepl-port repl
