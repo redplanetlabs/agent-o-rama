@@ -281,12 +281,12 @@ Example:\n
 (defn- check-unsupported-features!
   "Throws exception if schema contains unsupported features."
   [schema path]
-  (let [unsupported-keys ["minimum" "maximum" "minLength" "maxLength"
-                          "pattern" "format" "allOf" "oneOf"
-                          "not" "const" "default"]]
+  (let [unsupported-keys [:minimum :maximum :minLength :maxLength
+                          :pattern :format :allOf :oneOf
+                          :not :const :default]]
     (doseq [k unsupported-keys]
       (when (contains? schema k)
-        (throw (ex-info (str "Unsupported JSON schema feature: " k " at " path)
+        (throw (ex-info (str "Unsupported JSON schema feature: " (name k) " at " path)
                         {:feature k
                          :path path
                          :schema schema}))))))
@@ -302,10 +302,11 @@ Example:\n
 
   (check-unsupported-features! schema path)
 
-  (let [schema-type (get schema "type")
-        description (get schema "description")
-        enum-vals (get schema "enum")
-        ref (get schema "$ref")]
+  (let [schema-type (get schema :type)
+        description (get schema :description)
+        enum-vals (get schema :enum)
+        ref (get schema :$ref)
+        any-of-schemas (get schema :anyOf)]
 
     (cond
       ;; Handle $ref references
@@ -316,11 +317,19 @@ Example:\n
       enum-vals
       (enum description enum-vals)
 
+      ;; Handle anyOf combinator
+      any-of-schemas
+      (let [parsed-schemas (vec (map-indexed
+                                  (fn [idx schema]
+                                    (parse-schema schema (str path "/anyOf[" idx "]")))
+                                  any-of-schemas))]
+        (any-of description parsed-schemas))
+
       ;; Handle types
       (= schema-type "object")
-      (let [properties (get schema "properties" {})
-            required (get schema "required" [])
-            additional-props? (get schema "additionalProperties")
+      (let [properties (get schema :properties {})
+            required (get schema :required [])
+            additional-props? (get schema :additionalProperties)
             opts (cond-> {}
                    description (assoc :description description)
                    (seq required) (assoc :required required)
@@ -332,11 +341,13 @@ Example:\n
          opts
          (into {}
                (map (fn [[k v]]
-                      [k (parse-schema v (str path "/" k))])
+                      ;; Convert keyword keys to strings for Java API
+                      [(if (keyword? k) (name k) k)
+                       (parse-schema v (str path "/" (if (keyword? k) (name k) k)))])
                     properties))))
 
       (= schema-type "array")
-      (let [items (get schema "items")]
+      (let [items (get schema :items)]
         (when-not items
           (throw (ex-info (str "Array schema missing 'items' at " path)
                           {:path path :schema schema})))
@@ -379,12 +390,13 @@ Example:\n
   - Array types with item schemas
   - Enum types
   - References using $ref
+  - anyOf combinator for union types
   - Descriptions for all schema types
   - Nested objects and arrays
 
   Unsupported features (will throw exceptions):
   - Constraints: minimum, maximum, minLength, maxLength, pattern, format
-  - Logical combinators: allOf, oneOf, anyOf, not
+  - Logical combinators: allOf, oneOf, not
   - Other: const, default
 
   Args:
@@ -408,7 +420,7 @@ Example:\n
   </pre>"
   [json-str]
   (try
-    (let [schema (j/read-value json-str)]
+    (let [schema (j/read-value json-str j/keyword-keys-object-mapper)]
       (parse-schema schema "$"))
     (catch com.fasterxml.jackson.core.JsonParseException e
       (throw (ex-info "Invalid JSON in schema string"

@@ -4,6 +4,7 @@
    [com.rpl.agent-o-rama.langchain4j.json :as lj])
   (:import
    [dev.langchain4j.model.chat.request.json
+    JsonAnyOfSchema
     JsonArraySchema
     JsonBooleanSchema
     JsonEnumSchema
@@ -198,6 +199,64 @@
             ^JsonReferenceSchema user-schema (get props "user")]
         (is (instance? JsonReferenceSchema user-schema))
         (is (= "#/$defs/User" (.reference user-schema)))))
+
+    (testing "parses anyOf with primitive types"
+      (let [^JsonObjectSchema schema (lj/from-json-string
+                    "{\"type\": \"object\",
+                      \"properties\": {
+                        \"id\": {
+                          \"anyOf\": [
+                            {\"type\": \"string\"},
+                            {\"type\": \"integer\"}
+                          ]
+                        }
+                      }}")
+            props (.properties schema)
+            ^JsonAnyOfSchema id-schema (get props "id")
+            alternatives (vec (.anyOf id-schema))]
+        (is (instance? JsonAnyOfSchema id-schema))
+        (is (= 2 (count alternatives)))
+        (is (instance? JsonStringSchema (nth alternatives 0)))
+        (is (instance? JsonIntegerSchema (nth alternatives 1)))))
+
+    (testing "parses anyOf with description"
+      (let [^JsonObjectSchema schema (lj/from-json-string
+                    "{\"type\": \"object\",
+                      \"properties\": {
+                        \"value\": {
+                          \"description\": \"String or number\",
+                          \"anyOf\": [
+                            {\"type\": \"string\"},
+                            {\"type\": \"number\"}
+                          ]
+                        }
+                      }}")
+            props (.properties schema)
+            ^JsonAnyOfSchema value-schema (get props "value")]
+        (is (= "String or number" (.description value-schema)))))
+
+    (testing "parses anyOf with complex types"
+      (let [^JsonObjectSchema schema (lj/from-json-string
+                    "{\"type\": \"object\",
+                      \"properties\": {
+                        \"data\": {
+                          \"anyOf\": [
+                            {\"type\": \"object\",
+                             \"properties\": {
+                               \"name\": {\"type\": \"string\"}
+                             }},
+                            {\"type\": \"array\",
+                             \"items\": {\"type\": \"string\"}}
+                          ]
+                        }
+                      }}")
+            props (.properties schema)
+            ^JsonAnyOfSchema data-schema (get props "data")
+            alternatives (vec (.anyOf data-schema))]
+        (is (instance? JsonAnyOfSchema data-schema))
+        (is (= 2 (count alternatives)))
+        (is (instance? JsonObjectSchema (nth alternatives 0)))
+        (is (instance? JsonArraySchema (nth alternatives 1)))))
 
     (testing "throws on invalid JSON"
       (is (thrown-with-msg?
