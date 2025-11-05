@@ -88,18 +88,13 @@
         contents)))))
 
 (def DEFAULT-LLM-OUTPUT-SCHEMA
-  "{
-  \"type\": \"object\",
-  \"properties\": {
-    \"score\": {
-      \"type\": \"integer\",
-      \"minimum\": 0,
-      \"maximum\": 10
-    }
-  },
-  \"required\": [\"score\"],
-  \"additionalProperties\": false
-}")
+  (j/write-value-as-string
+   {:type                 "object"
+    :properties           {"score"
+                           {:type        "integer"
+                            :description "Numeric score from 0-10"}},
+    :required             ["score"]
+    :additionalProperties false}))
 
 (def DEFAULT-LLM-PROMPT
   "You are an impartial evaluator. Your task is to judge the quality of a model's output.
