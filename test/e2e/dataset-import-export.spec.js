@@ -255,15 +255,16 @@ test.describe('Dataset Import/Export Round-trip', () => {
     // Close the modal
     await importModal.getByText('×').click();
     await expect(importModal).not.toBeVisible();
-    
+
     console.log('Import completed successfully with all examples.');
 
     // --- PHASE 6: VERIFY WE NOW HAVE 6 EXAMPLES (3 ORIGINAL + 3 IMPORTED) ---
     console.log('--- PHASE 6: VERIFY WE NOW HAVE 6 EXAMPLES (3 ORIGINAL + 3 IMPORTED) ---');
-    
-    // Verify we now have 6 examples total (3 original + 3 imported)
+
+    // Wait for the table to refresh and show the newly imported examples
+    // The import is asynchronous, so we need to wait for the UI to update
     const exampleRows = page.locator('table tbody tr');
-    await expect(exampleRows).toHaveCount(6);
+    await expect(exampleRows).toHaveCount(6, { timeout: 10000 });
     
     // Verify we have 2 instances of each example ID
     const complex1Rows = page.locator('table tbody tr').filter({ hasText: `complex-1-${uniqueId}` });

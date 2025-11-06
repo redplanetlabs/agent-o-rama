@@ -193,7 +193,7 @@ test.describe('Dataset example crud', () => {
 
     // Open the Example Viewer modal by clicking on the example row
     await page.locator('table tbody tr').filter({ hasText: exampleId1 }).click();
-    await expect(page.getByText('Example Details')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole('heading', { name: 'Example Details' })).toBeVisible({ timeout: 30000 });
 
     // Start listening for confirm dialogs for destructive actions
     page.on('dialog', dialog => dialog.accept());
