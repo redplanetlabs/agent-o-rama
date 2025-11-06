@@ -147,26 +147,54 @@
                          ;; Dynamic Output Columns
                          (for [i (range num-targets)]
                            (let [agent-result (get-in run [:agent-results i])
-                                 is-winner? (and winning-index (= i winning-index))]
+                                 is-winner? (and winning-index (= i winning-index))
+                                 token-info (when agent-result
+                                              {:input-token-count (:input-token-count agent-result)
+                                               :output-token-count (:output-token-count agent-result)
+                                               :total-token-count (:total-token-count agent-result)})
+                                 duration-ms (when agent-result
+                                               (when (and (:start-time-millis agent-result)
+                                                          (:finish-time-millis agent-result))
+                                                 (unchecked-subtract (:finish-time-millis agent-result)
+                                                                     (:start-time-millis agent-result))))]
                              ($ :td {:key (str "output-" i)
                                      :className (common/cn (:td common/table-classes)
                                                            {"bg-green-50" is-winner?})}
                                 (if agent-result
-                                  (if (:failure? (:result agent-result))
-                                    ($ :div.space-y-2
-                                       (if-let [throwable (get-in agent-result [:result :val :throwable])]
-                                         ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
-                                            {:onClick #(state/dispatch [:modal/show :exception-detail
-                                                                        {:title "Error Details"
-                                                                         :component ($ regular-detail/ExceptionModal {:throwable throwable})}])}
-                                            "View Error")
-                                         ($ :span.text-red-500.font-semibold "FAIL")))
-                                    ($ regular-detail/CellContent
-                                       {:content (get-in agent-result [:result :val])
-                                        :truncated? (not show-full-text?)
-                                        :on-expand #(state/dispatch [:modal/show :content-detail
-                                                                     {:title (str "Output " (inc i))
-                                                                      :component ($ regular-detail/ContentModal {:content % :title (str "Output " (inc i))})}])}))
+                                  ($ :div.flex.flex-col.items-start.gap-2
+                                     (if (:failure? (:result agent-result))
+                                       ($ :div.space-y-2
+                                          (if-let [throwable (get-in agent-result [:result :val :throwable])]
+                                            ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
+                                               {:onClick #(state/dispatch [:modal/show :exception-detail
+                                                                           {:title "Error Details"
+                                                                            :component ($ regular-detail/ExceptionModal {:throwable throwable})}])}
+                                               "View Error")
+                                            ($ :span.text-red-500.font-semibold "FAIL")))
+                                       ($ regular-detail/CellContent
+                                          {:content (get-in agent-result [:result :val])
+                                           :truncated? (not show-full-text?)
+                                           :on-expand #(state/dispatch [:modal/show :content-detail
+                                                                        {:title (str "Output " (inc i))
+                                                                         :component ($ regular-detail/ContentModal {:content % :title (str "Output " (inc i))})}])}))
+                                     (when (or duration-ms
+                                               (and token-info
+                                                    (or (:total-token-count token-info)
+                                                        (:input-token-count token-info)
+                                                        (:output-token-count token-info))))
+                                       ($ :div.flex.flex-wrap.gap-1
+                                          (when duration-ms
+                                            ($ regular-detail/TimeCapsule {:key "time"
+                                                                           :duration-ms duration-ms}))
+                                          (when (and token-info
+                                                     (or (:total-token-count token-info)
+                                                         (:input-token-count token-info)
+                                                         (:output-token-count token-info)))
+                                            ($ regular-detail/TokenCountCapsule
+                                               {:key "tokens"
+                                                :input-token-count (:input-token-count token-info)
+                                                :output-token-count (:output-token-count token-info)
+                                                :total-token-count (:total-token-count token-info)})))))
                                   ($ :div.flex.items-center.justify-center.h-full.text-gray-500.text-sm
                                      ($ common/spinner {:size :small})
                                      ($ :span.ml-2 "Running..."))))))
