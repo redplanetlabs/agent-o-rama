@@ -40,22 +40,24 @@ export default defineConfig({
   ],
 
   // This is the magic part! It tells Playwright how to start your app.
-  webServer: {
-    // The exact command to start your Shadow-cljs dev server.
-    command: 'lein with-profile +ui run -m shadow.cljs.devtools.cli watch frontend',
+  // In CI, we start the server manually, so we disable webServer here.
+  ...(process.env.CI ? {} : {
+    webServer: {
+      // The exact command to start your Shadow-cljs dev server.
+      command: 'lein with-profile +ui run -m shadow.cljs.devtools.cli watch frontend',
 
-    // The URL Playwright will poll to know when the server is ready.
-    url: 'http://localhost:1974',
+      // The URL Playwright will poll to know when the server is ready.
+      url: 'http://localhost:1974',
 
-    // If you already have a dev server running, Playwright will use it instead of starting a new one.
-    // This is disabled in CI to ensure a clean state.
-    reuseExistingServer: !process.env.CI,
+      // If you already have a dev server running, Playwright will use it instead of starting a new one.
+      reuseExistingServer: true,
 
-    // Give your server up to 2 minutes to start up. Shadow-cljs can sometimes be slow on the first compile.
-    timeout: 120 * 1000,
+      // Give your server up to 2 minutes to start up. Shadow-cljs can sometimes be slow on the first compile.
+      timeout: 120 * 1000,
 
-    // Pipe server output to console for debugging.
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+      // Pipe server output to console for debugging.
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  }),
 });
