@@ -310,7 +310,7 @@ test('should test evaluators from the evaluators page with conditional field ren
   console.log('--- Testing Summary Evaluator Warning Message ---');
 
   // Search for the summary evaluator to ensure it's visible
-  const searchInput = page.getByPlaceholder('Search evaluators...');
+  await searchInput.clear();
   await searchInput.fill(testSummaryEvalName);
   await page.waitForTimeout(500); // Wait for debounced search
 
