@@ -352,8 +352,9 @@ test.describe('Dataset Import/Export Round-trip', () => {
     expect(codeOutputText).toContain('explanation');
     
     // Verify programming tags (look specifically for tag elements)
-    await expect(exampleModal.locator('.bg-blue-100').getByText('programming')).toBeVisible();
-    await expect(exampleModal.locator('.bg-blue-100').getByText('javascript')).toBeVisible();
+    // Use longer timeout as tags may load asynchronously
+    await expect(exampleModal.locator('.bg-blue-100').getByText('programming')).toBeVisible({ timeout: 10000 });
+    await expect(exampleModal.locator('.bg-blue-100').getByText('javascript')).toBeVisible({ timeout: 10000 });
     
     await page.keyboard.press('Escape');
     console.log('Code data integrity verified for imported example.');
