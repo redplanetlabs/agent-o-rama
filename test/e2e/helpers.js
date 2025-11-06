@@ -308,14 +308,11 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   await searchInput.clear();
   await searchInput.fill(evaluatorName);
 
-  // Wait for the dropdown container to appear first (search has 300ms debounce + query time)
-  // The dropdown container appears as a div with position absolute and z-10
-  const dropdownContainer = page.locator('.absolute.z-10');
-  await expect(dropdownContainer).toBeVisible({ timeout: 15000 });
-
-  // Now wait for the specific evaluator to appear in the dropdown
+  // Wait for the specific evaluator to appear in the dropdown
+  // This accounts for: 300ms debounce + query execution + render time
+  // The dropdown appears as a div with position absolute and z-10
   const dropdown = page.locator('.absolute.z-10').filter({ hasText: evaluatorName });
-  await expect(dropdown).toBeVisible({ timeout: 5000 });
+  await expect(dropdown).toBeVisible({ timeout: 20000 });
   
   // Click the evaluator in the dropdown
   await dropdown.getByText(evaluatorName, { exact: true }).click();
