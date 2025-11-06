@@ -57,6 +57,11 @@
   (shadow/watch :dev)
 
   (start-repl ipc {:port 1975 :build-id :dev})
+  
+  (rtest/launch-module!
+   ipc
+   research-agent/ResearchAgentModule
+   {:tasks 1 :threads 1})
 
   ;; (shadow/watch :dev2)
   ;; (shadow/nrepl-select :dev2)
