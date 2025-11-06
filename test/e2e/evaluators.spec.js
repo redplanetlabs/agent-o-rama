@@ -167,7 +167,9 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
 
   const summaryModal = page.locator('[role="dialog"]');
   await expect(summaryModal).toBeVisible();
-  await summaryModal.getByRole('button', { name: /Choose an evaluator/ }).click();
+  const chooseButton = summaryModal.getByRole('button', { name: /Choose an evaluator/ });
+  await expect(chooseButton).toBeVisible({ timeout: 10000 });
+  await chooseButton.click();
 
     // Assert dropdown is filtered correctly (only summary should be visible)
     // Use longer timeout as dropdown loads evaluators asynchronously
@@ -255,9 +257,15 @@ test('should test evaluators from the evaluators page with conditional field ren
 
   // 2. Test regular evaluator from evaluators page
   console.log('--- Testing Regular Evaluator from Evaluators Page ---');
-  
+
+  // Search for the regular evaluator to ensure it's visible
+  const searchInput = page.getByPlaceholder('Search evaluators...');
+  await searchInput.fill(testRegularEvalName);
+  await page.waitForTimeout(500); // Wait for debounced search
+
   // Click on the evaluator row to open details modal
   const regularEvalRow = page.locator('table tbody tr').filter({ hasText: testRegularEvalName });
+  await expect(regularEvalRow).toBeVisible({ timeout: 10000 });
   await regularEvalRow.click();
   
   // Wait for details modal to appear
