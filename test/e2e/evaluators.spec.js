@@ -167,10 +167,16 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
 
   const summaryModal = page.locator('[role="dialog"]');
   await expect(summaryModal).toBeVisible();
-  // Wait longer for modal content to fully render
-  await page.waitForTimeout(2000);
+  // Wait for evaluators to load - the modal shows "Loading evaluators..." initially
+  // We need to wait for that loading state to complete
+  const loadingText = summaryModal.getByText('Loading evaluators...');
+  const hasLoading = await loadingText.isVisible().catch(() => false);
+  if (hasLoading) {
+    console.log('Waiting for evaluators to load...');
+    await expect(loadingText).not.toBeVisible({ timeout: 30000 });
+  }
   const chooseButton = summaryModal.getByRole('button', { name: /Choose an evaluator/ });
-  await expect(chooseButton).toBeVisible({ timeout: 20000 });
+  await expect(chooseButton).toBeVisible({ timeout: 10000 });
   await chooseButton.click();
 
     // Assert dropdown is filtered correctly (only summary should be visible)
