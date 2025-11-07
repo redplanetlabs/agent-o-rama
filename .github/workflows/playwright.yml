@@ -87,7 +87,7 @@ jobs:
     - name: Run Playwright tests
       env:
         CI: true
-      run: npx playwright test
+      run: npx playwright test --workers=1
 
     - name: Upload Playwright report
       if: always()
