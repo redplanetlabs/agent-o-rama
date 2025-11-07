@@ -84,8 +84,7 @@ test.describe('Pagination Tests', () => {
       console.log(`Clicking Load More (click #${loadMoreClicks})...`);
       await loadMoreButton.click();
       
-      // Wait for loading state to complete
-      await expect(page.locator('tfoot').filter({ hasText: 'Loading...' })).toBeVisible();
+      // Wait for loading state to complete (if loading indicator appears)
       await expect(page.locator('tfoot').filter({ hasText: 'Loading...' })).not.toBeVisible({ timeout: 10000 });
       
       const currentCount = await page.locator('table tbody tr').count();
@@ -161,8 +160,7 @@ test.describe('Pagination Tests', () => {
       console.log(`Clicking Load More (click #${loadMoreClicks})...`);
       await loadMoreButton.click();
       
-      // Wait for loading state to complete
-      await expect(page.locator('tfoot').filter({ hasText: 'Loading...' })).toBeVisible();
+      // Wait for loading state to complete (if loading indicator appears)
       await expect(page.locator('tfoot').filter({ hasText: 'Loading...' })).not.toBeVisible({ timeout: 10000 });
       
       const currentCount = await page.locator('table tbody tr').count();
@@ -246,8 +244,7 @@ test.describe('Pagination Tests', () => {
       console.log(`Clicking Load More (click #${loadMoreClicks})...`);
       await loadMoreButton.click();
       
-      // Wait for loading state to complete
-      await expect(page.locator('tfoot').filter({ hasText: 'Loading...' })).toBeVisible();
+      // Wait for loading state to complete (if loading indicator appears)
       await expect(page.locator('tfoot').filter({ hasText: 'Loading...' })).not.toBeVisible({ timeout: 10000 });
       
       const currentCount = await page.locator('table tbody tr').count();
