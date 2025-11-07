@@ -22,7 +22,8 @@
                (string? aor-type)
                (or (str/includes? aor-type "SystemMessage")
                    (str/includes? aor-type "UserMessage")
-                   (str/includes? aor-type "AiMessage")))))))
+                   (str/includes? aor-type "AiMessage")
+                   (str/includes? aor-type "ToolExecutionResultMessage")))))))
 
 (defn conversation?
   "Check if data is a conversation (vector of chat messages and/or strings).
@@ -59,8 +60,45 @@
                              (filter some?)
                              (str/join separator))
                         (get-flexible contents "text"))))]
-       {:role role
-        :text text}))))
+
+       (cond
+         ;; If it's a ToolExecutionResultMessage, include tool name and ID
+         (= role "ToolExecutionResultMessage")
+         (let [tool-name (get-flexible msg "toolName")
+               tool-id (get-flexible msg "id")
+               result-text (or text "")
+               formatted-text (str (when tool-name (str "🔧 " tool-name " result"))
+                                   (when (and tool-name tool-id) (str " (ID: " tool-id ")"))
+                                   (when (and (or tool-name tool-id) (not (str/blank? result-text)))
+                                     (str "\n" result-text))
+                                   (when (and (not tool-name) (not tool-id))
+                                     result-text))]
+           {:role role
+            :text formatted-text})
+
+         ;; If no text but has tool execution requests (AiMessage with tool calls)
+         (and (str/blank? text)
+              (get-flexible msg "toolExecutionRequests"))
+         (let [tool-requests (get-flexible msg "toolExecutionRequests")
+               formatted-requests
+               (if (sequential? tool-requests)
+                 (->> tool-requests
+                      (map (fn [req]
+                             (let [tool-name (get-flexible req "name")
+                                   tool-args (get-flexible req "arguments")
+                                   tool-id (get-flexible req "id")]
+                               (str "🔧 Tool call: " tool-name
+                                    (when tool-args (str "\nArguments: " tool-args))
+                                    (when tool-id (str "\nID: " tool-id))))))
+                      (str/join "\n\n"))
+                 "")]
+           {:role role
+            :text formatted-requests})
+
+         ;; Default case
+         :else
+         {:role role
+          :text text})))))
 
 (defn conversation-preview-text
   "Generate preview text for a conversation.
@@ -76,6 +114,7 @@
                                    "SystemMessage" "SYSTEM"
                                    "UserMessage" "USER"
                                    "AiMessage" "AI"
+                                   "ToolExecutionResultMessage" "TOOL"
                                    (or role "MSG"))
                            display-text (if (str/blank? text)
                                           "(empty)"
@@ -96,6 +135,7 @@
                "SystemMessage" ["bg-gray-100" "text-gray-700" "SYSTEM"]
                "UserMessage" ["bg-blue-50" "text-blue-900" "USER"]
                "AiMessage" ["bg-green-50" "text-green-900" "AI"]
+               "ToolExecutionResultMessage" ["bg-purple-50" "text-purple-900" "TOOL RESULT"]
                ["bg-gray-50" "text-gray-800" (or role "MESSAGE")])]
          ($ :div
             {:key idx
