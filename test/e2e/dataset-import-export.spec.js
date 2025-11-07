@@ -56,10 +56,14 @@ async function addTagToExample(page, exampleId, tagName) {
   const tagInput = modal.getByPlaceholder('Add a tag and press Enter...');
   await tagInput.fill(tagName);
   await tagInput.press('Enter');
-  
-  // Wait for tag to be added (it should appear in the modal)
-  await expect(modal.getByText(tagName)).toBeVisible();
-  
+
+  // Wait for tag to be added and visible in the modal as a badge (not just text)
+  await expect(modal.locator('.bg-blue-100').getByText(tagName, { exact: true })).toBeVisible({ timeout: 10000 });
+
+  // Additional wait to ensure backend has fully persisted the tag
+  // This prevents race conditions in CI where export might happen before persistence completes
+  await page.waitForTimeout(500);
+
   // Close the modal
   await page.keyboard.press('Escape');
   await expect(modal).not.toBeVisible();
@@ -206,7 +210,19 @@ test.describe('Dataset Import/Export Round-trip', () => {
     
     // Parse and verify the structure of exported data
     const parsedExamples = exportedLines.map(line => JSON.parse(line));
-    
+
+    // Log ALL exported examples and their tags for debugging
+    console.log('=== EXPORTED EXAMPLES ===');
+    parsedExamples.forEach((ex, idx) => {
+      console.log(`Example ${idx + 1}:`, {
+        type: ex.input?.type,
+        tags: ex.tags,
+        hasJavascript: ex.tags?.includes('javascript'),
+        hasProgramming: ex.tags?.includes('programming')
+      });
+    });
+    console.log('=========================');
+
     // Verify first example has complex nested structure
     const firstExample = parsedExamples[0];
     expect(firstExample).toHaveProperty('input');
@@ -218,7 +234,14 @@ test.describe('Dataset Import/Export Round-trip', () => {
     expect(firstExample.output).toHaveProperty('sources');
     expect(firstExample.tags).toContain('geography');
     expect(firstExample.tags).toContain('easy');
-    
+
+    // Verify the code example has both programming AND javascript tags
+    const codeExample = parsedExamples.find(ex => ex.input?.type === 'code-generation');
+    expect(codeExample).toBeTruthy();
+    expect(codeExample.tags).toContain('programming');
+    expect(codeExample.tags).toContain('javascript');
+    console.log(`✓ Code example has both tags: ${codeExample.tags.join(', ')}`);
+
     console.log('Export file structure and content verified.');
 
     // --- PHASE 5: IMPORT THE EXPORTED FILE BACK INTO THE SAME DATASET ---
