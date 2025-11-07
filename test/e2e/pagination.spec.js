@@ -141,15 +141,16 @@ test.describe('Pagination Tests', () => {
     
     let itemCount = 0;
     const loadMoreButton = page.locator('tfoot tr').filter({ hasText: 'Load More' });
-    
-    // Keep creating until Load More appears (page size is 25, so we need enough to exceed that)
-    while (!(await loadMoreButton.isVisible()) && itemCount < 50) {
+
+    // Ensure we create at least 1 dataset for verification, even if Load More is already visible
+    const minDatasets = 1;
+    while ((!(await loadMoreButton.isVisible()) || itemCount < minDatasets) && itemCount < 50) {
       itemCount++;
       const name = `${namePrefix}-${String(itemCount).padStart(3, '0')}`;
       datasetNames.push(name);
-      
+
       await createDataset(page, name);
-      
+
       if (itemCount % 5 === 0) {
         console.log(`Created ${itemCount} datasets, checking for Load More button...`);
         await page.waitForTimeout(300);
