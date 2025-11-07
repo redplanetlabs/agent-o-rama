@@ -20,11 +20,9 @@
   ;; Small delay to let shadow-cljs start
   (Thread/sleep 2000)
 
-  ;; Create IPC and start UI
-  (println "Creating IPC and starting UI...")
+  ;; Create IPC and launch modules BEFORE starting UI
+  (println "Creating IPC...")
   (let [ipc (rtest/create-ipc)]
-    (aor/start-ui ipc {:port 1974 :no-input-before-close true})
-
     ;; Launch modules for Playwright tests
     (println "Launching BasicAgentModule...")
     (rtest/launch-module!
@@ -38,8 +36,12 @@
      e2e-test-agent/E2ETestAgentModule
      {:tasks 1 :threads 1})
 
+    ;; Start UI server AFTER modules are ready
+    (println "All modules launched. Starting UI server on port 1974...")
+    (aor/start-ui ipc {:port 1974 :no-input-before-close true})
+
     ;; Keep running - don't exit
-    (println "Setup complete. Server running on port 1974.")
+    (println "Setup complete. Server running on port 1974 with all modules ready.")
     (println "Waiting for Playwright tests...")
     ;; Block forever
     @(promise)))

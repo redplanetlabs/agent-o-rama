@@ -28,10 +28,9 @@
 
 (defn launch-for-playwright
   "playwright tests assume these modules are launched"
-  [ipc]
+  [ipc & {:keys [port build-id] :or {port 1974 build-id :frontend}}]
 
-  (start-repl ipc)
-
+  ;; Launch modules FIRST
   (rtest/launch-module!
    ipc
    basic-agent/BasicAgentModule
@@ -40,7 +39,12 @@
   (rtest/launch-module!
    ipc
    e2e-test-agent/E2ETestAgentModule
-   {:tasks 1 :threads 1}))
+   {:tasks 1 :threads 1})
+
+  ;; Start REPL/UI server AFTER modules are ready
+  (println "All modules launched. Starting UI server...")
+  (start-repl ipc {:port port :build-id build-id})
+  (println "Setup complete. Server running with all modules ready."))
 
 (comment
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
