@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
 import { unlinkSync, existsSync } from 'fs';
-import { getE2ETestAgentRow, createDataset, deleteDataset, addExample } from './helpers.js';
+import { getE2ETestAgentRow, createDataset, deleteDataset, addExample, shouldSkipCleanup } from './helpers.js';
 
 // =============================================================================
 // TEST CONSTANTS
@@ -77,9 +77,12 @@ test.describe('Dataset Import/Export Round-trip', () => {
   let downloadPath;
 
   test.afterEach(() => {
-    // Cleanup downloaded file
-    if (downloadPath) {
+    // Cleanup downloaded file (unless skipping cleanup)
+    if (downloadPath && !shouldSkipCleanup()) {
       cleanupTempFile(downloadPath);
+      downloadPath = null;
+    } else if (downloadPath) {
+      console.log(`⏭️  Skipping cleanup: Keeping downloaded file at ${downloadPath}`);
       downloadPath = null;
     }
   });
@@ -461,7 +464,11 @@ test.describe('Dataset Import/Export Round-trip', () => {
       await deleteDataset(page, testDatasetName);
       
     } finally {
-      cleanupTempFile(tempFile);
+      if (!shouldSkipCleanup()) {
+        cleanupTempFile(tempFile);
+      } else {
+        console.log(`⏭️  Skipping cleanup: Keeping temp file at ${tempFile}`);
+      }
     }
     
     console.log('--- Import Error Handling Test completed successfully ---');

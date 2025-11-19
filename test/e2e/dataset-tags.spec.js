@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getE2ETestAgentRow, addExample } from './helpers.js';
+import { getE2ETestAgentRow, addExample, deleteDataset } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE
@@ -145,13 +145,7 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     console.log('--- Starting Cleanup ---');
     await page.getByText('Datasets & Experiments').click();
     await expect(page).toHaveURL(/datasets/);
-
-    const datasetRow = page.locator('table tbody tr').filter({ hasText: datasetName });
-    if (await datasetRow.isVisible()) {
-      await datasetRow.getByRole('button', { name: 'Delete' }).click();
-      await expect(datasetRow).not.toBeVisible();
-      console.log(`Cleaned up dataset: ${datasetName}`);
-    }
+    await deleteDataset(page, datasetName);
     console.log('--- Cleanup Complete ---');
   });
 

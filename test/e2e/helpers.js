@@ -207,6 +207,11 @@ export async function createDataset(page, name) {
  * @returns {Promise<void>}
  */
 export async function deleteDataset(page, name) {
+  if (shouldSkipCleanup()) {
+    console.log(`⏭️  Skipping cleanup: Keeping dataset "${name}" (set SKIP_CLEANUP=false to enable cleanup)`);
+    return;
+  }
+  
   console.log(`Deleting dataset: ${name}`);
   
   // Set up dialog handler before clicking delete (only if not already handled)
@@ -243,6 +248,11 @@ export async function deleteDataset(page, name) {
  * @returns {Promise<void>}
  */
 export async function deleteEvaluator(page, name) {
+  if (shouldSkipCleanup()) {
+    console.log(`⏭️  Skipping cleanup: Keeping evaluator "${name}" (set SKIP_CLEANUP=false to enable cleanup)`);
+    return;
+  }
+  
   console.log(`Deleting evaluator: ${name}`);
   
   // Search for the evaluator first to ensure it's visible
@@ -284,6 +294,15 @@ export async function deleteEvaluator(page, name) {
   }
   
   console.log(`Successfully deleted evaluator: ${name}`);
+}
+
+/**
+ * Checks if cleanup should be skipped based on environment variable.
+ * Set SKIP_CLEANUP=true or KEEP_TEST_DATA=true to skip cleanup.
+ * @returns {boolean} True if cleanup should be skipped, false otherwise.
+ */
+export function shouldSkipCleanup() {
+  return process.env.SKIP_CLEANUP === 'true' || process.env.KEEP_TEST_DATA === 'true';
 }
 
 /**
