@@ -27,9 +27,10 @@
 (defn conversation?
   "Check if data is a conversation (vector of chat messages)"
   [data]
-  (and (sequential? data)
-       (seq data)
-       (every? chat-message? data)))
+  (boolean
+   (and (sequential? data)
+        (seq data)
+        (every? chat-message? data))))
 
 (defn extract-message-role-and-text
   "Extract role and text from a chat message.
