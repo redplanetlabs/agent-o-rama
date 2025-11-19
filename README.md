@@ -1,6 +1,6 @@
 # Agent-o-rama
 
-Agent-o-rama is a library for building scalable and stateful LLM agents on the JVM. Agent-o-rama provides two first-class APIs, one for Java and one for Clojure, with feature parity between them.
+Agent-o-rama is an end-to-end LLM agent platform for building, tracing, testing, and monitoring agents with integrated storage and one-click deployment. Agent-o-rama provides two first-class APIs, one for Java and one for Clojure, with feature parity between them.
 
 Building LLM-based applications requires being rigorous about testing and monitoring. Inspired by [LangGraph](https://www.langchain.com/langgraph) and [LangSmith](https://www.langchain.com/langsmith/observability), Agent-o-rama provides similar capabilities to support the end-to-end workflow of building LLM applications: datasets and experiments for evaluation, and detailed tracing, online evaluation, and time-series telemetry (e.g. model latency, token usage, database latency) for observability. All of this is exposed in a comprehensive web UI.
 
@@ -142,7 +142,7 @@ The Maven target for Agent-o-rama is:
 <dependency>
   <groupId>com.rpl</groupId>
   <artifactId>agent-o-rama</artifactId>
-  <version>0.5.0</version>
+  <version>0.6.0</version>
 </dependency>
 ```
 
@@ -153,6 +153,7 @@ The Maven target for Agent-o-rama is:
 * [Javadoc](https://redplanetlabs.com/aor/javadoc/index.html)
 * [Clojuredoc](https://redplanetlabs.com/aor/clojuredoc/index.html)
 * [Mailing list](https://groups.google.com/u/1/g/rama-user)
+* [Discord server](https://discord.gg/RX6UgQNR)
 * #rama channel on [Clojurians](https://clojurians.slack.com/)
 
 

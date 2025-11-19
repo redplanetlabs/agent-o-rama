@@ -12,6 +12,7 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
@@ -29,14 +30,13 @@
     UserMessage]
    [dev.langchain4j.model.chat
     ChatModel]
-   [dev.langchain4j.model.chat.request.json
-    JsonRawSchema]
    [dev.langchain4j.model.chat.response
     ChatResponse$Builder]))
 
-(defn- raw-schema
-  [^JsonRawSchema s]
-  (.schema s))
+(defn schema->json-string
+  "Convert a JsonSchema to its JSON string representation."
+  [schema]
+  (.toString schema))
 
 (defrecord MockChatModel []
   ChatModel
@@ -48,11 +48,11 @@
           (.aiMessage (AiMessage. (j/write-value-as-string
                                    {"temperature"  (.temperature request)
                                     "message"      (.singleText m)
-                                    "outputSchema" (-> request
-                                                       .responseFormat
-                                                       .jsonSchema
-                                                       .rootElement
-                                                       raw-schema)
+                                    "outputSchema" (schema->json-string
+                                                    (-> request
+                                                        .responseFormat
+                                                        .jsonSchema
+                                                        .rootElement))
                                    })))
           .build))))
 
@@ -351,15 +351,7 @@
                           (UserMessage. "......."))))
 
 
-     (bind os
-       "{
- \"type\": \"object\",
- \"properties\": {
-   \"aaa\": { \"type\": \"string\" }
- },
- \"required\": [\"aaa\"],
- \"additionalProperties\": false
-}")
+     (bind os "{\"type\":\"object\",\"properties\":{\"aaa\":{\"type\":\"string\"}},\"required\":[\"aaa\"],\"additionalProperties\":false}")
 
      (aor/create-evaluator! manager
                             "ajudge"
@@ -372,13 +364,15 @@
                             }
                             "a judge")
 
-     (is
-      (= {"message" "1 AB 2 CD 3 EF 4 AB" "temperature" 1.2 "outputSchema" os}
-         (aor/try-evaluator manager
-                            "ajudge"
-                            "AB"
-                            "CD"
-                            "EF")))
+     (let [result (aor/try-evaluator manager
+                                  "ajudge"
+                                  "AB"
+                                  "CD"
+                                  "EF")]
+       (is (= {"message" "1 AB 2 CD 3 EF 4 AB" "temperature" 1.2}
+              (select-keys result ["message" "temperature"])))
+       (let [expected-schema-str (schema->json-string (lj/from-json-string os))]
+        (is (= expected-schema-str (get result "outputSchema")))))
 
      (try
        (aor/create-evaluator! manager
@@ -717,3 +711,58 @@
           ]
           nil))
     )))
+
+(deftest llm-judge-with-default-schema-test
+  ;; Tests llm-judge evaluator using the default output schema.
+  ;; Verifies that when outputSchema parameter is omitted,
+  ;; DEFAULT-LLM-OUTPUT-SCHEMA is applied and response matches expected format.
+  (when (some? (System/getenv "OPENAI_API_KEY"))
+    (with-open [ipc (rtest/create-ipc)]
+      (let [module (aor/agentmodule
+                    [topology]
+                    (aor/declare-agent-object-builder
+                     topology
+                     "openai"
+                     (fn [setup]
+                       (-> (dev.langchain4j.model.openai.OpenAiChatModel/builder)
+                           (.apiKey (System/getenv "OPENAI_API_KEY"))
+                           (.modelName "gpt-4o-mini")
+                           .build)))
+                    (-> topology
+                        (aor/new-agent "foo")
+                        (aor/node
+                         "start"
+                         nil
+                         (fn [agent-node]
+                           (aor/result! agent-node "done")))))]
+        (rtest/launch-module! ipc module {:tasks 1 :threads 1})
+        (let [module-name (get-module-name module)
+              manager (aor/agent-manager ipc module-name)]
+
+          (testing "llm-judge evaluator"
+            (testing "creates evaluator with default output schema"
+              (aor/create-evaluator! manager
+                                     "test-judge"
+                                     "aor/llm-judge"
+                                     {"model"        "openai"
+                                      "temperature"  "0.0"
+                                      "prompt"       evals/DEFAULT-LLM-PROMPT
+                                      "outputSchema" evals/DEFAULT-LLM-OUTPUT-SCHEMA}
+                                     "test"))
+
+            (testing "evaluates with default schema"
+              (let [result (aor/try-evaluator manager
+                                              "test-judge"
+                                              "2+2"
+                                              "4"
+                                              "4")]
+
+                (testing "returns score key"
+                  (is (contains? result "score")))
+
+                (testing "score is an integer"
+                  (is (integer? (get result "score"))))
+
+                (testing "score is in valid range"
+                  (let [score (get result "score")]
+                    (is (<= 0 score 10))))))))))))

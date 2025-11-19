@@ -4,7 +4,8 @@
 This namespace provides Clojure-friendly functions for building JSON schemas used throughout LangChain4j for structured outputs, tool parameter definitions, and response formatting. These schemas ensure models return data in predictable formats and enable type-safe tool calling."
   (:refer-clojure :exclude [boolean int])
   (:require
-   [com.rpl.agent-o-rama.impl.helpers :as h])
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [jsonista.core :as j])
   (:import
    [dev.langchain4j.model.chat.request.json
     JsonAnyOfSchema
@@ -19,6 +20,12 @@ This namespace provides Clojure-friendly functions for building JSON schemas use
     JsonStringSchema]
    [java.util
     List]))
+
+(def ^:private unsupported-schema-features
+  "JSON schema features not yet supported by the from-json-string parser."
+  [:minimum :maximum :minLength :maxLength
+   :pattern :format :allOf :oneOf
+   :not :const :default])
 
 (defn any-of
   "Creates a JSON schema that accepts any of the provided schema types.\n
@@ -274,3 +281,163 @@ Example:\n
    (-> (JsonStringSchema/builder)
        (.description description)
        .build)))
+
+;;; JSON Schema Parsing
+
+(defn- check-unsupported-features!
+  "Throws exception if schema contains unsupported features."
+  [schema path]
+  (doseq [k unsupported-schema-features]
+    (when (contains? schema k)
+      (throw (ex-info (str "Unsupported JSON schema feature: " (name k) " at " path)
+                      {:feature k
+                       :path path
+                       :schema schema})))))
+
+(defn- extend-path
+  "Extends a schema path with a key or index segment.
+
+  Converts keyword keys to strings."
+  [path segment]
+  (str path "/" (if (keyword? segment) (name segment) segment)))
+
+(defn- parse-schema
+  "Recursively converts a JSON schema map to a JsonSchema object.
+
+  Path is used for error reporting.
+
+  Note: This implementation intentionally deviates from the JSON Schema spec
+  for additionalProperties. When additionalProperties is undefined (nil), this
+  function defaults to false (reject additional properties) rather than true
+  (allow additional properties) as specified in JSON Schema. This provides a
+  more restrictive and safer default behavior."
+  [schema path]
+  (when-not (map? schema)
+    (throw (ex-info (str "Schema must be a map at " path)
+                    {:path path :value schema})))
+
+  (check-unsupported-features! schema path)
+
+  (let [schema-type (get schema :type)
+        description (get schema :description)
+        enum-vals (get schema :enum)
+        ref (get schema :$ref)
+        any-of-schemas (get schema :anyOf)]
+
+    (cond
+      ;; Handle $ref references
+      ref
+      (reference ref)
+
+      ;; Handle enum types
+      enum-vals
+      (enum description enum-vals)
+
+      ;; Handle anyOf combinator
+      any-of-schemas
+      (let [parsed-schemas (vec (map-indexed
+                                  (fn [idx schema]
+                                    (parse-schema schema (extend-path path (str "anyOf[" idx "]"))))
+                                  any-of-schemas))]
+        (any-of description parsed-schemas))
+
+      ;; Handle types
+      (= schema-type "object")
+      (let [properties (get schema :properties {})
+            required (get schema :required [])
+            additional-props? (get schema :additionalProperties)
+            opts (cond-> {}
+                   description (assoc :description description)
+                   (seq required) (assoc :required required)
+                   true (assoc :additional-properties?
+                               (if (nil? additional-props?)
+                                 false
+                                 (clojure.core/boolean additional-props?))))]
+        (object
+         opts
+         (into {}
+               (map (fn [[k v]]
+                      (let [k-str (if (keyword? k) (name k) k)]
+                        [k-str (parse-schema v (extend-path path k))]))
+                    properties))))
+
+      (= schema-type "array")
+      (let [items (get schema :items)]
+        (when-not items
+          (throw (ex-info (str "Array schema missing 'items' at " path)
+                          {:path path :schema schema})))
+        (if (string? description)
+          (array description (parse-schema items (extend-path path "items")))
+          (array (parse-schema items (extend-path path "items")))))
+
+      (= schema-type "string")
+      (if (string? description)
+        (string description)
+        (string))
+
+      (= schema-type "integer")
+      (if (string? description)
+        (int description)
+        (int))
+
+      (= schema-type "number")
+      (if (string? description)
+        (number description)
+        (number))
+
+      (= schema-type "boolean")
+      (if (string? description)
+        (boolean description)
+        (boolean))
+
+      :else
+      (throw (ex-info (str "Unknown or missing schema type at " path)
+                      {:path path
+                       :type schema-type
+                       :schema schema})))))
+
+(defn from-json-string
+  "Parses a JSON schema string and constructs a JsonObjectSchema.
+
+  Supports JSON Schema features:
+  - Object types with properties, required fields, and additionalProperties
+  - Primitive types: string, integer, number, boolean
+  - Array types with item schemas
+  - Enum types
+  - References using $ref
+  - anyOf combinator for union types
+  - Descriptions for all schema types
+  - Nested objects and arrays
+
+  Unsupported features (will throw exceptions):
+  - Constraints: minimum, maximum, minLength, maxLength, pattern, format
+  - Logical combinators: allOf, oneOf, not
+  - Other: const, default
+
+  Args:
+    json-str - JSON string containing the schema definition
+
+  Returns:
+    JsonSchema object (typically JsonObjectSchema)
+
+  Throws:
+    ExceptionInfo if JSON is invalid or contains unsupported features
+
+  Example:
+  <pre>
+  (from-json-string
+    \"{\\\"type\\\": \\\"object\\\",
+      \\\"properties\\\": {
+        \\\"name\\\": {\\\"type\\\": \\\"string\\\", \\\"description\\\": \\\"User name\\\"},
+        \\\"age\\\": {\\\"type\\\": \\\"integer\\\"}
+      },
+      \\\"required\\\": [\\\"name\\\"]}\")
+  </pre>"
+  [json-str]
+  (try
+    (let [schema (j/read-value json-str j/keyword-keys-object-mapper)]
+      (parse-schema schema "$"))
+    (catch com.fasterxml.jackson.core.JsonParseException e
+      (throw (ex-info "Invalid JSON in schema string"
+                      {:error (.getMessage e)}
+                      e)))))

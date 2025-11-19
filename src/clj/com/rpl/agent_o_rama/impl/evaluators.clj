@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
+   [com.rpl.agent-o-rama.langchain4j.json :as lj]
    [com.rpl.rama.ops :as ops]
    [expound.alpha :as expound]
    [jsonista.core :as j])
@@ -22,9 +23,7 @@
     SystemMessage
     TextContent
     ToolExecutionResultMessage
-    UserMessage]
-   [dev.langchain4j.model.chat.request.json
-    JsonRawSchema]))
+    UserMessage]))
 
 (spec/def ::description string?)
 (spec/def ::default string?)
@@ -94,8 +93,7 @@
   \"properties\": {
     \"score\": {
       \"type\": \"integer\",
-      \"minimum\": 0,
-      \"maximum\": 10
+      \"description\": \"Numeric score from 0-10\"
     }
   },
   \"required\": [\"score\"],
@@ -135,7 +133,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                    :response-format
                    (lc4j/json-response-format
                     "Evaluation"
-                    (JsonRawSchema/from output-schema))}))
+                    (lj/from-json-string output-schema))}))
                 .aiMessage
                 .text
                 j/read-value)))))
@@ -224,7 +222,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
      :input-path? false
      ;; output-path? and reference-output-path? default to true
     }}})
-    
+
 (defn invalid-json-path
   [json-path]
   (if (empty? json-path)
