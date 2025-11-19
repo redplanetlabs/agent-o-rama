@@ -1164,7 +1164,7 @@
         [selected-node set-selected-node-internal] (uix/use-state nil)
 
         ;; Sidebar width state (default 320px)
-        [sidebar-width set-sidebar-width] (uix/use-state 320)
+        [sidebar-width set-sidebar-width] (common/use-local-storage "graph-sidebar-width" 320)
 
         affected-nodes (when forking-mode?
                          (find-downstream-nodes graph-data (set (keys changed-nodes))))
