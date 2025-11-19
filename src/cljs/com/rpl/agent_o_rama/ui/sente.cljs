@@ -20,15 +20,16 @@
 
 (defn firefox?
   []
-  (when-let [user-agent (.-userAgent js/navigator)]
-    (re-find #"Firefox" user-agent)))
+  (when (and (exists? js/navigator)
+             (.-userAgent js/navigator))
+    (re-find #"Firefox" (.-userAgent js/navigator))))
 
 ;; 1. Instantiate the Sente channel socket client
 (let [{:keys [chsk ch-recv send-fn state]}
       (sente/make-channel-socket-client!
        "/chsk"
        nil ; No CSRF token for development
-       {:type   (if (firefox?) :ajax :auto)
+       {:type (if (firefox?) :ajax :auto)
         :packer transit-packer})]
 
   ;; 2. Define the vars for our Sente client

@@ -53,8 +53,10 @@ jobs:
     - name: Install Playwright browsers
       run: npx playwright install --with-deps chromium
 
-    - name: Compile ClojureScript tests
-      run: lein with-profile +ui run -m shadow.cljs.devtools.cli compile :test
+    - name: Compile and run ClojureScript tests
+      run: |
+        lein with-profile +ui run -m shadow.cljs.devtools.cli compile :test
+        node target/test/test.js
 
     - name: Start REPL and launch modules
       env:
