@@ -373,9 +373,10 @@
                        :checked (= (:value selector-type-field) :example-ids)
                        :disabled (zero? selection-count) ;; Disable if nothing is selected
                        :on-change #((:on-change selector-type-field) :example-ids)})
-                   ($ :label.ml-3.block.text-sm.text-gray-700
+                   ($ :label
                       {:htmlFor "selected-examples"
-                       :className (when (zero? selection-count) "text-gray-400 cursor-not-allowed")
+                       :className (common/cn "ml-3 block text-sm text-gray-700"
+                                             {"text-gray-400 cursor-not-allowed" (zero? selection-count)})
                        :title (when (zero? selection-count) "Select examples from the list to enable this option.")}
                       (if (pos? selection-count)
                         (str "Only the " selection-count " selected examples")
