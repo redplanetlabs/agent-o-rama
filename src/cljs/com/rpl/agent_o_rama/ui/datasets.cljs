@@ -417,7 +417,7 @@
                  :title (when is-read-only? "Cannot remove tags from a read-only snapshot.")}
                 "Remove Tag...")
 
-;; Try Summary Evaluator button
+             ;; Try Summary Evaluator button
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:onClick #(when (seq selected-example-ids)
                              ;; Show the new unified modal in :multi mode
@@ -429,7 +429,33 @@
                                                                                            :selected-example-ids selected-example-ids})}]))}
                 "Try summary evaluator")
 
-;; Delete Selected button
+             ;; Run Experiment button
+             ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.cursor-pointer
+                {:onClick #(state/dispatch [:modal/show-form :create-experiment
+                                            {:module-id module-id
+                                             :dataset-id dataset-id
+                                             :snapshot snapshot-name
+                                             :selector {:type :example-ids}
+                                             :spec {:type :regular}}])
+                 :title "Run a regular experiment with the selected examples"}
+                "Run Experiment")
+
+             ;; Run Comparative Experiment button
+             ($ :button.px-3.py-1.text-sm.bg-indigo-600.text-white.rounded-md.hover:bg-indigo-700.cursor-pointer
+                {:onClick #(state/dispatch [:modal/show-form :create-experiment
+                                            {:module-id module-id
+                                             :dataset-id dataset-id
+                                             :snapshot snapshot-name
+                                             :selector {:type :example-ids}
+                                             :spec {:type :comparative
+                                                    :targets [{:target-spec {:type :agent :agent-name nil}
+                                                               :input->args [{:id (random-uuid) :value "$"}]}
+                                                              {:target-spec {:type :agent :agent-name nil}
+                                                               :input->args [{:id (random-uuid) :value "$"}]}]}}])
+                 :title "Run a comparative experiment with the selected examples"}
+                "Run Comparative Experiment")
+
+             ;; Delete Selected button
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-red-300.text-red-700.rounded-md.hover:bg-red-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:disabled is-read-only?
                  :onClick #(when-not is-read-only?
