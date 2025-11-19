@@ -980,8 +980,37 @@
              "Clear All Changes")))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
-                            module-id agent-name task-id forks fork-of invoke-id]}]
-  (let [active-tab (state/use-sub [:ui :active-tab])]
+                            module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change]}]
+  (let [active-tab (state/use-sub [:ui :active-tab])
+        [is-dragging set-is-dragging] (uix/use-state false)
+
+        handle-mouse-down (fn [e]
+                            (.preventDefault e)
+                            (set-is-dragging true))
+
+        handle-mouse-move (useCallback
+                           (fn [e]
+                             (when is-dragging
+                               (let [new-width (- (.-innerWidth js/window) (.-clientX e))]
+                                 (when (and (>= new-width 280) (<= new-width 800))
+                                   (on-sidebar-width-change new-width)))))
+                           #js [is-dragging on-sidebar-width-change])
+
+        handle-mouse-up (useCallback
+                         (fn [e]
+                           (set-is-dragging false))
+                         #js [])]
+
+    ;; Add/remove mouse event listeners for dragging
+    (uix/use-effect
+     (fn []
+       (when is-dragging
+         (.addEventListener js/document "mousemove" handle-mouse-move)
+         (.addEventListener js/document "mouseup" handle-mouse-up)
+         (fn []
+           (.removeEventListener js/document "mousemove" handle-mouse-move)
+           (.removeEventListener js/document "mouseup" handle-mouse-up))))
+     [is-dragging handle-mouse-move handle-mouse-up])
 
     ;; Update forking mode when tab changes
     (uix/use-effect
@@ -1000,11 +1029,21 @@
          (state/dispatch [:db/set-value [:ui :active-tab] :info])))
      [is-live changed-nodes])
 
-    ($ :div {:className (common/cn "fixed right-0 top-32 h-[calc(100vh-8rem)] w-80 bg-white shadow-lg border-l border-gray-200 flex flex-col z-40")
+    ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] bg-white shadow-lg border-l border-gray-200 flex flex-col z-40"
+             :style {:width (str sidebar-width "px")}
              :data-id "agent-info-panel"}
+
+       ;; Draggable resize handle
+       ($ :div {:className (common/cn "absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 transition-colors"
+                                      {"bg-blue-500" is-dragging})
+                :style {:marginLeft "-2px"}
+                :onMouseDown handle-mouse-down}
+          ;; Visual indicator
+          ($ :div {:className "absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-1 h-12 bg-gray-400 rounded-full pointer-events-none"}))
+
        ;; Tab header
-       ($ :div {:className (common/cn "border-b border-gray-200 p-4 flex-shrink-0")}
-          ($ :div {:className (common/cn "flex space-x-1 bg-gray-100 rounded-lg p-1")}
+       ($ :div {:className "border-b border-gray-200 p-4 flex-shrink-0"}
+          ($ :div {:className "flex space-x-1 bg-gray-100 rounded-lg p-1"}
              ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
                                                {"bg-white text-gray-900 shadow-sm" (= active-tab :info)
                                                 "text-gray-600 hover:text-gray-900" (not= active-tab :info)})
@@ -1124,6 +1163,9 @@
   (let [;; Convert selected-node-id to actual node object when needed
         [selected-node set-selected-node-internal] (uix/use-state nil)
 
+        ;; Sidebar width state (default 320px)
+        [sidebar-width set-sidebar-width] (uix/use-state 320)
+
         affected-nodes (when forking-mode?
                          (find-downstream-nodes graph-data (set (keys changed-nodes))))
 
@@ -1168,7 +1210,7 @@
          ($ :div.text-gray-500 "No graph data available"))
       ($ :<>
          ;; Main content area with right margin for the stats panel
-         ($ :div {:className "mr-80"
+         ($ :div {:style {:marginRight (str sidebar-width "px")}
                   :data-id "agent-graph-panel"}
             ($ :div {:style {:width "100%" :height "500px"}}
                ($ ReactFlow {:nodes flow-nodes
@@ -1282,4 +1324,6 @@
                          :task-id task-id
                          :forks forks
                          :fork-of fork-of
-                         :invoke-id invoke-id})))))
+                         :invoke-id invoke-id
+                         :sidebar-width sidebar-width
+                         :on-sidebar-width-change set-sidebar-width})))))
