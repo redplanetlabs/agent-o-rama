@@ -430,7 +430,7 @@
                 "Try summary evaluator")
 
              ;; Run Experiment button
-             ($ :button.px-3.py-1.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.cursor-pointer
+             ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
                 {:onClick #(state/dispatch [:modal/show-form :create-experiment
                                             {:module-id module-id
                                              :dataset-id dataset-id
@@ -441,7 +441,7 @@
                 "Run Experiment")
 
              ;; Run Comparative Experiment button
-             ($ :button.px-3.py-1.text-sm.bg-indigo-600.text-white.rounded-md.hover:bg-indigo-700.cursor-pointer
+             ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
                 {:onClick #(state/dispatch [:modal/show-form :create-experiment
                                             {:module-id module-id
                                              :dataset-id dataset-id
