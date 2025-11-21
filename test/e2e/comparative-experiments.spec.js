@@ -319,5 +319,131 @@ test.describe('Comparative Experiment Flow', () => {
 
     console.log('--- Test successfully completed and cleaned up. ---');
   });
+
+  test('should run comparative experiment from selection bar button', async ({ page }) => {
+    const uniqueId = randomUUID().substring(0, 8);
+    const datasetName = `e2e-comp-button-dataset-${uniqueId}`;
+    const experimentName = `e2e-comp-button-experiment-${uniqueId}`;
+
+    // ---
+    // PHASE 1: SETUP
+    // ---
+    console.log('--- PHASE 1: SETUP ---');
+    await page.goto('/');
+    const agentRow = await getE2ETestAgentRow(page);
+    await agentRow.click();
+
+    // Create Evaluator
+    await page.getByText('Evaluators').click();
+    await createEvaluator(page, selectLongestEvaluator);
+
+    // Create Dataset and Examples
+    await page.getByText('Datasets & Experiments').click();
+    await createDataset(page, datasetName);
+    await page.getByRole('link', { name: datasetName }).click();
+    await page.getByRole('link', { name: 'Examples' }).click();
+    
+    // Add only 2 examples for this test
+    for (const example of examples.slice(0, 2)) {
+      await addExample(page, example);
+    }
+    console.log('Setup complete: Dataset created with 2 examples.');
+
+    // ---
+    // PHASE 2: SELECT EXAMPLES AND RUN FROM BUTTON
+    // ---
+    console.log('--- PHASE 2: RUN FROM SELECTION BAR ---');
+    
+    // Select both examples
+    const row1 = page.locator('table tbody tr').nth(0);
+    const row2 = page.locator('table tbody tr').nth(1);
+    await row1.locator('td').first().click();
+    await row2.locator('td').first().click();
+
+    // Verify contextual action bar is visible
+    await expect(page.getByText('2 examples selected')).toBeVisible();
+    console.log('Selected 2 examples.');
+
+    // Click "Run Comparative Experiment" button
+    await page.getByRole('button', { name: 'Run Comparative Experiment' }).click();
+
+    const expModal = page.locator('[role="dialog"]');
+    await expect(expModal).toBeVisible();
+
+    // Verify form is pre-configured
+    await expect(expModal.getByLabel(/Only the 2 selected examples/)).toBeChecked();
+    await expect(expModal.getByRole('heading', { name: 'Target 1' })).toBeVisible();
+    await expect(expModal.getByRole('heading', { name: 'Target 2' })).toBeVisible();
+    console.log('Verified comparative experiment form defaults to 2 targets with selected examples.');
+
+    await expModal.getByLabel('Experiment Name').fill(experimentName);
+
+    // Configure Target 1
+    const target0 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 1' }).first();
+    await target0.getByTestId('agent-name-dropdown').click();
+    await target0.getByText(agentToRun, { exact: true }).click();
+    await target0.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target1_output"}');
+
+    // Configure Target 2
+    const target1 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 2' }).first();
+    await target1.getByTestId('agent-name-dropdown').click();
+    await target1.getByText(agentToRun, { exact: true }).click();
+    await target1.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target2_output"}');
+    console.log('Configured 2 targets for the experiment.');
+
+    // Configure Evaluator
+    await addEvaluatorToExperiment(page, expModal, selectLongestEvaluator.name);
+    console.log('Evaluator configured.');
+
+    // Run Experiment
+    await expModal.getByRole('button', { name: 'Run Experiment' }).click();
+    await expect(expModal).not.toBeVisible();
+    console.log('Experiment started.');
+
+    // Wait for redirect to comparative experiments list and then navigate to the experiment
+    await expect(page).toHaveURL(/comparative-experiments$/, { timeout: 30000 });
+    await page.getByRole('row').filter({ hasText: experimentName }).click();
+    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 });
+    console.log('Experiment completed.');
+
+    // ---
+    // PHASE 3: VERIFICATION
+    // ---
+    console.log('--- PHASE 3: VERIFICATION ---');
+    
+    // Verify table structure
+    const resultsTable = page.locator('table').filter({ hasText: 'Input' });
+    await expect(resultsTable.locator('tbody tr')).toHaveCount(2);
+    console.log('Verified: Ran on exactly 2 selected examples.');
+
+    // Verify outputs are present and winner highlighting works
+    const row = resultsTable.locator('tbody tr').first();
+    const output1Cell = row.locator('td').nth(2);
+    const output2Cell = row.locator('td').nth(3);
+    
+    // Check that both outputs are present
+    await expect(output1Cell).toContainText(/short|winner/);
+    await expect(output2Cell).toContainText(/short|winner/);
+    
+    // Check that one is highlighted as winner (has green background)
+    const hasWinner = await output1Cell.evaluate(el => el.classList.contains('bg-green-50'))
+                   || await output2Cell.evaluate(el => el.classList.contains('bg-green-50'));
+    expect(hasWinner).toBe(true);
+    console.log('Verified: Winner highlighting is working.');
+
+    // ---
+    // PHASE 4: TEARDOWN
+    // ---
+    console.log('--- PHASE 4: TEARDOWN ---');
+    page.on('dialog', dialog => dialog.accept());
+
+    await page.getByText('Datasets & Experiments').click();
+    await deleteDataset(page, datasetName);
+
+    await page.getByText('Evaluators').click();
+    await deleteEvaluator(page, selectLongestEvaluator.name);
+
+    console.log('--- Test successfully completed and cleaned up. ---');
+  });
 });
 

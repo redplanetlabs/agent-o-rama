@@ -37,6 +37,7 @@ const testCases = [
   { name: 'Latest - Tag B', snapshot: 'Latest (Working Copy)', selectorType: 'tag', selectorTag: 'tag-b', expectedCount: 2 },
   { name: 'Latest - Tag C', snapshot: 'Latest (Working Copy)', selectorType: 'tag', selectorTag: 'tag-c', expectedCount: 2 },
   { name: 'Latest - Selected Examples (A & D)', snapshot: 'Latest (Working Copy)', selectorType: 'selected', selectedExamples: ['A', 'D'], expectedCount: 2 },
+  { name: 'Latest - Selected Examples via Button (B & E)', snapshot: 'Latest (Working Copy)', selectorType: 'selected-button', selectedExamples: ['B', 'E'], expectedCount: 2 },
 ];
 
 // =============================================================================
@@ -71,6 +72,53 @@ async function selectExamplesInUI(page, { snapshot, selectedExamples }) {
     await exampleRow.locator('td').first().click(); // Click the checkbox cell
     console.log(`Selected example: ${exampleInput}`);
   }
+}
+
+async function runExperimentFromSelectionBar(page, { experimentName, selectedExamples, expectedCount, module_id, dataset_id }) {
+  console.log(`--- Running Experiment from Selection Bar: "${experimentName}" ---`);
+  
+  // Click the "Run Experiment" button from the contextual action bar
+  await page.getByRole('button', { name: 'Run Experiment', exact: true }).click();
+  const modal = page.locator('[role="dialog"]');
+  await expect(modal).toBeVisible();
+
+  // 1. Fill out the form
+  await modal.getByLabel('Experiment Name').fill(experimentName);
+  
+  // Verify that the selector is already set to "selected examples"
+  const selectedRadio = modal.getByLabel(new RegExp(`Only the ${selectedExamples.length} selected examples`));
+  await expect(selectedRadio).toBeChecked();
+  console.log(`Verified selector is pre-set to selected examples (${selectedExamples.length} examples)`);
+
+  // Configure Target Agent
+  await modal.getByTestId('agent-name-dropdown').click();
+  await modal.getByText(agentToRun, { exact: true }).click();
+  await modal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
+  
+  // Select Evaluator
+  await addEvaluatorToExperiment(page, modal, evaluatorName);
+  
+  // 2. Run the experiment
+  await modal.getByRole('button', { name: 'Run Experiment' }).click();
+  await expect(modal).not.toBeVisible();
+  console.log('Experiment started...');
+
+  // 3. Wait for completion and verify results
+  await expect(page).toHaveURL(/experiments\//, { timeout: 30000 });
+  await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 }); // Wait up to 2 mins for completion
+  console.log('Experiment completed.');
+
+  // The most important check: verify the number of examples it ran on.
+  const summaryTable = page.locator('table').filter({ hasText: '# Examples' });
+  await expect(summaryTable.locator('td').first().locator('div').nth(1)).toHaveText(String(expectedCount));
+  
+  const resultsTable = page.locator('table').filter({ hasText: 'Input' });
+  await expect(resultsTable.locator('tbody tr')).toHaveCount(expectedCount);
+  console.log(`Verified experiment ran on ${expectedCount} examples as expected.`);
+
+  // 4. Navigate back to the experiments list
+  await page.getByText('Back').click();
+  console.log(`--- Finished Experiment: "${experimentName}" ---`);
 }
 
 async function runAndVerifyExperiment(page, { experimentName, snapshot, selectorType, selectorTag, selectedExamples, expectedCount, module_id, dataset_id }) {
@@ -227,27 +275,38 @@ test.describe('Experiment Filtering with Tags and Snapshots', () => {
       await page.getByText('Datasets & Experiments').click();
       await page.getByRole('link', { name: datasetName }).click();
       
-      // If this is a "selected" test case, we need to select examples first
-      if (tc.selectorType === 'selected') {
+      // If this is a "selected" or "selected-button" test case, we need to select examples first
+      if (tc.selectorType === 'selected' || tc.selectorType === 'selected-button') {
         await selectExamplesInUI(page, {
           snapshot: tc.snapshot,
           selectedExamples: tc.selectedExamples
         });
-      } 
+      }
 
-      // select experiments tab
-      await page.getByRole('link', { name: 'Experiments', exact: true }).click();
+      // For "selected-button" test case, run directly from the selection bar
+      if (tc.selectorType === 'selected-button') {
+        await runExperimentFromSelectionBar(page, {
+          experimentName: tc.name,
+          selectedExamples: tc.selectedExamples,
+          expectedCount: tc.expectedCount,
+          module_id: module_id,
+          dataset_id: dataset_id,
+        });
+      } else {
+        // For all other test cases, navigate to experiments tab first
+        await page.getByRole('link', { name: 'Experiments', exact: true }).click();
 
-      await runAndVerifyExperiment(page, {
-        experimentName: tc.name,
-        snapshot: tc.snapshot,
-        selectorType: tc.selectorType,
-        selectorTag: tc.selectorTag,
-        selectedExamples: tc.selectedExamples,
-        expectedCount: tc.expectedCount,
-        module_id: module_id,
-        dataset_id: dataset_id,
-      });
+        await runAndVerifyExperiment(page, {
+          experimentName: tc.name,
+          snapshot: tc.snapshot,
+          selectorType: tc.selectorType,
+          selectorTag: tc.selectorTag,
+          selectedExamples: tc.selectedExamples,
+          expectedCount: tc.expectedCount,
+          module_id: module_id,
+          dataset_id: dataset_id,
+        });
+      }
     }
 
     // =============================================================================

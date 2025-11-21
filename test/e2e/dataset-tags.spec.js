@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getE2ETestAgentRow, addExample, deleteDataset } from './helpers.js';
+import { getE2ETestAgentRow, addExample, deleteDataset, createEvaluator, deleteEvaluator, addEvaluatorToExperiment } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE
@@ -146,6 +146,136 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     await page.getByText('Datasets & Experiments').click();
     await expect(page).toHaveURL(/datasets/);
     await deleteDataset(page, datasetName);
+    console.log('--- Cleanup Complete ---');
+  });
+
+  test('should show and use experiment buttons when examples are selected', async ({ page }) => {
+    const uniqueId = randomUUID().substring(0, 8);
+    const datasetName = `Experiment Buttons Test ${uniqueId}`;
+    const evaluatorName = `e2e-test-evaluator-${uniqueId}`;
+    const agentToRun = 'E2ETestAgent';
+
+    // --- 1. SETUP ---
+    console.log('--- Starting Test Setup ---');
+    await page.goto('/');
+    await expect(page).toHaveTitle(/Agent-o-rama/);
+
+    const agentRow = await getE2ETestAgentRow(page);
+    await agentRow.click();
+
+    // Create evaluator first
+    await page.getByText('Evaluators').click();
+    await createEvaluator(page, {
+      name: evaluatorName,
+      builderName: 'random-float',
+      description: 'Test evaluator for button tests',
+    });
+
+    // Create dataset and examples
+    await page.getByText('Datasets & Experiments').click();
+    await page.getByRole('button', { name: 'Create Dataset' }).first().click();
+    const createModal = page.locator('[role="dialog"]');
+    await createModal.getByLabel('Name').fill(datasetName);
+    await createModal.getByRole('button', { name: 'Create Dataset' }).click();
+    await expect(createModal).not.toBeVisible();
+
+    await page.getByRole('link', { name: datasetName }).click();
+    await page.getByRole('link', { name: 'Examples' }).click();
+
+    const example1 = { input: { "run-id": `ex1-${uniqueId}`, "output-value": "output 1" }, output: "output 1" };
+    const example2 = { input: { "run-id": `ex2-${uniqueId}`, "output-value": "output 2" }, output: "output 2" };
+    const example3 = { input: { "run-id": `ex3-${uniqueId}`, "output-value": "output 3" }, output: "output 3" };
+
+    await addExample(page, example1);
+    await addExample(page, example2);
+    await addExample(page, example3);
+    console.log('--- Test Setup Complete ---');
+
+    // --- 2. VERIFY BUTTONS APPEAR WHEN EXAMPLES SELECTED ---
+    console.log('--- Testing Button Visibility ---');
+    
+    // Initially, buttons should not be visible (no selection)
+    await expect(page.getByRole('button', { name: 'Run Experiment', exact: true })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run Comparative Experiment' })).not.toBeVisible();
+
+    // Select examples
+    const row1 = page.locator('table tbody tr').filter({ hasText: example1.input["run-id"] });
+    const row2 = page.locator('table tbody tr').filter({ hasText: example2.input["run-id"] });
+    await row1.locator('td').first().click();
+    await row2.locator('td').first().click();
+
+    // Buttons should now be visible
+    await expect(page.getByRole('button', { name: 'Run Experiment', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run Comparative Experiment' })).toBeVisible();
+    console.log('--- Buttons Visible After Selection ---');
+
+    // --- 3. TEST RUN EXPERIMENT BUTTON ---
+    console.log('--- Testing Run Experiment Button ---');
+    await page.getByRole('button', { name: 'Run Experiment', exact: true }).click();
+    
+    const expModal = page.locator('[role="dialog"]');
+    await expect(expModal).toBeVisible();
+
+    // Verify the form is pre-configured
+    await expect(expModal.getByLabel(/Only the 2 selected examples/)).toBeChecked();
+    console.log('Verified selector is pre-set to selected examples');
+
+    // Fill out the experiment form
+    await expModal.getByLabel('Experiment Name').fill(`Regular Exp ${uniqueId}`);
+    await expModal.getByTestId('agent-name-dropdown').click();
+    await expModal.getByText(agentToRun, { exact: true }).click();
+    await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
+    await addEvaluatorToExperiment(page, expModal, evaluatorName);
+    
+    await expModal.getByRole('button', { name: 'Run Experiment' }).click();
+    await expect(expModal).not.toBeVisible();
+
+    // Wait for experiment to complete
+    await expect(page).toHaveURL(/experiments\//, { timeout: 30000 });
+    await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 });
+
+    // Verify it ran on 2 examples
+    const summaryTable = page.locator('table').filter({ hasText: '# Examples' });
+    await expect(summaryTable.locator('td').first().locator('div').nth(1)).toHaveText('2');
+    console.log('--- Run Experiment Button Test Complete ---');
+
+    // Navigate back to examples
+    await page.getByText('Datasets & Experiments').click();
+    await page.getByRole('link', { name: datasetName }).click();
+    await page.getByRole('link', { name: 'Examples' }).click();
+
+    // --- 4. TEST RUN COMPARATIVE EXPERIMENT BUTTON ---
+    console.log('--- Testing Run Comparative Experiment Button ---');
+    
+    // Select examples again (selection was cleared)
+    await row1.locator('td').first().click();
+    await row2.locator('td').first().click();
+
+    await page.getByRole('button', { name: 'Run Comparative Experiment' }).click();
+    
+    const compModal = page.locator('[role="dialog"]');
+    await expect(compModal).toBeVisible();
+
+    // Verify the form is pre-configured for comparative
+    await expect(compModal.getByLabel(/Only the 2 selected examples/)).toBeChecked();
+    await expect(compModal.getByRole('heading', { name: 'Target 1' })).toBeVisible();
+    await expect(compModal.getByRole('heading', { name: 'Target 2' })).toBeVisible();
+    console.log('Verified comparative form is pre-set with 2 targets and selected examples');
+
+    // Close the modal without running
+    await compModal.getByRole('button', { name: '×' }).click();
+    await expect(compModal).not.toBeVisible();
+    console.log('--- Run Comparative Experiment Button Test Complete ---');
+
+    // --- 5. CLEANUP ---
+    console.log('--- Starting Cleanup ---');
+    page.on('dialog', dialog => dialog.accept());
+    
+    await page.getByText('Datasets & Experiments').click();
+    await deleteDataset(page, datasetName);
+    
+    await page.getByText('Evaluators').click();
+    await deleteEvaluator(page, evaluatorName);
     console.log('--- Cleanup Complete ---');
   });
 
