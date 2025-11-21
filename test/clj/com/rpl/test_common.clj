@@ -107,6 +107,10 @@
 
 (defn text-segment
   ^TextSegment [text metadata-map]
+  ;; Convert numeric values to Integer for consistent type handling.
+  ;; Clojure numeric literals are Long by default, but converting to Integer
+  ;; enables reliable pattern matching in test assertions that check for
+  ;; Integer class specifically (see object-wrapping-test).
   (let [java-metadata (into {}
                             (map (fn [[k v]]
                                    [k (if (number? v) (Integer. (int v)) v)])
