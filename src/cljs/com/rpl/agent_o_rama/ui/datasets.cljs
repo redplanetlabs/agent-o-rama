@@ -429,24 +429,26 @@
                                                                                            :selected-example-ids selected-example-ids})}]))}
                 "Try summary evaluator")
 
-             ;; Run Experiment button
+;; Run Experiment button
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
                 {:onClick #(state/dispatch [:modal/show-form :create-experiment
                                             {:module-id module-id
                                              :dataset-id dataset-id
                                              :snapshot snapshot-name
-                                             :selector {:type :example-ids}
+                                             :selector {:type :example-ids
+                                                        :example-ids selected-example-ids}
                                              :spec {:type :regular}}])
                  :title "Run a regular experiment with the selected examples"}
                 "Run Experiment")
 
-             ;; Run Comparative Experiment button
+;; Run Comparative Experiment button
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
                 {:onClick #(state/dispatch [:modal/show-form :create-experiment
                                             {:module-id module-id
                                              :dataset-id dataset-id
                                              :snapshot snapshot-name
-                                             :selector {:type :example-ids}
+                                             :selector {:type :example-ids
+                                                        :example-ids selected-example-ids}
                                              :spec {:type :comparative
                                                     :targets [{:target-spec {:type :agent :agent-name nil}
                                                                :input->args [{:id (random-uuid) :value "$"}]}
@@ -464,9 +466,9 @@
                 "Delete Selected"))))))
 
 (defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?
-                             has-more? is-fetching-more? load-more]}]
+                             has-more? is-fetching-more? load-more
+                             selected-ids set-selected-ids]}]
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
-        selected-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
         all-on-page-ids (set (map :id examples))
         all-selected? (and (seq all-on-page-ids)
                            (clojure.set/subset? all-on-page-ids selected-ids))]
@@ -485,15 +487,15 @@
        ($ :table.min-w-full.divide-y.divide-gray-200
           ($ :thead.bg-gray-50
              ($ :tr
-      ;; Checkbox column header - entire cell is clickable
+               ;; Checkbox column header - entire cell is clickable
                 ($ :th.px-4.py-3.text-left.cursor-pointer.hover:bg-blue-100
-                   {:onClick #(state/dispatch [:datasets/toggle-all-selection
-                                               {:dataset-id dataset-id
-                                                :example-ids-on-page all-on-page-ids
-                                                :select-all? (not all-selected?)}])}
+                   {:onClick #(set-selected-ids
+                               (if all-selected?
+                                 #{}
+                                 (into selected-ids all-on-page-ids)))}
                    ($ :input {:type "checkbox"
                               :checked all-selected?
-                              :readOnly true ; Make it read-only since cell handles the click
+                              :readOnly true
                               :className "pointer-events-none"}))
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Input")
                 ($ :th.px-6.py-3.text-left.text-xs.font-medium.text-gray-500.uppercase.tracking-wider "Reference Output")
@@ -518,17 +520,19 @@
                                                                     :dataset-id dataset-id
                                                                     :snapshot-name snapshot-name
                                                                     :on-delete-success on-delete-success
-                                                                    :is-read-only? is-read-only?})}])} ;; Pass read-only state
+                                                                    :is-read-only? is-read-only?})}])}
                     ;; Checkbox column - entire cell is clickable
                     ($ :td.px-4.py-4.cursor-pointer.hover:bg-blue-100
                        {:onClick (fn [e]
-                                   (.stopPropagation e) ; Prevent row click
-                                   (state/dispatch [:datasets/toggle-selection
-                                                    {:dataset-id dataset-id
-                                                     :example-id example-id}]))}
+                                   (.stopPropagation e)
+                                   (set-selected-ids
+                                    (fn [current-ids]
+                                      (if (contains? current-ids example-id)
+                                        (disj current-ids example-id)
+                                        (conj current-ids example-id)))))}
                        ($ :input {:type "checkbox"
                                   :checked is-selected?
-                                  :readOnly true ; Make it read-only since cell handles the click
+                                  :readOnly true
                                   :className "pointer-events-none"}))
                     ;; Input column
                     ($ :td.px-6.py-4.text-sm.font-mono.max-w-xs
@@ -545,21 +549,19 @@
                            ($ :div.truncate.cursor-help {:title output-str} output-str)
                            ($ :span "—"))))
                     ;; Tags column
-                    ;; Tags column
                     ($ :td.px-6.py-4.whitespace-nowrap.text-sm.text-gray-500
                        (let [tags (:tags example)]
                          (if (and tags (seq tags))
                            (->> tags
-                                (map name) ; Convert keywords to strings
-                                (sort) ; Sort alphabetically
-                                (clojure.string/join ", ")) ; Join with commas
+                                (map name)
+                                (sort)
+                                (clojure.string/join ", "))
                            ($ :span.italic "no tags"))))
-;; Created timestamp column
                     ;; Created timestamp column
                     ($ :td.px-6.py-4.text-sm.text-gray-600
                        {:title (common/format-timestamp (:created-at example))}
                        (common/format-relative-time (:created-at example)))
-;; Modified timestamp column
+                    ;; Modified timestamp column
                     ($ :td.px-6.py-4.text-sm.text-gray-600
                        {:title (common/format-timestamp (:modified-at example))}
                        (common/format-relative-time (:modified-at example)))
@@ -575,7 +577,7 @@
                             ;; Three dots button - prevent row click when clicking
                             ($ :button.inline-flex.items-center.justify-center.w-8.h-8.rounded-full.text-gray-400.hover:text-gray-600.hover:bg-gray-100.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-indigo-500.cursor-pointer
                                {:onClick (fn [e]
-                                           (.stopPropagation e) ; Prevent row click
+                                           (.stopPropagation e)
                                            (set-open-dropdown (if is-open? nil example-id)))}
                                ($ EllipsisVerticalIcon {:className "h-5 w-5"}))
 
@@ -589,8 +591,7 @@
                                        {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
                                         :onClick (fn [e]
                                                    (.stopPropagation e)
-                                                   (set-open-dropdown nil) ; Close dropdown
-                                                   ;; Show the new unified modal in :single mode
+                                                   (set-open-dropdown nil)
                                                    (state/dispatch [:modal/show :run-evaluator
                                                                     {:title "Try Evaluator on Example"
                                                                      :component ($ evaluators/RunEvaluatorModal {:module-id module-id
@@ -604,20 +605,18 @@
                                        {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
                                         :onClick (fn [e]
                                                    (.stopPropagation e)
-                                                   (set-open-dropdown nil) ; Close dropdown
+                                                   (set-open-dropdown nil)
                                                    (sente/request!
                                                     [:datasets/add-example
                                                      {:module-id module-id
                                                       :dataset-id dataset-id
                                                       :snapshot-name snapshot-name
-                                                      ;; Pass the data from the current example
                                                       :input (:input example)
                                                       :output (:reference-output example)
-                                                      :tags (vec (:tags example))}] ;; Pass tags as well
+                                                      :tags (vec (:tags example))}]
                                                     10000
                                                     (fn [reply]
                                                       (if (:success reply)
-                                                        ;; Invalidate query to refresh the list with the new example
                                                         (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                                         (js/alert (str "Error duplicating example: " (:error reply)))))))}
                                        ($ DocumentDuplicateIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
@@ -627,7 +626,7 @@
                                        {:className "group flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-red-100 hover:text-red-800 cursor-pointer"
                                         :onClick (fn [e]
                                                    (.stopPropagation e)
-                                                   (set-open-dropdown nil) ; Close dropdown
+                                                   (set-open-dropdown nil)
                                                    (when (js/confirm "Are you sure you want to delete this example?")
                                                      (sente/request!
                                                       [:datasets/delete-example
@@ -934,8 +933,8 @@
       :else ($ detail-examples {:module-id module-id :dataset-id dataset-id}))))
 
 (defui detail-examples [{:keys [module-id dataset-id]}]
-  (let [;; Get selected examples for this dataset
-        selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
+  (let [;; --- CHANGED: Use local state instead of app-db for selection ---
+        [selected-example-ids set-selected-example-ids] (uix/use-state #{})
 
         ;; --- REFACTORED ---
         ;; State for selected snapshot now comes from app-db and is updated via dispatch
@@ -983,9 +982,9 @@
                     :value search-string
                     :onChange #(set-search-string (.. % -target -value))}))
 
-;; Right side - Action buttons
+             ;; Right side - Action buttons
              ($ :div.flex.items-center.space-x-4
-;; Export button
+                ;; Export button
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.bg-white.border.border-gray-300.hover:bg-gray-50.cursor-pointer
                    {:onClick (fn [_]
                                (let [snapshot-param (when-not (str/blank? selected-snapshot-name)
@@ -994,7 +993,7 @@
                                  (set! (.-href js/window.location) href)))}
                    "Export")
 
-                   ;; Import button - next to export
+                ;; Import button - next to export
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.bg-white.border.border-gray-300.hover:bg-gray-50.cursor-pointer.disabled:opacity-50.disabled:cursor-not-allowed
                    {:onClick #(state/dispatch [:modal/show :dataset-import
                                                {:title "Import Examples from JSONL"
@@ -1005,7 +1004,7 @@
                     :title (when is-read-only? "Cannot import into a read-only snapshot.")}
                    "Import")
 
-                   ;; Add Example button
+                ;; Add Example button
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.text-white.bg-blue-600.hover:bg-blue-700.cursor-pointer.disabled:bg-gray-400.disabled:cursor-not-allowed
                    {:onClick #(datasets-forms/show-add-example-modal!
                                {:module-id module-id
@@ -1053,6 +1052,9 @@
                                             :dataset-id dataset-id
                                             :snapshot-name selected-snapshot-name
                                             :is-read-only? is-read-only?
+                                            ;; Pass local selection state handlers
+                                            :selected-ids selected-example-ids
+                                            :set-selected-ids set-selected-example-ids
                                             ;; Pass pagination props
                                             :has-more? hasMore
                                             :is-fetching-more? isFetchingMore

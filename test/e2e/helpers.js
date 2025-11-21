@@ -123,6 +123,9 @@ export async function addExample(page, { input, output, tags }) {
   await createModal.getByRole('button', { name: 'Add Example' }).click();
   await expect(createModal).not.toBeVisible({ timeout: 15000 });
 
+  // Wait for paginated query to refetch after invalidation
+  await page.waitForTimeout(500);
+
   // Step 3: Wait for the new row to appear
   await expect(async () => {
     const rowsAfter = await page.locator('table tbody tr').count();

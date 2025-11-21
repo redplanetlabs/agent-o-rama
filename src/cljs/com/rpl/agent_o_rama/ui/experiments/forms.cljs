@@ -307,8 +307,9 @@
         use-remote-evaluators-field (forms/use-form-field form-id :use-remote-evaluators)
         use-remote-evaluators? (:value use-remote-evaluators-field)
 
-        ;; Get selected examples from global state
-        selected-example-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
+;; Get selected examples from form state (passed as initial data)
+        selector-example-ids-field (forms/use-form-field form-id [:selector :example-ids])
+        selected-example-ids (or (:value selector-example-ids-field) #{})
         selection-count (count selected-example-ids)
 
         ;; Target config fields
@@ -515,13 +516,8 @@
   (fn [db form-state]
     (let [{:keys [form-id module-id dataset-id spec]} form-state
           spec-type (get spec :type)
-          ;; Get selected IDs from the DB at submission time
-          selected-ids (get-in db [:ui :datasets :selected-examples dataset-id])
-
-          ;; Add selected IDs to the selector if that option was chosen
-          form-with-selection (if (= (get-in form-state [:selector :type]) :example-ids)
-                                (assoc-in form-state [:selector :example-ids] (vec selected-ids))
-                                form-state)
+;; Example IDs are already in form-state from initial data, no need to add them
+          form-with-selection form-state
 
           ;; Parse metadata and convert input->args back to simple strings for the backend
           cleaned-form-state (update-in form-with-selection [:spec :targets]
