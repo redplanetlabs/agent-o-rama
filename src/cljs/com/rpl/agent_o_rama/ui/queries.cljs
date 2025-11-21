@@ -160,6 +160,7 @@
                                      new-items (or (:items response-data)
                                                    (:agent-invokes response-data)
                                                    (:datasets response-data)
+                                                   (:examples response-data)
                                                    [])
                                      new-pagination (:pagination-params response-data)
                                      ;; Check if more pages are available (handles both string and map formats)

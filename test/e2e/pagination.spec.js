@@ -209,6 +209,77 @@ test.describe('Pagination Tests', () => {
     console.log(`✓ Cleanup complete - deleted ${datasetNames.length} datasets`);
   });
 
+  test('should paginate dataset examples correctly with Load More button', async ({ page }) => {
+    console.log('--- Testing Dataset Examples Pagination ---');
+    test.setTimeout(120000); // 2 minutes
+    
+    // Navigate to datasets page
+    await page.getByText('Datasets & Experiments').click();
+    await expect(page).toHaveURL(/datasets/);
+    
+    // Create a dedicated dataset for examples pagination
+    const datasetName = `examples-pagination-test-${uniqueId}`;
+    await createDataset(page, datasetName);
+    
+    // Navigate to the dataset
+    await page.getByRole('link', { name: datasetName }).click();
+    await page.getByRole('link', { name: 'Examples' }).click();
+    
+    // Add 25 examples (page size is 20) to trigger pagination
+    // We can do this faster by importing a JSONL file via the UI if we wanted, 
+    // but addExample loop is reliable enough given the timeout.
+    console.log('Creating 25 examples to trigger pagination...');
+    
+    const examples = [];
+    for (let i = 1; i <= 25; i++) {
+      examples.push({
+        input: { "id": `pg-ex-${i}`, "value": `test value ${i}` },
+        output: { "result": `output ${i}` }
+      });
+    }
+
+    // Use helper to add examples sequentially
+    // This might take a bit of time, but ensures clean state
+    for (let i = 0; i < examples.length; i++) {
+      // Only log every 5th one to keep output clean
+      if ((i + 1) % 5 === 0) console.log(`Adding example ${i + 1}/25...`);
+      await addExample(page, examples[i]);
+    }
+    
+    // Verify initial state (should show ~20 items and Load More button)
+    const rowsBefore = await page.locator('table tbody tr').count();
+    console.log(`Initial visible examples: ${rowsBefore}`);
+    expect(rowsBefore).toBeGreaterThanOrEqual(20);
+    
+    const loadMoreButton = page.locator('tfoot tr').filter({ hasText: 'Load More' });
+    await expect(loadMoreButton).toBeVisible();
+    console.log('✓ Load More button is visible');
+    
+    // Click Load More
+    await loadMoreButton.click();
+    await expect(page.locator('tfoot').filter({ hasText: 'Loading...' })).not.toBeVisible({ timeout: 10000 });
+    
+    // Verify count increased
+    await expect(async () => {
+      const rowsAfter = await page.locator('table tbody tr').count();
+      expect(rowsAfter).toBeGreaterThan(rowsBefore);
+      expect(rowsAfter).toBe(25);
+    }).toPass({ timeout: 5000 });
+    
+    const finalCount = await page.locator('table tbody tr').count();
+    console.log(`✓ Loaded all examples. Final count: ${finalCount}`);
+    
+    // Verify Load More is gone
+    await expect(loadMoreButton).not.toBeVisible();
+    
+    // Cleanup
+    console.log('Cleaning up dataset...');
+    page.on('dialog', dialog => dialog.accept());
+    await page.getByText('Datasets & Experiments').click();
+    await deleteDataset(page, datasetName);
+    console.log('✓ Cleanup complete');
+  });
+
   test('should handle search with pagination', async ({ page }) => {
     console.log('--- Testing Search with Pagination ---');
     test.setTimeout(120000); // 2 minutes

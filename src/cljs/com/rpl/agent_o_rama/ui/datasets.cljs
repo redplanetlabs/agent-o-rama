@@ -463,7 +463,8 @@
                  :title (when is-read-only? "Cannot delete examples from a read-only snapshot.")}
                 "Delete Selected"))))))
 
-(defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
+(defui ExamplesList [{:keys [examples module-id dataset-id snapshot-name on-delete-success is-read-only?
+                             has-more? is-fetching-more? load-more]}]
   (let [[open-dropdown set-open-dropdown] (uix/use-state nil)
         selected-ids (or (state/use-sub [:ui :datasets :selected-examples dataset-id]) #{})
         all-on-page-ids (set (map :id examples))
@@ -642,7 +643,21 @@
                                                             (when on-delete-success (on-delete-success)))
                                                           (js/alert (str "Error deleting example: " (:error reply))))))))}
                                        ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
-                                       "Delete")))))))))))))))
+                                       "Delete")))))))))))
+
+          ;; Load More Footer
+          (when has-more?
+            ($ :tfoot.bg-gray-50.border-t.border-gray-200
+               ($ :tr.hover:bg-gray-100.transition-colors.duration-150
+                  {:onClick (when-not is-fetching-more? load-more)}
+                  ($ :td.px-4.py-3.cursor-pointer {:colSpan 8}
+                     ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
+                        ($ :span.mr-2.text-sm.font-medium (if is-fetching-more? "Loading..." "Load More"))
+                        (when-not is-fetching-more?
+                          ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
+                             ($ :path {:fillRule "evenodd"
+                                       :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                       :clipRule "evenodd"}))))))))))))
 
 (defn get-dataset-path [module-id dataset-id]
   (rfe/href :module/dataset-detail.examples
@@ -932,21 +947,21 @@
 
         ;; State for search string
         [search-string set-search-string] (uix/use-state "")
+        [debounced-search-string] (useDebounce search-string 300)
 
-        ;; Fetch examples
-        {:keys [data loading? error refetch]}
-        (queries/use-sente-query
-         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name search-string]
+        ;; Use the paginated query hook
+        {:keys [data isLoading isFetchingMore hasMore loadMore error refetch]}
+        (queries/use-paginated-query
+         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name debounced-search-string]
           :sente-event [:datasets/search-examples {:module-id module-id
                                                    :dataset-id dataset-id
                                                    :snapshot-name selected-snapshot-name
-                                                   :filters (when-not (str/blank? search-string)
-                                                              {:search-string search-string})
-                                                   :limit 20
-                                                   :pagination nil}]
+                                                   :filters (when-not (str/blank? debounced-search-string)
+                                                              {:search-string debounced-search-string})}]
+          :page-size 20
           :enabled? (boolean (and module-id dataset-id))})
 
-        examples (get data :examples)]
+        examples data]
 
     ($ :div.h-full.flex.flex-col
        ;; Examples Tab Header with Controls
@@ -1021,8 +1036,11 @@
           ($ :div.h-full.flex.flex-col
              ($ :div.flex-1.overflow-hidden
                 (cond
-                  loading? ($ :div.flex.items-center.justify-center.h-full
-                              ($ :div "Loading examples..."))
+                  (and isLoading (empty? examples)) ;; Only show full loading if no data exists yet
+                  ($ :div.flex.items-center.justify-center.h-full
+                     ($ common/spinner {:size :large})
+                     ($ :div.ml-2.text-gray-500 "Loading examples..."))
+
                   error ($ :div.flex.items-center.justify-center.h-full
                            ($ :div.text-red-500 "Error loading examples."))
                   (empty? examples) ($ :div.flex.items-start.justify-center.h-screen
@@ -1034,7 +1052,11 @@
                                             :module-id module-id
                                             :dataset-id dataset-id
                                             :snapshot-name selected-snapshot-name
-                                            :is-read-only? is-read-only?})))))))))
+                                            :is-read-only? is-read-only?
+                                            ;; Pass pagination props
+                                            :has-more? hasMore
+                                            :is-fetching-more? isFetchingMore
+                                            :load-more loadMore})))))))))
 
 ;; =============================================================================
 ;; DATASET DETAIL LAYOUT COMPONENT
