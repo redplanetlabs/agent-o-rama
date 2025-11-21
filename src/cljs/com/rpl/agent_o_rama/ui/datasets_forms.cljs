@@ -378,10 +378,8 @@
             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
                   ;; 2. Get the CURRENTLY selected snapshot name from its state path.
                   snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
-                  ;; 3. Get the CURRENTLY selected example IDs from their state path.
-                  example-ids (s/select-one (state/path->specter-path [:ui :datasets :selected-examples dataset-id]) db)
-                  ;; 4. Get the tag name from the form state.
-                  {:keys [tag-name]} form-state]
+                  ;; 3. Get example IDs from form state (passed as props)
+                  {:keys [tag-name example-ids]} form-state]
               [:datasets/add-tag-to-examples
                {:module-id module-id
                 :dataset-id dataset-id
@@ -418,10 +416,8 @@
             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
                   ;; 2. Get the CURRENTLY selected snapshot name from its state path.
                   snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
-                  ;; 3. Get the CURRENTLY selected example IDs from their state path.
-                  example-ids (s/select-one (state/path->specter-path [:ui :datasets :selected-examples dataset-id]) db)
-                  ;; 4. Get the tag name from the form state.
-                  {:keys [tag-name]} form-state]
+                  ;; 3. Get example IDs from form state (passed as props)
+                  {:keys [tag-name example-ids]} form-state]
               [:datasets/remove-tag-from-examples
                {:module-id module-id
                 :dataset-id dataset-id
