@@ -308,7 +308,8 @@
   (search [this request]
     (EmbeddingSearchResult.
      [(EmbeddingMatch. 0.5 "11" (tc/embedding 0.1 0.2) (tc/text-segment "foo" {"source" "doc1" "page" 1}))
-      (EmbeddingMatch. 0.75 "12" (tc/embedding 1.5 0.3) (tc/text-segment "bar" {"source" "doc2" "page" 3}))]
+      (EmbeddingMatch. 0.75 "12" (tc/embedding 1.5 0.3) (tc/text-segment "bar" {"source" "doc2" "page" 3}))
+      (EmbeddingMatch. 0.6 "13" (tc/embedding 0.2 0.4) nil)]
     )))
 
 (deftest object-wrapping-test
@@ -695,6 +696,8 @@
                             {"id"    "12"
                              "score" ["d" "0.75"]
                              "metadata" {"source" "doc2" "page" ["i" "3"]}}
+                            {"id"    "13"
+                             "score" ["d" "0.6"]}
                            ]
                           }}]
          :input         ["emb" ""]}}
