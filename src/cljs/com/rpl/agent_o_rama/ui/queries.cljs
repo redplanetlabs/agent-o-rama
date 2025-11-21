@@ -7,15 +7,17 @@
 
 (defn has-more-pages?
   "Checks if pagination-params indicates more data is available.
-   Handles two backend formats:
+   Handles backend formats:
    - String: 'next-cursor' or nil
-   - Map: {:i0 'cursor'} or {:i0 nil}"
+   - Map: {:i0 'cursor'} or {:i0 nil}
+   - UUID: A UUID cursor object"
   [pagination-params]
   (boolean
    (cond
      (nil? pagination-params) false
      (string? pagination-params) (seq pagination-params)
      (map? pagination-params) (some some? (vals pagination-params))
+     (uuid? pagination-params) true
      :else false)))
 
 (defhook use-sente-query
