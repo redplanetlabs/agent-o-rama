@@ -281,10 +281,9 @@ test.describe('Experiment Filtering with Tags and Snapshots', () => {
           snapshot: tc.snapshot,
           selectedExamples: tc.selectedExamples
         });
-      }
-
-      // For "selected-button" test case, run directly from the selection bar
-      if (tc.selectorType === 'selected-button') {
+        
+        // For both "selected" and "selected-button", run directly from the selection bar
+        // Selection context is only preserved when opening modal from Examples page
         await runExperimentFromSelectionBar(page, {
           experimentName: tc.name,
           selectedExamples: tc.selectedExamples,

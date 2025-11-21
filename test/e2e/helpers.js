@@ -105,9 +105,19 @@ export async function createEvaluator(page, { name, builderName, description, pa
 export async function addExample(page, { input, output, tags }) {
   console.log('Adding example with input:', JSON.stringify(input), 'tags:', tags);
   
-  // Step 1: Count existing rows before adding
-  const rowsBefore = await page.locator('table tbody tr').count();
-  console.log(`Rows before adding example: ${rowsBefore}`);
+  // Step 1: Check if table exists (may not exist if no examples yet)
+  const table = page.locator('table tbody');
+  const hasTable = await table.isVisible().catch(() => false);
+  
+  let rowsBefore = 0;
+  if (hasTable) {
+    // Wait for table to be stable before counting
+    await page.waitForTimeout(300);
+    rowsBefore = await page.locator('table tbody tr').count();
+    console.log(`Rows before adding example: ${rowsBefore}`);
+  } else {
+    console.log('No table yet (empty state)');
+  }
   
   // Step 2: Create the example
   await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
@@ -126,7 +136,9 @@ export async function addExample(page, { input, output, tags }) {
   // Wait for paginated query to refetch after invalidation
   await page.waitForTimeout(500);
 
-  // Step 3: Wait for the new row to appear
+  // Step 3: Wait for table to appear (if it didn't exist) and new row to be added
+  await expect(table).toBeVisible({ timeout: 5000 });
+  
   await expect(async () => {
     const rowsAfter = await page.locator('table tbody tr').count();
     expect(rowsAfter).toBe(rowsBefore + 1);
