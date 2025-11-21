@@ -324,6 +324,13 @@ test.describe('Comparative Experiment Flow', () => {
     const uniqueId = randomUUID().substring(0, 8);
     const datasetName = `e2e-comp-button-dataset-${uniqueId}`;
     const experimentName = `e2e-comp-button-experiment-${uniqueId}`;
+    
+    // Define evaluator config local to this test with this test's uniqueId
+    const selectLongestEvaluator = {
+      name: `e2e-select-longest-${uniqueId}`,
+      builderName: 'select-longest',
+      description: 'Comparative evaluator that selects the longest output.',
+    };
 
     // ---
     // PHASE 1: SETUP
