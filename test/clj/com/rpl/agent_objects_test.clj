@@ -603,103 +603,107 @@
                              10000))
 
 ;; Verify all nested operations exist with correct types
-     (let [nested-ops (select-one [:invokes-map MAP-VALS :nested-ops] trace)]
-       (is (= 11 (count nested-ops)))
-       
-       ;; Verify write operations
-       (is (= :db-write (:type (nth nested-ops 0))))
-       (is (= "add" (get-in (nth nested-ops 0) [:info "op"])))
-       (is (= "999" (get-in (nth nested-ops 0) [:info "id"])))
-       (is (= "emb" (get-in (nth nested-ops 0) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 1))))
-       (is (= "add" (get-in (nth nested-ops 1) [:info "op"])))
-       (is (= "1001" (get-in (nth nested-ops 1) [:info "id"])))
-       (is (= "emb" (get-in (nth nested-ops 1) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 2))))
-       (is (= "add" (get-in (nth nested-ops 2) [:info "op"])))
-       (is (= "abcd" (get-in (nth nested-ops 2) [:info "id"])))
-       (is (= "emb" (get-in (nth nested-ops 2) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 3))))
-       (is (= "addAll" (get-in (nth nested-ops 3) [:info "op"])))
-       (is (= ["0" "1"] (get-in (nth nested-ops 3) [:info "ids"])))
-       (is (= "emb" (get-in (nth nested-ops 3) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 4))))
-       (is (= "addAll" (get-in (nth nested-ops 4) [:info "op"])))
-       (is (= ["0" "1"] (get-in (nth nested-ops 4) [:info "ids"])))
-       (is (= "emb" (get-in (nth nested-ops 4) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 5))))
-       (is (= "addAll" (get-in (nth nested-ops 5) [:info "op"])))
-       (is (= ["7" "8"] (get-in (nth nested-ops 5) [:info "ids"])))
-       (is (= "emb" (get-in (nth nested-ops 5) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 6))))
-       (is (= "remove" (get-in (nth nested-ops 6) [:info "op"])))
-       (is (= "id1" (get-in (nth nested-ops 6) [:info "id"])))
-       (is (= "emb" (get-in (nth nested-ops 6) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 7))))
-       (is (= "removeAll" (get-in (nth nested-ops 7) [:info "op"])))
-       (is (= "emb" (get-in (nth nested-ops 7) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 8))))
-       (is (= "removeAll" (get-in (nth nested-ops 8) [:info "op"])))
-       (is (= "IsEqualTo(key=a, comparisonValue=1)" (get-in (nth nested-ops 8) [:info "filter"])))
-       (is (= "emb" (get-in (nth nested-ops 8) [:info "objectName"])))
-       
-       (is (= :db-write (:type (nth nested-ops 9))))
-       (is (= "removeAll" (get-in (nth nested-ops 9) [:info "op"])))
-       (is (= ["id1" "id2"] (get-in (nth nested-ops 9) [:info "ids"])))
-       (is (= "emb" (get-in (nth nested-ops 9) [:info "objectName"])))
-       
-       ;; Verify search operation with metadata extraction
-       (let [search-op (nth nested-ops 10)]
-         (is (= :db-read (:type search-op)))
-         (is (= "search" (get-in search-op [:info "op"])))
-         (is (= "emb" (get-in search-op [:info "objectName"])))
-         (is (= "IsEqualTo(key=b, comparisonValue=2)" (get-in search-op [:info "request" "filter"])))
-         (is (= 5 (get-in search-op [:info "request" "maxResults"])))
-         (is (= 0.75 (get-in search-op [:info "request" "minScore"])))
-         
-         ;; Verify matches structure
-         (let [matches (get-in search-op [:info "matches"])]
-           (is (= 5 (count matches)))
-           
-           ;; First match: has TextSegment metadata
-           (let [m1 (first matches)]
-             (is (= "11" (get m1 "id")))
-             (is (= 0.5 (get m1 "score")))
-             (is (map? (get m1 "metadata")))
-             (is (= "doc1" (get-in m1 ["metadata" "source"])))
-             (is (= 1 (get-in m1 ["metadata" "page"]))))
-           
-           ;; Second match: has TextSegment metadata
-           (let [m2 (second matches)]
-             (is (= "12" (get m2 "id")))
-             (is (= 0.75 (get m2 "score")))
-             (is (map? (get m2 "metadata")))
-             (is (= "doc2" (get-in m2 ["metadata" "source"])))
-             (is (= 3 (get-in m2 ["metadata" "page"]))))
-           
-           ;; Third match: null embedded, no metadata key
-           (let [m3 (nth matches 2)]
-             (is (= "13" (get m3 "id")))
-             (is (= 0.6 (get m3 "score")))
-             (is (not (contains? m3 "metadata"))))
-           
-           ;; Fourth match: Document embedded, no metadata key
-           (let [m4 (nth matches 3)]
-             (is (= "14" (get m4 "id")))
-             (is (= 0.8 (get m4 "score")))
-             (is (not (contains? m4 "metadata"))))
-           
-           ;; Fifth match: TextSegment with empty metadata
-           (let [m5 (nth matches 4)]
-             (is (= "15" (get m5 "id")))
-             (is (= 0.9 (get m5 "score")))
-             (is (= {} (get m5 "metadata")))))))
+     (is
+      (trace-matches?
+       (walk/postwalk
+        (fn [x]
+          ;; meander seems unable to match floats/doubles/ints, so do this as a
+          ;; workaround
+          (cond
+            (= (class (float-array 0)) (class x))
+            ["*" (mapv str x)]
+
+            (= Integer (class x))
+            ["i" (str x)]
+
+            (= Double (class x))
+            ["d" (str x)]
+
+            :else
+            x))
+        (:invokes-map trace))
+       {!id1
+        {:agent-id      ?agent-id
+         :emits         []
+         :agent-task-id ?agent-task-id
+         :node          "start"
+         :result        {:val "eee" :failure? false}
+         :nested-ops    [{:type :db-write
+                          :info
+                          {"op"         "add"
+                           "id"         "999"
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "add"
+                           "id"         "1001"
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "add"
+                           "id"         "abcd"
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "addAll"
+                           "ids"        ["0" "1"]
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "addAll"
+                           "ids"        ["0" "1"]
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "addAll"
+                           "ids"        ["7" "8"]
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "remove"
+                           "id"         "id1"
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "removeAll"
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "removeAll"
+                           "filter"     "IsEqualTo(key=a, comparisonValue=1)"
+                           "objectName" "emb"}}
+                         {:type :db-write
+                          :info
+                          {"op"         "removeAll"
+                           "ids"        ["id1" "id2"]
+                           "objectName" "emb"}}
+                         {:type :db-read
+                          :info
+                          {"op"         "search"
+                           "objectName" "emb"
+                           "request"
+                           {"filter"     "IsEqualTo(key=b, comparisonValue=2)"
+                            "maxResults" ["i" "5"]
+                            "minScore"   ["d" "0.75"]}
+                           "matches"
+                           [{"id"       "11"
+                             "score"    ["d" "0.5"]
+                             "metadata" {"source" "doc1"
+                                         "page"   ["i" "1"]}}
+                            {"id"       "12"
+                             "score"    ["d" "0.75"]
+                             "metadata" {"source" "doc2"
+                                         "page"   ["i" "3"]}}
+                            {"id"    "13"
+                             "score" ["d" "0.6"]}
+                            {"id"    "14"
+                             "score" ["d" "0.8"]}
+                            {"id"       "15"
+                             "score"    ["d" "0.9"]
+                             "metadata" {}}]}}]
+         :input         ["emb" ""]}}
+       (m/guard
+        (and (= ?agent-id agent-id)
+             (= ?agent-task-id agent-task-id)))
+      ))
     )))
