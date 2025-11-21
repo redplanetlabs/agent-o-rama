@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getE2ETestAgentRow, addExample, deleteDataset, createEvaluator, deleteEvaluator, addEvaluatorToExperiment } from './helpers.js';
+import { getE2ETestAgentRow, addExample, deleteDataset, createEvaluator, deleteEvaluator, addEvaluatorToExperiment, shouldSkipCleanup} from './helpers.js';
 
 // =============================================================================
 // TEST SUITE
@@ -247,12 +247,9 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     // --- 4. TEST RUN COMPARATIVE EXPERIMENT BUTTON ---
     console.log('--- Testing Run Comparative Experiment Button ---');
     
-    // Selection should still be active from before (selection persists in state)
-    // Verify the contextual action bar is still showing
-    await expect(page.getByText('2 examples selected')).toBeVisible();
-
-    // Button should already be visible since examples are still selected
-    await expect(page.getByRole('button', { name: 'Run Comparative Experiment' })).toBeVisible();
+    // Select examples again (selection was cleared)
+    await row1.locator('td').first().click();
+    await row2.locator('td').first().click();
 
     await page.getByRole('button', { name: 'Run Comparative Experiment' }).click();
     

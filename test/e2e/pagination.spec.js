@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getE2ETestAgentRow, createEvaluator, createDataset, deleteEvaluator, deleteDataset, addExample} from './helpers.js';
+import { getE2ETestAgentRow, createEvaluator, createDataset, deleteEvaluator, deleteDataset, addExample, shouldSkipCleanup} from './helpers.js';
 
 // =============================================================================
 // PAGINATION TEST SUITE
@@ -258,6 +258,21 @@ test.describe('Pagination Tests', () => {
         console.log(`Added ${exampleCount} examples, checking for Load More...`);
         await page.waitForTimeout(300);
       }
+    }
+    
+    // Ensure there's at least one more example beyond what's visible
+    // This guarantees the "Load More" has actual data to fetch
+    if (await loadMoreButton.isVisible() && exampleCount <= 20) {
+      exampleCount++;
+      console.log(`Load More appeared at ${exampleCount - 1} examples, adding one more to ensure page 2 has data...`);
+      await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
+      const modal = page.locator('[role="dialog"]');
+      await expect(modal).toBeVisible();
+      await modal.getByLabel('Input (JSON)').fill(JSON.stringify({ "id": `pg-ex-${exampleCount}`, "value": `test value ${exampleCount}` }, null, 2));
+      await modal.getByLabel('Output (JSON, Optional)').fill(JSON.stringify({ "result": `output ${exampleCount}` }, null, 2));
+      await modal.getByRole('button', { name: 'Add Example' }).click();
+      await expect(modal).not.toBeVisible({ timeout: 15000 });
+      await page.waitForTimeout(500); // Wait for backend to process
     }
     
     console.log(`✓ Created ${exampleCount} examples, Load More button is visible`);
