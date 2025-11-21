@@ -307,8 +307,8 @@
   (^void removeAll [this ^java.util.Collection ids])
   (search [this request]
     (EmbeddingSearchResult.
-     [(EmbeddingMatch. 0.5 "11" (tc/embedding 0.1 0.2) "foo")
-      (EmbeddingMatch. 0.75 "12" (tc/embedding 1.5 0.3) "bar")]
+     [(EmbeddingMatch. 0.5 "11" (tc/embedding 0.1 0.2) (tc/text-segment "foo" {"source" "doc1" "page" 1}))
+      (EmbeddingMatch. 0.75 "12" (tc/embedding 1.5 0.3) (tc/text-segment "bar" {"source" "doc2" "page" 3}))]
     )))
 
 (deftest object-wrapping-test
@@ -690,9 +690,11 @@
                             "minScore"   ["d" "0.75"]}
                            "matches"
                            [{"id"    "11"
-                             "score" ["d" "0.5"]}
+                             "score" ["d" "0.5"]
+                             "metadata" {"source" "doc1" "page" ["i" "1"]}}
                             {"id"    "12"
-                             "score" ["d" "0.75"]}
+                             "score" ["d" "0.75"]
+                             "metadata" {"source" "doc2" "page" ["i" "3"]}}
                            ]
                           }}]
          :input         ["emb" ""]}}

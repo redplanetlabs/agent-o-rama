@@ -31,6 +31,8 @@
     StreamingChatModel]
    [dev.langchain4j.data.embedding
     Embedding]
+   [dev.langchain4j.data.segment
+    TextSegment]
    [dev.langchain4j.data.message
     ChatMessage]
    [dev.langchain4j.model.chat.request
@@ -769,8 +771,12 @@
                       "minScore"   (.minScore request)}
            "matches" (mapv
                       (fn [^EmbeddingMatch match]
-                        {"id"    (.embeddingId match)
-                         "score" (.score match)})
+                        (let [embedded (.embedded match)
+                              base-map {"id"    (.embeddingId match)
+                                        "score" (.score match)}]
+                          (if (instance? TextSegment embedded)
+                            (assoc base-map "metadata" (into {} (.toMap (.metadata ^TextSegment embedded))))
+                            base-map)))
                       (.matches res))
           }))
 
