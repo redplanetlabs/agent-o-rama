@@ -775,7 +775,10 @@
                               base-map {"id"    (.embeddingId match)
                                         "score" (.score match)}]
                           (if (instance? TextSegment embedded)
-                            (assoc base-map "metadata" (into {} (.toMap (.metadata ^TextSegment embedded))))
+                            (let [metadata (.metadata ^TextSegment embedded)]
+                              (if metadata
+                                (assoc base-map "metadata" (into {} (.toMap metadata)))
+                                base-map))
                             base-map)))
                       (.matches res))
           }))

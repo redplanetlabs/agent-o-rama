@@ -23,6 +23,8 @@
     TopologyUtils]
    [dev.langchain4j.data.document
     Document]
+   [dev.langchain4j.data.segment
+    TextSegment]
    [dev.langchain4j.data.embedding
     Embedding]
    [dev.langchain4j.data.message
@@ -312,7 +314,8 @@
      [(EmbeddingMatch. 0.5 "11" (tc/embedding 0.1 0.2) (tc/text-segment "foo" {"source" "doc1" "page" 1}))
       (EmbeddingMatch. 0.75 "12" (tc/embedding 1.5 0.3) (tc/text-segment "bar" {"source" "doc2" "page" 3}))
       (EmbeddingMatch. 0.6 "13" (tc/embedding 0.2 0.4) nil)
-      (EmbeddingMatch. 0.8 "14" (tc/embedding 0.3 0.5) (tc/document "doc text" {"author" "Smith" "year" 2023}))])))
+      (EmbeddingMatch. 0.8 "14" (tc/embedding 0.3 0.5) (tc/document "doc text" {"author" "Smith" "year" 2023}))
+      (EmbeddingMatch. 0.9 "15" (tc/embedding 0.4 0.6) (TextSegment/from "baz"))])))
 
 (deftest object-wrapping-test
   (with-open [ipc (rtest/create-ipc)
@@ -702,6 +705,8 @@
                              "score" ["d" "0.6"]}
                             {"id"    "14"
                              "score" ["d" "0.8"]}
+                            {"id"    "15"
+                             "score" ["d" "0.9"]}
                            ]
                           }}]
          :input         ["emb" ""]}}
