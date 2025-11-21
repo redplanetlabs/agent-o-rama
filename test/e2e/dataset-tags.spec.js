@@ -247,9 +247,12 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     // --- 4. TEST RUN COMPARATIVE EXPERIMENT BUTTON ---
     console.log('--- Testing Run Comparative Experiment Button ---');
     
-    // Select examples again (selection was cleared)
-    await row1.locator('td').first().click();
-    await row2.locator('td').first().click();
+    // Selection should still be active from before (selection persists in state)
+    // Verify the contextual action bar is still showing
+    await expect(page.getByText('2 examples selected')).toBeVisible();
+
+    // Button should already be visible since examples are still selected
+    await expect(page.getByRole('button', { name: 'Run Comparative Experiment' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Run Comparative Experiment' }).click();
     
