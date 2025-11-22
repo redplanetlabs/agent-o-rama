@@ -342,8 +342,10 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   await searchInput.clear();
   await searchInput.fill(evaluatorName);
 
-  // Wait for the dropdown container to appear first
-  const dropdownContainer = page.locator('.absolute.z-10');
+  // Wait for the dropdown container (listbox) to appear first
+  const dropdownContainer = modal.getByRole('listbox', {
+    name: 'Evaluator search results',
+  });
   await expect(dropdownContainer).toBeVisible({ timeout: 15000 });
 
   // Check if we see "Loading..." and wait for it to finish
@@ -356,11 +358,14 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
 
   // Now wait for the specific evaluator to appear in the dropdown
   // This accounts for: 300ms debounce + query execution + render time
-  const dropdown = page.locator('.absolute.z-10').filter({ hasText: evaluatorName });
-  await expect(dropdown).toBeVisible({ timeout: 15000 });
+  const evaluatorOption = dropdownContainer.getByRole('option', {
+    name: evaluatorName,
+    exact: true,
+  });
+  await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
   
   // Click the evaluator in the dropdown
-  await dropdown.getByText(evaluatorName, { exact: true }).click();
+  await evaluatorOption.click();
   
   // Verify the evaluator was added by checking for its badge
   await expect(modal.getByText(evaluatorName, { exact: true })).toBeVisible();
