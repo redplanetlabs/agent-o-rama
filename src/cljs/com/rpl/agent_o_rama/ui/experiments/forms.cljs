@@ -49,10 +49,16 @@
      :spec {:type (if is-regular? :regular :comparative)
             :targets (mapv
                       (fn [t]
-                        (let [ts (:target-spec t)]
+                        (let [ts (:target-spec t)
+                              metadata (:metadata t)
+                              metadata-str (cond
+                                             (nil? metadata) ""
+                                             (string? metadata) metadata
+                                             :else (js/JSON.stringify (clj->js metadata)))]
                           {:target-spec (if (:node ts)
                                           (assoc ts :type :node)
                                           (assoc ts :type :agent))
+                           :metadata metadata-str
                            :input->args (normalize-mappings (:input->args t))}))
                       targets)}
      :evaluators (:evaluators info)
@@ -256,7 +262,7 @@
           ($ :textarea.w-full.p-2.border.border-gray-300.rounded-md.text-sm.font-mono
              {:placeholder "{ \"key\": \"value\" }"
               :value (or (:value metadata-field) "")
-              :onChange (:on-change metadata-field)
+              :onChange #((:on-change metadata-field) (.. % -target -value))
               :rows 3})
           (when (:error metadata-field)
             ($ :p.text-sm.text-red-600.mt-1 (:error metadata-field))))
