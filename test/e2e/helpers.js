@@ -342,26 +342,23 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   await searchInput.clear();
   await searchInput.fill(evaluatorName);
 
-  // Wait for the dropdown container (listbox) to appear first
-  const dropdownContainer = modal.getByRole('listbox', {
-    name: 'Evaluator search results',
-  });
-  await expect(dropdownContainer).toBeVisible({ timeout: 15000 });
+  // Wait for the dropdown container (listbox) to appear.
+  // The popover is rendered in a portal, so target it globally.
+  const listboxes = page.getByRole('listbox', { name: 'Evaluator search results' });
+  await expect(listboxes.first()).toBeVisible({ timeout: 15000 });
 
   // Check if we see "Loading..." and wait for it to finish
-  const loadingText = dropdownContainer.getByText('Loading...');
+  const loadingText = listboxes.getByText('Loading...');
   const hasLoading = await loadingText.isVisible().catch(() => false);
   if (hasLoading) {
     console.log(`Waiting for evaluator search results for "${evaluatorName}"...`);
     await expect(loadingText).not.toBeVisible({ timeout: 30000 });
   }
 
-  // Now wait for the specific evaluator to appear in the dropdown
-  // This accounts for: 300ms debounce + query execution + render time
-  const evaluatorOption = dropdownContainer.getByRole('option', {
-    name: evaluatorName,
-    exact: true,
-  });
+  // Now wait for the specific evaluator option to appear in the dropdown
+  const evaluatorOption = page
+    .getByRole('option', { name: evaluatorName, exact: true })
+    .first();
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
   
   // Click the evaluator in the dropdown
