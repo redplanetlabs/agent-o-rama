@@ -33,7 +33,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.m2
-        key: ${{ runner.os }}-lein-${{ hashFiles('**/project.clj') }}
+        key: ${{ runner.os }}-lein-${{ hashFiles('project.clj') }}
         restore-keys: |
           ${{ runner.os }}-lein-
 
@@ -41,7 +41,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
         restore-keys: |
           ${{ runner.os }}-node-
 
