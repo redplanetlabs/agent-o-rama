@@ -277,7 +277,6 @@
             (cond-> {:type "text"
                      :className input-classes
                      :value (or (:value param-field) "")
-                     :placeholder (or (:default param-info) "")
                      :onChange #((:on-change param-field) (.. % -target -value))}
               data-id (assoc :data-id data-id)))
 
@@ -424,6 +423,22 @@
              (:error reply)))))
        js/undefined)
      [])
+
+    ;; Populate action-params with defaults when action is selected
+    (uix/use-effect
+     (fn []
+       (when (and (:value action-name-field) action-builders)
+         (let [action-info (get action-builders (:value action-name-field))
+               params (get-in action-info [:options :params])
+               defaults (into {}
+                              (keep (fn [[param-name param-info]]
+                                      (when-let [default (:default param-info)]
+                                        [param-name default]))
+                                    params))]
+           (when (seq defaults)
+             (state/dispatch [:form/update-field form-id :action-params defaults]))))
+       js/undefined)
+     [(:value action-name-field) action-builders])
 
     ($ :div.space-y-1
        ($ :label.block.text-sm.font-medium.text-gray-700
