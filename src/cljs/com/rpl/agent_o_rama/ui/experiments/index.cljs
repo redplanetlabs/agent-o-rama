@@ -134,7 +134,8 @@
                  :onChange set-start-date
                  :className "border border-gray-300 rounded-md"
                  :clearIcon nil
-                 :maxDate end-date}))
+                 :maxDate end-date
+                 :disableClock true}))
 
           ($ :div.flex.items-center.gap-2
              ($ :label.text-sm.font-medium.text-gray-700 "End Date:")
@@ -143,7 +144,8 @@
                  :onChange set-end-date
                  :className "border border-gray-300 rounded-md"
                  :clearIcon nil
-                 :minDate start-date}))
+                 :minDate start-date
+                 :disableClock true}))
 
           (when (or start-date end-date)
             ($ :button.text-sm.text-blue-600.hover:text-blue-800.underline
