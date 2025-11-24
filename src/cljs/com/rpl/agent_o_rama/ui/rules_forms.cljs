@@ -276,8 +276,7 @@
          ($ :input
             (cond-> {:type "text"
                      :className input-classes
-                     :value (or (:value param-field) "")
-                     :placeholder (or (:default param-info) "")
+                     :value (or (:value param-field) (:default param-info) "")
                      :onChange #((:on-change param-field) (.. % -target -value))}
               data-id (assoc :data-id data-id)))
 
