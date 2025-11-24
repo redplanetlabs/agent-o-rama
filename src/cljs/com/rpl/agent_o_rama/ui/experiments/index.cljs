@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.experiments.index
   (:require
    [uix.core :as uix :refer [defui $]]
-   ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon TrashIcon MagnifyingGlassIcon]]
+   ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon TrashIcon MagnifyingGlassIcon XMarkIcon]]
    ["use-debounce" :refer [useDebounce]]
    ["react-datetime-picker" :default DateTimePicker]
    [com.rpl.agent-o-rama.ui.common :as common]
@@ -129,7 +129,7 @@
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Run New Experiment"))
 
-       ;; Date range filters
+;; Date range filters
        ($ :div.flex.items-center.gap-4.mb-6
           ($ :div.flex.items-center.gap-2
              ($ :label.text-sm.font-medium.text-gray-700 "Start Date:")
@@ -139,7 +139,12 @@
                  :className "border border-gray-300 rounded-md"
                  :clearIcon nil
                  :maxDate end-date
-                 :disableClock true}))
+                 :disableClock true})
+             (when start-date
+               ($ :button.p-1.text-gray-400.hover:text-gray-600.transition-colors
+                  {:onClick #(set-start-date nil)
+                   :title "Clear start date"}
+                  ($ XMarkIcon {:className "h-5 w-5"}))))
 
           ($ :div.flex.items-center.gap-2
              ($ :label.text-sm.font-medium.text-gray-700 "End Date:")
@@ -149,12 +154,12 @@
                  :className "border border-gray-300 rounded-md"
                  :clearIcon nil
                  :minDate start-date
-                 :disableClock true}))
-
-          (when (or start-date end-date)
-            ($ :button.text-sm.text-blue-600.hover:text-blue-800.underline
-               {:onClick #(do (set-start-date nil) (set-end-date nil))}
-               "Clear dates")))
+                 :disableClock true})
+             (when end-date
+               ($ :button.p-1.text-gray-400.hover:text-gray-600.transition-colors
+                  {:onClick #(set-end-date nil)
+                   :title "Clear end date"}
+                  ($ XMarkIcon {:className "h-5 w-5"})))))
 
        ;; Main content
        (cond
