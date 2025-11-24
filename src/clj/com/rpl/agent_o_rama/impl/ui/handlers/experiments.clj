@@ -19,13 +19,28 @@
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-all-for-dataset
   [{:keys [manager dataset-id pagination filters]} uid]
   (let [search-query (:search-experiments-query (aor-types/underlying-objects manager))
-        ;; Process filters to translate type keywords to classes
-        processed-filters (if-let [type (:type filters)]
-                            (assoc filters :type (case type
-                                                   :regular RegularExperiment
-                                                   :comparative ComparativeExperiment
-                                                   nil)) ; Default to nil if unknown
-                            filters)]
+        ;; Helper to convert keyword predicates to functions
+        keyword->pred (fn [k]
+                        (case k
+                          :>= >=
+                          :<= <=
+                          :< <
+                          :> >
+                          k))
+        ;; Process filters to translate type keywords to classes and predicates to functions
+        processed-filters (cond-> filters
+                            ;; Convert type keyword to class
+                            (:type filters)
+                            (assoc :type (case (:type filters)
+                                           :regular RegularExperiment
+                                           :comparative ComparativeExperiment
+                                           nil))
+
+                            ;; Convert predicate keywords to functions in times filter
+                            (:times filters)
+                            (assoc :times (mapv (fn [time-spec]
+                                                  (update time-spec :pred keyword->pred))
+                                                (:times filters))))]
     ;; For the index table, we get the first page with a reasonable limit
     (foreign-invoke-query search-query
                           dataset-id

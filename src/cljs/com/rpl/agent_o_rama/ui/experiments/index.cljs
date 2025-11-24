@@ -74,13 +74,17 @@
         ;; Build the times filter based on selected dates
         times-filter (when (or start-date end-date)
                        (cond-> []
-                         start-date (conj {:pred >= :value (.getTime start-date)})
-                         end-date (conj {:pred <= :value (.getTime end-date)})))
+                         start-date (conj {:pred :>= :value (.getTime start-date)})
+                         end-date (conj {:pred :<= :value (.getTime end-date)})))
 
-        ;; Update the query hook to use the debounced search term and time filter
+;; Update the query hook to use the debounced search term and time filter
+        ;; Convert dates to timestamps for the query key (dates aren't serializable)
+        start-ts (when start-date (.getTime start-date))
+        end-ts (when end-date (.getTime end-date))
+
         {:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:experiments module-id dataset-id :regular debounced-search-term start-date end-date]
+         {:query-key [:experiments module-id dataset-id :regular debounced-search-term start-ts end-ts]
           :sente-event [:experiments/get-all-for-dataset
                         {:module-id module-id
                          :dataset-id dataset-id
