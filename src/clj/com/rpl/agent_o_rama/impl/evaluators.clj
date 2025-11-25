@@ -122,9 +122,9 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
         (fn [fetcher input ref-output output]
           (let [model  (.getAgentObject ^AgentObjectFetcher fetcher model-name)
                 prompt (-> prompt-template
-                           (str/replace "%input" input)
-                           (str/replace "%output" output)
-                           (str/replace "%referenceOutput" ref-output))]
+                           (str/replace "%input" (str input))
+                           (str/replace "%output" (str output))
+                           (str/replace "%referenceOutput" (str ref-output)))]
             (-> model
                 (lc4j/chat
                  (lc4j/chat-request

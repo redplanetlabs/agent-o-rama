@@ -374,6 +374,10 @@
        (let [expected-schema-str (schema->json-string (lj/from-json-string os))]
         (is (= expected-schema-str (get result "outputSchema")))))
 
+     ;; Verify non-string values are converted to strings in template
+     (let [result (aor/try-evaluator manager "ajudge" 42 100 200)]
+       (is (= "1 42 2 100 3 200 4 42" (get result "message"))))
+
      (try
        (aor/create-evaluator! manager
                               "ajudge"
