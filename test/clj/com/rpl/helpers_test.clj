@@ -66,3 +66,34 @@
    (bind template (h/parse-json-path-template "{\"q\": \"$$.a\"}"))
    (is (= {"q" "$.a"} (h/resolve-json-path-template template {"a" [1 2 3] "b" [4 5 6]})))
   ))
+
+(deftest split-into-n-test
+  (testing "basic splitting"
+    (is (= [[1 4 7]
+            [2 5 8]
+            [3 6]]
+           (h/split-into-n 3 [1 2 3 4 5 6 7 8]))))
+
+  (testing "exact multiples"
+    (is (= [[1 4 7]
+            [2 5 8]
+            [3 6 9]]
+           (h/split-into-n 3 [1 2 3 4 5 6 7 8 9]))))
+
+  (testing "n larger than collection"
+    (is (= [[1] [2] [3] [] []]
+           (h/split-into-n 5 [1 2 3]))))
+
+  (testing "empty coll returns n empty vectors"
+    (is (= [[] [] []]
+           (h/split-into-n 3 []))))
+
+  (testing "n = 1 returns everything in one column"
+    (is (= [[1 2 3 4]]
+           (h/split-into-n 1 [1 2 3 4]))))
+
+  (testing "order preservation within each column"
+    (is (= [[0 3 6 9]
+            [1 4 7 10]
+            [2 5 8 11]]
+           (h/split-into-n 3 (range 12))))))

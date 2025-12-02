@@ -360,10 +360,11 @@
 
 (defn split-into-n
   [n coll]
-  (let [rows (partition-all n coll)
-        pad  (map #(take n (concat % (repeat nil))) rows)
-        cols (apply map vector pad)]
-    (mapv (comp vec #(remove nil? %)) cols)))
+  (reduce
+   (fn [cols [i x]]
+     (update cols (mod i n) conj x))
+   (vec (repeat n []))
+   (map-indexed vector coll)))
 
 (def +concatv
   (accumulator
