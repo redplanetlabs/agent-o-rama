@@ -21,6 +21,8 @@
   - Cleans up proxy on unmount
   
   Parameters:
+  - module-id: Module ID (URL-encoded)
+  - agent-name: Agent name (URL-encoded)
   - invoke-id: String in format 'task-id-agent-id'
   - node-name: String name of the node to stream from
   - opts: Optional map with:
@@ -38,16 +40,16 @@
   
   Example:
   ```
-  (let [{:keys [text streaming?]} (use-node-stream invoke-id \"llm-node\")]
+  (let [{:keys [text streaming?]} (use-node-stream module-id agent-name invoke-id \"llm-node\")]
     ($ :div
        ($ :pre text)
        (when streaming?
          ($ :span.animate-pulse \"█\"))))
   ```"
-  ([invoke-id node-name]
-   (use-node-stream invoke-id node-name nil))
+  ([module-id agent-name invoke-id node-name]
+   (use-node-stream module-id agent-name invoke-id node-name nil))
 
-  ([invoke-id node-name opts]
+  ([module-id agent-name invoke-id node-name opts]
    (let [;; Generate unique stream ID (or use provided one)
          stream-id (uix/use-memo
                     (fn []
@@ -74,7 +76,9 @@
                           chunks))]
 
      (println "[STREAMING-FRONTEND] use-node-stream render:"
-              {:invoke-id invoke-id
+              {:module-id module-id
+               :agent-name agent-name
+               :invoke-id invoke-id
                :node-name node-name
                :stream-id stream-id
                :chunk-count (count chunks)
@@ -85,11 +89,15 @@
       (fn []
         ;; 1. Start streaming on mount
         (println "[STREAMING-FRONTEND] useEffect MOUNT - Starting stream")
+        (println "[STREAMING-FRONTEND]   module-id:" module-id)
+        (println "[STREAMING-FRONTEND]   agent-name:" agent-name)
         (println "[STREAMING-FRONTEND]   invoke-id:" invoke-id)
         (println "[STREAMING-FRONTEND]   node-name:" node-name)
         (println "[STREAMING-FRONTEND]   stream-id:" stream-id)
 
-        (let [msg [:stream/start {:invoke-id invoke-id
+        (let [msg [:stream/start {:module-id module-id
+                                  :agent-name agent-name
+                                  :invoke-id invoke-id
                                   :node-name node-name
                                   :stream-id stream-id}]]
           (println "[STREAMING-FRONTEND]   Sending via sente/push!:" (pr-str msg))
@@ -103,8 +111,8 @@
           (sente/push! [:stream/stop {:stream-id stream-id}])
           (state/dispatch [:stream/cleanup {:stream-id stream-id}])
           (println "[STREAMING-FRONTEND]   Cleanup dispatched")))
-      ;; Re-run effect if invoke-id or node-name changes
-      [invoke-id node-name stream-id])
+      ;; Re-run effect if any of these change
+      [module-id agent-name invoke-id node-name stream-id])
 
      ;; Call optional callbacks
      (uix/use-effect
