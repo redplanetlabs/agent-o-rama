@@ -426,7 +426,17 @@
    Only shown when the node is actively streaming (in progress and not complete)."
   [{:keys [module-id agent-name invoke-id node-name node-invoke-id is-streaming?]}]
   (let [{:keys [text streaming? chunks reset-count]}
-        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id)]
+        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id)
+        
+        ;; Ref for auto-scrolling
+        scroll-ref (uix/use-ref nil)]
+    
+    ;; Auto-scroll to bottom when text changes
+    (uix/use-effect
+     (fn []
+       (when-let [el @scroll-ref]
+         (set! (.-scrollTop el) (.-scrollHeight el))))
+     [text])
     
     ;; Only show the panel if we have chunks to display
     (when (seq chunks)
@@ -442,8 +452,9 @@
               ($ :span {:className "text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded"}
                  (str "↻ Reset " reset-count "x"))))
          
-         ;; Streaming content
-         ($ :div {:className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
+         ;; Streaming content with auto-scroll
+         ($ :div {:ref scroll-ref
+                  :className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
             ($ :pre {:className "text-sm text-gray-800 whitespace-pre-wrap font-mono"}
                text
                (when streaming?
