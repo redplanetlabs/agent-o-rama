@@ -13,6 +13,7 @@
    [com.rpl.agent-o-rama.ui.trace-analytics :as trace-analytics]
    [com.rpl.agent-o-rama.ui.feedback :as feedback]
    [com.rpl.agent-o-rama.ui.components.conversation :as conversation]
+   [com.rpl.agent-o-rama.ui.streaming :as streaming]
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
@@ -420,6 +421,44 @@
                  ($ :div {:className "text-xs text-indigo-600 mt-1"}
                     ($ generic-data-viewer {:data info :color "indigo" :depth 0})))))))))
 
+(defui node-streaming-panel
+  "Displays real-time streaming output from a node.
+   Only shown when the node is actively streaming (in progress and not complete)."
+  [{:keys [invoke-id node-name is-streaming?]}]
+  (let [{:keys [text streaming? chunks reset-count]}
+        (streaming/use-node-stream invoke-id node-name)]
+    
+    ;; Only show the panel if we have streaming content or are actively streaming
+    (when (or streaming? (seq chunks))
+      ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4 border border-blue-200"}
+         ($ :div {:className "flex items-center justify-between mb-2"}
+            ($ :div {:className "flex items-center gap-2"}
+               ($ :span {:className "text-sm font-medium text-blue-700"} "Streaming Output")
+               (when streaming?
+                 ($ :span {:className "flex items-center gap-1 text-xs text-blue-600"}
+                    ($ :span {:className "w-2 h-2 bg-blue-500 rounded-full animate-pulse"})
+                    "Live")))
+            (when (pos? reset-count)
+              ($ :span {:className "text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded"}
+                 (str "↻ Reset " reset-count "x"))))
+         
+         ;; Streaming content
+         ($ :div {:className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
+            (if (seq text)
+              ($ :pre {:className "text-sm text-gray-800 whitespace-pre-wrap font-mono"}
+                 text
+                 (when streaming?
+                   ($ :span {:className "inline-block w-2 h-4 bg-blue-500 animate-pulse ml-0.5"})))
+              (when streaming?
+                ($ :div {:className "text-sm text-gray-400 italic flex items-center gap-2"}
+                   ($ common/spinner {:size :small})
+                   "Waiting for output..."))))
+         
+         ;; Chunk count
+         (when (seq chunks)
+           ($ :div {:className "mt-2 text-xs text-blue-500"}
+              (str (count chunks) " chunk" (when (not= (count chunks) 1) "s") " received")))))))
+
 (defui node-emits-panel [{:keys [emits graph-data flow-nodes on-select-node on-paginate-node]}]
   (when (and emits (> (count emits) 0))
     ($ :div {:className "mt-4 bg-indigo-50 p-3 rounded-md"}
@@ -459,38 +498,48 @@
 
 (defui node-details-info-panel [{:keys [data hr hr-invoke-id hitl-response submitting? module-id agent-name invoke-id
                                         node-id node-name result exceptions start-time finish-time duration input
-                                        emits graph-data flow-nodes on-select-node on-paginate-node]}]
-  ($ :<>
-     ($ hitl-request-panel {:hr hr
-                            :hr-invoke-id hr-invoke-id
-                            :hitl-response hitl-response
-                            :submitting? submitting?
-                            :module-id module-id
-                            :agent-name agent-name
-                            :invoke-id invoke-id})
+                                        emits graph-data flow-nodes on-select-node on-paginate-node
+                                        agent-invoke-id]}]
+  (let [;; Determine if node is in progress (started but not finished)
+        is-node-in-progress? (and start-time (not finish-time))]
+    ($ :<>
+       ($ hitl-request-panel {:hr hr
+                              :hr-invoke-id hr-invoke-id
+                              :hitl-response hitl-response
+                              :submitting? submitting?
+                              :module-id module-id
+                              :agent-name agent-name
+                              :invoke-id invoke-id})
 
-     ($ node-info-panel {:node-id node-id
-                         :node-name node-name
-                         :graph-data graph-data
-                         :module-id module-id})
+       ($ node-info-panel {:node-id node-id
+                           :node-name node-name
+                           :graph-data graph-data
+                           :module-id module-id})
 
-     ($ node-exceptions-panel {:exceptions exceptions})
+       ;; Streaming panel - shown for nodes that are in progress or have streaming data
+       (when agent-invoke-id
+         ($ node-streaming-panel {:invoke-id agent-invoke-id
+                                  :node-name node-name
+                                  :is-streaming? is-node-in-progress?}))
 
-     ($ node-input-panel {:input input})
 
-     ($ node-operations-panel {:data data})
+       ($ node-exceptions-panel {:exceptions exceptions})
 
-     ($ node-result-panel {:result result})
+       ($ node-input-panel {:input input})
 
-     ($ node-emits-panel {:emits emits
-                          :graph-data graph-data
-                          :flow-nodes flow-nodes
-                          :on-select-node on-select-node
-                          :on-paginate-node on-paginate-node})
+       ($ node-operations-panel {:data data})
 
-     ($ node-timing-panel {:start-time start-time
-                           :finish-time finish-time
-                           :duration duration})))
+       ($ node-result-panel {:result result})
+
+       ($ node-emits-panel {:emits emits
+                            :graph-data graph-data
+                            :flow-nodes flow-nodes
+                            :on-select-node on-select-node
+                            :on-paginate-node on-paginate-node})
+
+       ($ node-timing-panel {:start-time start-time
+                             :finish-time finish-time
+                             :duration duration}))))
 
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
@@ -559,6 +608,7 @@
                   :module-id module-id
                   :agent-name agent-name
                   :invoke-id invoke-id
+                  :agent-invoke-id invoke-id  ;; Pass invoke-id for streaming
                   :node-id node-id
                   :node-name node-name
                   :result result
