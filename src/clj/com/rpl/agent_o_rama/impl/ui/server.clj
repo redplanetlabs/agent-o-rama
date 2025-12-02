@@ -10,6 +10,7 @@
    [com.rpl.agent-o-rama.impl.ui.handlers.evaluators]
    [com.rpl.agent-o-rama.impl.ui.handlers.invocations]
    [com.rpl.agent-o-rama.impl.ui.handlers.experiments]
+   [com.rpl.agent-o-rama.impl.ui.handlers.streaming]
    [com.rpl.agent-o-rama.impl.ui.handlers.http :as http]
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]

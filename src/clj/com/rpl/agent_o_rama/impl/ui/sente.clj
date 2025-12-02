@@ -29,7 +29,7 @@
 
         ;; The rest of the function now operates on the processed message
         {:keys [id ?reply-fn ?data uid]} processed-ev-msg
-        handler-fn       (get-method -event-msg-handler id)]
+        handler-fn (get-method -event-msg-handler id)]
 
     ;; Check if we found a specific handler or just the default
     (if (= handler-fn (get-method -event-msg-handler :default))
@@ -57,7 +57,17 @@
 (defmethod -event-msg-handler :chsk/ws-ping [_ _])
 (defmethod -event-msg-handler :chsk/ws-pong [_ _])
 (defmethod -event-msg-handler :chsk/uidport-open [_ _])
-(defmethod -event-msg-handler :chsk/uidport-close [_ _])
+(defmethod -event-msg-handler :chsk/uidport-close
+  [ev-msg]
+  (let [uid (:uid ev-msg)]
+    (println "[SENTE] Client disconnected, cleaning up streams for uid:" uid)
+    ;; Call streaming cleanup - require dynamically to avoid circular deps
+    (when-let [cleanup-fn (try
+                            (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.handlers.streaming/close-all-streams-for-uid!)
+                            (catch Exception e
+                              (println "exception" e)
+                              nil))]
+      (cleanup-fn uid))))
 
 (defonce router_ (atom nil))
 

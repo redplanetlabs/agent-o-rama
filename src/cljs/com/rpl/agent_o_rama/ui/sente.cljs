@@ -64,6 +64,18 @@
   [{:as ev-msg :keys [?data]}]
   (state/dispatch [:db/set-value [:sente :connected?] true]))
 
+;; Handler for server-pushed streaming updates
+(defmethod -event-msg-handler :stream/update
+  [{:as ev-msg :keys [?data]}]
+  (println "[SENTE-FRONTEND] :stream/update received!")
+  (println "[SENTE-FRONTEND]   ?data:" (pr-str ?data))
+  (println "[SENTE-FRONTEND]   stream-id:" (:stream-id ?data))
+  (println "[SENTE-FRONTEND]   new-chunks count:" (count (:new-chunks ?data)))
+  (println "[SENTE-FRONTEND]   reset?:" (:reset? ?data))
+  (println "[SENTE-FRONTEND]   complete?:" (:complete? ?data))
+  (state/dispatch [:stream/update ?data])
+  (println "[SENTE-FRONTEND]   Dispatched to state"))
+
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))
 
@@ -100,7 +112,9 @@
 (defn push!
   "Send a one-way message to the server (no response expected)."
   [event-vec]
-  (chsk-send! event-vec))
+  (println "[SENTE-FRONTEND] push! called with:" (pr-str event-vec))
+  (chsk-send! event-vec)
+  (println "[SENTE-FRONTEND] push! completed"))
 
 (defn init!
   []
