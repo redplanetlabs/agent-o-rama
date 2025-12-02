@@ -428,8 +428,8 @@
   (let [{:keys [text streaming? chunks reset-count]}
         (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id)]
     
-    ;; Only show the panel if we have streaming content or are actively streaming
-    (when (or streaming? (seq chunks))
+    ;; Only show the panel if we have chunks to display
+    (when (seq chunks)
       ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4 border border-blue-200"}
          ($ :div {:className "flex items-center justify-between mb-2"}
             ($ :div {:className "flex items-center gap-2"}
@@ -444,15 +444,10 @@
          
          ;; Streaming content
          ($ :div {:className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
-            (if (seq text)
-              ($ :pre {:className "text-sm text-gray-800 whitespace-pre-wrap font-mono"}
-                 text
-                 (when streaming?
-                   ($ :span {:className "inline-block w-2 h-4 bg-blue-500 animate-pulse ml-0.5"})))
-              (when streaming?
-                ($ :div {:className "text-sm text-gray-400 italic flex items-center gap-2"}
-                   ($ common/spinner {:size :small})
-                   "Waiting for output..."))))
+            ($ :pre {:className "text-sm text-gray-800 whitespace-pre-wrap font-mono"}
+               text
+               (when streaming?
+                 ($ :span {:className "inline-block w-2 h-4 bg-blue-500 animate-pulse ml-0.5"}))))
          
          ;; Chunk count
          (when (seq chunks)
