@@ -67,14 +67,7 @@
 ;; Handler for server-pushed streaming updates
 (defmethod -event-msg-handler :stream/update
   [{:as ev-msg :keys [?data]}]
-  (println "[SENTE-FRONTEND] :stream/update received!")
-  (println "[SENTE-FRONTEND]   ?data:" (pr-str ?data))
-  (println "[SENTE-FRONTEND]   stream-id:" (:stream-id ?data))
-  (println "[SENTE-FRONTEND]   new-chunks count:" (count (:new-chunks ?data)))
-  (println "[SENTE-FRONTEND]   reset?:" (:reset? ?data))
-  (println "[SENTE-FRONTEND]   complete?:" (:complete? ?data))
-  (state/dispatch [:stream/update ?data])
-  (println "[SENTE-FRONTEND]   Dispatched to state"))
+  (state/dispatch [:stream/update ?data]))
 
 ;; 4. Router lifecycle functions
 (defonce router_ (atom nil))
@@ -102,19 +95,15 @@
   ([event-vec timeout-ms]
    (request! event-vec timeout-ms nil))
   ([event-vec timeout-ms callback]
-   #_(println "SENDING SENTE EVENT:" event-vec timeout-ms callback)
    (chsk-send! event-vec
                timeout-ms
                (fn [reply]
-                 #_(println "SENTE EVENT REPLY:" reply)
                  (callback reply)))))
 
 (defn push!
   "Send a one-way message to the server (no response expected)."
   [event-vec]
-  (println "[SENTE-FRONTEND] push! called with:" (pr-str event-vec))
-  (chsk-send! event-vec)
-  (println "[SENTE-FRONTEND] push! completed"))
+  (chsk-send! event-vec))
 
 (defn init!
   []

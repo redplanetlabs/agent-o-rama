@@ -370,31 +370,21 @@
 
 ;; Handle incoming chunks pushed from server via WebSocket
 (state/reg-event :stream/update
-  (fn [db {:keys [stream-id new-chunks reset? complete?] :as data}]
-    (println "[EVENTS] :stream/update handler called!")
-    (println "[EVENTS]   stream-id:" stream-id)
-    (println "[EVENTS]   new-chunks:" (pr-str (take 3 new-chunks)))
-    (println "[EVENTS]   reset?:" reset?)
-    (println "[EVENTS]   complete?:" complete?)
-    (println "[EVENTS]   current db streaming state:" (pr-str (get-in db [:streaming :buffers stream-id])))
+  (fn [db {:keys [stream-id new-chunks reset? complete?]}]
     ;; If reset? is true (node retry happened), wipe the buffer and start fresh
-    (let [update-path [:streaming :buffers stream-id]
-          result (if reset?
-                   ;; Reset: replace chunks entirely
-                   (s/multi-path
-                    [update-path :chunks (s/terminal-val new-chunks)]
-                    [update-path :reset-count (s/terminal #(inc (or % 0)))]
-                    [update-path :complete? (s/terminal-val complete?)])
-                   ;; Normal update: append new chunks
-                   (s/multi-path
-                    [update-path :chunks (s/terminal #(into (or % []) new-chunks))]
-                    [update-path :complete? (s/terminal-val complete?)]))]
-      (println "[EVENTS]   returning specter path")
-      result)))
+    (let [update-path [:streaming :buffers stream-id]]
+      (if reset?
+        ;; Reset: replace chunks entirely
+        (s/multi-path
+         [update-path :chunks (s/terminal-val new-chunks)]
+         [update-path :reset-count (s/terminal #(inc (or % 0)))]
+         [update-path :complete? (s/terminal-val complete?)])
+        ;; Normal update: append new chunks
+        (s/multi-path
+         [update-path :chunks (s/terminal #(into (or % []) new-chunks))]
+         [update-path :complete? (s/terminal-val complete?)])))))
 
 ;; Clear buffer when component unmounts
 (state/reg-event :stream/cleanup
   (fn [db {:keys [stream-id]}]
-    (println "[EVENTS] :stream/cleanup handler called!")
-    (println "[EVENTS]   stream-id:" stream-id)
     [:streaming :buffers (s/terminal #(dissoc % stream-id))]))
