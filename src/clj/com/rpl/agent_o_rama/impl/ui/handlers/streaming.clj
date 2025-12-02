@@ -55,11 +55,12 @@
 ;; =============================================================================
 
 (defmethod sente/-event-msg-handler :stream/start
-  [{:keys [invoke-id node-name stream-id client] :as data} uid]
+  [{:keys [invoke-id node-name node-invoke-id stream-id client] :as data} uid]
   (println "[STREAMING-BACKEND] :stream/start received!")
   (println "[STREAMING-BACKEND]   data keys:" (keys data))
   (println "[STREAMING-BACKEND]   invoke-id:" invoke-id)
   (println "[STREAMING-BACKEND]   node-name:" node-name)
+  (println "[STREAMING-BACKEND]   node-invoke-id:" node-invoke-id)
   (println "[STREAMING-BACKEND]   stream-id:" stream-id)
   (println "[STREAMING-BACKEND]   client:" (if client "present" "MISSING!"))
   (println "[STREAMING-BACKEND]   uid:" uid)
@@ -78,39 +79,50 @@
     (let [[task-id agent-id] (common/parse-url-pair invoke-id)
           _ (println "[STREAMING-BACKEND] Parsed task-id:" task-id "agent-id:" agent-id)
           agent-invoke (aor-types/->AgentInvokeImpl task-id agent-id)
-          _ (println "[STREAMING-BACKEND] Created AgentInvokeImpl:" agent-invoke)]
+          _ (println "[STREAMING-BACKEND] Created AgentInvokeImpl:" agent-invoke)
+          ;; Parse node-invoke-id if provided (for specific node streaming)
+          parsed-node-invoke-id (when node-invoke-id
+                                  (java.util.UUID/fromString node-invoke-id))
+          _ (println "[STREAMING-BACKEND] Parsed node-invoke-id:" parsed-node-invoke-id)]
 
-      (println "[STREAMING-BACKEND] Opening Rama proxy for node:" node-name)
+      (when-not parsed-node-invoke-id
+        (println "[STREAMING-BACKEND] ERROR: node-invoke-id is required!")
+        (throw (ex-info "node-invoke-id is required" {:invoke-id invoke-id :node-name node-name})))
+
+      (println "[STREAMING-BACKEND] Opening Rama proxy for node:" node-name
+               "(specific invoke:" parsed-node-invoke-id ")")
 
       ;; Open the Rama Proxy with callback that bridges to Sente
-      (let [proxy (aor/agent-stream
-                    client
-                    agent-invoke
-                    node-name
-                    (fn [all-chunks new-chunks reset? complete?]
+      (let [proxy (aor/agent-stream-specific
+                   client
+                   agent-invoke
+                   node-name
+                   parsed-node-invoke-id
+                   (fn [all-chunks new-chunks reset? complete?]
                      ;; THE BRIDGE: Rama Callback -> Sente Push
-                      (println "[STREAMING-BACKEND] CALLBACK FIRED!")
-                      (println "[STREAMING-BACKEND]   all-chunks count:" (count all-chunks))
-                      (println "[STREAMING-BACKEND]   new-chunks count:" (count new-chunks))
-                      (println "[STREAMING-BACKEND]   new-chunks:" (pr-str (take 3 new-chunks)))
-                      (println "[STREAMING-BACKEND]   reset?:" reset?)
-                      (println "[STREAMING-BACKEND]   complete?:" complete?)
-                      (println "[STREAMING-BACKEND]   Sending to uid:" uid)
+                     (println "[STREAMING-BACKEND] CALLBACK FIRED!")
+                     (println "[STREAMING-BACKEND]   node-invoke-id:" parsed-node-invoke-id)
+                     (println "[STREAMING-BACKEND]   all-chunks count:" (count all-chunks))
+                     (println "[STREAMING-BACKEND]   new-chunks count:" (count new-chunks))
+                     (println "[STREAMING-BACKEND]   new-chunks:" (pr-str (take 3 new-chunks)))
+                     (println "[STREAMING-BACKEND]   reset?:" reset?)
+                     (println "[STREAMING-BACKEND]   complete?:" complete?)
+                     (println "[STREAMING-BACKEND]   Sending to uid:" uid)
 
-                      (try
-                        (let [serialized-chunks (common/->ui-serializable new-chunks)
-                              _ (println "[STREAMING-BACKEND]   serialized-chunks:" (pr-str (take 3 serialized-chunks)))
-                              msg [:stream/update
-                                   {:stream-id stream-id
-                                    :new-chunks serialized-chunks
-                                    :reset? reset?
-                                    :complete? complete?}]]
-                          (println "[STREAMING-BACKEND]   Calling chsk-send! with msg:" (pr-str msg))
-                          (sente/chsk-send! uid msg)
-                          (println "[STREAMING-BACKEND]   chsk-send! completed"))
-                        (catch Exception e
-                          (println "[STREAMING-BACKEND] ERROR in callback:" (.getMessage e))
-                          (.printStackTrace e)))))]
+                     (try
+                       (let [serialized-chunks (common/->ui-serializable new-chunks)
+                             _ (println "[STREAMING-BACKEND]   serialized-chunks:" (pr-str (take 3 serialized-chunks)))
+                             msg [:stream/update
+                                  {:stream-id stream-id
+                                   :new-chunks serialized-chunks
+                                   :reset? reset?
+                                   :complete? complete?}]]
+                         (println "[STREAMING-BACKEND]   Calling chsk-send! with msg:" (pr-str msg))
+                         (sente/chsk-send! uid msg)
+                         (println "[STREAMING-BACKEND]   chsk-send! completed"))
+                       (catch Exception e
+                         (println "[STREAMING-BACKEND] ERROR in callback:" (.getMessage e))
+                         (.printStackTrace e)))))]
 
         (println "[STREAMING-BACKEND] Proxy created successfully:" proxy)
 

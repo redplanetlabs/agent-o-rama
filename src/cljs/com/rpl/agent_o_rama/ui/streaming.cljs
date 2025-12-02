@@ -13,7 +13,7 @@
 ;; =============================================================================
 
 (defn use-node-stream
-  "Hook to stream chunks from a specific agent node in real-time.
+  "Hook to stream chunks from a specific agent node invocation in real-time.
   
   Automatically manages the streaming lifecycle:
   - Opens Rama proxy on mount
@@ -23,8 +23,9 @@
   Parameters:
   - module-id: Module ID (URL-encoded)
   - agent-name: Agent name (URL-encoded)
-  - invoke-id: String in format 'task-id-agent-id'
+  - invoke-id: String in format 'task-id-agent-id' (agent invocation)
   - node-name: String name of the node to stream from
+  - node-invoke-id: UUID of the specific node invocation (to distinguish multiple invocations of same node)
   - opts: Optional map with:
     - :stream-id - Custom stream ID (defaults to auto-generated)
     - :on-chunk - Callback fn called with each new chunk
@@ -40,24 +41,26 @@
   
   Example:
   ```
-  (let [{:keys [text streaming?]} (use-node-stream module-id agent-name invoke-id \"llm-node\")]
+  (let [{:keys [text streaming?]} (use-node-stream module-id agent-name invoke-id \"llm-node\" node-invoke-id)]
     ($ :div
        ($ :pre text)
        (when streaming?
          ($ :span.animate-pulse \"█\"))))
   ```"
-  ([module-id agent-name invoke-id node-name]
-   (use-node-stream module-id agent-name invoke-id node-name nil))
+  ([module-id agent-name invoke-id node-name node-invoke-id]
+   (use-node-stream module-id agent-name invoke-id node-name node-invoke-id nil))
 
-  ([module-id agent-name invoke-id node-name opts]
-   (let [;; Generate unique stream ID (or use provided one)
+  ([module-id agent-name invoke-id node-name node-invoke-id opts]
+   (let [;; Generate unique stream ID based on the specific node invocation
+         ;; This ensures each node instance gets its own stream
          stream-id (uix/use-memo
                     (fn []
                       (let [id (or (:stream-id opts)
-                                   (str invoke-id "-" node-name "-" (random-uuid)))]
+                                   ;; Use node-invoke-id to make stream unique per node instance
+                                   (str invoke-id "-" node-name "-" node-invoke-id))]
                         (println "[STREAMING-FRONTEND] Generated stream-id:" id)
                         id))
-                    [invoke-id node-name])
+                    [invoke-id node-name node-invoke-id])
 
          ;; Subscribe to the stream buffer in app-db
          stream-state (state/use-sub [:streaming :buffers stream-id])
@@ -80,6 +83,7 @@
                :agent-name agent-name
                :invoke-id invoke-id
                :node-name node-name
+               :node-invoke-id (str node-invoke-id)
                :stream-id stream-id
                :chunk-count (count chunks)
                :complete? complete?})
@@ -93,12 +97,14 @@
         (println "[STREAMING-FRONTEND]   agent-name:" agent-name)
         (println "[STREAMING-FRONTEND]   invoke-id:" invoke-id)
         (println "[STREAMING-FRONTEND]   node-name:" node-name)
+        (println "[STREAMING-FRONTEND]   node-invoke-id:" (str node-invoke-id))
         (println "[STREAMING-FRONTEND]   stream-id:" stream-id)
 
         (let [msg [:stream/start {:module-id module-id
                                   :agent-name agent-name
                                   :invoke-id invoke-id
                                   :node-name node-name
+                                  :node-invoke-id (str node-invoke-id)  ;; Send as string for serialization
                                   :stream-id stream-id}]]
           (println "[STREAMING-FRONTEND]   Sending via sente/push!:" (pr-str msg))
           (sente/push! msg)
@@ -112,7 +118,7 @@
           (state/dispatch [:stream/cleanup {:stream-id stream-id}])
           (println "[STREAMING-FRONTEND]   Cleanup dispatched")))
       ;; Re-run effect if any of these change
-      [module-id agent-name invoke-id node-name stream-id])
+      [module-id agent-name invoke-id node-name node-invoke-id stream-id])
 
      ;; Call optional callbacks
      (uix/use-effect

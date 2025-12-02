@@ -424,9 +424,9 @@
 (defui node-streaming-panel
   "Displays real-time streaming output from a node.
    Only shown when the node is actively streaming (in progress and not complete)."
-  [{:keys [module-id agent-name invoke-id node-name is-streaming?]}]
+  [{:keys [module-id agent-name invoke-id node-name node-invoke-id is-streaming?]}]
   (let [{:keys [text streaming? chunks reset-count]}
-        (streaming/use-node-stream module-id agent-name invoke-id node-name)]
+        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id)]
     
     ;; Only show the panel if we have streaming content or are actively streaming
     (when (or streaming? (seq chunks))
@@ -517,11 +517,13 @@
                            :module-id module-id})
 
        ;; Streaming panel - shown for nodes that are in progress or have streaming data
-       (when agent-invoke-id
+       ;; Uses node-id (specific node invocation UUID) to stream from the correct node instance
+       (when (and agent-invoke-id node-id)
          ($ node-streaming-panel {:module-id module-id
                                   :agent-name agent-name
                                   :invoke-id agent-invoke-id
                                   :node-name node-name
+                                  :node-invoke-id node-id  ;; Specific node invocation ID
                                   :is-streaming? is-node-in-progress?}))
 
 
