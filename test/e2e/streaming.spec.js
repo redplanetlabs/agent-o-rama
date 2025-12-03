@@ -120,12 +120,13 @@ test.describe('Streaming UI', () => {
     await expect(streamNode).toBeVisible({ timeout: 30000 });
     await streamNode.click();
 
-    // Wait for the node details panel to appear
-    const nodeInfoPanel = page.locator('div').filter({ hasText: 'Node Info' });
-    await expect(nodeInfoPanel).toBeVisible({ timeout: 10000 });
+    // Wait for the node details panel to appear (verify by checking Result section)
+    const resultSection = page.getByText('Result').first();
+    await expect(resultSection).toBeVisible({ timeout: 10000 });
+    console.log('Node details panel is visible.');
 
     // Verify streaming panel does NOT appear (no chunks = no panel)
-    const streamingPanel = page.locator('div').filter({ hasText: 'Streaming Output' });
+    const streamingPanel = page.getByText('Streaming Output');
     await expect(streamingPanel).not.toBeVisible({ timeout: 5000 });
     console.log('Streaming panel correctly hidden when no chunks.');
 
@@ -162,8 +163,8 @@ test.describe('Streaming UI', () => {
     const streamingPanel = page.locator('div').filter({ hasText: 'Streaming Output' }).first();
     await expect(streamingPanel).toBeVisible({ timeout: 30000 });
 
-    // Get the scrollable container
-    const scrollContainer = streamingPanel.locator('.overflow-y-auto');
+    // Get the scrollable container (use specific class to avoid matching sidebar/other panels)
+    const scrollContainer = streamingPanel.locator('.bg-white.rounded.border-blue-100');
     
     // Wait for some content to arrive
     await page.waitForTimeout(1000);
