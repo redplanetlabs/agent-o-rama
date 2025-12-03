@@ -6,7 +6,8 @@
    [shadow.cljs.devtools.api :as shadow]
    [shadow.cljs.devtools.server]
    [com.rpl.agent.basic.basic-agent :as basic-agent]
-   [com.rpl.agent.e2e-test-agent :as e2e-test-agent]))
+   [com.rpl.agent.e2e-test-agent :as e2e-test-agent]
+   [com.rpl.agent.streaming-test-agent :as streaming-test-agent]))
 
 (defn -main []
   (println "Starting CI Playwright setup...")
@@ -34,6 +35,12 @@
     (rtest/launch-module!
      ipc
      e2e-test-agent/E2ETestAgentModule
+     {:tasks 1 :threads 1})
+
+    (println "Launching StreamingTestAgentModule...")
+    (rtest/launch-module!
+     ipc
+     streaming-test-agent/StreamingTestAgentModule
      {:tasks 1 :threads 1})
 
     ;; Start UI server AFTER modules are ready
