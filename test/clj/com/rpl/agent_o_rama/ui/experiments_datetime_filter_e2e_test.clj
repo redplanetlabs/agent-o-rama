@@ -5,10 +5,16 @@
   based on their start_time_millis.
 
   Uses TopologyUtils/startSimTime and advanceSimTime to create experiments
-  at different simulated timestamps, allowing proper testing of date filters."
+  at different simulated timestamps, allowing proper testing of date filters.
+  
+  IMPORTANT: This test uses a namespace-level :once fixture that:
+  1. Calls startSimTime BEFORE creating the IPC (required for simulated time)
+  2. Sets up the system (IPC, module, UI, container)
+  3. Runs all tests
+  4. Tears down - simulated time ends automatically via with-open"
   (:require
    [clojure.string :as str]
-   [clojure.test :refer [deftest is testing]]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.ui.etaoin-test-helpers :as eth]
@@ -17,16 +23,17 @@
             setup-datetime-filter-testing!
             ONE-DAY-MS]]
    [com.rpl.rama :as rama]
-   [com.rpl.rama.path :as path]
+   [com.rpl.rama.test :as rtest]
    [etaoin.api :as e])
   (:import
+   [com.rpl.rama.helpers TopologyUtils]
    [java.net URLEncoder]))
 
+;;; Shared state for the test namespace
+
 (defonce system (volatile! nil))
-
-;;; Test data storage
-
 (defonce test-data (atom nil))
+(defonce sim-time-closer (atom nil))
 
 ;;; URL helpers
 
@@ -66,110 +73,131 @@
   [driver]
   (count (e/query-all driver {:css "tbody tr"})))
 
-;;; Post-deploy hook
+;;; Namespace-level fixture that sets up simulated time BEFORE IPC creation
 
-(defn make-post-deploy-hook
-  "Creates a post-deploy hook that sets up test data with simulated timestamps."
-  []
-  (fn [ipc module-name]
-    (let [data (setup-datetime-filter-testing! ipc module-name)]
-      (reset! test-data data)
-      data)))
+(defn sim-time-system-fixture
+  "Fixture that sets up simulated time and the system for all tests in this namespace.
+   
+   This is a :once fixture that:
+   1. Calls TopologyUtils/startSimTime BEFORE creating the IPC
+   2. Creates the IPC
+   3. Deploys the module
+   4. Sets up test data using the post-deploy hook
+   5. Starts the UI
+   6. Sets up the Selenium container
+   7. Runs all tests
+   8. Tears everything down (simulated time ends automatically)"
+  [f]
+  ;; Start simulated time BEFORE any Rama operations
+  ;; startSimTime returns something that implements Closeable - when closed, sim time ends
+  (let [sim-closer (TopologyUtils/startSimTime)]
+    (reset! sim-time-closer sim-closer)
+    (try
+      ;; Now set up the system
+      (eth/setup-system
+       system
+       ExperimentsDatetimeFilterTestAgentModule
+       :post-deploy-hook
+       (fn [ipc module-name]
+         (let [data (setup-datetime-filter-testing! ipc module-name)]
+           (reset! test-data data)
+           data)))
+      (try
+        (f)
+        (finally
+          (eth/teardown-system system)))
+      (finally
+        ;; End simulated time by closing the closer
+        (when sim-closer
+          (.close sim-closer))))))
 
-;;; Tests
+(use-fixtures :once sim-time-system-fixture)
+
+;;; Tests - these all share the same system setup from the :once fixture
 
 (deftest experiments-datetime-picker-renders-test
   "Test that the datetime picker components render correctly."
-  (eth/with-system
-    [system ExperimentsDatetimeFilterTestAgentModule
-     {:post-deploy-hook (make-post-deploy-hook)}]
-    (eth/with-webdriver [system driver]
-      (let [env @system
-            {:keys [dataset-id]} @test-data]
+  (eth/with-webdriver [system driver]
+    (let [env @system
+          {:keys [dataset-id]} @test-data]
 
-        (testing "datetime picker components are visible"
-          (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [url (experiments-index-url env dataset-id)]
-              (e/go driver url)
-              (wait-for-experiments-table driver)
+      (testing "datetime picker components are visible"
+        (e/with-postmortem driver {:dir "target/etaoin"}
+          (let [url (experiments-index-url env dataset-id)]
+            (e/go driver url)
+            (wait-for-experiments-table driver)
 
-              ;; Check that the datetime picker labels are present
-              (is (e/has-text? driver {:tag :label} "Start Date"))
-              (is (e/has-text? driver {:tag :label} "End Date"))
+            ;; Check that the datetime picker labels are present
+            (is (e/has-text? driver {:tag :label} "Start Date"))
+            (is (e/has-text? driver {:tag :label} "End Date"))
 
-              ;; Check that we have experiments showing
-              (let [exp-count (get-visible-experiment-count driver)]
-                (is (= 3 exp-count)
-                    "Should show all 3 experiments initially")))))))))
+            ;; Check that we have experiments showing
+            (let [exp-count (get-visible-experiment-count driver)]
+              (is (= 3 exp-count)
+                  "Should show all 3 experiments initially"))))))))
 
 (deftest experiments-search-filter-test
   "Test that the search filter works (as a baseline for filter functionality)."
-  (eth/with-system
-    [system ExperimentsDatetimeFilterTestAgentModule
-     {:post-deploy-hook (make-post-deploy-hook)}]
-    (eth/with-webdriver [system driver]
-      (let [env @system
-            {:keys [dataset-id]} @test-data]
+  (eth/with-webdriver [system driver]
+    (let [env @system
+          {:keys [dataset-id]} @test-data]
 
-        (testing "search filter filters experiments by name"
-          (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [url (experiments-index-url env dataset-id)]
-              (e/go driver url)
-              (wait-for-experiments-table driver)
+      (testing "search filter filters experiments by name"
+        (e/with-postmortem driver {:dir "target/etaoin"}
+          (let [url (experiments-index-url env dataset-id)]
+            (e/go driver url)
+            (wait-for-experiments-table driver)
 
-              ;; Type in search box to filter by name
-              (e/fill driver {:css "input[placeholder*='Search']"} "3 days ago")
-              (Thread/sleep 500) ; Wait for debounce
+            ;; Type in search box to filter by name
+            (e/fill driver {:css "input[placeholder*='Search']"} "3 days ago")
+            (Thread/sleep 500) ; Wait for debounce
 
-              ;; Should now show only the matching experiment
-              (let [exp-names (get-visible-experiment-names driver)]
-                (is (= 1 (count exp-names))
-                    "Should show only 1 experiment matching '3 days ago'")
-                (is (some #(str/includes? (or % "") "3 days ago") exp-names)
-                    "Should show the '3 days ago' experiment"))
+            ;; Should now show only the matching experiment
+            (let [exp-names (get-visible-experiment-names driver)]
+              (is (= 1 (count exp-names))
+                  "Should show only 1 experiment matching '3 days ago'")
+              (is (some #(str/includes? (or % "") "3 days ago") exp-names)
+                  "Should show the '3 days ago' experiment"))
 
-              ;; Clear search and verify all experiments return
-              (e/clear driver {:css "input[placeholder*='Search']"})
-              (Thread/sleep 500)
+            ;; Clear search and verify all experiments return
+            (e/clear driver {:css "input[placeholder*='Search']"})
+            (Thread/sleep 500)
 
-              (let [exp-count (get-visible-experiment-count driver)]
-                (is (= 3 exp-count)
-                    "Should show all 3 experiments after clearing search")))))))))
+            (let [exp-count (get-visible-experiment-count driver)]
+              (is (= 3 exp-count)
+                  "Should show all 3 experiments after clearing search"))))))))
 
 (deftest experiments-datetime-picker-components-test
   "Test that the datetime picker components are present and interactive."
-  (eth/with-system
-    [system ExperimentsDatetimeFilterTestAgentModule
-     {:post-deploy-hook (make-post-deploy-hook)}]
-    (eth/with-webdriver [system driver]
-      (let [env @system
-            {:keys [dataset-id]} @test-data]
+  (eth/with-webdriver [system driver]
+    (let [env @system
+          {:keys [dataset-id]} @test-data]
 
-        (testing "datetime pickers are present"
-          (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [url (experiments-index-url env dataset-id)]
-              (e/go driver url)
-              (wait-for-experiments-table driver)
+      (testing "datetime pickers are present"
+        (e/with-postmortem driver {:dir "target/etaoin"}
+          (let [url (experiments-index-url env dataset-id)]
+            (e/go driver url)
+            (wait-for-experiments-table driver)
 
-              ;; Find the datetime picker wrappers
-              ;; react-datetime-picker creates a wrapper with class 'react-datetime-picker'
-              (let [picker-wrappers (e/query-all
-                                     driver
-                                     {:css ".react-datetime-picker"})]
-                (is (= 2 (count picker-wrappers))
-                    "Should have 2 datetime pickers (start and end)")))))
+            ;; Find the datetime picker wrappers
+            ;; react-datetime-picker creates a wrapper with class 'react-datetime-picker'
+            (let [picker-wrappers (e/query-all
+                                   driver
+                                   {:css ".react-datetime-picker"})]
+              (is (= 2 (count picker-wrappers))
+                  "Should have 2 datetime pickers (start and end)")))))
 
-        (testing "clear buttons work"
-          (e/with-postmortem driver {:dir "target/etaoin"}
-            (let [url (experiments-index-url env dataset-id)]
-              (e/go driver url)
-              (wait-for-experiments-table driver)
+      (testing "clear buttons work"
+        (e/with-postmortem driver {:dir "target/etaoin"}
+          (let [url (experiments-index-url env dataset-id)]
+            (e/go driver url)
+            (wait-for-experiments-table driver)
 
-              ;; The clear buttons (X icons) should be present but hidden when no date is set
-              ;; After clicking a date picker and selecting a date, the clear button should appear
-              ;; For now, just verify the picker structure is correct
-              (is (e/exists? driver {:css ".react-datetime-picker__wrapper"})
-                  "Datetime picker wrapper should exist"))))))))
+            ;; The clear buttons (X icons) should be present but hidden when no date is set
+            ;; After clicking a date picker and selecting a date, the clear button should appear
+            ;; For now, just verify the picker structure is correct
+            (is (e/exists? driver {:css ".react-datetime-picker__wrapper"})
+                "Datetime picker wrapper should exist")))))))
 
 ;; NOTE: Testing the actual date filtering requires interacting with the
 ;; react-datetime-picker component, which has a complex interaction model.

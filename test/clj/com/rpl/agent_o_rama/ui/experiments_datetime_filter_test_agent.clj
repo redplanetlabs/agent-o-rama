@@ -58,8 +58,8 @@
   (let [dataset-id (aor/create-dataset! manager "Datetime Filter Test Dataset")]
     ;; Add some test examples
     (doseq [i (range 3)]
-      (aor/add-example! manager dataset-id (str "input-" i)
-                        {:reference-output (str "expected-" i)}))
+      (aor/add-dataset-example! manager dataset-id (str "input-" i)
+                                {:reference-output (str "expected-" i)}))
     dataset-id))
 
 (defn create-evaluator!
@@ -104,9 +104,9 @@
 ;;; We'll create experiments at these simulated timestamps (in milliseconds)
 
 (def ^:const ONE-DAY-MS (* 24 60 60 1000))
-(def ^:const THREE-DAYS-AGO-SIM 0)              ;; Simulated: 3 days ago
-(def ^:const ONE-DAY-AGO-SIM (* 2 ONE-DAY-MS))  ;; Simulated: 1 day ago (after 2 days advance)
-(def ^:const TODAY-SIM (* 3 ONE-DAY-MS))        ;; Simulated: today (after 3 days advance)
+(def ^:const THREE-DAYS-AGO-SIM 0) ;; Simulated: 3 days ago
+(def ^:const ONE-DAY-AGO-SIM (* 2 ONE-DAY-MS)) ;; Simulated: 1 day ago (after 2 days advance)
+(def ^:const TODAY-SIM (* 3 ONE-DAY-MS)) ;; Simulated: today (after 3 days advance)
 
 (defn days-ago-sim-millis
   "Returns the simulated timestamp for n days ago.
@@ -124,6 +124,9 @@
 (defn setup-datetime-filter-testing!
   "Sets up test data for datetime filter testing.
    
+   NOTE: TopologyUtils/startSimTime MUST be called BEFORE the IPC is created,
+   not in this function. This function assumes simulated time is already active.
+
    Uses TopologyUtils/advanceSimTime to create experiments at different
    simulated timestamps, allowing the date filter to be tested properly.
 
@@ -137,8 +140,8 @@
 
    Returns a map with all the IDs and timestamps for use in tests."
   [ipc module-name]
-  ;; Start simulated time at 0
-  (TopologyUtils/startSimTime)
+  ;; NOTE: startSimTime must be called before IPC creation, which is done
+  ;; in the test fixture. Don't call it here.
 
   (let [manager (aor/agent-manager ipc module-name)
         exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME)
@@ -188,9 +191,3 @@
                          :two-days-ago ONE-DAY-MS
                          :yesterday ONE-DAY-AGO-SIM
                          :today TODAY-SIM}}))
-
-(defn make-post-deploy-hook
-  "Creates a post-deploy hook that sets up datetime filter testing."
-  []
-  (fn [ipc module-name]
-    (setup-datetime-filter-testing! ipc module-name)))
