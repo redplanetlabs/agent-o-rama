@@ -31,16 +31,31 @@
       ;; First, try to serve from "public" for compiled JS and other assets.
       (resource/wrap-resource "public")))
 
+(defn- ensure-session-uid
+  "Middleware that ensures the session has a unique :uid.
+  Creates one if not present, using a random UUID."
+  [handler]
+  (fn [request]
+    (if (get-in request [:session :uid])
+      ;; Session already has uid, proceed normally
+      (handler request)
+      ;; Create new uid and add to session
+      (let [new-uid (str (random-uuid))
+            response (handler (assoc-in request [:session :uid] new-uid))]
+        ;; Ensure the new uid is persisted in the session cookie
+        (when response
+          (assoc response :session (assoc (:session response (:session request)) :uid new-uid)))))))
+
 (defn routes
   [request]
-  (let [uri    (:uri request)
+  (let [uri (:uri request)
         method (:request-method request)]
     (cond
       ;; Sente routes are the only specific routes we need
       (= uri "/chsk")
       (case method
-        :get (sente/ring-ajax-get-or-ws-handshake request)
-        :post (sente/ring-ajax-post request))
+        :get ((ensure-session-uid sente/ring-ajax-get-or-ws-handshake) request)
+        :post ((ensure-session-uid sente/ring-ajax-post) request))
 
       ;; Dataset export
       (and (= method :get)
