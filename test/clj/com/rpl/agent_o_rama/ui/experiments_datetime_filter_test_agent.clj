@@ -8,9 +8,9 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.rama :as rama]
-   [com.rpl.rama.test :as rtest])
+   [com.rpl.rama :as rama])
   (:import
    [com.rpl.rama.helpers TopologyUtils]))
 
@@ -48,6 +48,11 @@
        "process"
        nil
        simple-test-agent-impl)))
+
+;;; Constants for simulated time
+;;; We'll create experiments at these simulated timestamps (in milliseconds)
+
+(def ^:const ONE-DAY-MS (* 24 60 60 1000))
 
 ;;; Helper functions for test setup
 
@@ -100,54 +105,29 @@
     {:experiment-id exp-id
      :invoke exp-invoke}))
 
-;;; Constants for simulated time
-;;; We'll create experiments at these simulated timestamps (in milliseconds)
-
-(def ^:const ONE-DAY-MS (* 24 60 60 1000))
-(def ^:const THREE-DAYS-AGO-SIM 0) ;; Simulated: 3 days ago
-(def ^:const ONE-DAY-AGO-SIM (* 2 ONE-DAY-MS)) ;; Simulated: 1 day ago (after 2 days advance)
-(def ^:const TODAY-SIM (* 3 ONE-DAY-MS)) ;; Simulated: today (after 3 days advance)
-
-(defn days-ago-sim-millis
-  "Returns the simulated timestamp for n days ago.
-   Based on the pattern: experiments are created at 0, 2 days, 3 days sim time."
-  [n]
-  (case n
-    3 THREE-DAYS-AGO-SIM
-    1 ONE-DAY-AGO-SIM
-    0 TODAY-SIM
-    ;; For other values, calculate relative to 'today'
-    (- TODAY-SIM (* n ONE-DAY-MS))))
-
-;;; Post-deploy hook for setting up test data
+;;; Main setup function for datetime filter testing with simulated time
 
 (defn setup-datetime-filter-testing!
-  "Sets up test data for datetime filter testing.
+  "Sets up test data for datetime filter testing using simulated time.
    
-   NOTE: TopologyUtils/startSimTime MUST be called BEFORE the IPC is created,
-   not in this function. This function assumes simulated time is already active.
+   IMPORTANT: TopologyUtils/startSimTime must be called BEFORE launching the module.
+   This is done via the :pre-launch-hook in the test fixture.
 
-   Uses TopologyUtils/advanceSimTime to create experiments at different
-   simulated timestamps, allowing the date filter to be tested properly.
-
-   Creates:
-   - A dataset with examples
+   This function creates:
    - An evaluator
+   - A dataset with examples
    - Three experiments at different simulated times:
      - Experiment 1: time 0 (represents '3 days ago')
-     - Experiment 2: time 2 days (represents 'yesterday')
-     - Experiment 3: time 3 days (represents 'today')
+     - Experiment 2: after advancing 2 days (represents 'yesterday')  
+     - Experiment 3: after advancing 1 more day (represents 'today')
 
-   Returns a map with all the IDs and timestamps for use in tests."
+   Returns a map with dataset-id, experiment info, and timestamps."
   [ipc module-name]
-  ;; NOTE: startSimTime must be called before IPC creation, which is done
-  ;; in the test fixture. Don't call it here.
-
   (let [manager (aor/agent-manager ipc module-name)
         exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME)
         global-actions-depot (rama/foreign-depot
                               ipc module-name
-                              (str "$$" aor-types/AGENT-TOPOLOGY-NAME "_global-actions"))
+                              (po/global-actions-depot-name))
 
         ;; Create evaluator first
         _ (create-evaluator! manager)
@@ -155,11 +135,12 @@
         ;; Create dataset
         dataset-id (create-test-dataset! manager)
 
-        ;; Wait for examples to be processed
-        _ (rtest/wait-for-microbatch-processed-count
-           ipc module-name
-           aor-types/AGENT-TOPOLOGY-NAME
-           3)
+        ;; Small sleep to let microbatch process examples
+        ;; (same pattern as search-experiments-test uses)
+        _ (Thread/sleep 100)
+
+        ;; Capture initial sim time (time 0)
+        time-0 (System/currentTimeMillis)
 
         ;; Run experiment 1 at sim time 0 ("3 days ago")
         exp1 (run-experiment! manager exp-client global-actions-depot
@@ -167,27 +148,27 @@
 
         ;; Advance sim time by 2 days and run experiment 2 ("yesterday")
         _ (TopologyUtils/advanceSimTime (* 2 ONE-DAY-MS))
+        time-2-days (System/currentTimeMillis)
         exp2 (run-experiment! manager exp-client global-actions-depot
                               dataset-id "Experiment from yesterday")
 
         ;; Advance sim time by 1 more day and run experiment 3 ("today")
         _ (TopologyUtils/advanceSimTime ONE-DAY-MS)
+        time-3-days (System/currentTimeMillis)
         exp3 (run-experiment! manager exp-client global-actions-depot
                               dataset-id "Experiment from today")]
 
     {:dataset-id dataset-id
      :experiments [{:id (:experiment-id exp1)
                     :name "Experiment from 3 days ago"
-                    :sim-timestamp THREE-DAYS-AGO-SIM}
+                    :timestamp time-0}
                    {:id (:experiment-id exp2)
                     :name "Experiment from yesterday"
-                    :sim-timestamp ONE-DAY-AGO-SIM}
+                    :timestamp time-2-days}
                    {:id (:experiment-id exp3)
                     :name "Experiment from today"
-                    :sim-timestamp TODAY-SIM}]
-     ;; For the date filter, we need to know the simulated timestamps
-     ;; to construct proper filter predicates
-     :filter-timestamps {:three-days-ago THREE-DAYS-AGO-SIM
-                         :two-days-ago ONE-DAY-MS
-                         :yesterday ONE-DAY-AGO-SIM
-                         :today TODAY-SIM}}))
+                    :timestamp time-3-days}]
+     ;; Return timestamps for filter assertions
+     :timestamps {:three-days-ago time-0
+                  :yesterday time-2-days
+                  :today time-3-days}}))

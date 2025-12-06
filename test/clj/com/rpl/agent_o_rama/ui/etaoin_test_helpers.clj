@@ -42,10 +42,10 @@
   (when-not (:container system)
     (Testcontainers/exposeHostPorts (int-array [port]))
     (let [webdriver-port 4444
-          container      (-> (tc/create
-                              {:image-name    "selenium/standalone-chromium:latest"
-                               :exposed-ports [webdriver-port]})
-                             (tc/start!))]
+          container (-> (tc/create
+                         {:image-name "selenium/standalone-chromium:latest"
+                          :exposed-ports [webdriver-port]})
+                        (tc/start!))]
       {:container container})))
 
 (defn setup-webdriver
@@ -53,12 +53,12 @@
    Returns the driver."
   [container]
   (let [webdriver-port 4444
-        driver         (e/chrome
-                        {:headless true
-                         :size     [1280 800]
-                         :port     (get (:mapped-ports container) webdriver-port)
-                         :host     (:host container)
-                         :args     ["--no-sandbox"]})]
+        driver (e/chrome
+                {:headless true
+                 :size [1280 800]
+                 :port (get (:mapped-ports container) webdriver-port)
+                 :host (:host container)
+                 :args ["--no-sandbox"]})]
     driver))
 
 (defn teardown-webdriver
@@ -85,12 +85,17 @@
    Returns a map with :ipc, :module-name, and :launched flag.
 
    Options:
+   - :pre-launch-hook - Function to call before module is launched,
+                        receives ipc. Use for starting simulated time.
    - :post-deploy-hook - Function to call after module is deployed,
                          receives ipc and module-name"
-  [system agent-module {:keys [post-deploy-hook]}]
+  [system agent-module {:keys [pre-launch-hook post-deploy-hook]}]
   (when-not (:launched system)
     (let [module-name (rama/get-module-name agent-module)
-          ipc         (:ipc system)]
+          ipc (:ipc system)]
+      ;; Call pre-launch hook (e.g., to start simulated time)
+      (when pre-launch-hook
+        (pre-launch-hook ipc))
       (rtest/launch-module!
        ipc
        agent-module
@@ -98,7 +103,7 @@
       (when post-deploy-hook
         (post-deploy-hook ipc module-name))
       {:module-name module-name
-       :launched    true})))
+       :launched true})))
 
 (defn setup-agent-ui
   "Start the agent UI server.
@@ -115,23 +120,26 @@
         (shadow/watch :dev)))
     (aor/start-ui (:ipc system) {:port port})
     {:ui-launched true
-     :port        port}))
+     :port port}))
 
 (defn setup-system
   "Setup all resources in order: IPC, module, UI, container.
    Returns a system map with all resources.
 
    Options:
+   - :pre-launch-hook - Function to call before module is launched,
+                        receives ipc. Use for starting simulated time.
    - :post-deploy-hook - Function to call after module is deployed,
                          receives ipc and module-name"
-  [system-vol agent-module & {:keys [post-deploy-hook]}]
+  [system-vol agent-module & {:keys [pre-launch-hook post-deploy-hook]}]
   (let [merge-vol (fn [val] (vswap! system-vol merge val))]
     (-> @system-vol
         (setup-ipc)
         merge-vol
         (setup-agent-module
          agent-module
-         {:post-deploy-hook post-deploy-hook})
+         {:pre-launch-hook pre-launch-hook
+          :post-deploy-hook post-deploy-hook})
         merge-vol
         (setup-agent-ui {:port default-port})
         merge-vol
@@ -145,7 +153,7 @@
       (shadow.cljs.devtools.server/stop!))
     (aor/stop-ui)
     {:ui-launched nil
-     :port        nil}))
+     :port nil}))
 
 (defn- teardown-module
   [{:keys [ipc launched module-name]}]
@@ -154,7 +162,7 @@
       (rtest/destroy-module! ipc module-name)
       (catch Exception e
         (println "Destroying module failed:" (ex-message e) (ex-data e))))
-    {:launched    nil
+    {:launched nil
      :module-name nil}))
 
 (defn- teardown-ipc
@@ -184,12 +192,16 @@
    f: The test function to execute
 
    Options:
+   - :pre-launch-hook - Function to call before module is launched,
+                        receives ipc. Use for starting simulated time.
    - :post-deploy-hook - Function to call after module is deployed,
                          receives ipc and module-name"
-  [system-vol agent-module f & {:keys [post-deploy-hook]}]
+  [system-vol agent-module f & {:keys [pre-launch-hook post-deploy-hook]}]
   (setup-system
    system-vol
    agent-module
+   :pre-launch-hook
+   pre-launch-hook
    :post-deploy-hook
    post-deploy-hook)
   (try
@@ -205,6 +217,8 @@
    - system-vol: Volatile to store system state
    - agent-module: The agent module to deploy
    - opts (optional): Map with options
+     - :pre-launch-hook - Function to call before module is launched,
+                          receives ipc. Use for starting simulated time.
      - :post-deploy-hook - Function to call after module is deployed,
                            receives ipc and module-name
 
@@ -213,13 +227,17 @@
      (testing ...))
 
    (with-system [system MyModule {:post-deploy-hook (fn [ipc module-name] ...)}]
+     (testing ...))
+
+   (with-system [system MyModule {:pre-launch-hook (fn [ipc] (TopologyUtils/startSimTime))}]
      (testing ...))"
-  [[system-vol agent-module & [{:keys [post-deploy-hook]}]] & body]
+  [[system-vol agent-module & [{:keys [pre-launch-hook post-deploy-hook]}]] & body]
   `(reusable-system-fixture
     ~system-vol
     ~agent-module
     (fn []
       ~@body)
+    ~@(when pre-launch-hook [:pre-launch-hook pre-launch-hook])
     ~@(when post-deploy-hook [:post-deploy-hook post-deploy-hook])))
 
 (defn webdriver-fixture
@@ -228,7 +246,7 @@
    f: Function that takes a driver as argument"
   [system-vol f]
   (let [container (:container @system-vol)
-        driver    (setup-webdriver container)]
+        driver (setup-webdriver container)]
     (try
       (f driver)
       (finally
@@ -260,7 +278,7 @@
    invoke: AgentInvoke instance"
   [env agent-name ^AgentInvoke invoke]
   (let [invoke-id (.getAgentInvokeId invoke)
-        task-id   (.getTaskId invoke)]
+        task-id (.getTaskId invoke)]
     (str
      (module-base-url env)
      "/agent/" agent-name
