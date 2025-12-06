@@ -13,13 +13,11 @@ Mirror agents can be declared to reference remote agents, invoked like local age
 Mirror agents maintain referential integrity with their remote counterparts. They preserve the same interface and behavior as the original agent. Communication failures are handled through the framework's retry and error handling mechanisms.
 
 ## Key Clojure API
-- Primary functions: `declare-cluster-agent`
-- Creation: `declare-cluster-agent` with remote module and agent name references
+- Primary functions: `mirror-agent-client`
 - Access: Used through standard agent client interfaces
 
 ## Key Java API
-- Primary functions: `AgentTopology.declareClusterAgent()`
-- Creation: Declaration with module name and agent identifier
+- Primary functions: `AgentNode.getMirrorAgent()`
 - Access: Through standard `AgentClient` interfaces
 
 ## Relationships

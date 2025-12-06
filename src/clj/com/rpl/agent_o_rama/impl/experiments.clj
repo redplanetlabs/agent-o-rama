@@ -280,6 +280,8 @@
                (.getAgentObject agent-node name))
              (getAgentClient [this name]
                (.getAgentClient agent-node name))
+             (getMirrorAgentClient [this module-name agent-name]
+               (.getMirrorAgentClient agent-node module-name agent-name))
              (getStore [this name]
                (.getStore agent-node name))
              (streamChunk [this chunk])

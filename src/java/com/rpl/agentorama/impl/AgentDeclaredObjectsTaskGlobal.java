@@ -9,19 +9,21 @@ import com.rpl.rama.integration.*;
 import clojure.lang.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
   Map<String, Map<String, Object>> _builders;
   Map<String, Map<Keyword, Object>> _evaluatorBuilders;
   Map<String, Map<Keyword, Object>> _actionBuilders;
-  Map<String, List<String>> _agentsInfo;
   Map<String, Object> _agentGraphs;
 
   Map<String, WorkerManagedResource> _objects;
   Map<String, List> _evaluators;
   String _thisModuleName;
   WorkerManagedResource<Map<String, AgentClient>> _agents;
+  WorkerManagedResource<ConcurrentHashMap<String, AgentManager>> _managers;
+  WorkerManagedResource<ConcurrentHashMap<List, AgentClient>> _mirrorAgents;
   ClusterManagerBase _clusterRetriever;
   WorkerManagedResource<AgentManager> _thisManager;
 
@@ -31,12 +33,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     Map<String, Map<String, Object>> builders,
     Map<String, Map<Keyword, Object>> evaluatorBuilders,
     Map<String, Map<Keyword, Object>> actionBuilders,
-    Map<String, List<String>> agentsInfo,
     Map<String, Object> agentGraphs) {
     _builders = builders;
     _evaluatorBuilders = evaluatorBuilders;
     _actionBuilders = actionBuilders;
-    _agentsInfo = agentsInfo;
     _agentGraphs = agentGraphs;
   }
 
@@ -105,14 +105,21 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     return ret;
   }
 
-  public List<String> getAgentInfo(String localName) {
-    List<String> ret = _agentsInfo.get(localName);
-    if(ret==null) throw new RuntimeException("Could not find agent " + localName);
-    if(ret.get(0)==null) {
-      return Arrays.asList(_thisModuleName, ret.get(1));
-    } else {
-      return ret;
-    }
+  public AgentClient getMirrorAgentClient(String moduleName, String agentName) {
+    ConcurrentHashMap<String, AgentManager> managers = _managers.getResource();
+    ConcurrentHashMap<List, AgentClient> mirrors = _mirrorAgents.getResource();
+
+    AgentManager manager = managers.computeIfAbsent(moduleName, new Function<String, AgentManager>() {
+      public AgentManager apply(String mn) {
+        return AgentManager.create(_clusterRetriever, moduleName);
+      }
+    });
+
+    return mirrors.computeIfAbsent(Arrays.asList(moduleName, agentName), new Function<List, AgentClient>() {
+      public AgentClient apply(List tuple) {
+        return manager.getAgentClient(agentName);
+      }
+    });
   }
 
   public ClusterManagerBase getClusterRetriever() {
@@ -159,23 +166,16 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
     _agents = new WorkerManagedResource("__agentClients", context, () -> {
       Map m = new CloseableMap();
-      Set<String> moduleNames = new HashSet();
-      for(List<String> tuple: _agentsInfo.values()) {
-        String moduleName = tuple.get(0);
-        moduleNames.add(moduleName);
-      }
-      Map<String, AgentManager> managers = new HashMap();
-      for(String moduleName: moduleNames) {
-        String mn = moduleName == null ? context.getModuleInstanceInfo().getModuleName() : moduleName;
-        managers.put(moduleName, AgentManager.create(context.getClusterRetriever(), mn));
-      }
-      for(String localName: _agentsInfo.keySet()) {
-        List<String> tuple = _agentsInfo.get(localName);
-        String moduleName = tuple.get(0);
-        String agentName = tuple.get(1);
-        m.put(localName, managers.get(moduleName).getAgentClient(agentName));
+      for(String agentName: _agentGraphs.keySet()) {
+        m.put(agentName, _thisManager.getResource().getAgentClient(agentName));
       }
       return m;
+    });
+    _managers = new WorkerManagedResource("__agentManagers", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _mirrorAgents = new WorkerManagedResource("__mirrorAgentClients", context, () -> {
+      return new CloseableConcurrentMap();
     });
   }
 
@@ -186,5 +186,6 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
       resource.close();
     }
     _agents.close();
+    _mirrorAgents.close();
   }
 }

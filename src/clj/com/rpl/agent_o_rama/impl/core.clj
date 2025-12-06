@@ -200,18 +200,10 @@
        :exception e}
     )))
 
-(defn mk-agents-info
-  [agent-graphs mirror-agents]
-  (reduce-kv
-   (fn [m agent-name _]
-     (assoc m agent-name [nil agent-name]))
-   mirror-agents
-   agent-graphs))
-
 (defn hook:analytics-tick [])
 
 (defn define-agents!
-  [setup topologies stream-topology mb-topology analytics-mb-topology agent-graphs mirror-agents
+  [setup topologies stream-topology mb-topology analytics-mb-topology agent-graphs
    store-info declared-objects evaluator-builders action-builders]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
@@ -233,7 +225,6 @@
                     declared-objects
                     evaluator-builders
                     action-builders
-                    (mk-agents-info agent-graphs mirror-agents)
                     (transform MAP-VALS
                                graph/resolve-agent-graph
                                agent-graphs)

@@ -198,6 +198,140 @@
   []
   (h/random-uuid7))
 
+(defn subagent-client
+  [^AgentNode agent-node ^AgentClient client module-name name]
+  (let [agent-info-tuple [module-name name]]
+    (reify
+     AgentClient
+     (invoke [this args]
+       (let [inv (.initiate this args)]
+         (.result this inv)))
+     (invokeAsync [this args]
+       (no-async!))
+     (initiate [this args]
+       (timed-agent-call
+        (.initiate client args)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"     "initiate"
+         "args"   (vec args) ; so it doesn't put a raw array in the trace
+         "result" res}))
+     (initiateAsync [this args]
+       (no-async!))
+     (fork [this invoke nodeInvokeIdToNewArgs]
+       (let [inv (.initiateFork this invoke nodeInvokeIdToNewArgs)]
+         (.result this inv)))
+     (forkAsync [this invoke nodeInvokeIdToNewArgs]
+       (no-async!))
+     (initiateFork [this invoke nodeInvokeIdToNewArgs]
+       (timed-agent-call
+        (.initiateFork client invoke nodeInvokeIdToNewArgs)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"           "initiateFork"
+         "invoke"       invoke
+         "new-args-map" nodeInvokeIdToNewArgs
+         "result"       res}))
+     (initiateForkAsync [this invoke invokeIdToNewArgs]
+       (no-async!))
+     (nextStep [this agent-invoke]
+       (let [start-time-millis (h/current-time-millis)
+             ret               (.get ^CompletableFuture
+                                     (aor-types/subagent-next-step-async client agent-invoke))
+             [stats res]       (if (instance? HumanInputRequest ret)
+                                 [nil ret]
+                                 [(:stats ret) (:result ret)])
+
+             finish-time-millis
+             (h/current-time-millis)
+             [agent-module-name agent-name]
+             agent-info-tuple
+             data-map
+             {"op"           "nextStep"
+              "agent-invoke" agent-invoke
+              "agent-module-name" agent-module-name
+              "agent-name"   agent-name}
+
+             data-map
+             (if stats (assoc data-map "stats" stats) data-map)
+             data-map
+             (if (instance? AgentFailedException res) data-map (assoc data-map "result" res))
+            ]
+         (record-nested-op!-impl
+          agent-node
+          :agent-call
+          start-time-millis
+          finish-time-millis
+          data-map)
+         (if (instance? AgentFailedException res)
+           (throw res))
+         res
+       ))
+     (nextStepAsync [this agent-invoke]
+       (no-async!))
+     (result [this agent-invoke]
+       (loop [step (.nextStep this agent-invoke)]
+         (if (instance? HumanInputRequest step)
+           (do
+             (.provideHumanInput
+              this
+              step
+              (.getHumanInput agent-node (:prompt step)))
+             (recur (.nextStep this agent-invoke)))
+           (:result step))))
+     (resultAsync [this agent-invoke]
+       (no-async!))
+     (stream [this agent-invoke node]
+       (no-stream!))
+     (stream [this agent-invoke node stream-callback]
+       (no-stream!))
+     (streamSpecific [this agent-invoke node node-invoke-id]
+       (no-stream!))
+     (streamSpecific
+       [this agent-invoke node node-invoke-id stream-callback]
+       (no-stream!))
+     (streamAll [this agent-invoke node]
+       (no-stream!))
+     (streamAll [this agent-invoke node stream-all-callback]
+       (no-stream!))
+     (pendingHumanInputs [this agent-invoke]
+       (timed-agent-call
+        (.pendingHumanInputs client agent-invoke)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"           "pendingHumanInputs"
+         "agent-invoke" agent-invoke
+         "result"       res}))
+     (pendingHumanInputsAsync [this invoke]
+       (no-async!))
+     (provideHumanInput [this request response]
+       (timed-agent-call
+        (.provideHumanInput client request response)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"       "provideHumanInput"
+         "request"  request
+         "response" response}))
+     (provideHumanInputAsync [this request response]
+       (no-async!))
+     (close [this]
+       (close! client))
+     aor-types/AgentClientInternal
+     (invoke-with-context-async-internal [this context args]
+       (aor-types/invoke-with-context-async-internal client context args))
+     (initiate-with-context-async-internal [this context args]
+       (aor-types/initiate-with-context-async-internal client context args))
+     (subagent-next-step-async [this agent-invoke]
+       (aor-types/subagent-next-step-async client agent-invoke))
+     aor-types/UnderlyingObjects
+     (underlying-objects [this]
+       (aor-types/underlying-objects client))
+    )))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id execution-context curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
@@ -297,140 +431,15 @@
                               :type (get store-info name)}))
          )))
      (getAgentClient [agent-node name]
-       (let [client (.getAgentClient declared-objects-tg name)
-
-             agent-info-tuple
-             (.getAgentInfo declared-objects-tg name)]
-         (reify
-          AgentClient
-          (invoke [this args]
-            (let [inv (.initiate this args)]
-              (.result this inv)))
-          (invokeAsync [this args]
-            (no-async!))
-          (initiate [this args]
-            (timed-agent-call
-             (.initiate client args)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"     "initiate"
-              "args"   (vec args) ; so it doesn't put a raw array in the trace
-              "result" res}))
-          (initiateAsync [this args]
-            (no-async!))
-          (fork [this invoke nodeInvokeIdToNewArgs]
-            (let [inv (.initiateFork this invoke nodeInvokeIdToNewArgs)]
-              (.result this inv)))
-          (forkAsync [this invoke nodeInvokeIdToNewArgs]
-            (no-async!))
-          (initiateFork [this invoke nodeInvokeIdToNewArgs]
-            (timed-agent-call
-             (.initiateFork client invoke nodeInvokeIdToNewArgs)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"           "initiateFork"
-              "invoke"       invoke
-              "new-args-map" nodeInvokeIdToNewArgs
-              "result"       res}))
-          (initiateForkAsync [this invoke invokeIdToNewArgs]
-            (no-async!))
-          (nextStep [this agent-invoke]
-            (let [start-time-millis (h/current-time-millis)
-                  ret               (.get ^CompletableFuture
-                                          (aor-types/subagent-next-step-async client agent-invoke))
-                  [stats res]       (if (instance? HumanInputRequest ret)
-                                      [nil ret]
-                                      [(:stats ret) (:result ret)])
-
-                  finish-time-millis
-                  (h/current-time-millis)
-                  [agent-module-name agent-name]
-                  agent-info-tuple
-                  data-map
-                  {"op"           "nextStep"
-                   "agent-invoke" agent-invoke
-                   "agent-module-name" agent-module-name
-                   "agent-name"   agent-name}
-
-                  data-map
-                  (if stats (assoc data-map "stats" stats) data-map)
-                  data-map
-                  (if (instance? AgentFailedException res) data-map (assoc data-map "result" res))
-                 ]
-              (record-nested-op!-impl
-               agent-node
-               :agent-call
-               start-time-millis
-               finish-time-millis
-               data-map)
-              (if (instance? AgentFailedException res)
-                (throw res))
-              res
-            ))
-          (nextStepAsync [this agent-invoke]
-            (no-async!))
-          (result [this agent-invoke]
-            (loop [step (.nextStep this agent-invoke)]
-              (if (instance? HumanInputRequest step)
-                (do
-                  (.provideHumanInput
-                   this
-                   step
-                   (.getHumanInput agent-node (:prompt step)))
-                  (recur (.nextStep this agent-invoke)))
-                (:result step))))
-          (resultAsync [this agent-invoke]
-            (no-async!))
-          (stream [this agent-invoke node]
-            (no-stream!))
-          (stream [this agent-invoke node stream-callback]
-            (no-stream!))
-          (streamSpecific [this agent-invoke node node-invoke-id]
-            (no-stream!))
-          (streamSpecific
-            [this agent-invoke node node-invoke-id stream-callback]
-            (no-stream!))
-          (streamAll [this agent-invoke node]
-            (no-stream!))
-          (streamAll [this agent-invoke node stream-all-callback]
-            (no-stream!))
-          (pendingHumanInputs [this agent-invoke]
-            (timed-agent-call
-             (.pendingHumanInputs client agent-invoke)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"           "pendingHumanInputs"
-              "agent-invoke" agent-invoke
-              "result"       res}))
-          (pendingHumanInputsAsync [this invoke]
-            (no-async!))
-          (provideHumanInput [this request response]
-            (timed-agent-call
-             (.provideHumanInput client request response)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"       "provideHumanInput"
-              "request"  request
-              "response" response}))
-          (provideHumanInputAsync [this request response]
-            (no-async!))
-          (close [this]
-            (close! client))
-          aor-types/AgentClientInternal
-          (invoke-with-context-async-internal [this context args]
-            (aor-types/invoke-with-context-async-internal client context args))
-          (initiate-with-context-async-internal [this context args]
-            (aor-types/initiate-with-context-async-internal client context args))
-          (subagent-next-step-async [this agent-invoke]
-            (aor-types/subagent-next-step-async client agent-invoke))
-          aor-types/UnderlyingObjects
-          (underlying-objects [this]
-            (aor-types/underlying-objects client))
-         )))
+       (subagent-client agent-node
+                        (.getAgentClient declared-objects-tg name)
+                        (.getThisModuleName declared-objects-tg)
+                        name))
+     (getMirrorAgentClient [agent-node module-name name]
+       (subagent-client agent-node
+                        (.getMirrorAgentClient declared-objects-tg module-name name)
+                        module-name
+                        name))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
      (recordNestedOp [this type start-time-millis finish-time-millis info]
