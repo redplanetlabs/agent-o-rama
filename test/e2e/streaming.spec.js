@@ -77,7 +77,8 @@ test.describe('Streaming UI', () => {
     // --- 6. ASSERTION: Verify the accumulated text contains our chunks ---
     // Wait for streaming to complete and verify final text
     const expectedText = testChunks.join('');
-    const preElement = streamingPanel.locator('pre');
+    // Use .first() to target the content <pre>, not the status <pre>
+    const preElement = streamingPanel.locator('pre.text-gray-800').first();
     
     // Wait for the full text to appear (with some tolerance for timing)
     await expect(preElement).toContainText(expectedText, { timeout: 30000 });
@@ -171,7 +172,8 @@ test.describe('Streaming UI', () => {
 
     // Check that the container is scrolled (scrollTop > 0 when content overflows)
     // We'll verify by checking that later lines are visible
-    const preElement = streamingPanel.locator('pre');
+    // Use .first() to target the content <pre>, not the status <pre>
+    const preElement = streamingPanel.locator('pre.text-gray-800').first();
     
     // Wait for the last line to appear
     await expect(preElement).toContainText('Line 50', { timeout: 60000 });
