@@ -318,7 +318,8 @@ test.describe('Pagination Tests', () => {
     const evaluatorNames = [];
     const searchPrefix = `searchtest-eval-${uniqueId}`;
     
-    // Create evaluators one at a time until Load More button appears
+    // Create evaluators one at a time until Load More button appears, then create more
+    // to ensure there's actually a second page to load
     console.log('Creating evaluators until pagination is triggered...');
     const searchInput = page.getByPlaceholder('Search evaluators...');
     await searchInput.fill(searchPrefix);
@@ -326,8 +327,9 @@ test.describe('Pagination Tests', () => {
     
     let itemCount = 0;
     const loadMoreButton = page.locator('tfoot tr').filter({ hasText: 'Load More' });
+    const PAGE_SIZE = 20; // Must match UI page size in queries.cljs
     
-    // Keep creating until Load More appears (backend returns up to 40 items, so we need 41+)
+    // Keep creating until Load More appears (at page size threshold)
     while (!(await loadMoreButton.isVisible()) && itemCount < 50) {
       itemCount++;
       const name = `${searchPrefix}-${String(itemCount).padStart(3, '0')}`;
@@ -347,7 +349,25 @@ test.describe('Pagination Tests', () => {
       }
     }
     
-    console.log(`✓ Created ${itemCount} evaluators, Load More button is now visible`);
+    // IMPORTANT: Create additional items beyond the first page to ensure Load More
+    // actually has items to load. Without this, clicking Load More would return empty.
+    const itemsToAddForSecondPage = 5;
+    console.log(`Load More appeared at ${itemCount} items. Creating ${itemsToAddForSecondPage} more for second page...`);
+    for (let i = 0; i < itemsToAddForSecondPage; i++) {
+      itemCount++;
+      const name = `${searchPrefix}-${String(itemCount).padStart(3, '0')}`;
+      evaluatorNames.push(name);
+      
+      await createEvaluator(page, {
+        name,
+        builderName: 'aor/conciseness',
+        description: `Search pagination test ${itemCount}`,
+        params: { threshold: '10' }
+      });
+    }
+    await page.waitForTimeout(300); // Wait for UI to catch up
+    
+    console.log(`✓ Created ${itemCount} total evaluators, ensuring items exist beyond first page`);
     
     const initialCount = await page.locator('table tbody tr').count();
     console.log(`Initial visible count: ${initialCount}`);
