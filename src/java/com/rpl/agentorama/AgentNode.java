@@ -111,8 +111,6 @@ public interface AgentNode extends AgentObjectFetcher, IFetchAgentClient {
    */
   <T> QueryTopologyClient<T> getMirrorQueryTopologyClient(String moduleName, String name);
 
-
-
   /**
    * Streams a chunk of data to clients.
    *

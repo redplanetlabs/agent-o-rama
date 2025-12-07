@@ -213,8 +213,7 @@
                    (RamaClientsTaskGlobal.
                     (-> agent-graphs
                         keys
-                        vec)
-                    []))
+                        vec)))
   (declare-object* setup
                    (symbol (po/agent-node-executor-name))
                    (AgentNodeExecutorTaskGlobal.))

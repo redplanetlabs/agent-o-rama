@@ -26,6 +26,10 @@
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     Node]
+   [com.rpl.rama
+    AckLevel
+    Depot
+    QueryTopologyClient]
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
@@ -362,6 +366,104 @@
                          :type        (get store-info-map pstate-name)}))
     )))
 
+(defn ack-level->str
+  [ack-level]
+  (condp = ack-level
+    AckLevel/ACK "ack"
+    AckLevel/APPEND_ACK "append-ack"
+    AckLevel/NONE "none"
+    (throw (h/ex-info "Unrecognized ack level" {:ack-level ack-level}))))
+
+(defmacro traced-other-call
+  ([expr nested-ops-vol info-map]
+   `(traced-other-call true ~expr ~nested-ops-vol ~info-map))
+  ([capture-response? expr nested-ops-vol info-map]
+   `(let [info-map# ~info-map
+          start-time-millis# (h/current-time-millis)
+          ret#      ~expr]
+      (vswap! ~nested-ops-vol
+              conj
+              (aor-types/->NestedOpInfoImpl
+               start-time-millis#
+               (h/current-time-millis)
+               :other
+               (if ~capture-response?
+                 (assoc info-map# "response" ret#)
+                 info-map#)
+              ))
+      ret#
+    )))
+
+(defn traced-depot
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
+  (let [depot (.getForeignDepot
+               declared-objects-tg
+               module-name
+               name)]
+    (reify
+     Depot
+     (append [this data]
+       (traced-other-call
+        (.append depot data)
+        nested-ops-vol
+        {"op"         "depot-append"
+         "moduleName" module-name
+         "name"       name
+         "data"       data
+         "ackLevel"   "ack"
+        }))
+     (append [this data ack-level]
+       (traced-other-call
+        (.append depot data ack-level)
+        nested-ops-vol
+        {"op"         "depot-append"
+         "moduleName" module-name
+         "name"       name
+         "data"       data
+         "ackLevel"   (ack-level->str ack-level)
+        }))
+     (getPartitionInfo [this partition-index]
+       (traced-other-call
+        (.getPartitionInfo depot partition-index)
+        nested-ops-vol
+        {"op"         "get-partition-info"
+         "moduleName" module-name
+         "name"       name
+         "partitionIndex" partition-index
+        }))
+     (read [this partition-index start-offset end-offset]
+       (traced-other-call
+        false
+        (.read depot partition-index start-offset end-offset)
+        nested-ops-vol
+        {"op"             "depot-read"
+         "moduleName"     module-name
+         "name"           name
+         "partitionIndex" partition-index
+         "startOffset"    start-offset
+         "endOffset"      end-offset
+        }))
+    )))
+
+(defn traced-qt-client
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
+  (let [q (.getForeignQuery
+           declared-objects-tg
+           module-name
+           name)]
+    (reify
+     QueryTopologyClient
+     (invoke [this args]
+       (traced-other-call
+        (.invoke q args)
+        nested-ops-vol
+        {"op"         "query-topology"
+         "moduleName" module-name
+         "name"       name
+         "args"       (vec args)
+        }))
+    )))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id execution-context curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
@@ -467,25 +569,29 @@
                    nil
                    nested-ops-vol)))
      (getDepot [this name]
-       (.getForeignDepot
+       (traced-depot
         declared-objects-tg
         (.getThisModuleName declared-objects-tg)
-        name))
+        name
+        nested-ops-vol))
      (getMirrorDepot [this module-name name]
-       (.getForeignDepot
+       (traced-depot
         declared-objects-tg
         module-name
-        name))
+        name
+        nested-ops-vol))
      (getQueryTopologyClient [this name]
-       (.getForeignQuery
+       (traced-qt-client
         declared-objects-tg
         (.getThisModuleName declared-objects-tg)
-        name))
+        name
+        nested-ops-vol))
      (getMirrorQueryTopologyClient [this module-name name]
-       (.getForeignQuery
+       (traced-qt-client
         declared-objects-tg
         module-name
-        name))
+        name
+        nested-ops-vol))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
      (recordNestedOp [this type start-time-millis finish-time-millis info]

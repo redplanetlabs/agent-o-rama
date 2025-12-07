@@ -25,7 +25,6 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
 
   private static class ClientInfo implements Closeable {
     private String moduleName;
-    public Map<List, PState> mirrorClients;
     public Map<String, Depot> agentDepots;
     public Map<String, Depot> streamingDepots;
     public Map<String, Depot> humanDepots;
@@ -33,9 +32,8 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     public Depot pstateWritesDepot;
     ClusterManagerBase manager;
 
-    public ClientInfo(String moduleName, Map mirrorClients, Map agentDepots, Map streamingDepots, Map humanDepots, Depot pstateWritesDepot, ClusterManagerBase manager) {
+    public ClientInfo(String moduleName, Map agentDepots, Map streamingDepots, Map humanDepots, Depot pstateWritesDepot, ClusterManagerBase manager) {
       this.moduleName = moduleName;
-      this.mirrorClients = mirrorClients;
       this.agentDepots = agentDepots;
       this.streamingDepots = streamingDepots;
       this.humanDepots = humanDepots;
@@ -67,17 +65,6 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
   WorkerManagedResource<ClientInfo> _clientInfo;
 
   final Collection<String> _agentNames;
-  final List<List> _mirrorTuples;
-
-
-  public PState getMirrorPState(String moduleName, String pstateName) {
-    List tuple = new ArrayList();
-    tuple.add(moduleName);
-    tuple.add(pstateName);
-    PState ret = _clientInfo.getResource().mirrorClients.get(tuple);
-    if(ret==null) throw new RuntimeException("Mirror PState is not a dependency:" + moduleName + "/" + pstateName);
-    return ret;
-  }
 
   public Depot getPStateWriteDepot() {
     return _clientInfo.getResource().pstateWritesDepot;
@@ -99,9 +86,8 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     return _clientInfo.getResource().getLocalPState(pstateName);
   }
 
-  public RamaClientsTaskGlobal(Collection<String> agentNames, List<List> mirrorTuples) {
+  public RamaClientsTaskGlobal(Collection<String> agentNames) {
     _agentNames = agentNames;
-    _mirrorTuples = mirrorTuples;
   }
 
   @Override
@@ -122,15 +108,8 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
                       for(String name: _agentNames) {
                         humanDepots.put(name, manager.clusterDepot(moduleName, agentHumanDepotName(name)));
                       }
-                      Map clients = new HashMap();
-                      for(List<String> tuple: _mirrorTuples) {
-                        String mm = tuple.get(0);
-                        String pstateName = tuple.get(1);
-                        clients.put(tuple, manager.clusterPState(mm, pstateName));
-                      }
                       return new ClientInfo(
                                moduleName,
-                               clients,
                                agentDepots,
                                streamingDepots,
                                humanDepots,

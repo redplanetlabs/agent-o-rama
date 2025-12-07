@@ -146,7 +146,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     });
   }
 
-  public Map getMirroStoreInfo(String moduleName) {
+  public Map getMirrorStoreInfo(String moduleName) {
     return _mirrorStoreInfo.getResource().computeIfAbsent(moduleName, new Function<String, Map>() {
       public Map apply(String mn) {
         try {
