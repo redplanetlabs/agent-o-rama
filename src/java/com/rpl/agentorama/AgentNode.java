@@ -2,6 +2,7 @@ package com.rpl.agentorama;
 
 import com.rpl.agentorama.impl.*;
 import com.rpl.agentorama.store.Store;
+import com.rpl.rama.*;
 import java.util.Map;
 
 /**
@@ -45,6 +46,9 @@ public interface AgentNode extends AgentObjectFetcher, IFetchAgentClient {
    */
   void result(Object arg);
 
+
+  AgentClient getMirrorAgentClient(String moduleName, String agentName);
+
   /**
    * Gets a store by name for persistent data access.
    *
@@ -58,37 +62,56 @@ public interface AgentNode extends AgentObjectFetcher, IFetchAgentClient {
    */
   <T extends Store> T getStore(String name);
 
+  /**
+   * Gets a store instance from another module.
+   *
+   * Stores provide distributed, persistent, replicated storage. Mirror stores are read-only.
+   *
+   * @param moduleName the module where the store exists
+   * @param name the name of the store (declared with declare*Store functions in the target module)
+   * @return the store instance with API methods (get, put, etc.)
+   */
+  <T extends Store> T getMirrorStore(String moduleName, String name);
 
-  AgentClient getMirrorAgentClient(String moduleName, String agentName);
+  /**
+   * Gets a depot client within a node.
+   *
+   * Depots are Rama's append-only logs that can be consumed by any number of topologies.
+   *
+   * @param name the name of the depot (declared in the module)
+   * @return Depot instance for appending data
+   */
+  Depot getDepot(String name);
 
-  // TODO: add methods to get local and mirror depots and query topologies
-  //  - what about mirror PStates... or mirror stores?
-  //    - probably don't want to be able to write to mirror stores?
-  //      - can enforce that, which is fine
-  //  - for mirrors:
-  //    - need to specify the dependency and give it a unique name
-  //    - API here is the same
-  //  - what about for depots / query topologies? those could be declared normally...
-  //    - same can be said of PState mirrors as well...
-  //    - not the worst thing in the world to require it to be specified twice
-  //      - no, Rama doesn't allow duplicate mirrors...
-  //    - but doesn't Rama error if you specify the same mirror multiple times?
-  //  - either have to be permissive and dynamic without declaration, or need to use rpl.rama.distributed.core/thread-module-
-  //    instance-info
-  //    - even with using thread-module-instance-info, without mirrors it's not enforced at deploy time, including for the other
-  //     module! so probably should just make it dynamic
-  //      - only issue with this is it's a bit inconsistent with declare-cluster-agent
-  //        - could remove that API pretty safely
-  // - so make:
-  //   - getMirrorStore
-  //      - this queries other module for store info (if it exists) to determine what type to make
-  //        - returned store should NOT allow writes
-  //   - getDepot
-  //   - getMirrorDepot
-  //   - getQuery
-  //   - getMirrorQuery
-  //   - getMirrorAgent?
-  //      - and remove declareClusterAgent, making it dynamic instead
+  /**
+   * Gets a depot instance from another module.
+   *
+   * Depots are Rama's append-only logs that can be consumed by any number of topologies.
+   *
+   * @param moduleName the module where the depot exists
+   * @param name the name of the depot (declared in the target module)
+   * @return Depot instance for appending data
+   */
+  Depot getMirrorDepot(String moduleName, String name);
+
+  /**
+   * Gets a query topology client for invoking queries within a node.
+   *
+   * @param name the name of the query topology
+   * @return QueryTopologyClient instance
+   */
+  <T> QueryTopologyClient<T> getQueryTopologyClient(String name);
+
+  /**
+   * Gets a query topology client from another module.
+   *
+   * @param moduleName the module where the query topology exists
+   * @param name the name of the query topology
+   * @return QueryTopologyClient instance
+   */
+  <T> QueryTopologyClient<T> getMirrorQueryTopologyClient(String moduleName, String name);
+
+
 
   /**
    * Streams a chunk of data to clients.

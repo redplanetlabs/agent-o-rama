@@ -1392,28 +1392,29 @@
                :finish-time-millis 1
                :type :store-read
                :info
-               {"name" "$$kv" "op" "get" "params" [:b] "result" []}}
+               {"moduleName" ?module-name "name" "$$kv" "op" "get" "params" [:b] "result" []}}
               {:start-time-millis 1
                :finish-time-millis 3
                :type :store-read
                :info
-               {"name" "$$kv" "op" "get" "params" [:b] "result" nil}}
+               {"moduleName" ?module-name "name" "$$kv" "op" "get" "params" [:b] "result" nil}}
               {:start-time-millis 3
                :finish-time-millis 6
                :type :store-read
                :info
-               {"name"   "$$kv"
-                "op"     "contains?"
-                "params" [:a]
-                "result" false}}
+               {"moduleName" ?module-name
+                "name"       "$$kv"
+                "op"         "contains?"
+                "params"     [:a]
+                "result"     false}}
               {:start-time-millis 6
                :finish-time-millis 10
                :type :store-write
-               :info {"name" "$$kv" "op" "put" "params" [:a 1]}}
+               :info {"moduleName" ?module-name "name" "$$kv" "op" "put" "params" [:a 1]}}
               {:start-time-millis 10
                :finish-time-millis 15
                :type :store-write
-               :info {"name" "$$kv" "op" "update" "params" [:d]}}]
+               :info {"moduleName" ?module-name "name" "$$kv" "op" "update" "params" [:d]}}]
              :result            nil
              :agent-id          ?agent-id
              :input             []
@@ -1433,40 +1434,45 @@
                :finish-time-millis 21
                :type :store-read
                :info
-               {"name"   "$$doc"
-                "op"     "get-document-field"
-                "params" [:m :a {:default nil}]
-                "result" nil}}
+               {"moduleName" ?module-name
+                "name"       "$$doc"
+                "op"         "get-document-field"
+                "params"     [:m :a {:default nil}]
+                "result"     nil}}
               {:start-time-millis 21
                :finish-time-millis 28
                :type :store-read
                :info
-               {"name"   "$$doc"
-                "op"     "get-document-field"
-                "params" [:m :b {:default []}]
-                "result" []}}
+               {"moduleName" ?module-name
+                "name"       "$$doc"
+                "op"         "get-document-field"
+                "params"     [:m :b {:default []}]
+                "result"     []}}
               {:start-time-millis 28
                :finish-time-millis 36
                :type :store-read
                :info
-               {"name"   "$$doc"
-                "op"     "contains-document-field?"
-                "params" [:m :a]
-                "result" false}}
+               {"moduleName" ?module-name
+                "name"       "$$doc"
+                "op"         "contains-document-field?"
+                "params"     [:m :a]
+                "result"     false}}
               {:start-time-millis 36
                :finish-time-millis 45
                :type :store-write
                :info
-               {"name"   "$$doc"
-                "op"     "put-document-field"
-                "params" [:m :a 1]}}
+               {"moduleName" ?module-name
+                "name"       "$$doc"
+                "op"         "put-document-field"
+                "params"     [:m :a 1]}}
               {:start-time-millis 45
                :finish-time-millis 55
                :type :store-write
                :info
-               {"name"   "$$doc"
-                "op"     "update-document-field"
-                "params" [:m :a]}}]
+               {"moduleName" ?module-name
+                "name"       "$$doc"
+                "op"         "update-document-field"
+                "params"     [:m :a]}}]
              :result            nil
              :agent-id          ?agent-id
              :input             []
@@ -1486,44 +1492,48 @@
                :finish-time-millis 66
                :type :store-write
                :info
-               {"name" "$$p" "op" "pstate-transform" "params" [:a]}}
+               {"moduleName" ?module-name "name" "$$p" "op" "pstate-transform" "params" [:a]}}
               {:start-time-millis 66
                :finish-time-millis 78
                :type :store-write
                :info
-               {"name" "$$p" "op" "pstate-transform" "params" [:a]}}
+               {"moduleName" ?module-name "name" "$$p" "op" "pstate-transform" "params" [:a]}}
               {:start-time-millis 78
                :finish-time-millis 91
                :type :store-read
                :info
-               {"name"   "$$p"
-                "op"     "pstate-select-one"
-                "params" []
-                "result" 1}}
+               {"moduleName" ?module-name
+                "name"       "$$p"
+                "op"         "pstate-select-one"
+                "params"     []
+                "result"     1}}
               {:start-time-millis 91
                :finish-time-millis 105
                :type :store-read
                :info
-               {"name"   "$$p"
-                "op"     "pstate-select"
-                "params" []
-                "result" [1]}}
+               {"moduleName" ?module-name
+                "name"       "$$p"
+                "op"         "pstate-select"
+                "params"     []
+                "result"     [1]}}
               {:start-time-millis 105
                :finish-time-millis 120
                :type :store-read
                :info
-               {"name"   "$$p"
-                "op"     "pstate-select-one"
-                "params" [{:pkey :a}]
-                "result" 2}}
+               {"moduleName" ?module-name
+                "name"       "$$p"
+                "op"         "pstate-select-one"
+                "params"     [{:pkey :a}]
+                "result"     2}}
               {:start-time-millis 120
                :finish-time-millis 136
                :type :store-read
                :info
-               {"name"   "$$p"
-                "op"     "pstate-select"
-                "params" [{:pkey :a}]
-                "result" [2]}}]
+               {"moduleName" ?module-name
+                "name"       "$$p"
+                "op"         "pstate-select"
+                "params"     [{:pkey :a}]
+                "result"     [2]}}]
              :result            nil
              :agent-id          ?agent-id
              :input             []
@@ -1591,7 +1601,8 @@
            }
            (m/guard
             (and (= ?agent-id agent-id)
-                 (= ?agent-task-id agent-task-id)))))
+                 (= ?agent-task-id agent-task-id)
+                 (= ?module-name module-name)))))
         )))))
 
 (aor/defagentmodule

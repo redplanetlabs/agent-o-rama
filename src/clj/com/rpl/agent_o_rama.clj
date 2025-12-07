@@ -848,7 +848,7 @@ Args:\n
   - name - String name of the store (declared with declare-*-store functions)
 \n
 Returns:\n
-  - Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, delete!, etc.)
+  - Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, etc.)
 \n
 Example:\n
 <pre>
@@ -858,6 +858,107 @@ Example:\n
 </pre>"
   [^AgentNode agent-node name]
   (.getStore agent-node name))
+
+(defn get-mirror-store
+  "Gets a store instance from another module.\n
+\n
+Stores provide distributed, persistent, replicated storage. Mirror stores are read-only.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - module-name – module where the store exists
+  - name - String name of the store (declared with declare-*-store functions in the target module)
+\n
+Returns:\n
+  - Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, etc.)
+\n
+Example:\n
+<pre>
+(let [store (get-mirror-store agent-node \"com.mycompany/OtherModule\" \"$$some-kv-store\")]
+  (store/get store \"user-123\"))
+</pre>"
+  [^AgentNode agent-node module-name name]
+  (.getMirrorStore agent-node module-name name))
+
+(defn get-depot
+  "Gets a depot client within a node.\n
+\n
+Depots are Rama's append-only logs that can be consumed by any number of topologies.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - name - String name of the depot (declared in the module)
+\n
+Returns:\n
+  - Depot instance for appending data using foreign-append! or similar Rama functions
+\n
+Example:\n
+<pre>
+(let [depot (get-depot agent-node \"*my-depot\")]
+  (foreign-append! depot {:event \"user-action\" :data data}))
+</pre>"
+  [^AgentNode agent-node name]
+  (.getDepot agent-node name))
+
+(defn get-mirror-depot
+  "Gets a depot instance from another module.\n
+\n
+Depots are Rama's append-only logs that can be consumed by any number of topologies.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - module-name – module where the depot exists
+  - name - String name of the depot (declared in the target module)
+\n
+Returns:\n
+  - Depot instance for appending data using foreign-append! or similar Rama functions
+\n
+Example:\n
+<pre>
+(let [depot (get-mirror-depot agent-node \"com.mycompany/OtherModule\" \"*events-depot\")]
+  (foreign-append! depot {:event \"cross-module-event\" :data data}))
+</pre>"
+  [^AgentNode agent-node module-name name]
+  (.getMirrorDepot agent-node module-name name))
+
+(defn get-query-topology-client
+  "Gets a query topology client for invoking queries within a node.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - name - String name of the query topology
+\n
+Returns:\n
+  - QueryTopologyClient instance
+\n
+Example:\n
+<pre>
+(let [query-client (get-query-topology-client agent-node \"my-query-topology\")]
+  (let [result (foreign-invoke-query query-client \"arg1\" 100)]
+    (process-results result)))
+</pre>"
+  [^AgentNode agent-node name]
+  (.getQueryTopologyClient agent-node name))
+
+(defn get-mirror-query-topology-client
+  "Gets a query topology client from another module.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - module-name – module where the query topology exists
+  - name - String name of the query topology
+\n
+Returns:\n
+  - QueryTopologyClient instance
+\n
+Example:\n
+<pre>
+(let [query-client (get-mirror-query-topology-client agent-node \"com.mycompany/OtherModule\" \"analytics-query\")]
+  (let [result (foreign-invoke-query query-client \"arg1\" 100)]
+    (process-analytics result)))
+</pre>"
+  [^AgentNode agent-node module-name name]
+  (.getMirrorQueryTopologyClient agent-node module-name name))
 
 (defn get-agent-object
   "Gets a shared agent object (AI models, database clients, etc.) within a node, evaluator, or action function.\n
@@ -1727,7 +1828,6 @@ Example:\n
 </pre>"
   [^AgentNode agent-node module-name agent-name]
   (.getMirrorAgentClient agent-node module-name agent-name))
-
 
 (defn agent-names
   "Gets the names of all available agents in a module.\n

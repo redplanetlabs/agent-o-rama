@@ -248,9 +248,7 @@
   (close [this]))
 
 (defaorrecord StoreInfo
-  [store-info :- {String clojure.lang.Keyword}
-   ;; module-name -> pstate-name -> store-type
-   mirror-store-info :- {String {String clojure.lang.Keyword}}]
+  [store-info :- {String clojure.lang.Keyword}]
   TaskGlobalObject
   (prepareForTask [this task-id context])
   (close [this]))

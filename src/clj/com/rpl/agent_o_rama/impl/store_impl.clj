@@ -20,14 +20,14 @@
 (def DOC :doc)
 
 (aor-types/defaorrecord StoreParams
-  [pstate-name :- String
+  [module-name :- String
+   pstate-name :- String
    agent-name :- String
    agent-task-id :- Long
    agent-id :- UUID
    retry-num :- Long
-   mirror? :- Boolean
    pstate-client :- PState
-   write-depot :- Depot
+   write-depot :- (s/maybe Depot)
    nested-ops-vol :- (s/pred volatile?)
   ])
 
@@ -62,9 +62,10 @@
 
 (defn- pstate-write!*
   [store-params path k op params]
-  (when (:mirror? store-params)
+  (when (nil? (:write-depot store-params))
     (throw (h/ex-info "Can only write to colocated PStates"
-                      {:pstate-name (:pstate-name store-params)})))
+                      {:module-name (:module-name store-params)
+                       :pstate-name (:pstate-name store-params)})))
   (let [start-time  (h/current-time-millis)
         _ (hook:initiating-pstate-write)
         _ (do-pstate-write!
@@ -84,9 +85,10 @@
              start-time
              finish-time
              :store-write
-             {"name"   (:pstate-name store-params)
-              "op"     op
-              "params" params}
+             {"moduleName" (:module-name store-params)
+              "name"       (:pstate-name store-params)
+              "op"         op
+              "params"     params}
             ))))
 
 (defmacro pstate-write!
@@ -112,10 +114,11 @@
       start-time
       finish-time
       :store-read
-      {"name"   (:pstate-name store-params)
-       "op"     op
-       "params" params
-       "result" res}
+      {"moduleName" (:module-name store-params)
+       "name"       (:pstate-name store-params)
+       "op"         op
+       "params"     params
+       "result"     res}
      ))
     res))
 

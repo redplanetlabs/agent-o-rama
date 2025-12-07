@@ -207,7 +207,7 @@
    store-info declared-objects evaluator-builders action-builders]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
-                   (aor-types/->valid-StoreInfo store-info {}))
+                   (aor-types/->valid-StoreInfo store-info))
   (declare-object* setup
                    (symbol (po/agents-clients-name))
                    (RamaClientsTaskGlobal.
@@ -335,6 +335,8 @@
   (queries/declare-search-evaluators-query-topology topologies)
   (queries/declare-search-experiments-query-topology topologies)
   (queries/declare-experiment-results-query-topology topologies)
+
+  (queries/declare-get-module-store-info topologies)
 
   (queries/declare-fork-affected-aggs-query-topology topologies)
   (queries/declare-get-current-graph topologies)

@@ -332,6 +332,36 @@
        (aor-types/underlying-objects client))
     )))
 
+(defn mk-store
+  [store-info-map module-name pstate-name agent-name agent-task-id agent-id
+   retry-num pstate-client pstate-write-depot nested-ops-vol]
+  (let [store-params
+        (simpl/->valid-StoreParams
+         module-name
+         pstate-name
+         agent-name
+         agent-task-id
+         agent-id
+         retry-num
+         pstate-client
+         pstate-write-depot
+         nested-ops-vol)]
+    (condp = (get store-info-map pstate-name)
+      simpl/KV
+      (simpl/mk-kv-store store-params)
+
+      simpl/DOC
+      (simpl/mk-doc-store store-params)
+
+      nil
+      (simpl/mk-pstate-store store-params)
+
+      (throw (h/ex-info "Unknown store type"
+                        {:module-name module-name
+                         :name        pstate-name
+                         :type        (get store-info-map pstate-name)}))
+    )))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id execution-context curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
@@ -403,33 +433,6 @@
        (:metadata execution-context))
      (getAgentObject [this name]
        (.getAgentObject fetcher name))
-     (getStore [this name]
-       (let [store-params
-             (simpl/->valid-StoreParams
-              name
-              agent-name
-              agent-task-id
-              agent-id
-              retry-num
-              false
-              (.getLocalPState rama-clients name)
-              (.getPStateWriteDepot rama-clients)
-              nested-ops-vol)]
-         ;; TODO: not sure this is the right approach for mirrors
-         (condp = (get (:store-info store-info) name)
-           simpl/KV
-           (simpl/mk-kv-store store-params)
-
-           simpl/DOC
-           (simpl/mk-doc-store store-params)
-
-           nil
-           (simpl/mk-pstate-store store-params)
-
-           (throw (h/ex-info "Unknown store type"
-                             {:name name
-                              :type (get store-info name)}))
-         )))
      (getAgentClient [agent-node name]
        (subagent-client agent-node
                         (.getAgentClient declared-objects-tg name)
@@ -440,6 +443,49 @@
                         (.getMirrorAgentClient declared-objects-tg module-name name)
                         module-name
                         name))
+     (getStore [this name]
+       (mk-store (:store-info store-info)
+                 (.getThisModuleName declared-objects-tg)
+                 name
+                 agent-name
+                 agent-task-id
+                 agent-id
+                 retry-num
+                 (.getLocalPState rama-clients name)
+                 (.getPStateWriteDepot rama-clients)
+                 nested-ops-vol))
+     (getMirrorStore [this module-name name]
+       (let [store-info-map (.getMirrorStoreInfo declared-objects-tg module-name)]
+         (mk-store store-info-map
+                   module-name
+                   name
+                   agent-name
+                   agent-task-id
+                   agent-id
+                   retry-num
+                   (.getForeignPState declared-objects-tg module-name name)
+                   nil
+                   nested-ops-vol)))
+     (getDepot [this name]
+       (.getForeignDepot
+        declared-objects-tg
+        (.getThisModuleName declared-objects-tg)
+        name))
+     (getMirrorDepot [this module-name name]
+       (.getForeignDepot
+        declared-objects-tg
+        module-name
+        name))
+     (getQueryTopologyClient [this name]
+       (.getForeignQuery
+        declared-objects-tg
+        (.getThisModuleName declared-objects-tg)
+        name))
+     (getMirrorQueryTopologyClient [this module-name name]
+       (.getForeignQuery
+        declared-objects-tg
+        module-name
+        name))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
      (recordNestedOp [this type start-time-millis finish-time-millis info]

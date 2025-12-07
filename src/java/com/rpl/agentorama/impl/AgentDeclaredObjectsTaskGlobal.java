@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import com.rpl.agentorama.*;
 import com.rpl.rama.cluster.ClusterManagerBase;
+import com.rpl.rama.*;
 import com.rpl.rama.integration.*;
 
 import clojure.lang.*;
@@ -11,7 +12,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
+import rpl.rama.generated.TopologyDoesNotExistException;
+
 public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
+  public static final String MODULE_GET_STORE_INFO_QUERY_NAME = "_module-get-store-info";
   public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
   Map<String, Map<String, Object>> _builders;
   Map<String, Map<Keyword, Object>> _evaluatorBuilders;
@@ -26,6 +30,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   WorkerManagedResource<ConcurrentHashMap<List, AgentClient>> _mirrorAgents;
   ClusterManagerBase _clusterRetriever;
   WorkerManagedResource<AgentManager> _thisManager;
+  WorkerManagedResource<ConcurrentHashMap<List, Depot>> _depots;
+  WorkerManagedResource<ConcurrentHashMap<List, PState>> _pstates;
+  WorkerManagedResource<ConcurrentHashMap<String, Map>> _mirrorStoreInfo;
+  WorkerManagedResource<ConcurrentHashMap<List, QueryTopologyClient>> _queries;
 
 
   // agents is localName -> [moduleName, agentName] (nil for local module)
@@ -122,6 +130,45 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     });
   }
 
+  public Depot getForeignDepot(String moduleName, String name) {
+    return _depots.getResource().computeIfAbsent(Arrays.asList(moduleName, name), new Function<List, Depot>() {
+      public Depot apply(List tuple) {
+        return _clusterRetriever.clusterDepot(moduleName, name);
+      }
+    });
+  }
+
+  public PState getForeignPState(String moduleName, String name) {
+    return _pstates.getResource().computeIfAbsent(Arrays.asList(moduleName, name), new Function<List, PState>() {
+      public PState apply(List tuple) {
+        return _clusterRetriever.clusterPState(moduleName, name);
+      }
+    });
+  }
+
+  public Map getMirroStoreInfo(String moduleName) {
+    return _mirrorStoreInfo.getResource().computeIfAbsent(moduleName, new Function<String, Map>() {
+      public Map apply(String mn) {
+        try {
+          QueryTopologyClient<Map> q = _clusterRetriever.clusterQuery(moduleName, MODULE_GET_STORE_INFO_QUERY_NAME);
+          return q.invoke();
+        } catch(Exception e) {
+          // can't catch this directly since it's a checked exception type
+          if(e instanceof TopologyDoesNotExistException) return new HashMap();
+          else throw e;
+        }
+      }
+    });
+  }
+
+  public QueryTopologyClient getForeignQuery(String moduleName, String name) {
+    return _queries.getResource().computeIfAbsent(Arrays.asList(moduleName, name), new Function<List, QueryTopologyClient>() {
+      public QueryTopologyClient apply(List tuple) {
+        return _clusterRetriever.clusterQuery(moduleName, name);
+      }
+    });
+  }
+
   public ClusterManagerBase getClusterRetriever() {
     return _clusterRetriever;
   }
@@ -177,6 +224,18 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     _mirrorAgents = new WorkerManagedResource("__mirrorAgentClients", context, () -> {
       return new CloseableConcurrentMap();
     });
+    _depots = new WorkerManagedResource("__foreignDepotClients", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _pstates = new WorkerManagedResource("__foreignPStateClients", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _mirrorStoreInfo = new WorkerManagedResource("__mirrorStoreInfo", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _queries = new WorkerManagedResource("__foreignQueryClients", context, () -> {
+      return new CloseableConcurrentMap();
+    });
   }
 
   @Override
@@ -187,5 +246,9 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     }
     _agents.close();
     _mirrorAgents.close();
+    _depots.close();
+    _pstates.close();
+    _mirrorStoreInfo.close();
+    _queries.close();
   }
 }
