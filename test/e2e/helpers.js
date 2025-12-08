@@ -248,27 +248,11 @@ export async function deleteDataset(page, name) {
   const datasetRow = page.locator('table tbody tr').filter({ hasText: name });
   await datasetRow.getByRole('button', { name: 'Delete' }).click();
   
-  // Wait for dialog to appear and be handled, then wait for network to settle
+  // Wait a bit for dialog to appear and be handled
   await page.waitForTimeout(500);
-  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   
-  // Wait for the row to disappear after deletion (with longer timeout for CI)
-  try {
-    await expect(datasetRow).not.toBeVisible({ timeout: 15000 });
-  } catch (e) {
-    // If row is still visible, the table cache might be stale - try to force refresh
-    // But handle gracefully if browser is already closing (test timeout)
-    try {
-      console.log(`Row still visible after delete, forcing table refresh...`);
-      const currentUrl = page.url();
-      await page.goto(currentUrl);
-      await page.waitForLoadState('networkidle');
-      await expect(datasetRow).not.toBeVisible({ timeout: 10000 });
-    } catch (refreshError) {
-      // Browser likely closed due to test timeout - just log and continue
-      console.log(`Could not refresh page (browser may be closing): ${refreshError.message}`);
-    }
-  }
+  // Wait for the row to disappear after deletion
+  await expect(datasetRow).not.toBeVisible({ timeout: 10000 });
   console.log(`Successfully deleted dataset: ${name}`);
 }
 
@@ -312,33 +296,11 @@ export async function deleteEvaluator(page, name) {
   const evalRow = page.locator('table tbody tr').filter({ hasText: name });
   await evalRow.getByRole('button', { name: 'Delete' }).click();
   
-  // Wait for dialog to appear and be handled, then wait for network to settle
+  // Wait a bit for dialog to appear and be handled
   await page.waitForTimeout(500);
-  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   
-  // Wait for the row to disappear after deletion (with longer timeout for CI)
-  try {
-    await expect(evalRow).not.toBeVisible({ timeout: 15000 });
-  } catch (e) {
-    // If row is still visible, the table cache might be stale - try to force refresh
-    // But handle gracefully if browser is already closing (test timeout)
-    try {
-      console.log(`Row still visible after delete, forcing table refresh...`);
-      const currentUrl = page.url();
-      await page.goto(currentUrl);
-      await page.waitForLoadState('networkidle');
-      // Re-search for the evaluator if search was used
-      if (await searchInput.isVisible()) {
-        await searchInput.fill(name);
-        await page.waitForTimeout(500);
-      }
-      // Now the row should definitely be gone
-      await expect(evalRow).not.toBeVisible({ timeout: 10000 });
-    } catch (refreshError) {
-      // Browser likely closed due to test timeout - just log and continue
-      console.log(`Could not refresh page (browser may be closing): ${refreshError.message}`);
-    }
-  }
+  // Wait for the row to disappear after deletion
+  await expect(evalRow).not.toBeVisible({ timeout: 10000 });
   
   // Clear search if it was used
   if (await searchInput.isVisible()) {
