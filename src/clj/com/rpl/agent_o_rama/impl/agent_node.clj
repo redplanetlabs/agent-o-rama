@@ -370,7 +370,7 @@
   [ack-level]
   (condp = ack-level
     AckLevel/ACK "ack"
-    AckLevel/APPEND_ACK "append-ack"
+    AckLevel/APPEND_ACK "appendAck"
     AckLevel/NONE "none"
     (throw (h/ex-info "Unrecognized ack level" {:ack-level ack-level}))))
 
@@ -424,6 +424,7 @@
         }))
      (getObjectInfo [this]
        (traced-other-call
+        false
         (.getObjectInfo depot)
         nested-ops-vol
         {"op"         "getObjectInfo"
@@ -433,6 +434,7 @@
      )
      (getPartitionInfo [this partition-index]
        (traced-other-call
+        false
         (.getPartitionInfo depot partition-index)
         nested-ops-vol
         {"op"         "getPartitionInfo"

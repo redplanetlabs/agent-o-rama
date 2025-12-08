@@ -8,8 +8,9 @@
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
-   [com.rpl.agent-o-rama.store :as store]
    [com.rpl.agent-o-rama.impl.queries :as queries]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.store :as store]
    [com.rpl.rama.aggs :as aggs]
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
@@ -154,6 +155,8 @@
                   (vswap! res conj (foreign-object-info depot1))
                   (vswap! res conj (foreign-depot-partition-info depot1 0))
                   (vswap! res conj (foreign-depot-read depot1 0 0 3))
+                  (foreign-append! depot1 :1 :append-ack)
+                  (foreign-append! depot1 :2 nil)
                   (aor/result! agent-node @res)
                 ))))
            (aor/define-agents! topology)
@@ -166,14 +169,213 @@
 
      (bind agent-manager (aor/agent-manager ipc module3-name))
      (bind foo (aor/agent-client agent-manager "foo"))
-     (bind res (aor/agent-invoke foo :a))
+     (bind root-pstate
+       (foreign-pstate ipc
+                       module3-name
+                       (po/agent-root-task-global-name "foo")))
+     (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
+
+
+     (bind {:keys [task-id agent-invoke-id] :as inv} (aor/agent-initiate foo :a))
+     (bind res (aor/agent-result foo inv))
 
      (is (= res
             [1 :abc :def ".!" ".!!" ".!!!" true true true 1 {:a 1} 1
              {:name "*depot" :module-name module1-name :num-partitions 1}
              {:start-offset 0 :end-offset 4} [:a :x :y]]
          ))
+
+
+
+     (bind root-invoke-id
+       (foreign-select-one [(keypath agent-invoke-id) :root-invoke-id]
+                           root-pstate
+                           {:pkey task-id}))
+     (bind res
+       (foreign-invoke-query traces-query
+                             task-id
+                             [[task-id root-invoke-id]]
+                             10000))
+
+     (is
+      (trace-matches?
+       (:invokes-map res)
+       {!id1
+        {:agent-id      ?agent-id
+         :emits         []
+         :agent-task-id ?agent-task-id
+         :node          "start"
+         :nested-ops
+         [{:type :other
+           :info
+           {"op"         "depotAppend"
+            "moduleName" ?module1-name
+            "name"       "*depot"
+            "data"       :a
+            "ackLevel"   "ack"
+            "response"   {}}}
+          {:type :store-read
+           :info
+           {"moduleName" ?module1-name
+            "name"       "$$p"
+            "op"         "pstate-select-one"
+            "params"     []
+            "result"     1}}
+          {:type :other
+           :info
+           {"op"         "depotAppend"
+            "moduleName" ?module2-name
+            "name"       "*depot"
+            "data"       :a
+            "ackLevel"   "ack"
+            "response"   {}}}
+          {:type :store-read
+           :info
+           {"moduleName" ?module2-name
+            "name"       "$$p"
+            "op"         "pstate-select-one"
+            "params"     []
+            "result"     :abc}}
+          {:type :other
+           :info
+           {"op"         "depotAppend"
+            "moduleName" ?module3-name
+            "name"       "*depot"
+            "data"       :a
+            "ackLevel"   "ack"
+            "response"   {}}}
+          {:type :store-read
+           :info
+           {"moduleName" ?module3-name
+            "name"       "$$p"
+            "op"         "pstate-select-one"
+            "params"     []
+            "result"     :def}}
+          {:type :other
+           :info
+           {"op"         "queryTopology"
+            "moduleName" ?module1-name
+            "name"       "q"
+            "args"       ["."]
+            "response"   ".!"}}
+          {:type :other
+           :info
+           {"op"         "queryTopology"
+            "moduleName" ?module2-name
+            "name"       "q"
+            "args"       ["."]
+            "response"   ".!!"}}
+          {:type :other
+           :info
+           {"op"         "queryTopology"
+            "moduleName" ?module3-name
+            "name"       "q"
+            "args"       ["."]
+            "response"   ".!!!"}}
+          {:type :agent-call
+           :info
+           {"op"         "initiate"
+            "args"       [:a]
+            "agent-module-name" ?module2-name
+            "agent-name" "foo"}}
+          {:type :agent-call
+           :info
+           {"op"         "nextStep"
+            "agent-module-name" ?module2-name
+            "agent-name" "foo"
+            "result"     {:result :done}}}
+          {:type :store-read
+           :info
+           {"moduleName" ?module2-name
+            "name"       "$$kv"
+            "op"         "get"
+            "params"     [:a]
+            "result"     1}}
+          {:type :store-read
+           :info
+           {"moduleName" ?module2-name
+            "name"       "$$doc"
+            "op"         "get"
+            "params"     [:a]
+            "result"     {:a 1}}}
+          {:type :store-read
+           :info
+           {"moduleName" ?module2-name
+            "name"       "$$pstore"
+            "op"         "pstate-select-one"
+            "params"     []
+            "result"     1}}
+          {:type :other
+           :info
+           {"op"         "depotAppend"
+            "moduleName" ?module1-name
+            "name"       "*depot"
+            "data"       :x
+            "ackLevel"   "ack"
+            "response"   {}}}
+          {:type :other
+           :info
+           {"op"         "depotAppend"
+            "moduleName" ?module1-name
+            "name"       "*depot"
+            "data"       :y
+            "ackLevel"   "ack"
+            "response"   {}}}
+          {:type :other
+           :info
+           {"op"         "depotAppend"
+            "moduleName" ?module1-name
+            "name"       "*depot"
+            "data"       :z
+            "ackLevel"   "ack"
+            "response"   {}}}
+          {:type :other
+           :info
+           {"op"         "getObjectInfo"
+            "moduleName" ?module1-name
+            "name"       "*depot"}}
+          {:type :other
+           :info
+           {"op"         "getPartitionInfo"
+            "moduleName" ?module1-name
+            "name"       "*depot"
+            "partitionIndex" 0}}
+          {:type :other
+           :info
+           {"op"             "depotRead"
+            "moduleName"     ?module1-name
+            "name"           "*depot"
+            "partitionIndex" 0
+            "startOffset"    0
+            "endOffset"      3}}
+          {:type :other
+           :info
+           {"op"         "depotAppend"
+            "moduleName" ?module1-name
+            "name"       "*depot"
+            "data"       :1
+            "ackLevel"   "appendAck"
+            "response"   {}}}
+          {:type :other
+           :info
+           {"op"         "depotAppend"
+            "moduleName" ?module1-name
+            "name"       "*depot"
+            "data"       :2
+            "ackLevel"   "none"
+            "response"   {}}}
+         ]
+         :input         [:a]
+         :metadata      {}}}
+       (m/guard
+        (and (= ?agent-id agent-invoke-id)
+             (= ?agent-task-id task-id)
+             (= ?module1-name module1-name)
+             (= ?module2-name module2-name)
+             (= ?module3-name module3-name)))
+      ))
+
+     ;     (clojure.pprint/pprint (:invokes-map res))
      ;; TODO: <<<<>>>>
      ;;   - direct test of store info query
-     ;;   - check trace
     )))
