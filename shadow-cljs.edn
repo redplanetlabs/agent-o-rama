@@ -11,8 +11,7 @@
    :modules          {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
    :output-dir       "resource/public/"
    :compiler-options {:optimizations :advanced
-                      :infer-externs :auto
-                      :closure-defines {"process.env.NODE_ENV" "production"}}}
+                      :infer-externs :auto}}
   :test
   {:target    :node-test
    :output-to "target/test/test.js"
