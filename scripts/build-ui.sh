@@ -1,4 +1,7 @@
-#!bin/sh
+#!/bin/sh
+
+# Set NODE_ENV to production for React production builds
+export NODE_ENV=production
 
 npm i
 rm -rf resource/public
