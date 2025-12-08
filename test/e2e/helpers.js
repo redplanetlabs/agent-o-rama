@@ -107,10 +107,9 @@ export async function addExample(page, { input, output, tags }) {
   
   // Step 1: Check if table exists (may not exist if no examples yet)
   const table = page.locator('table tbody');
-  const hasTable = await table.isVisible().catch(() => false);
   
   let rowsBefore = 0;
-  if (hasTable) {
+  if (await table.isVisible().catch(() => false)) {
     // Wait for table to be stable before counting
     await page.waitForTimeout(300);
     rowsBefore = await page.locator('table tbody tr').count();
