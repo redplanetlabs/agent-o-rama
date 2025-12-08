@@ -375,7 +375,9 @@
              (= ?module3-name module3-name)))
       ))
 
-     ;     (clojure.pprint/pprint (:invokes-map res))
-     ;; TODO: <<<<>>>>
-     ;;   - direct test of store info query
+     (bind store-info-query
+       (foreign-query ipc module2-name (queries/module-get-store-info-name)))
+
+     (is (= {"$$kv" :kv "$$doc" :doc}
+            (foreign-invoke-query store-info-query)))
     )))
