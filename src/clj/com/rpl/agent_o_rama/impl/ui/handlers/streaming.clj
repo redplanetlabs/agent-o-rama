@@ -66,20 +66,22 @@
 
       ;; Open the Rama Proxy with callback that bridges to Sente
       (let [proxy (aor/agent-stream-specific
-                   client
-                   agent-invoke
-                   node-name
-                   parsed-node-invoke-id
-                   (fn [_all-chunks new-chunks reset? complete?]
+                    client
+                    agent-invoke
+                    node-name
+                    parsed-node-invoke-id
+                    (fn [_all-chunks new-chunks reset? complete?]
                      ;; THE BRIDGE: Rama Callback -> Sente Push
-                     (try
-                       (let [serialized-chunks (common/->ui-serializable new-chunks)]
-                         (sente/chsk-send! uid [:stream/update
-                                                {:stream-id stream-id
-                                                 :new-chunks serialized-chunks
-                                                 :reset? reset?
-                                                 :complete? complete?}]))
-                       (catch Exception _))))]
+                      (try
+                        (let [serialized-chunks (common/->ui-serializable new-chunks)]
+                          (sente/chsk-send! uid [:stream/update
+                                                 {:stream-id stream-id
+                                                  :new-chunks serialized-chunks
+                                                  :reset? reset?
+                                                  :complete? complete?}]))
+                        (catch Exception _
+                         ;; Client likely disconnected - clean up the stream proxy
+                          (close-stream! uid stream-id)))))]
 
         ;; Store proxy reference for cleanup
         (swap! active-streams assoc-in [uid stream-id] proxy)

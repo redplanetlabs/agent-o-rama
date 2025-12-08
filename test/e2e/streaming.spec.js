@@ -1,6 +1,5 @@
 // test/e2e/streaming.spec.js
 import { test, expect } from '@playwright/test';
-import { randomUUID } from 'crypto';
 
 /**
  * Helper to get the StreamingTestAgent row.

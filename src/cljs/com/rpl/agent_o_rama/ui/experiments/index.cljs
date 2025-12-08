@@ -77,7 +77,6 @@
                          start-date (conj {:pred :>= :value (.getTime start-date)})
                          end-date (conj {:pred :<= :value (.getTime end-date)})))
 
-;; Update the query hook to use the debounced search term and time filter
         ;; Convert dates to timestamps for the query key (dates aren't serializable)
         start-ts (when start-date (.getTime start-date))
         end-ts (when end-date (.getTime end-date))
