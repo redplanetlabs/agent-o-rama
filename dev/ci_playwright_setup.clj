@@ -9,17 +9,21 @@
    [com.rpl.agent.e2e-test-agent :as e2e-test-agent]
    [com.rpl.agent.streaming-test-agent :as streaming-test-agent]))
 
-(defn -main []
+(defn -main [& args]
   (println "Starting CI Playwright setup...")
 
-  ;; Start shadow-cljs server and watch frontend
-  (println "Starting shadow-cljs server...")
-  (shadow.cljs.devtools.server/start!)
-  (println "Watching frontend build...")
-  (shadow/watch :frontend)
-
-  ;; Small delay to let shadow-cljs start
-  (Thread/sleep 2000)
+  ;; Check if --no-frontend flag is passed (frontend already built)
+  (let [no-frontend? (some #{"--no-frontend"} args)]
+    (if no-frontend?
+      (println "Skipping frontend build (using pre-built production bundle)")
+      (do
+        ;; Start shadow-cljs server and watch frontend
+        (println "Starting shadow-cljs server...")
+        (shadow.cljs.devtools.server/start!)
+        (println "Watching frontend build...")
+        (shadow/watch :frontend)
+        ;; Small delay to let shadow-cljs start
+        (Thread/sleep 2000))))
 
   ;; Create IPC and launch modules BEFORE starting UI
   (println "Creating IPC...")

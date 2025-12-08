@@ -58,12 +58,21 @@ jobs:
         lein with-profile +ui run -m shadow.cljs.devtools.cli compile :test
         node target/test/test.js
 
+    - name: Build production frontend
+      env:
+        NODE_ENV: production
+      run: |
+        rm -rf resource/public
+        mkdir -p resource/public
+        cp -r resource/assets/* resource/public
+        lein with-profile +ui run -m shadow.cljs.devtools.cli release :frontend
+
     - name: Start REPL and launch modules
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         CI: true
       run: |
-        lein with-profile +dev,+ui run -m ci-playwright-setup &
+        lein with-profile +dev,+ui run -m ci-playwright-setup --no-frontend &
         SERVER_PID=$!
         echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
         
