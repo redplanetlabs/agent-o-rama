@@ -130,13 +130,26 @@
                       depot2    (aor/get-mirror-depot agent-node module2-name "*depot")
                       q3        (aor/get-query-topology-client agent-node "q")
                       q1        (aor/get-mirror-query-topology-client agent-node module1-name "q")
-                      q2        (aor/get-mirror-query-topology-client agent-node module2-name "q")]
+                      q2        (aor/get-mirror-query-topology-client agent-node module2-name "q")
+                      res       (volatile! [])]
+                  (foreign-append! depot1 k)
+                  (vswap! res conj (foreign-select-one (keypath k) p1))
+                  (foreign-append! depot2 k)
+                  (vswap! res conj (foreign-select-one (keypath k) p2))
+                  (foreign-append! depot3 k)
+                  (vswap! res conj (foreign-select-one (keypath k) p3))
+                  (vswap! res conj (foreign-invoke-query q1))
+                  (vswap! res conj (foreign-invoke-query q2))
+                  (vswap! res conj (foreign-invoke-query q3))
+                  (aor/agent-invoke foo-m2 k)
+                  ;; TODO: query m2-kv, m2-doc, m2-pstore
+
+
+                  (aor/result! agent-node @res)
+
                   ;; TODO: <<<<>>>> use all depots/queries/PStates
                   ;; return results of all queries / PStates updates after depot appends
-                  ;;  - shouldn't query topoologies and depot appends be traced? it would be easy to
-                  ;;  do so
-                  ;;    - 4 methods for depot and 1 for querytopologyclient (just the blocking
-                  ;;    methods)
+                  ;;  - need to call all the methods and check the traces (just for depots and QTs)
                 ))))
 
            (aor/define-agents! topology)
@@ -145,7 +158,7 @@
 
 
 
-     (rtest/launch-module! ipc module1 {:tasks 2 :threads 2})
+     (rtest/launch-module! ipc module1 {:tasks 1 :threads 1})
      (launch-module-without-eval-agent! ipc module2 {:tasks 2 :threads 2})
      (launch-module-without-eval-agent! ipc module3 {:tasks 2 :threads 2})
      ;; TODO: <<<<>>>>
