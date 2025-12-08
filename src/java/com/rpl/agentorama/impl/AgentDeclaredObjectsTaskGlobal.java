@@ -153,8 +153,8 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
           QueryTopologyClient<Map> q = _clusterRetriever.clusterQuery(moduleName, MODULE_GET_STORE_INFO_QUERY_NAME);
           return q.invoke();
         } catch(Exception e) {
-          // can't catch this directly since it's a checked exception type
-          if(e instanceof TopologyDoesNotExistException) return new HashMap();
+          if(e instanceof TopologyDoesNotExistException || e.getCause() instanceof TopologyDoesNotExistException)
+            return new HashMap();
           else throw e;
         }
       }

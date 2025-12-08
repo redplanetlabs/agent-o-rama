@@ -406,7 +406,7 @@
        (traced-other-call
         (.append depot data)
         nested-ops-vol
-        {"op"         "depot-append"
+        {"op"         "depotAppend"
          "moduleName" module-name
          "name"       name
          "data"       data
@@ -416,17 +416,26 @@
        (traced-other-call
         (.append depot data ack-level)
         nested-ops-vol
-        {"op"         "depot-append"
+        {"op"         "depotAppend"
          "moduleName" module-name
          "name"       name
          "data"       data
          "ackLevel"   (ack-level->str ack-level)
         }))
+     (getObjectInfo [this]
+       (traced-other-call
+        (.getObjectInfo depot)
+        nested-ops-vol
+        {"op"         "getObjectInfo"
+         "moduleName" module-name
+         "name"       name
+        })
+     )
      (getPartitionInfo [this partition-index]
        (traced-other-call
         (.getPartitionInfo depot partition-index)
         nested-ops-vol
-        {"op"         "get-partition-info"
+        {"op"         "getPartitionInfo"
          "moduleName" module-name
          "name"       name
          "partitionIndex" partition-index
@@ -436,7 +445,7 @@
         false
         (.read depot partition-index start-offset end-offset)
         nested-ops-vol
-        {"op"             "depot-read"
+        {"op"             "depotRead"
          "moduleName"     module-name
          "name"           name
          "partitionIndex" partition-index
@@ -457,7 +466,7 @@
        (traced-other-call
         (.invoke q args)
         nested-ops-vol
-        {"op"         "query-topology"
+        {"op"         "queryTopology"
          "moduleName" module-name
          "name"       name
          "args"       (vec args)

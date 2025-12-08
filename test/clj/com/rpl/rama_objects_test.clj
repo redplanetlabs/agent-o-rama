@@ -133,42 +133,47 @@
                       q2        (aor/get-mirror-query-topology-client agent-node module2-name "q")
                       res       (volatile! [])]
                   (foreign-append! depot1 k)
-                  (vswap! res conj (foreign-select-one (keypath k) p1))
+                  (vswap! res conj (store/pstate-select-one (keypath k) p1))
                   (foreign-append! depot2 k)
-                  (vswap! res conj (foreign-select-one (keypath k) p2))
+                  (vswap! res conj (store/pstate-select-one (keypath k) p2))
                   (foreign-append! depot3 k)
-                  (vswap! res conj (foreign-select-one (keypath k) p3))
-                  (vswap! res conj (foreign-invoke-query q1))
-                  (vswap! res conj (foreign-invoke-query q2))
-                  (vswap! res conj (foreign-invoke-query q3))
+                  (vswap! res conj (store/pstate-select-one (keypath k) p3))
+                  (vswap! res conj (foreign-invoke-query q1 "."))
+                  (vswap! res conj (foreign-invoke-query q2 "."))
+                  (vswap! res conj (foreign-invoke-query q3 "."))
                   (aor/agent-invoke foo-m2 k)
-                  ;; TODO: query m2-kv, m2-doc, m2-pstore
-
-
+                  (vswap! res conj (h/contains-string? (str (class m2-kv)) "mk_kv_store"))
+                  (vswap! res conj (h/contains-string? (str (class m2-doc)) "mk_doc_store"))
+                  (vswap! res conj (h/contains-string? (str (class m2-pstore)) "mk_pstate_store"))
+                  (vswap! res conj (store/get m2-kv k))
+                  (vswap! res conj (store/get m2-doc k))
+                  (vswap! res conj (store/pstate-select-one (keypath k 0) m2-pstore))
+                  (foreign-append! depot1 :x)
+                  (foreign-append! depot1 :y)
+                  (foreign-append! depot1 :z)
+                  (vswap! res conj (foreign-object-info depot1))
+                  (vswap! res conj (foreign-depot-partition-info depot1 0))
+                  (vswap! res conj (foreign-depot-read depot1 0 0 3))
                   (aor/result! agent-node @res)
-
-                  ;; TODO: <<<<>>>> use all depots/queries/PStates
-                  ;; return results of all queries / PStates updates after depot appends
-                  ;;  - need to call all the methods and check the traces (just for depots and QTs)
                 ))))
-
            (aor/define-agents! topology)
          )))
      (bind module3-name (get-module-name module3))
 
-
-
      (rtest/launch-module! ipc module1 {:tasks 1 :threads 1})
      (launch-module-without-eval-agent! ipc module2 {:tasks 2 :threads 2})
      (launch-module-without-eval-agent! ipc module3 {:tasks 2 :threads 2})
+
+     (bind agent-manager (aor/agent-manager ipc module3-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind res (aor/agent-invoke foo :a))
+
+     (is (= res
+            [1 :abc :def ".!" ".!!" ".!!!" true true true 1 {:a 1} 1
+             {:name "*depot" :module-name module1-name :num-partitions 1}
+             {:start-offset 0 :end-offset 4} [:a :x :y]]
+         ))
      ;; TODO: <<<<>>>>
-     ;;  - test using:
-     ;;   - regular depots
-     ;;   - mirror depots
-     ;;   - mirror stores
-     ;;     - including for regular PStates not declared as such
-     ;;   - regular query topology
-     ;;   - mirror query topology
-     ;;   - other module having agents or not
      ;;   - direct test of store info query
+     ;;   - check trace
     )))
