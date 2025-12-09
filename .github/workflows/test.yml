@@ -24,6 +24,11 @@ jobs:
       with:
         lein: latest
 
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
     - name: Cache Leiningen dependencies
       uses: actions/cache@v4
       with:
@@ -32,8 +37,27 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-lein-
 
+    - name: Cache Node modules
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
     - name: Install dependencies
-      run: lein deps
+      run: |
+        lein deps
+        npm ci
+
+    - name: Build frontend for UI tests
+      env:
+        NODE_ENV: production
+      run: |
+        rm -rf resource/public
+        mkdir -p resource/public
+        cp -r resource/assets/* resource/public
+        lein with-profile +ui run -m shadow.cljs.devtools.cli release :frontend
 
     - name: Run tests
       env:
