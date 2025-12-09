@@ -553,7 +553,7 @@
 
 (defui selected-node-component [{:keys [selected-node graph-data on-paginate-node on-select-node flow-nodes module-id agent-name invoke-id]}]
   (let [data (when selected-node
-               (js->clj (.-data selected-node) :keywordize-keys true))
+               (js->clj (aget selected-node "data") :keywordize-keys true))
         node-id (:node-id data)
         node-name (:node data)
         input (:input data)
@@ -645,7 +645,7 @@
 
 (defui forking-input-component [{:keys [selected-node changed-nodes on-change-node-input affected-nodes]}]
   (let [data (when selected-node
-               (js->clj (.-data selected-node) :keywordize-keys true))
+               (js->clj (aget selected-node "data") :keywordize-keys true))
         node-id (:node-id data)
         node-name (:node data)
         original-input (:input data)
@@ -666,7 +666,7 @@
     (uix/use-effect
      (fn []
        (when selected-node
-         (let [data (js->clj (.-data selected-node) :keywordize-keys true)
+         (let [data (js->clj (aget selected-node "data") :keywordize-keys true)
                node-id (:node-id data)
                original-input (:input data)
                current-input (get changed-nodes node-id (to-pretty-json original-input))]
@@ -1262,7 +1262,7 @@
         ;; Use callbacks passed as props
         handle-select-node-click (fn [node]
                                    (when on-select-node
-                                     (let [node-data (js->clj (.-data node) :keywordize-keys true)]
+                                     (let [node-data (js->clj (aget node "data") :keywordize-keys true)]
                                        (on-select-node (:node-id node-data)))))]
 
     (if (empty? graph-data)
@@ -1284,7 +1284,7 @@
                                                      (let [data (js->clj data :keywordize-keys true)
                                                            label (:label data)
                                                            node-id (:node-id data)
-                                                           selected (= (when selected-node (.-id selected-node)) id)
+                                                           selected (= (when selected-node (aget selected-node "id")) id)
                                                            has-changes (contains? changed-nodes node-id)
                                                            is-affected (and forking-mode? (contains? affected-nodes node-id))
                                                            ;; Check if node is in progress

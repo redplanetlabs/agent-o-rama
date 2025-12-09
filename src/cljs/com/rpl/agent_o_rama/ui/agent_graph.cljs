@@ -228,13 +228,13 @@
                    :edges (clj->js edges)}]
     (-> (.layout elk graph)
         (.then (fn [layouted-graph]
-                 (let [layouted-nodes (-> (.-children layouted-graph)
+                 (let [layouted-nodes (-> (aget layouted-graph "children")
                                           (js->clj :keywordize-keys true)
                                           (->> (map (fn [node]
                                                       (-> node
                                                           (assoc :position {:x (:x node) :y (:y node)})
                                                           (dissoc :x :y))))))
-                       layouted-edges (-> (.-edges layouted-graph)
+                       layouted-edges (-> (aget layouted-graph "edges")
                                           (js->clj :keywordize-keys true)
                                           (->> (map (fn [elk-edge]
                                                      ;; Merge original edge properties with ELK results
@@ -271,8 +271,8 @@
              (let [opts elk-options]
                (-> (get-layouted-elements nodes edges opts start-id)
                    (.then (fn [result]
-                            (let [layouted-nodes (clj->js (.-nodes result))
-                                  layouted-edges (clj->js (.-edges result))]
+                            (let [layouted-nodes (clj->js (aget result "nodes"))
+                                  layouted-edges (clj->js (aget result "edges"))]
                               (set-nodes layouted-nodes)
                               (set-edges layouted-edges)
                               (when (fn? fit-view)
@@ -296,7 +296,7 @@
                                         label (:label data)
                                         node-id (:node-id data)
                                         node-type (:node-type data)
-                                        selected (= (when selected-node (.-id selected-node)) id)
+                                        selected (= (when selected-node (aget selected-node "id")) id)
                                         base-classes (cond
                                                        (= "agg-start-node" node-type)
                                                        ["bg-green-500" "text-white" "border-2" "border-green-600"]
@@ -322,7 +322,7 @@
                      :defaultEdgeOptions {:style {:strokeWidth 2 :stroke "#a5b4fc"}
                                           :markerEnd {:type "arrowclosed" :width 20 :height 20}}
                      :onNodeClick (fn [_ node]
-                                    (if (and selected-node (= (.-id node) (.-id selected-node)))
+                                    (if (and selected-node (= (aget node "id") (aget selected-node "id")))
                                       (set-selected-node nil)
                                       (set-selected-node node)))}
           ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
