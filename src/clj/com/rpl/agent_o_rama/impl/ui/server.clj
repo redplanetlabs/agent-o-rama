@@ -17,19 +17,68 @@
    [ring.middleware.file :as ring-file]
    [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
    [ring.middleware.multipart-params :refer [wrap-multipart-params]]
-   [ring.middleware.cors :refer [wrap-cors]]))
+   [ring.middleware.cors :refer [wrap-cors]]
+   [clojure.string :as str]))
+
+(defn- cache-control-for-uri
+  "Returns appropriate Cache-Control header value based on URI/content-type.
+   - JS/CSS: Long cache (1 year) since we use content-hashed filenames
+   - HTML: No cache (always validate for fresh asset references)
+   - Images/fonts: Long cache"
+  [uri content-type]
+  (cond
+    ;; HTML - always revalidate to get fresh JS references
+    (or (str/ends-with? uri ".html")
+        (str/includes? (str content-type) "text/html"))
+    "no-cache"
+
+    ;; JS/CSS - cache for 1 year (use content hashing for cache busting)
+    (or (str/ends-with? uri ".js")
+        (str/ends-with? uri ".css")
+        (str/includes? (str content-type) "javascript")
+        (str/includes? (str content-type) "text/css"))
+    "public, max-age=31536000, immutable"
+
+    ;; Images and fonts - cache for 1 year
+    (or (str/ends-with? uri ".png")
+        (str/ends-with? uri ".jpg")
+        (str/ends-with? uri ".jpeg")
+        (str/ends-with? uri ".gif")
+        (str/ends-with? uri ".svg")
+        (str/ends-with? uri ".ico")
+        (str/ends-with? uri ".woff")
+        (str/ends-with? uri ".woff2")
+        (str/ends-with? uri ".ttf")
+        (str/ends-with? uri ".eot"))
+    "public, max-age=31536000, immutable"
+
+    ;; Default - short cache with revalidation
+    :else "public, max-age=3600"))
+
+(defn wrap-cache-control
+  "Middleware that adds Cache-Control headers to static asset responses."
+  [handler]
+  (fn [request]
+    (when-let [response (handler request)]
+      (let [uri (:uri request)
+            content-type (get-in response [:headers "Content-Type"])
+            cache-control (cache-control-for-uri uri content-type)]
+        (assoc-in response [:headers "Cache-Control"] cache-control)))))
 
 (defn spa-index-handler
   [_request]
   (-> (resp/resource-response "index.html")
-      (resp/content-type "text/html")))
+      (resp/content-type "text/html")
+      (resp/header "Cache-Control" "no-cache")))
 
 (def file-handler
   (-> (fn [_] nil)
       ;; Fallback to serving source assets for development.
       (resource/wrap-resource "assets")
       ;; First, try to serve from "public" for compiled JS and other assets.
-      (resource/wrap-resource "public")))
+      (resource/wrap-resource "public")
+      ;; Add Cache-Control headers for proper browser caching
+      wrap-cache-control))
 
 (defn- ensure-session-uid
   "Middleware that ensures the session has a unique :uid.
