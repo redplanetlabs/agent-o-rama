@@ -65,63 +65,43 @@
       (let [uri (:uri request)
             content-type (get-in response [:headers "Content-Type"])
             cache-control (cache-control-for-uri uri content-type)]
-        (assoc-in response [:headers "Cache-Control"] cache-control)))))
+        (resp/header response "Cache-Control" cache-control)))))
 
 (defn- get-js-filename
   "Reads the shadow-cljs manifest to get the hashed JS filename.
-   Falls back to 'main.js' if manifest doesn't exist (dev mode)."
+   Throws if manifest doesn't exist or is malformed."
   []
-  (if-let [manifest-resource (io/resource "public/manifest.edn")]
-    (try
-      (let [manifest (edn/read-string (slurp manifest-resource))]
-        (get-in manifest [:main :output-name] "main.js"))
-      (catch Exception _
-        "main.js"))
-    "main.js"))
+  (let [manifest-resource (io/resource "public/manifest.edn")]
+    (when-not manifest-resource
+      (throw (ex-info "manifest.edn not found - run shadow-cljs release :frontend" {})))
+    (let [manifest (edn/read-string (slurp manifest-resource))
+          output-name (:output-name (first manifest))]
+      (when-not output-name
+        (throw (ex-info "Could not read :output-name from manifest.edn" {:manifest manifest})))
+      output-name)))
 
-(defn- generate-index-html
-  "Generates index.html with the correct hashed JS filename."
+(defn- render-index-html
+  "Renders index.html with the correct hashed JS filename."
   []
-  (let [js-filename (get-js-filename)]
-    (str "<!doctype html>
-<html>
-  <head>
-    <meta charset=\"utf-8\" />
-    <title>Agent-o-rama</title>
-    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@xyflow/react@12.6.1/dist/style.css\"></link>
-    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.min.css\"></link>
-    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/react-datetime-picker@7/dist/DateTimePicker.css\"></link>
-    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/react-calendar@5/dist/Calendar.css\"></link>
-    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/react-clock@5/dist/Clock.css\"></link>
-    <script src=\"https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4\"></script>
-    <style>
-      @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-      }
-      .animate-spin { animation: spin 1s linear infinite; }
-    </style>
-  </head>
-  <body>
-    <div id=\"root\"></div>
-    <script src=\"/" js-filename "\"></script>
-  </body>
-</html>")))
+  (-> (io/resource "index.html")
+      slurp
+      (str/replace "{{MAIN_JS}}" (get-js-filename))))
 
 (defn spa-index-handler
   [_request]
-  (-> (resp/response (generate-index-html))
+  (-> (resp/response (render-index-html))
       (resp/content-type "text/html")
       (resp/header "Cache-Control" "no-cache")))
 
-(def file-handler
-  (-> (fn [_] nil)
-      ;; Fallback to serving source assets for development.
-      (resource/wrap-resource "assets")
-      ;; First, try to serve from "public" for compiled JS and other assets.
-      (resource/wrap-resource "public")
-      ;; Add Cache-Control headers for proper browser caching
-      wrap-cache-control))
+(defn file-handler
+  "Serves static files from public and assets directories with cache headers."
+  [request]
+  (when-let [response (or ((resource/wrap-resource (fn [_] nil) "public") request)
+                          ((resource/wrap-resource (fn [_] nil) "assets") request))]
+    (let [uri (:uri request)
+          content-type (get-in response [:headers "Content-Type"])
+          cache-control (cache-control-for-uri uri content-type)]
+      (resp/header response "Cache-Control" cache-control))))
 
 (defn- ensure-session-uid
   "Middleware that ensures the session has a unique :uid.
@@ -186,4 +166,6 @@
                  :access-control-allow-headers #{"Content-Type"
                                                  "Authorization"
                                                  "X-CSRF-Token"
-                                                 "x-requested-with"})))
+                                                 "x-requested-with"})
+      ;; Add cache control headers as outermost middleware
+      wrap-cache-control))
