@@ -18,7 +18,9 @@
    [ring.middleware.defaults :refer [wrap-defaults site-defaults]]
    [ring.middleware.multipart-params :refer [wrap-multipart-params]]
    [ring.middleware.cors :refer [wrap-cors]]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [clojure.java.io :as io]
+   [clojure.edn :as edn]))
 
 (defn- cache-control-for-uri
   "Returns appropriate Cache-Control header value based on URI/content-type.
@@ -65,9 +67,50 @@
             cache-control (cache-control-for-uri uri content-type)]
         (assoc-in response [:headers "Cache-Control"] cache-control)))))
 
+(defn- get-js-filename
+  "Reads the shadow-cljs manifest to get the hashed JS filename.
+   Falls back to 'main.js' if manifest doesn't exist (dev mode)."
+  []
+  (if-let [manifest-resource (io/resource "public/manifest.edn")]
+    (try
+      (let [manifest (edn/read-string (slurp manifest-resource))]
+        (get-in manifest [:main :output-name] "main.js"))
+      (catch Exception _
+        "main.js"))
+    "main.js"))
+
+(defn- generate-index-html
+  "Generates index.html with the correct hashed JS filename."
+  []
+  (let [js-filename (get-js-filename)]
+    (str "<!doctype html>
+<html>
+  <head>
+    <meta charset=\"utf-8\" />
+    <title>Agent-o-rama</title>
+    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@xyflow/react@12.6.1/dist/style.css\"></link>
+    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/uplot@1.6.30/dist/uPlot.min.css\"></link>
+    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/react-datetime-picker@7/dist/DateTimePicker.css\"></link>
+    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/react-calendar@5/dist/Calendar.css\"></link>
+    <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/react-clock@5/dist/Clock.css\"></link>
+    <script src=\"https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4\"></script>
+    <style>
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin { animation: spin 1s linear infinite; }
+    </style>
+  </head>
+  <body>
+    <div id=\"root\"></div>
+    <script src=\"/" js-filename "\"></script>
+  </body>
+</html>")))
+
 (defn spa-index-handler
   [_request]
-  (-> (resp/resource-response "index.html")
+  (-> (resp/response (generate-index-html))
       (resp/content-type "text/html")
       (resp/header "Cache-Control" "no-cache")))
 

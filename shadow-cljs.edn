@@ -10,6 +10,7 @@
   {:target           :browser
    :modules          {:main {:init-fn com.rpl.agent-o-rama.ui/init}}
    :output-dir       "resource/public/"
+   :module-hash-names true  ; Content hashing for cache busting
    :compiler-options {:optimizations :advanced
                       :infer-externs :auto}}
   :test
