@@ -53,7 +53,7 @@
   (println "Setup complete. Server running with all modules ready."))
 
 (defn launch-no-frontend-build
-  "build script with ./scripts/build-ui.sh, then run this."
+  "build ui with ./scripts/build-ui.sh, then run this."
   [ipc]
 
   (rtest/launch-module!
@@ -69,9 +69,19 @@
   (aor/start-ui ipc {:port 1974}))
 
 (comment
+  "instructions for ai"
+  "./scripts/repl.sh to start repl"
+  "use your repl to evaluate these forms"
+  (require 'repl :reload)
+  (def ipc (rtest/create-ipc))
+  (launch-dev ipc)
+  "use inline def trick to see intermediate values"
+  )
+
+(comment
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (def ipc (rtest/create-ipc))
-  (launch-for-playwright ipc)
+  (launch-for-dev ipc)
   (launch-no-frontend-build ipc)
   
   (aor/stop-ui)
