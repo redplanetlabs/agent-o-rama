@@ -143,7 +143,8 @@
   (.getSourceString i))
 
 (defaorrecord HumanSourceImpl
-  [name :- String]
+  [name :- String
+   id :- (s/maybe UUID)]
   HumanSource
   (getName [this] name)
   (getSourceString [this] (str "human[" name "]")))
@@ -508,6 +509,97 @@
   (getReferenceOutput [this] reference-output)
   (getOutput [this] output))
 
+(definterface HumanMetric)
+(definterface HumanFeedbackEvent)
+
+(defaorrecord HumanCategoryMetric
+  [categories :- #{String}]
+  HumanMetric)
+
+(defaorrecord HumanNumericMetric
+  [min :- Long
+   max :- Long]
+  HumanMetric)
+
+(defaorrecord AddHumanMetric
+  [name :- String
+   description :- String
+   metric :- HumanMetric]
+  HumanFeedbackEvent)
+
+(defaorrecord RemoveHumanMetric
+  [name :- String]
+  HumanFeedbackEvent)
+
+(defaorrecord HumanFeedbackQueueRubric
+  [human-metric :- String
+   required? :- Boolean])
+
+(defaorrecord FeedbackTarget
+  [agent-name :- String
+   agent-invoke :- AgentInvokeImpl
+   node-invoke :- (s/maybe NodeInvokeImpl)])
+
+(defaorrecord HumanFeedbackRequest
+  [target :- FeedbackTarget
+   comment :- String])
+
+(defaorrecord CreateHumanFeedbackQueue
+  [name :- String
+   description :- String
+   rubrics :- [HumanFeedbackQueueRubric]]
+  HumanFeedbackEvent)
+
+(defaorrecord UpdateHumanFeedbackQueue
+  [new-info :- CreateHumanFeedbackQueue]
+  HumanFeedbackEvent)
+
+(defaorrecord RemoveHumanFeedbackQueue
+  [name :- String]
+  HumanFeedbackEvent)
+
+(defaorrecord AddHumanFeedbackRequest
+  [human-feedback-queue :- String
+   request :- HumanFeedbackRequest]
+  HumanFeedbackEvent)
+
+(defaorrecord HumanFeedback
+  [human-name :- String
+   scores :- {String (s/maybe Object)}
+   comment :- String])
+
+(defaorrecord AddHumanFeedback
+  [target :- FeedbackTarget
+   feedback-id :- UUID
+   feedback :- HumanFeedback]
+  HumanFeedbackEvent)
+
+(defaorrecord ResolveHumanFeedbackQueueItem
+  [human-feedback-queue :- String
+   item-id :- UUID
+   add-feedback :- (s/maybe AddHumanFeedback)]
+  HumanFeedbackEvent)
+
+(defaorrecord EditHumanFeedback
+  [target :- FeedbackTarget
+   feedback-id :- UUID
+   ;; - this is used to detect if this was already retried to avoid double appending to
+   ;; human analytics depot
+   new-feedback-id :- UUID
+   new-feedback :- HumanFeedback]
+  HumanFeedbackEvent)
+
+(defaorrecord DeleteHumanFeedback
+  [target :- FeedbackTarget
+   feedback-id :- UUID]
+  HumanFeedbackEvent)
+
+(defaorrecord HumanAnalyticsEvent
+  [old-scores :- (s/maybe {String (s/maybe Object)})
+   old-scores-millis :- (s/maybe Long)
+   new-scores :- (s/maybe {String (s/maybe Object)})
+   new-scores-millis :- (s/maybe Long)])
+
 ;; Experiments
 
 (definterface ExperimentEvent)
@@ -664,6 +756,7 @@
 (defaorrecord FeedbackImpl
   [scores :- {String (s/maybe Object)}
    source :- InfoSource
+   comment :- (s/maybe String)
    created-at :- Long
    modified-at :- Long]
   Feedback

@@ -1227,6 +1227,22 @@ Example:\n
                                       cluster
                                       module-name
                                       (queries/search-evaluators-name))
+        search-human-metrics-query   (foreign-query
+                                      cluster
+                                      module-name
+                                      (queries/search-human-metrics-name))
+        search-human-feedback-queues-query (foreign-query
+                                            cluster
+                                            module-name
+                                            (queries/search-human-feedback-queues-name))
+        human-feedback-queue-info-query (foreign-query
+                                         cluster
+                                         module-name
+                                         (queries/human-feedback-queue-info-name))
+        human-feedback-queue-page-query (foreign-query
+                                         cluster
+                                         module-name
+                                         (queries/human-feedback-queue-page-name))
         search-experiments-query     (foreign-query
                                       cluster
                                       module-name
@@ -1714,6 +1730,33 @@ Example:\n
         global-actions-depot
         (aor-types/->valid-RemoveEvaluator name)
        ))
+     (createCategoricalHumanMetric [this name description categories]
+       (when (empty? categories)
+         (throw (h/ex-info "Categories must be non-empty"
+                           {:name       name
+                            :categories categories})))
+       (evals/create-human-metric!*
+        global-actions-depot
+        name
+        description
+        (aor-types/->valid-HumanCategoryMetric categories)))
+     (createNumericHumanMetric [this name description min max]
+       (let [lmin (long min)
+             lmax (long max)]
+         (when (> lmin lmax)
+           (throw (h/ex-info "max must be >= min"
+                             {:name name
+                              :min  lmin
+                              :max  lmax})))
+         (evals/create-human-metric!*
+          global-actions-depot
+          name
+          description
+          (aor-types/->valid-HumanNumericMetric lmin lmax))))
+     (removeHumanMetric [this name]
+       (foreign-append!
+        global-actions-depot
+        (aor-types/->valid-RemoveHumanMetric name)))
      (searchEvaluators [this searchString]
        (into #{}
              (foreign-select
@@ -1765,20 +1808,24 @@ Example:\n
            (throw (h/ex-info "Error creating dataset" {:info error})))))
      aor-types/UnderlyingObjects
      (underlying-objects [this]
-       {:datasets-depot            datasets-depot
-        :datasets-pstate           datasets-pstate
-        :evals-pstate              evals-pstate
-        :global-actions-depot      global-actions-depot
-        :datasets-page-query       datasets-page-query
-        :search-examples-query     search-examples-query
-        :multi-examples-query      multi-examples-query
-        :all-eval-builders-query   all-eval-builders-query
-        :all-action-builders-query all-action-builders-query
-        :search-evals-query        search-evals-query
-        :search-experiments-query  search-experiments-query
-        :search-datasets-query     datasets-search-query
-        :experiments-results-query experiments-results-query
-        :global-config-pstate      global-config-pstate
+       {:datasets-depot             datasets-depot
+        :datasets-pstate            datasets-pstate
+        :evals-pstate               evals-pstate
+        :global-actions-depot       global-actions-depot
+        :datasets-page-query        datasets-page-query
+        :search-examples-query      search-examples-query
+        :multi-examples-query       multi-examples-query
+        :all-eval-builders-query    all-eval-builders-query
+        :all-action-builders-query  all-action-builders-query
+        :search-evals-query         search-evals-query
+        :search-human-metrics-query search-human-metrics-query
+        :search-human-feedback-queues-query search-human-feedback-queues-query
+        :human-feedback-queue-info-query human-feedback-queue-info-query
+        :human-feedback-queue-page-query human-feedback-queue-page-query
+        :search-experiments-query   search-experiments-query
+        :search-datasets-query      datasets-search-query
+        :experiments-results-query  experiments-results-query
+        :global-config-pstate       global-config-pstate
        }))))
 
 (defn agent-client
@@ -2653,6 +2700,46 @@ Args:\n
   - name - String name of the evaluator to remove"
   [^AgentManager manager name]
   (.removeEvaluator manager name))
+
+(defn create-categorical-human-metric!
+  "Creates a categorical human metric for collecting human feedback on agent runs.\n
+\n
+Human metrics allow humans to provide feedback on agent executions through the UI.\n
+Categorical metrics present a fixed set of category options for humans to choose from.\n
+The collected feedback is aggregated and displayed in time-series telemetry in the UI.\n
+\n
+Args:\n
+  - manager - agent manager instance
+  - name - String unique name for the metric
+  - description - String description of what the metric measures
+  - categories - Set of String category options that humans can select from. Must be non-empty."
+  [^AgentManager manager name description categories]
+  (.createCategoricalHumanMetric manager name description categories))
+
+(defn create-numeric-human-metric!
+  "Creates a numeric human metric for collecting human feedback on agent runs.\n
+\n
+Human metrics allow humans to provide feedback on agent executions through the UI.\n
+Numeric metrics allow humans to provide a numeric value within a specified range.\n
+The collected feedback is aggregated and displayed in time-series telemetry in the UI.\n
+\n
+Args:\n
+  - manager - agent manager instance
+  - name - String unique name for the metric
+  - description - String description of what the metric measures
+  - min - Long minimum allowed value (inclusive)
+  - max - Long maximum allowed value (inclusive). Must be greater than or equal to min."
+  [^AgentManager manager name description min max]
+  (.createNumericHumanMetric manager name description (int min) (int max)))
+
+(defn remove-human-metric!
+  "Removes a human metric from the system.\n
+\n
+Args:\n
+  - manager - agent manager instance
+  - name - String name of the human metric to remove"
+  [^AgentManager manager name]
+  (.removeHumanMetric manager name))
 
 (defn search-evaluators
   "Searches for evaluators by name or description.\n

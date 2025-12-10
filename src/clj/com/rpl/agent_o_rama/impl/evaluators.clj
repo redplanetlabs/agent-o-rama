@@ -4,6 +4,7 @@
   (:require
    [clojure.string :as str]
    [clojure.spec.alpha :as spec]
+   [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -17,7 +18,17 @@
     AgentObjectFetcher]
    [com.rpl.agent_o_rama.impl.types
     AddEvaluator
-    RemoveEvaluator]
+    AddHumanFeedback
+    AddHumanFeedbackRequest
+    AddHumanMetric
+    CreateHumanFeedbackQueue
+    DeleteHumanFeedback
+    EditHumanFeedback
+    RemoveEvaluator
+    RemoveHumanFeedbackQueue
+    RemoveHumanMetric
+    ResolveHumanFeedbackQueueItem
+    UpdateHumanFeedbackQueue]
    [dev.langchain4j.data.message
     AiMessage
     SystemMessage
@@ -339,3 +350,263 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                           builder-name
                           builder-params
                           params)))
+
+(defn matching-human-feedback
+  ^:direct-nav [feedback-id]
+  (path ALL
+        (selected?
+         :source
+         aor-types/HumanSourceImpl?
+         :id
+         (pred= feedback-id))))
+
+(deframaop update-feedback!>
+  [{:keys [*agent-name *agent-invoke *node-invoke]} *feedback-id *path]
+  (<<if (not (contains? (po/agent-names-set) *agent-name))
+    (:no-agent>)
+   (else>)
+    (<<if (nil? *node-invoke)
+      (po/agent-root-task-global-name *agent-name :> *pstate-name)
+      (get *agent-invoke :task-id :> *task-id)
+      (get *agent-invoke :agent-invoke-id :> *root-id)
+     (else>)
+      (po/agent-node-task-global-name *agent-name :> *pstate-name)
+      (get *node-invoke :task-id :> *task-id)
+      (get *node-invoke :node-invoke-id :> *root-id))
+    (|direct *task-id)
+    (this-module-pobject-task-global *pstate-name :> $$p)
+    (local-select> [(keypath *root-id)
+                    :feedback
+                    :results
+                    (subselect (matching-human-feedback *feedback-id))
+                    (view first)]
+                   $$p
+                   :> *existing)
+    (path> (must *root-id) *path :> *update-path)
+    (local-transform> *update-path $$p)
+    (:> *existing)))
+
+(deframaop add-human-feedback!>
+  [{:keys [*target *feedback-id *feedback]}]
+  (<<with-substitutions
+   [*human-analytics-depot (po/human-analytics-depot-task-global)]
+   (identity *feedback :> {:keys [*human-name *scores *comment]})
+   (h/current-time-millis :> *current-time-millis)
+   (update-feedback!> *target
+                      *feedback-id
+                      (path>
+                       (not-selected? :feedback :results (matching-human-feedback *feedback-id))
+                       (fb/add-feedback-path
+                        *scores
+                        *comment
+                        *current-time-millis
+                        (aor-types/->valid-HumanSourceImpl *human-name *feedback-id)))
+                      :no-agent> :>> (:>)
+                      :> *existing)
+   (<<if (nil? *existing)
+     (depot-partition-append!
+      *human-analytics-depot
+      (aor-types/->valid-HumanAnalyticsEvent nil nil *scores *current-time-millis)
+      :append-ack))
+   (:>)))
+
+(deframaop handle-human-feedback-op
+  [*data]
+  (<<with-substitutions
+   [$$human-feedback (po/human-feedback-task-global)
+    *human-analytics-depot (po/human-analytics-depot-task-global)]
+   (<<subsource *data
+    (case> AddHumanMetric :> {:keys [*name *description *metric]})
+     (local-select> [:metrics (view contains? *name)] $$human-feedback :> *exists?)
+     (<<if *exists?
+       (ack-return> "Metric already exists")
+      (else>)
+       (local-transform> [:metrics (keypath *name)
+                          (termval {:description *description :metric *metric})]
+                         $$human-feedback))
+
+    (case> RemoveHumanMetric :> {:keys [*name]})
+     (local-transform> [:metrics (keypath *name) NONE>] $$human-feedback)
+
+    (case> CreateHumanFeedbackQueue :> {:keys [*name *description *rubrics]})
+     (local-select> [:queues (view contains? *name)] $$human-feedback :> *exists?)
+     (<<if *exists?
+       (ack-return> "Human feedback queue already exists")
+      (else>)
+       (local-transform> [:queues
+                          (keypath *name)
+                          (termval {:description *description :rubrics *rubrics :items {}})]
+                         $$human-feedback))
+
+    (case> UpdateHumanFeedbackQueue :> {:keys [*new-info]})
+     (identity *new-info :> {:keys [*name *description *rubrics]})
+     (local-transform> [:queues
+                        (must *name)
+                        (multi-path
+                         [:description (termval *description)]
+                         [:rubrics (termval *rubrics)])]
+                       $$human-feedback)
+
+    (case> RemoveHumanFeedbackQueue :> {:keys [*name]})
+     (local-transform> [:queues (must *name) :items NONE>] $$human-feedback)
+     (|direct (ops/current-task-id))
+     (local-transform> [:queues (must *name) NONE>] $$human-feedback)
+
+    (case> AddHumanFeedbackRequest :> {:keys [*human-feedback-queue *request]})
+     (h/random-uuid7 :> *item-id)
+     (local-transform> [:queues
+                        (must *human-feedback-queue)
+                        :items
+                        (keypath *item-id)
+                        (termval *request)]
+                       $$human-feedback)
+
+    (case> AddHumanFeedback)
+     (add-human-feedback!> *data)
+
+    (case> ResolveHumanFeedbackQueueItem
+           :> {:keys [*human-feedback-queue *item-id *add-feedback]})
+     (<<if (some? *add-feedback)
+       (add-human-feedback!> *add-feedback))
+     (|global)
+     (local-transform> [:queues
+                        (must *human-feedback-queue :items *item-id)
+                        NONE>]
+                       $$human-feedback)
+
+    (case> EditHumanFeedback :> {:keys [*target *feedback-id *new-feedback-id *new-feedback]})
+     (identity *new-feedback :> {:keys [*human-name *scores *comment]})
+     (h/current-time-millis :> *modified-at)
+     (update-feedback!> *target
+                        *feedback-id
+                        (path>
+                         :feedback
+                         :results
+                         (matching-human-feedback *feedback-id)
+                         (multi-path
+                          [:scores (termval *scores)]
+                          [:comment (termval *comment)]
+                          [:modified-at (termval *modified-at)]
+                          [:source :name (termval *human-name)]
+                          [:source :id (termval *new-feedback-id)]
+                         ))
+                        :> *existing)
+     (filter> (some? *existing))
+     (depot-partition-append!
+      *human-analytics-depot
+      (aor-types/->valid-HumanAnalyticsEvent (get *existing :scores)
+                                             (get *existing :modified-at)
+                                             *scores
+                                             *modified-at)
+      :append-ack)
+
+    (case> DeleteHumanFeedback :> {:keys [*target *feedback-id]})
+     (update-feedback!> *target
+                        *feedback-id
+                        (path>
+                         :feedback
+                         :results
+                         (matching-human-feedback *feedback-id)
+                         NONE>)
+                        :> *existing)
+     (filter> (some? *existing))
+     (depot-partition-append!
+      *human-analytics-depot
+      (aor-types/->valid-HumanAnalyticsEvent (get *existing :scores)
+                                             (get *existing :modified-at)
+                                             nil
+                                             nil)
+      :append-ack)
+   )))
+
+;; for use by AgentManager
+(defn create-human-metric!*
+  [global-actions-depot name description human-metric]
+  (let [{error aor-types/AGENT-TOPOLOGY-NAME}
+        (foreign-append! global-actions-depot
+                         (aor-types/->valid-AddHumanMetric
+                          name
+                          description
+                          human-metric))]
+    (when error
+      (throw (h/ex-info error {:name name})))))
+
+(defn create-human-feedback-queue!
+  [global-actions-depot name description rubrics]
+  (when (empty? rubrics)
+    (throw (h/ex-info "Rubrics cannot be empty" {:name name})))
+  (let [{error aor-types/AGENT-TOPOLOGY-NAME}
+        (foreign-append! global-actions-depot
+                         (aor-types/->valid-CreateHumanFeedbackQueue name description rubrics))]
+    (when error
+      (throw (h/ex-info error {:name name})))))
+
+(defn update-human-feedback-queue!
+  [global-actions-depot name description rubrics]
+  (when (empty? rubrics)
+    (throw (h/ex-info "Rubrics cannot be empty" {:name name})))
+  (foreign-append! global-actions-depot
+                   (aor-types/->valid-UpdateHumanFeedbackQueue
+                    (aor-types/->valid-CreateHumanFeedbackQueue name description rubrics))))
+
+(defn remove-human-feedback-queue!
+  [global-actions-depot name]
+  (foreign-append! global-actions-depot (aor-types/->valid-RemoveHumanFeedbackQueue name)))
+
+(defn add-human-feedback-request!
+  [global-actions-depot feedback-queue-name feedback-target comment]
+  (foreign-append! global-actions-depot
+                   (aor-types/->valid-AddHumanFeedbackRequest
+                    feedback-queue-name
+                    (aor-types/->valid-HumanFeedbackRequest
+                     feedback-target
+                     comment))))
+
+(defn add-human-feedback!
+  [global-actions-depot feedback-target human-name scores comment]
+  (let [id (h/random-uuid7)]
+    (foreign-append! global-actions-depot
+                     (aor-types/->valid-AddHumanFeedback
+                      feedback-target
+                      id
+                      (aor-types/->valid-HumanFeedback human-name scores comment)))
+    id))
+
+(defn resolve-human-feedback-queue-item!
+  [global-actions-depot queue-name item-id feedback-target human-name scores comment]
+  (let [id (h/random-uuid7)]
+    (foreign-append! global-actions-depot
+                     (aor-types/->valid-ResolveHumanFeedbackQueueItem
+                      queue-name
+                      item-id
+                      (aor-types/->valid-AddHumanFeedback
+                       feedback-target
+                       id
+                       (aor-types/->valid-HumanFeedback human-name scores comment))))
+    id))
+
+(defn remove-human-feedback-queue-item!
+  [global-actions-depot queue-name item-id]
+  (foreign-append! global-actions-depot
+                   (aor-types/->valid-ResolveHumanFeedbackQueueItem
+                    queue-name
+                    item-id
+                    nil)))
+
+(defn edit-human-feedback!
+  [global-actions-depot feedback-target feedback-id human-name scores comment]
+  (let [id (h/random-uuid7)]
+    (foreign-append! global-actions-depot
+                     (aor-types/->valid-EditHumanFeedback
+                      feedback-target
+                      feedback-id
+                      id
+                      (aor-types/->valid-HumanFeedback human-name scores comment)))
+    id))
+
+(defn delete-human-feedback!
+  [global-actions-depot feedback-target feedback-id]
+  (foreign-append! global-actions-depot
+                   (aor-types/->valid-DeleteHumanFeedback
+                    feedback-target
+                    feedback-id)))

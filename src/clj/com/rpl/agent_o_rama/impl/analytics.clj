@@ -6,6 +6,7 @@
    [clojure.string :as str]
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.clojure :as c]
+   [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.experiments :as exp]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
@@ -215,6 +216,20 @@
           {"response" body}
         )))))
 
+(defn add-to-human-feedback-queue-action-builder-fn
+  [{:strs [queueName]}]
+  (let [global-actions-depot (.getGlobalActionsDepot (rama-clients))]
+    (fn [fetcher input output run-info]
+      (evals/add-human-feedback-request!
+       global-actions-depot
+       queueName
+       (aor-types/->valid-FeedbackTarget
+        (:agent-name run-info)
+        (:agent-invoke run-info)
+        (:node-invoke run-info))
+       "")
+      {})))
+
 (def EVAL-ACTION-NAME "aor/eval")
 
 (def BUILT-IN-ACTIONS
@@ -225,19 +240,20 @@
                   {"name" {:description "Evaluator to use"}}
                   :limit-concurrency? true}}
    "aor/add-to-dataset"
-   {:builder-fn add-to-dataset-action-builder-fn
+   {:builder-fn  add-to-dataset-action-builder-fn
     :description "Add a run to a dataset"
-    :options {:params
-              {"datasetId" {:description "Dataset to add to"}
-               "inputJsonPathTemplate"
-               {:description
-                "<a class=\"text-blue-600 hover:underline\" href=\"https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates\"> JSON path template </a> to translate input of a run to dataset example input " 
-                :default     "$"}
-               "outputJsonPathTemplate"
-               {:description
-                "<a class=\"text-blue-600 hover:underline\" href=\"https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates\"> JSON path template </a> to translate output of a run to dataset example output"
-                :default     "$"}}
-             }}
+    :options
+    {:params
+     {"datasetId" {:description "Dataset to add to"}
+      "inputJsonPathTemplate"
+      {:description
+       "<a class=\"text-blue-600 hover:underline\" href=\"https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates\"> JSON path template </a> to translate input of a run to dataset example input "
+       :default     "$"}
+      "outputJsonPathTemplate"
+      {:description
+       "<a class=\"text-blue-600 hover:underline\" href=\"https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates\"> JSON path template </a> to translate output of a run to dataset example output"
+       :default     "$"}}
+    }}
    "aor/webhook"
    {:builder-fn  webhook-action-builder-fn
     :description "Post a JSON payload to a URL"
@@ -256,6 +272,13 @@
       {:description
        "Timeout for the POST request"
        :default     "60000"}}
+    }}
+   "aor/add-to-human-feedback-queue"
+   {:builder-fn  add-to-human-feedback-queue-action-builder-fn
+    :description "Add a run to a human feedback queue"
+    :options
+    {:params
+     {"queueName" {:description "Human feedback queue name"}}
     }}
   })
 
@@ -967,6 +990,10 @@
    :> *m *end-scan-offset)
   (local-transform> [(keypath *query-id) (termval *end-scan-offset)]
                     $$metric-cursors)
+  ;; TODO: factor from here to share with human analytics
+  ;;    - where to get metadata from?
+  ;;      - should be part of analytics event?
+  ;;    - also needs to know aor/status
   (ops/explode-map *m :> *k {:keys [*start-time-millis *metadata] :as *data-map})
   (filter> (some? *start-time-millis)) ; defensive
   (filter> (not (experiment-source? *data-map)))
@@ -1127,6 +1154,14 @@
      [local-select> STAY processed-agg-pstate :> '*new-cursors]
      [update-rule-offsets! '*new-cursors]
     ]))
+
+(deframaop handle-human-analytics
+  [%mb]
+  (%mb :> {:keys [*old-scores *old-scores-millis *new-scores *new-scores-millis]})
+  ;; TODO:
+  ;;    - subtract old-scores from that bucket
+  ;;    - add new-scores to that bucket
+)
 
 (defn add-rule!
   [global-actions-depot name agent-name

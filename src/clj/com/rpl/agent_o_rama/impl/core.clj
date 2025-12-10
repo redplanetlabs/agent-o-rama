@@ -31,6 +31,7 @@
     ChangeConfig
     EvaluatorEvent
     ExperimentEvent
+    HumanFeedbackEvent
     NodeOp
     RuleEvent]
    [com.rpl.rama
@@ -228,14 +229,16 @@
                                graph/resolve-agent-graph
                                agent-graphs)
                    ))
-  (let [pstate-write-depot-sym   (symbol (po/agent-pstate-write-depot-name))
-        datasets-depot-sym       (symbol (po/datasets-depot-name))
-        global-actions-depot-sym (symbol (po/global-actions-depot-name))
-        analytics-tick-depot-sym (symbol (po/agent-analytics-tick-depot-name))
-        agent-edit-depot-sym     (symbol (po/agent-edit-depot-name))]
+  (let [pstate-write-depot-sym    (symbol (po/agent-pstate-write-depot-name))
+        datasets-depot-sym        (symbol (po/datasets-depot-name))
+        global-actions-depot-sym  (symbol (po/global-actions-depot-name))
+        analytics-tick-depot-sym  (symbol (po/agent-analytics-tick-depot-name))
+        agent-edit-depot-sym      (symbol (po/agent-edit-depot-name))
+        human-analytics-depot-sym (symbol (po/human-analytics-depot-name))]
     (declare-depot* setup pstate-write-depot-sym (hash-by :key))
     (declare-depot* setup datasets-depot-sym (hash-by :dataset-id))
     (declare-depot* setup agent-edit-depot-sym apart/agent-task-id-depot-partitioner)
+    (declare-depot* setup human-analytics-depot-sym :disallow)
     (declare-depot* setup global-actions-depot-sym :random {:global? true})
     (if SUBSTITUTE-TICK-DEPOTS
       (declare-depot* setup
@@ -253,6 +256,11 @@
      stream-topology
      (symbol (po/evaluators-task-global-name))
      po/EVALUATORS-PSTATE-SCHEMA
+     {:global? true})
+    (declare-pstate*
+     stream-topology
+     (symbol (po/human-feedback-task-global-name))
+     po/HUMAN-FEEDBACK-PSTATE-SCHEMA
      {:global? true})
     (declare-pstate*
      stream-topology
@@ -276,7 +284,11 @@
      (source> analytics-tick-depot-sym :> %mb)
       (%mb)
       (hook:analytics-tick)
-      (ana/handle-analytics-tick))
+      (ana/handle-analytics-tick)
+
+     (source> human-analytics-depot-sym :> %mb)
+      (ana/handle-human-analytics %mb)
+    )
     (<<sources stream-topology
      (source> pstate-write-depot-sym
                {:retry-mode :none}
@@ -308,6 +320,9 @@
        (case> (instance? EvaluatorEvent *data))
         (evals/handle-evaluators-op *data)
 
+       (case> (instance? HumanFeedbackEvent *data))
+        (evals/handle-human-feedback-op *data)
+
        (case> (instance? ExperimentEvent *data))
         (exp/handle-experiments-op *data)
 
@@ -332,8 +347,12 @@
   (ana/declare-all-action-builders-query-topology topologies)
   (queries/declare-try-evaluator-query-topology topologies)
   (queries/declare-search-evaluators-query-topology topologies)
+  (queries/declare-search-human-metrics-query-topology topologies)
+  (queries/declare-search-human-feedback-queues-query-topology topologies)
   (queries/declare-search-experiments-query-topology topologies)
   (queries/declare-experiment-results-query-topology topologies)
+  (queries/declare-human-feedback-queue-info topologies)
+  (queries/declare-human-feedback-queue-page topologies)
 
   (queries/declare-get-module-store-info topologies)
 

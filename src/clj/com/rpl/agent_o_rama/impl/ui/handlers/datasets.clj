@@ -111,13 +111,13 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-example
   [{:keys [manager dataset-id snapshot-name input output tags]} uid]
-  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user")]
+  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user" nil)]
     (aor/add-dataset-example! manager
                               dataset-id
                               input
                               {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
                                :reference-output output
-                               :tags (set tags)}))
+                               :tags     (set tags)}))
   {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
@@ -263,20 +263,20 @@
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-direct-data
   [{:keys [manager dataset-id input output]} uid]
   (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
-        schemas (queries/get-dataset-properties datasets-pstate dataset-id)
-        input-schema (:input-json-schema schemas)
-        output-schema (:output-json-schema schemas)]
+        schemas         (queries/get-dataset-properties datasets-pstate dataset-id)
+        input-schema    (:input-json-schema schemas)
+        output-schema   (:output-json-schema schemas)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
-      (let [input-validation (when input-schema
-                               (datasets/validate-with-schema* input-schema input))
+      (let [input-validation  (when input-schema
+                                (datasets/validate-with-schema* input-schema input))
             output-validation (when output-schema
                                 (datasets/validate-with-schema* output-schema output))]
         (cond
           input-validation (throw (ex-info (str "Input schema validation failed: " input-validation) {}))
           output-validation (throw (ex-info (str "Output schema validation failed: " output-validation) {}))
           :else (do
-                  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user")]
+                  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user" nil)]
                     (aor/add-dataset-example! manager dataset-id input
                                               {:reference-output output}))
                   {:status :ok}))))))
@@ -302,14 +302,14 @@
 
     (if-not example-summary
       {:status :ok :result nil :error "No examples found in dataset"}
-      
+
       ;; 2. Fetch the full example data
       (let [full-examples (foreign-invoke-query multi-examples-query
                                                 dataset-id
                                                 (when-not (str/blank? snapshot-name) snapshot-name)
                                                 [(:id example-summary)])
             example (get full-examples (:id example-summary))
-            
+
             ;; 3. Select the source data (input or reference-output)
             source-data (case source-field
                           :input (:input example)
@@ -317,15 +317,15 @@
                           nil)
 
             ;; 4. Apply logic based on type (:path or :template)
-            preview-result 
+            preview-result
             (if (nil? source-data)
               ::no-source-data
               (try
                 (case type
-                  :path 
+                  :path
                   (h/read-json-path source-data expression)
 
-                  :template 
+                  :template
                   (let [template-obj
                         (if (string? expression)
                           ;; If it looks like a JSON object/array string, parse it
@@ -345,7 +345,7 @@
                           (str/includes? msg "No results")
                           (str/includes? msg "Missing property"))
                       ::path-not-found
-                      
+
                       ;; Re-throw other exceptions
                       :else
                       (throw e))))))]
@@ -353,11 +353,11 @@
         (cond
           (= preview-result ::no-source-data)
           {:status :ok :result nil :error (str "No " (name source-field) " data in this example")}
-          
+
           (= preview-result ::path-not-found)
           {:status :ok :result nil :error "Path not found in data"}
-          
+
           :else
-          {:status :ok 
+          {:status :ok
            :result (common/->ui-serializable preview-result)
            :example-preview (common/->ui-serializable source-data)})))))

@@ -9,10 +9,12 @@
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.feedback :as fb]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.metrics :as metrics]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.topology :as at]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -666,6 +668,8 @@
             (po/agent-root-task-global-name "foo")
             (path (keypath (:agent-invoke-id inv))
                   (fb/add-feedback-path {"concise?" true}
+                                        nil
+                                        (h/current-time-millis)
                                         (aor-types/->valid-EvalSourceImpl
                                          "concise5"
                                          inv
@@ -682,6 +686,8 @@
             (po/agent-root-task-global-name "foo")
             (path (keypath (:agent-invoke-id inv))
                   (fb/add-feedback-path {"concise?" false}
+                                        nil
+                                        (h/current-time-millis)
                                         (aor-types/->valid-EvalSourceImpl
                                          "concise5"
                                          inv
@@ -832,3 +838,678 @@
          (is (= #{[:root] [:nodes]})
              (set (foreign-select MAP-KEYS cursors {:pkey i}))))
       ))))
+
+
+(defn node-invoke-by-name
+  [trace n]
+  (let [[id task-id]
+        (select-one!
+         [ALL (selected? LAST :node (pred= n)) (subselect (multi-path FIRST [LAST :node-task-id]))]
+         trace)]
+    (aor-types/->valid-NodeInvokeImpl task-id id)))
+
+(deftest human-metrics-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node input]
+               (aor/result! agent-node (str input "!"))
+             )))
+        (-> topology
+            (aor/new-agent "bar")
+            (aor/node
+             "start"
+             "end"
+             (fn [agent-node input]
+               (aor/emit! agent-node "end" (str input "?"))))
+            (aor/node
+             "end"
+             nil
+             (fn [agent-node input]
+               (aor/result! agent-node input)
+             )))
+       ))
+     (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+     (bind module-name (get-module-name module))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind global-actions-depot
+       (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+     (bind search-human-metrics
+       (:search-human-metrics-query (aor-types/underlying-objects agent-manager)))
+     (bind search-queues
+       (:search-human-feedback-queues-query (aor-types/underlying-objects agent-manager)))
+     (bind queue-info
+       (:human-feedback-queue-info-query (aor-types/underlying-objects agent-manager)))
+     (bind queue-page
+       (:human-feedback-queue-page-query (aor-types/underlying-objects agent-manager)))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind foo-root (:root-pstate (aor-types/underlying-objects foo)))
+     (bind foo-nodes
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-node-task-global-name "foo")))
+     (bind foo-traces (:tracing-query (aor-types/underlying-objects foo)))
+     (bind bar (aor/agent-client agent-manager "bar"))
+     (bind bar-root (:root-pstate (aor-types/underlying-objects bar)))
+     (bind bar-nodes
+       (foreign-pstate ipc
+                       module-name
+                       (po/agent-node-task-global-name "bar")))
+     (bind bar-traces (:tracing-query (aor-types/underlying-objects bar)))
+
+     (bind get-trace
+       (fn [traces-query root {:keys [task-id agent-invoke-id]}]
+         (let [root-invoke-id
+               (foreign-select-one [(keypath agent-invoke-id) :root-invoke-id]
+                                   root
+                                   {:pkey task-id})]
+           (:invokes-map (foreign-invoke-query traces-query
+                                               task-id
+                                               [[task-id root-invoke-id]]
+                                               10000)))))
+
+     (bind foo-inv1
+       (aor/agent-initiate foo "a"))
+     (is (= "a!" (aor/agent-result foo foo-inv1)))
+     (bind foo-inv2
+       (aor/agent-initiate foo "b"))
+     (is (= "b!" (aor/agent-result foo foo-inv2)))
+     (bind bar-inv1
+       (aor/agent-initiate bar "a"))
+     (is (= "a?" (aor/agent-result bar bar-inv1)))
+     (bind bar-inv2
+       (aor/agent-initiate bar "b"))
+     (is (= "b?" (aor/agent-result bar bar-inv2)))
+
+     (bind foo-trace1 (get-trace foo-traces foo-root foo-inv1))
+     (bind foo-trace2 (get-trace foo-traces foo-root foo-inv2))
+     (bind bar-trace1 (get-trace bar-traces bar-root bar-inv1))
+     (bind bar-trace2 (get-trace bar-traces bar-root bar-inv2))
+
+     (aor/create-categorical-human-metric! agent-manager
+                                           "c1"
+                                           "c1 metric"
+                                           #{"option1" "option2" "option3"})
+     (aor/create-categorical-human-metric! agent-manager
+                                           "c2"
+                                           "c2 metric"
+                                           #{"option1" "o2" "o3"})
+     (aor/create-numeric-human-metric! agent-manager
+                                       "n1"
+                                       "n1 metric"
+                                       1
+                                       10)
+     (aor/create-numeric-human-metric! agent-manager
+                                       "n2"
+                                       "n2 metric"
+                                       0
+                                       5)
+     (is (thrown? Exception
+                  (aor/create-categorical-human-metric! agent-manager
+                                                        "q1"
+                                                        "q1 metric"
+                                                        #{})))
+     (is (thrown? Exception
+                  (aor/create-numeric-human-metric! agent-manager
+                                                    "q1"
+                                                    "q1 metric"
+                                                    10
+                                                    9)))
+     (is (thrown? Exception
+                  (aor/create-numeric-human-metric! agent-manager
+                                                    "c1"
+                                                    ""
+                                                    1
+                                                    10)))
+     (aor/create-categorical-human-metric! agent-manager
+                                           "q1"
+                                           "q1 metric"
+                                           #{"a"})
+
+
+     (bind res (foreign-invoke-query search-human-metrics {} 2 nil))
+     (is (= (:items res)
+            [{:name        "c1"
+              :description "c1 metric"
+              :metric      (aor-types/->HumanCategoryMetric #{"option1" "option2" "option3"})}
+             {:name        "c2"
+              :description "c2 metric"
+              :metric      (aor-types/->HumanCategoryMetric #{"option1" "o2" "o3"})}
+            ]))
+     (bind res (foreign-invoke-query search-human-metrics {} 2 (:pagination-params res)))
+     (is (= (:items res)
+            [{:name        "n1"
+              :description "n1 metric"
+              :metric      (aor-types/->HumanNumericMetric 1 10)}
+             {:name        "n2"
+              :description "n2 metric"
+              :metric      (aor-types/->HumanNumericMetric 0 5)}
+            ]))
+     (bind res (foreign-invoke-query search-human-metrics {} 2 (:pagination-params res)))
+     (is (= (:items res)
+            [{:name        "q1"
+              :description "q1 metric"
+              :metric      (aor-types/->HumanCategoryMetric #{"a"})}
+            ]))
+     (is (nil? (:pagination-params res)))
+
+
+     (bind res (foreign-invoke-query search-human-metrics {:search-string "2"} 2 nil))
+     (is (= (:items res)
+            [{:name        "c2"
+              :description "c2 metric"
+              :metric      (aor-types/->HumanCategoryMetric #{"option1" "o2" "o3"})}
+             {:name        "n2"
+              :description "n2 metric"
+              :metric      (aor-types/->HumanNumericMetric 0 5)}
+            ]))
+
+
+     (aor/remove-human-metric! agent-manager "c2")
+     (bind res (foreign-invoke-query search-human-metrics {:search-string "2"} 2 nil))
+     (is (= (:items res)
+            [{:name        "n2"
+              :description "n2 metric"
+              :metric      (aor-types/->HumanNumericMetric 0 5)}
+            ]))
+
+     (bind rubric
+       (fn [human-metric required?]
+         (aor-types/->valid-HumanFeedbackQueueRubric human-metric required?)))
+
+     (evals/create-human-feedback-queue! global-actions-depot
+                                         "q1"
+                                         "q1 q"
+                                         [(rubric "c1" true)
+                                          (rubric "n1" false)])
+     (is (thrown? Exception
+                  (evals/create-human-feedback-queue! global-actions-depot
+                                                      "qq2"
+                                                      "q2 q"
+                                                      [])))
+     (is (thrown? Exception
+                  (evals/create-human-feedback-queue! global-actions-depot
+                                                      "q1"
+                                                      "q1 qq"
+                                                      [(rubric "c1" false)])))
+
+     (evals/create-human-feedback-queue! global-actions-depot
+                                         "q2qq"
+                                         "q2 q"
+                                         [(rubric "n1" false)])
+
+     (evals/create-human-feedback-queue! global-actions-depot
+                                         "q3"
+                                         "q3 q"
+                                         [(rubric "n1" true)])
+     (evals/create-human-feedback-queue! global-actions-depot
+                                         "q4qq"
+                                         "q4 q"
+                                         [(rubric "n2" true)])
+
+
+     (bind res (foreign-invoke-query search-queues {} 2 nil))
+     (is (= (:items res)
+            [{:name        "q1"
+              :description "q1 q"
+              :rubrics     [(rubric "c1" true)
+                            (rubric "n1" false)]}
+             {:name        "q2qq"
+              :description "q2 q"
+              :rubrics     [(rubric "n1" false)]}
+            ]))
+     (bind res (foreign-invoke-query search-queues {} 2 (:pagination-params res)))
+     (is (= (:items res)
+            [{:name        "q3"
+              :description "q3 q"
+              :rubrics     [(rubric "n1" true)]}
+             {:name        "q4qq"
+              :description "q4 q"
+              :rubrics     [(rubric "n2" true)]}
+            ]))
+     (bind res (foreign-invoke-query search-queues {} 2 (:pagination-params res)))
+     (is (empty? (:items res)))
+     (is (nil? (:pagination-params res)))
+
+     (bind res (foreign-invoke-query search-queues {:search-string "qq"} 2 nil))
+     (is (= (:items res)
+            [{:name        "q2qq"
+              :description "q2 q"
+              :rubrics     [(rubric "n1" false)]}
+             {:name        "q4qq"
+              :description "q4 q"
+              :rubrics     [(rubric "n2" true)]}
+            ]))
+
+     (evals/update-human-feedback-queue! global-actions-depot
+                                         "q1"
+                                         "aq"
+                                         [(rubric "c1" false)
+                                          (rubric "notmetric1" true)
+                                          (rubric "n2" true)
+                                          (rubric "notmetric2" false)])
+     ;; verify this is a no-op
+     (evals/update-human-feedback-queue! global-actions-depot
+                                         "a"
+                                         "aq"
+                                         [(rubric "c1" false)])
+     (bind res (foreign-invoke-query search-queues {} 1 nil))
+     (is (= (:items res)
+            [{:name        "q1"
+              :description "aq"
+              :rubrics     [(rubric "c1" false)
+                            (rubric "notmetric1" true)
+                            (rubric "n2" true)
+                            (rubric "notmetric2" false)]}
+            ]))
+
+     (evals/remove-human-feedback-queue! global-actions-depot "q3")
+     ;; verify this is a no-op
+     (evals/remove-human-feedback-queue! global-actions-depot "a")
+     (bind res (foreign-invoke-query search-queues {} 4 nil))
+     (is (= ["q1" "q2qq" "q4qq"]
+            (->> res
+                 :items
+                 (mapv :name))))
+     (is (nil? (:pagination-params res)))
+
+
+     (bind res (foreign-invoke-query queue-info "q1"))
+
+     (is (= res
+            {:description "aq"
+             :rubrics     [{:description "c1 metric"
+                            :name        "c1"
+                            :metric      (aor-types/->HumanCategoryMetric #{"option1" "option3"
+                                                                            "option2"})
+                            :required    false}
+                           {:description "n2 metric"
+                            :name        "n2"
+                            :metric      (aor-types/->HumanNumericMetric 0 5)
+                            :required    true}]}))
+
+     (bind agent-target
+       (fn [agent-name agent-invoke]
+         (aor-types/->valid-FeedbackTarget agent-name agent-invoke nil)))
+     (bind node-target
+       (fn [agent-name agent-invoke node-invoke]
+         (aor-types/->valid-FeedbackTarget agent-name agent-invoke node-invoke)))
+
+     (bind target0 (agent-target "foo" foo-inv1))
+     (evals/add-human-feedback-request!
+      global-actions-depot
+      "q1"
+      target0
+      "comment 1")
+     (bind target1 (agent-target "bar" bar-inv2))
+     (evals/add-human-feedback-request!
+      global-actions-depot
+      "q1"
+      target1
+      "comment 2")
+     (bind target2 (agent-target "notagent" bar-inv2))
+     (evals/add-human-feedback-request!
+      global-actions-depot
+      "q1"
+      target2
+      "comment 3")
+     (bind target3 (node-target "notagent" bar-inv2 (node-invoke-by-name bar-trace2 "start")))
+     (evals/add-human-feedback-request!
+      global-actions-depot
+      "q1"
+      target3
+      "comment 4")
+     (bind target4 (node-target "bar" bar-inv2 (node-invoke-by-name bar-trace2 "start")))
+     (evals/add-human-feedback-request!
+      global-actions-depot
+      "q1"
+      target4
+      "comment 5")
+     (bind target5 (node-target "bar" bar-inv2 (node-invoke-by-name bar-trace2 "end")))
+     (evals/add-human-feedback-request!
+      global-actions-depot
+      "q1"
+      target5
+      "comment 6")
+     (bind target6 (agent-target "foo" (assoc foo-inv2 :agent-invoke-id (h/random-uuid7))))
+     (evals/add-human-feedback-request!
+      global-actions-depot
+      "q1"
+      target6
+      "comment 7")
+     (bind target7
+       (node-target "foo"
+                    foo-inv2
+                    (assoc (node-invoke-by-name foo-trace2 "start")
+                     :node-invoke-id (h/random-uuid7))))
+     (evals/add-human-feedback-request!
+      global-actions-depot
+      "q1"
+      target7
+      "comment 8")
+
+
+     (bind no-ids
+       (fn [l]
+         (setval [:items ALL (must :id)] :* l)))
+
+     (bind res (no-ids (foreign-invoke-query queue-page "q1" 3 nil)))
+     (is (= (:items res)
+            [{:output  (aor-types/->AgentResult "a!" false)
+              :id      :*
+              :comment "comment 1"
+              :input   ["a"]
+              :target  target0}
+             {:output  (aor-types/->AgentResult "b?" false)
+              :id      :*
+              :comment "comment 2"
+              :input   ["b"]
+              :target  target1}
+             {:output  queries/TARGET-DOES-NOT-EXIST
+              :id      :*
+              :comment "comment 3"
+              :input   queries/TARGET-DOES-NOT-EXIST
+              :target  target2}
+            ]))
+     (bind res (no-ids (foreign-invoke-query queue-page "q1" 3 (:pagination-params res))))
+     (is (= (:items res)
+            [{:output  queries/TARGET-DOES-NOT-EXIST
+              :id      :*
+              :comment "comment 4"
+              :input   queries/TARGET-DOES-NOT-EXIST
+              :target  target3}
+             {:output  [{"node" "end" "args" ["b?"]}]
+              :id      :*
+              :comment "comment 5"
+              :input   ["b"]
+              :target  target4}
+             {:output  "b?"
+              :id      :*
+              :comment "comment 6"
+              :input   ["b?"]
+              :target  target5}
+            ]))
+
+     (bind res (no-ids (foreign-invoke-query queue-page "q1" 3 (:pagination-params res))))
+     (is (= (:items res)
+            [{:output  queries/TARGET-DOES-NOT-EXIST
+              :id      :*
+              :comment "comment 7"
+              :input   queries/TARGET-DOES-NOT-EXIST
+              :target  target6}
+             {:output  queries/TARGET-DOES-NOT-EXIST
+              :id      :*
+              :comment "comment 8"
+              :input   queries/TARGET-DOES-NOT-EXIST
+              :target  target7}]))
+     (is (nil? (:pagination-params res)))
+
+
+     (bind all-ids-fn
+       (fn []
+         (select
+          [:items ALL :id]
+          (foreign-invoke-query queue-page "q1" 10 nil))))
+     (bind all-ids (all-ids-fn))
+
+     (bind cleaned-feedback
+       (fn [{:keys [agent-name agent-invoke node-invoke]}]
+         (let [p        (if (some? node-invoke)
+                          (if (= agent-name "foo")
+                            foo-nodes
+                            bar-nodes)
+                          (if (= agent-name "foo")
+                            foo-root
+                            bar-root))
+               task-id  (if (some? node-invoke) (:task-id node-invoke) (:task-id agent-invoke))
+               root-id  (if (some? node-invoke)
+                          (:node-invoke-id node-invoke)
+                          (:agent-invoke-id agent-invoke))
+               clean-fn (fn [{:keys [created-at modified-at] :as fb}]
+                          (let [delta (cond (> modified-at created-at) 1
+                                            (< modified-at created-at) -1
+                                            :else 0)]
+                            (assoc (into {} fb)
+                             :created-at 0
+                             :modified-at delta)))]
+           (foreign-select [(keypath root-id) :feedback :results ALL (view clean-fn)]
+                           p
+                           {:pkey task-id})
+         )))
+
+
+     (bind fid0
+       (evals/resolve-human-feedback-queue-item!
+        global-actions-depot
+        "q1"
+        (nth all-ids 0)
+        target0
+        "alice"
+        {"score"    5
+         "helpful?" true}
+        "hcomment 0"))
+     (is (= (all-ids-fn) (next all-ids)))
+     (is (= (cleaned-feedback target0)
+            [{:scores      {"score"    5
+                            "helpful?" true}
+              :comment     "hcomment 0"
+              :source      (aor-types/->HumanSourceImpl "alice" fid0)
+              :created-at  0
+              :modified-at 0}]))
+
+
+
+     (bind fid1
+       (evals/resolve-human-feedback-queue-item!
+        global-actions-depot
+        "q1"
+        (nth all-ids 4)
+        target4
+        "bob"
+        {"score" 10
+         "type"  "suggestion"}
+        "hcomment 1"))
+     (is (= (all-ids-fn)
+            (->> all-ids
+                 (setval (nthpath 4) NONE)
+                 next)))
+     (is (= (cleaned-feedback target4)
+            [{:scores      {"score" 10
+                            "type"  "suggestion"}
+              :comment     "hcomment 1"
+              :source      (aor-types/->HumanSourceImpl "bob" fid1)
+              :created-at  0
+              :modified-at 0}]))
+
+     ;; verify non-existent agent is no-op but still removes from queue
+     (evals/resolve-human-feedback-queue-item!
+      global-actions-depot
+      "q1"
+      (nth all-ids 2)
+      target2
+      "bob"
+      {"score" 10}
+      "hcomment 2")
+     (is (= (all-ids-fn)
+            (->> all-ids
+                 (setval (nthpath 4) NONE)
+                 (setval (nthpath 2) NONE)
+                 next)))
+
+     ;; verify non-existent traces are no-ops but still removes from queue
+     (evals/resolve-human-feedback-queue-item!
+      global-actions-depot
+      "q1"
+      (nth all-ids 6)
+      target6
+      "bob"
+      {"score" 10}
+      "hcomment 3")
+     (is (= (all-ids-fn)
+            (->> all-ids
+                 (setval (nthpath 6) NONE)
+                 (setval (nthpath 4) NONE)
+                 (setval (nthpath 2) NONE)
+                 next)))
+
+     (evals/resolve-human-feedback-queue-item!
+      global-actions-depot
+      "q1"
+      (nth all-ids 7)
+      target7
+      "bob"
+      {"score" 10}
+      "hcomment 3")
+     (is (= (all-ids-fn)
+            (->> all-ids
+                 (setval (nthpath 7) NONE)
+                 (setval (nthpath 6) NONE)
+                 (setval (nthpath 4) NONE)
+                 (setval (nthpath 2) NONE)
+                 next)))
+
+     (evals/remove-human-feedback-queue-item! global-actions-depot "q1" (nth all-ids 1))
+     (is (= (all-ids-fn)
+            (->> all-ids
+                 (setval (nthpath 7) NONE)
+                 (setval (nthpath 6) NONE)
+                 (setval (nthpath 4) NONE)
+                 (setval (nthpath 2) NONE)
+                 (setval (nthpath 1) NONE)
+                 next)))
+     ;; verify idempotent
+     (evals/remove-human-feedback-queue-item! global-actions-depot "q1" (nth all-ids 1))
+     (is (= (all-ids-fn)
+            (->> all-ids
+                 (setval (nthpath 7) NONE)
+                 (setval (nthpath 6) NONE)
+                 (setval (nthpath 4) NONE)
+                 (setval (nthpath 2) NONE)
+                 (setval (nthpath 1) NONE)
+                 next)))
+
+
+     (bind fid2
+       (evals/add-human-feedback! global-actions-depot
+                                  target0
+                                  "charlie"
+                                  {"a" 1 "b" 2}
+                                  "hcomment 4"))
+     (bind fid3
+       (evals/add-human-feedback! global-actions-depot
+                                  target5
+                                  "dan"
+                                  {"c" 6}
+                                  ""))
+     (bind fid4
+       (evals/add-human-feedback! global-actions-depot
+                                  target5
+                                  "emily"
+                                  {}
+                                  "hcomment 6"))
+
+
+     (is (= (cleaned-feedback target0)
+            [{:scores      {"score"    5
+                            "helpful?" true}
+              :comment     "hcomment 0"
+              :source      (aor-types/->HumanSourceImpl "alice" fid0)
+              :created-at  0
+              :modified-at 0}
+             {:scores      {"a" 1
+                            "b" 2}
+              :comment     "hcomment 4"
+              :source      (aor-types/->HumanSourceImpl "charlie" fid2)
+              :created-at  0
+              :modified-at 0}
+            ]))
+     (is (= (cleaned-feedback target5)
+            [{:scores      {"c" 6}
+              :comment     ""
+              :source      (aor-types/->HumanSourceImpl "dan" fid3)
+              :created-at  0
+              :modified-at 0}
+             {:scores      {}
+              :comment     "hcomment 6"
+              :source      (aor-types/->HumanSourceImpl "emily" fid4)
+              :created-at  0
+              :modified-at 0}
+            ]))
+
+     (bind fid0-a
+       (evals/edit-human-feedback!
+        global-actions-depot
+        target0
+        fid0
+        "alice2"
+        {"score2" 6}
+        "0-hcomment 0-0"))
+     (is (not= fid0 fid0-a))
+     (is (= (cleaned-feedback target0)
+            [{:scores      {"score2" 6}
+              :comment     "0-hcomment 0-0"
+              :source      (aor-types/->HumanSourceImpl "alice2" fid0-a)
+              :created-at  0
+              :modified-at 1}
+             {:scores      {"a" 1
+                            "b" 2}
+              :comment     "hcomment 4"
+              :source      (aor-types/->HumanSourceImpl "charlie" fid2)
+              :created-at  0
+              :modified-at 0}
+            ]))
+     (evals/edit-human-feedback!
+      global-actions-depot
+      target0
+      fid0
+      "alice3"
+      {"score3" 6}
+      "aaa")
+     ;; verify it needs the correct ID to change it, and otherwise is a no-op
+     (is (= (cleaned-feedback target0)
+            [{:scores      {"score2" 6}
+              :comment     "0-hcomment 0-0"
+              :source      (aor-types/->HumanSourceImpl "alice2" fid0-a)
+              :created-at  0
+              :modified-at 1}
+             {:scores      {"a" 1
+                            "b" 2}
+              :comment     "hcomment 4"
+              :source      (aor-types/->HumanSourceImpl "charlie" fid2)
+              :created-at  0
+              :modified-at 0}
+            ]))
+
+     (evals/delete-human-feedback!
+      global-actions-depot
+      target0
+      fid0-a)
+     (is (= (cleaned-feedback target0)
+            [{:scores      {"a" 1
+                            "b" 2}
+              :comment     "hcomment 4"
+              :source      (aor-types/->HumanSourceImpl "charlie" fid2)
+              :created-at  0
+              :modified-at 0}
+            ]))
+     ;; verify idempotent
+     (evals/delete-human-feedback!
+      global-actions-depot
+      target0
+      fid0-a)
+     (is (= (cleaned-feedback target0)
+            [{:scores      {"a" 1
+                            "b" 2}
+              :comment     "hcomment 4"
+              :source      (aor-types/->HumanSourceImpl "charlie" fid2)
+              :created-at  0
+              :modified-at 0}
+            ]))
+    )))

@@ -22,6 +22,7 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
   }
 
   public static String AGENT_PSTATE_WRITE_DEPOT = "*_agent-pstate-write";
+  public static String GLOBAL_ACTIONS_DEPOT = "*_agent-global-actions-depot";
 
   private static class ClientInfo implements Closeable {
     private String moduleName;
@@ -30,14 +31,17 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
     public Map<String, Depot> humanDepots;
     public ConcurrentHashMap<String, PState> localPStates;
     public Depot pstateWritesDepot;
+    public Depot globalActionsDepot;
     ClusterManagerBase manager;
 
-    public ClientInfo(String moduleName, Map agentDepots, Map streamingDepots, Map humanDepots, Depot pstateWritesDepot, ClusterManagerBase manager) {
+    public ClientInfo(String moduleName, Map agentDepots, Map streamingDepots, Map humanDepots, Depot pstateWritesDepot,
+                      Depot globalActionsDepot, ClusterManagerBase manager) {
       this.moduleName = moduleName;
       this.agentDepots = agentDepots;
       this.streamingDepots = streamingDepots;
       this.humanDepots = humanDepots;
       this.pstateWritesDepot = pstateWritesDepot;
+      this.globalActionsDepot = globalActionsDepot;
       this.localPStates = new ConcurrentHashMap();
       this.manager = manager;
     }
@@ -68,6 +72,10 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
 
   public Depot getPStateWriteDepot() {
     return _clientInfo.getResource().pstateWritesDepot;
+  }
+
+  public Depot getGlobalActionsDepot() {
+    return _clientInfo.getResource().globalActionsDepot;
   }
 
   public Depot getAgentDepot(String agentName) {
@@ -114,6 +122,7 @@ public class RamaClientsTaskGlobal implements TaskGlobalObject {
                                streamingDepots,
                                humanDepots,
                                manager.clusterDepot(moduleName, AGENT_PSTATE_WRITE_DEPOT),
+                               manager.clusterDepot(moduleName, GLOBAL_ACTIONS_DEPOT),
                                manager);
                     });
   }

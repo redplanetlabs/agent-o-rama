@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
    [com.rpl.agent-o-rama.impl.core :as i]
+   [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.stats :as stats]
@@ -462,6 +463,7 @@
              filter
              {:feedback {:results [(aor-types/->FeedbackImpl {"abc" 6}
                                                              (aor-types/->AiSourceImpl)
+                                                             nil
                                                              0
                                                              0)]}})))
        (is (tp-rule-filter-matches?
@@ -470,6 +472,7 @@
             {:feedback {:results [(aor-types/->valid-FeedbackImpl
                                    {"abc" 6}
                                    matching-source
+                                   nil
                                    0
                                    0)]}}))
        (is (not
@@ -478,6 +481,7 @@
              filter
              {:feedback {:results [(aor-types/->FeedbackImpl {"def" 6}
                                                              matching-source
+                                                             nil
                                                              0
                                                              0)]}})))
        (is (not (tp-rule-filter-matches?
@@ -486,6 +490,7 @@
                  {:feedback {:results [(aor-types/->valid-FeedbackImpl
                                         {"abc" "6"}
                                         matching-source
+                                        nil
                                         0
                                         0)]}})))
 
@@ -2268,7 +2273,6 @@
              (:global-actions-depot (aor-types/underlying-objects agent-manager)))
            (bind foo (aor/agent-client agent-manager "foo"))
            (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
-           (bind foo-action-log (:action-log-query (aor-types/underlying-objects foo)))
 
            (bind cycle!
              (fn []
@@ -2403,3 +2407,141 @@
           )))
       (finally
         (stop-server)))))
+
+(deftest add-human-feedback-queue-action-test
+  (with-redefs [TICKS (atom 0)
+                i/SUBSTITUTE-TICK-DEPOTS true
+
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+
+                i/hook:analytics-tick
+                (fn [& args] (swap! TICKS inc))]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               "end"
+               (fn [agent-node input]
+                 (aor/emit! agent-node "end" (str input "!"))))
+              (aor/node
+               "end"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "?")))))
+         ))
+       (rtest/launch-module! ipc module {:tasks 1 :threads 1})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+       (bind queue-page
+         (:human-feedback-queue-page-query (aor-types/underlying-objects agent-manager)))
+
+       (aor/create-numeric-human-metric! agent-manager
+                                         "n1"
+                                         "n1 metric"
+                                         1
+                                         10)
+       (bind rubric
+         (fn [human-metric required?]
+           (aor-types/->valid-HumanFeedbackQueueRubric human-metric required?)))
+       (evals/create-human-feedback-queue! global-actions-depot
+                                           "q1"
+                                           "my queue"
+                                           [(rubric "n1" true)])
+       (evals/create-human-feedback-queue! global-actions-depot
+                                           "q2"
+                                           "my queue2"
+                                           [(rubric "n1" true)])
+
+       (bind cycle!
+         (fn []
+           (reset! TICKS 0)
+           (foreign-append! ana-depot nil)
+           (is (condition-attained? (> @TICKS 0)))
+           (rtest/pause-microbatch-topology! ipc
+                                             module-name
+                                             aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+           (rtest/resume-microbatch-topology! ipc
+                                              module-name
+                                              aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+
+       (ana/add-rule!
+        global-actions-depot
+        "my-add-to-queue"
+        "foo"
+        {:node-name         nil
+         :action-name       "aor/add-to-human-feedback-queue"
+         :action-params     {"queueName" "q1"}
+         :filter            (aor-types/->AndFilter [])
+         :sampling-rate     1.0
+         :start-time-millis 0
+         :status-filter     :success
+        })
+
+       (ana/add-rule!
+        global-actions-depot
+        "my-add-to-queue2"
+        "foo"
+        {:node-name         "start"
+         :action-name       "aor/add-to-human-feedback-queue"
+         :action-params     {"queueName" "q2"}
+         :filter            (aor-types/->AndFilter [])
+         :sampling-rate     1.0
+         :start-time-millis 0
+         :status-filter     :success
+        })
+
+       (bind inv1 (aor/agent-initiate foo "a"))
+       (is (= "a!?" (aor/agent-result foo inv1)))
+       (bind inv2 (aor/agent-initiate foo "b"))
+       (is (= "b!?" (aor/agent-result foo inv2)))
+       (cycle!)
+       (cycle!)
+
+
+       (bind items
+         (->> (foreign-invoke-query queue-page "q1" 10 nil)
+              :items
+              (setval [ALL :id] :*)))
+       (is (= 2 (count items)))
+       (is (= (set items)
+              #{{:output  (aor-types/->AgentResult "a!?" false)
+                 :id      :*
+                 :comment ""
+                 :input   ["a"]
+                 :target  (aor-types/->FeedbackTarget "foo" inv1 nil)}
+                {:output  (aor-types/->AgentResult "b!?" false)
+                 :id      :*
+                 :comment ""
+                 :input   ["b"]
+                 :target  (aor-types/->FeedbackTarget "foo" inv2 nil)}}))
+
+       (bind res (foreign-invoke-query queue-page "q2" 10 nil))
+       (bind items
+         (->> res
+              :items
+              (setval [ALL :id] :*)
+              (setval [ALL :target :node-invoke] nil)))
+       (is (= 2 (count items)))
+       (is (= (set items)
+              #{{:output  [{"node" "end" "args" ["a!"]}]
+                 :id      :*
+                 :comment ""
+                 :input   ["a"]
+                 :target  (aor-types/->FeedbackTarget "foo" inv1 nil)}
+                {:output  [{"node" "end" "args" ["b!"]}]
+                 :id      :*
+                 :comment ""
+                 :input   ["b"]
+                 :target  (aor-types/->FeedbackTarget "foo" inv2 nil)}}))
+       (is (every? some? (select [:items ALL :target :node-invoke] res)))
+      ))))

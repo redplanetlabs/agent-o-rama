@@ -22,6 +22,9 @@
     ExperimentInputSelector
     FeedbackImpl
     ForkContext
+    HumanFeedbackQueueRubric
+    HumanFeedbackRequest
+    HumanMetric
     NestedOpInfoImpl
     NodeHumanInputRequest
     HistoricalAgentGraphInfo
@@ -54,6 +57,10 @@
 (defn agent-edit-depot-name
   []
   "*_agent-edit-depot")
+
+(defn human-analytics-depot-name
+  []
+  "*_human-analytics-depot")
 
 (defn agent-depot-name
   [name]
@@ -93,7 +100,7 @@
 
 (defn global-actions-depot-name
   []
-  "*_agent-global-actions-depot")
+  RamaClientsTaskGlobal/GLOBAL_ACTIONS_DEPOT)
 
 (defn agents-clients-name
   []
@@ -372,6 +379,27 @@
             :reference-output-json-path String
            })})
 
+(defn human-feedback-task-global-name
+  []
+  "$$_aor-human-feedback")
+
+(def HUMAN-FEEDBACK-PSTATE-SCHEMA
+  (fixed-keys-schema
+   {:metrics (map-schema String
+                         (fixed-keys-schema
+                          {:metric      HumanMetric
+                           :description String
+                          })
+                         {:subindex? true})
+    :queues  (map-schema String
+                         (fixed-keys-schema
+                          {:description String
+                           :rubrics     [HumanFeedbackQueueRubric]
+                           :items       (map-schema UUID
+                                                    HumanFeedbackRequest
+                                                    {:subindex? true})})
+                         {:subindex? true})}))
+
 (defn agent-rules-task-global-name
   [agent-name]
   (str "$$_agent-rules-" agent-name))
@@ -413,6 +441,10 @@
 (defn agent-edit-depot-task-global
   []
   (this-module-pobject-task-global (agent-edit-depot-name)))
+
+(defn human-analytics-depot-task-global
+  []
+  (this-module-pobject-task-global (human-analytics-depot-name)))
 
 (defn agent-depot-task-global
   [name]
@@ -491,6 +523,10 @@
 (defn evaluators-task-global
   []
   (this-module-pobject-task-global (evaluators-task-global-name)))
+
+(defn human-feedback-task-global
+  []
+  (this-module-pobject-task-global (human-feedback-task-global-name)))
 
 (defn action-log-task-global
   []

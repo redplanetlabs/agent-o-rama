@@ -165,7 +165,7 @@
                        module-name
                        (po/agent-root-task-global-name "foo")))
      (bind traces-query (:tracing-query (aor-types/underlying-objects foo)))
-     (bind source (aor-types/->HumanSourceImpl "user1"))
+     (bind source (aor-types/->HumanSourceImpl "user1" (h/random-uuid7)))
 
      (bind {agent-task-id :task-id agent-id :agent-invoke-id}
        (binding [aor-types/OPERATION-SOURCE source]
@@ -216,6 +216,7 @@
                  :node-name      "node2"
                  :args           ["xyz-0-01"]}]
                :node          "node1"
+               :node-task-id  ?agent-task-id
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -230,6 +231,7 @@
                  :node-name      "node3"
                  :args           ["xyz-0-00-000"]}]
                :node          "node2"
+               :node-task-id  ?agent-task-id
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -253,6 +255,7 @@
                  :args           [1]}]
                :started-agg?  true
                :node          "node3"
+               :node-task-id  ?agent-task-id
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -267,6 +270,7 @@
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
+               :node-task-id  ?agent-task-id
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -282,6 +286,7 @@
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
+               :node-task-id  !id5-t1
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -297,6 +302,7 @@
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
+               :node-task-id  !id5-t2
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -312,6 +318,7 @@
                  :node-name      "node3"
                  :args           ["xyz-0-01-000"]}]
                :node          "node2"
+               :node-task-id  !id2-t1
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -335,6 +342,7 @@
                  :args           [1]}]
                :started-agg?  true
                :node          "node3"
+               :node-task-id  ?agent-task-id
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -349,6 +357,7 @@
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
+               :node-task-id  ?agent-task-id
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -364,6 +373,7 @@
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
+               :node-task-id  !id12-t1
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -379,6 +389,7 @@
                  :node-name      "agg"
                  :args           ["1-a"]}]
                :node          "node4"
+               :node-task-id  !id12-t2
                :nested-ops    []
                :result        nil
                :agent-id      ?agent-id
@@ -387,50 +398,52 @@
                :metadata      {"a" 1}
                :source        {:name "user1"}}
         !id18 {:invoked-agg-invoke-id !agg1}
-        !agg0 {:agg-invoke-id   nil
-               :agg-input-count 3
-               :agg-start-res   "xyz-0-00-000-0000"
-               :emits           []
-               :node            "agg"
+        !agg0 {:agg-invoke-id       nil
+               :agg-input-count     3
+               :agg-start-res       "xyz-0-00-000-0000"
+               :emits               []
+               :node                "agg"
+               :node-task-id        ?agent-task-id
                :agg-inputs-first-10
                [{:invoke-id !id9' :args ["1-a"]}
                 {:invoke-id !id10' :args ["1-a"]}
                 {:invoke-id !id11' :args ["1-a"]}]
-               :nested-ops      []
-               :agg-ack-val     0
-               :result          {:val [["1-a" "1-a" "1-a"]
-                                       "xyz-0-00-000-0000"]}
-               :agg-finished?   true
-               :agent-id        ?agent-id
-               :agg-state       ["1-a" "1-a" "1-a"]
-               :input           [["1-a" "1-a" "1-a"]
-                                 "xyz-0-00-000-0000"]
+               :nested-ops          []
+               :agg-ack-val         0
+               :result              {:val [["1-a" "1-a" "1-a"]
+                                           "xyz-0-00-000-0000"]}
+               :agg-finished?       true
+               :agent-id            ?agent-id
+               :agg-state           ["1-a" "1-a" "1-a"]
+               :input               [["1-a" "1-a" "1-a"]
+                                     "xyz-0-00-000-0000"]
                :agg-start-invoke-id !id5
-               :agent-task-id   ?agent-task-id
-               :metadata        {"a" 1}
-               :source          {:name "user1"}}
-        !agg1 {:agg-invoke-id   nil
-               :agg-input-count 3
-               :agg-start-res   "xyz-0-01-000-0000"
-               :emits           []
-               :node            "agg"
+               :agent-task-id       ?agent-task-id
+               :metadata            {"a" 1}
+               :source              {:name "user1"}}
+        !agg1 {:agg-invoke-id       nil
+               :agg-input-count     3
+               :agg-start-res       "xyz-0-01-000-0000"
+               :emits               []
+               :node                "agg"
+               :node-task-id        ?agent-task-id
                :agg-inputs-first-10
                [{:invoke-id !id16' :args ["1-a"]}
                 {:invoke-id !id17' :args ["1-a"]}
                 {:invoke-id !id18' :args ["1-a"]}]
-               :nested-ops      []
-               :agg-ack-val     0
-               :result          {:val [["1-a" "1-a" "1-a"]
-                                       "xyz-0-01-000-0000"]}
-               :agg-finished?   true
-               :agent-id        ?agent-id
-               :agg-state       ["1-a" "1-a" "1-a"]
-               :input           [["1-a" "1-a" "1-a"]
-                                 "xyz-0-01-000-0000"]
+               :nested-ops          []
+               :agg-ack-val         0
+               :result              {:val [["1-a" "1-a" "1-a"]
+                                           "xyz-0-01-000-0000"]}
+               :agg-finished?       true
+               :agent-id            ?agent-id
+               :agg-state           ["1-a" "1-a" "1-a"]
+               :input               [["1-a" "1-a" "1-a"]
+                                     "xyz-0-01-000-0000"]
                :agg-start-invoke-id !id12
-               :agent-task-id   ?agent-task-id
-               :metadata        {"a" 1}
-               :source          {:name "user1"}}
+               :agent-task-id       ?agent-task-id
+               :metadata            {"a" 1}
+               :source              {:name "user1"}}
        }
        (m/guard
         (and (= ?agent-id agent-id)
@@ -1043,7 +1056,8 @@
            :node              "node1"
            :start-time-millis !start2
            :input             []
-           :node-task-id      ?agent-task-id}
+           :node-task-id      ?agent-task-id
+           :incomplete?       true}
           !id3
           {:started-agg?      true
            :agg-invoke-id     !agg1
@@ -1083,6 +1097,7 @@
            :start-time-millis   !start-agg1
            :agg-state           [1 2]
            :node-task-id        ?agent-task-id
+           :incomplete?         true
            :input               [[1 2] nil]
            :agg-start-invoke-id !id3}}
          (m/guard

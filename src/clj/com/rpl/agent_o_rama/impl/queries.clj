@@ -93,6 +93,14 @@
   []
   "_aor-search-evaluators")
 
+(defn search-human-metrics-name
+  []
+  "_aor-search-human-metrics")
+
+(defn search-human-feedback-queues-name
+  []
+  "_aor-search-human-feedback-queues")
+
 (defn search-experiments-name
   []
   "_aor-search-experiments")
@@ -101,6 +109,13 @@
   []
   "_aor-experiment-results")
 
+(defn human-feedback-queue-info-name
+  []
+  "_aor-human-feedback-queue-info")
+
+(defn human-feedback-queue-page-name
+  []
+  "_aor-human-feedback-queue-page")
 
 (defn- to-pqueue
   [coll]
@@ -121,14 +136,15 @@
                 (assoc :agg-inputs-first-10
                        (select-any (srange 0 (min 10 ai-count)) ai))))
           all-invoke-info
-        )]
+        )
+        all-invoke-info (assoc all-invoke-info :node-task-id (ops/current-task-id))]
     (if (and (-> all-invoke-info
                  (contains? :finish-time-millis)
                  not)
              (-> all-invoke-info
                  (contains? :invoked-agg-invoke-id)
                  not))
-      (assoc all-invoke-info :node-task-id (ops/current-task-id))
+      (assoc all-invoke-info :incomplete? true)
       all-invoke-info
     )))
 
@@ -644,7 +660,7 @@
       (%filter *id *info :> *assoc-map *dissoc-keys)
       (<<if (some? *assoc-map)
         (conj-vol! *results
-                   (merge (into {} (dissoc-all *info *dissoc-keys))
+                   (merge (dissoc-all (into {} *info) *dissoc-keys)
                           *assoc-map))))
     (<<cond
      (case> (< (count *m) *limit))
@@ -748,10 +764,7 @@
           (:> nil nil)
 
          (default>)
-          (:> (assoc *info
-               :name *name
-               :type *type)
-              nil)))
+          (:> {:name *name :type *type} nil)))
       (search-loop evals-pstate-sym
                    STAY
                    %filter
@@ -762,6 +775,87 @@
       (|origin)
       (hash-map :items *items :pagination-params *page-key :> *res)
     )))
+
+
+
+;; - filters can contain :search-string, which matches against the metric name
+;; - limit is approximate, it will return at least that amount and up to twice
+;; that amount
+;; - returns {:items [{:name ... :metric ... :description ...}
+;;                    ...]
+;;            :pagination-params <next-key>}
+;;   - :metric is an instance of HumanMetric protocol (either categorical or numeric)
+(defn declare-search-human-metrics-query-topology
+  [topologies]
+  (let [human-feedback-pstate-sym (symbol (po/human-feedback-task-global-name))]
+    (<<query-topology topologies
+      (search-human-metrics-name)
+      [*filters *limit *next-key :> *res]
+      (|direct 0)
+      (identity *filters :> {:keys [*search-string]})
+      (ifexpr (some? *search-string)
+        (str/lower-case *search-string)
+        :> *search-string-lower)
+      (<<ramafn %filter
+        [*name *info]
+        (<<cond
+         (case> (and> (some? *search-string-lower)
+                      (not (h/contains-string? (str/lower-case *name)
+                                                *search-string-lower))))
+          (:> nil nil)
+
+         (default>)
+          (:> {:name *name} nil)))
+      (search-loop human-feedback-pstate-sym
+                   (keypath :metrics)
+                   %filter
+                   *limit
+                   *next-key
+                   false
+                   :> *items *page-key)
+      (|origin)
+      (hash-map :items *items :pagination-params *page-key :> *res)
+    )))
+
+
+;; - filters can contain :search-string, which matches against the queue name
+;; - limit is approximate, it will return at least that amount and up to twice
+;; that amount
+;; - returns {:items [{:name ... :description ... :rubrics ...}
+;;                    ...]
+;;            :pagination-params <next-key>}
+(defn declare-search-human-feedback-queues-query-topology
+  [topologies]
+  (let [human-feedback-pstate-sym (symbol (po/human-feedback-task-global-name))]
+    (<<query-topology topologies
+      (search-human-feedback-queues-name)
+      [*filters *limit *next-key :> *res]
+      (|direct 0)
+      (identity *filters :> {:keys [*search-string]})
+      (ifexpr (some? *search-string)
+        (str/lower-case *search-string)
+        :> *search-string-lower)
+      (<<ramafn %filter
+        [*name *info]
+        (<<cond
+         (case> (and> (some? *search-string-lower)
+                      (not (h/contains-string? (str/lower-case *name)
+                                                *search-string-lower))))
+          (:> nil nil)
+
+         (default>)
+          (:> {:name *name} [:items])))
+      (search-loop human-feedback-pstate-sym
+                   (keypath :queues)
+                   %filter
+                   *limit
+                   *next-key
+                   false
+                   :> *items *page-key)
+      (|origin)
+      (hash-map :items *items :pagination-params *page-key :> *res)
+    )))
+
 ;; - filters can contain:
 ;;    - :search-string, which matches against the experiment name or ID
 ;;    - :type which is either com.rpl.agent_o_rama.impl.types.RegularExperiment
@@ -1035,6 +1129,108 @@
     (|origin)
     (aggs/+set-agg *metric-id :> *res)
   ))
+
+;; returns {:description ... :rubrics [{:name ... :description ... :metric ...} ...]}
+(defn declare-human-feedback-queue-info
+  [topologies]
+  (let [human-feedback-pstate-sym (symbol (po/human-feedback-task-global-name))]
+    (<<query-topology topologies
+      (human-feedback-queue-info-name)
+      [*queue-name :> *res]
+      (|global)
+      (local-select> [:queues (keypath *queue-name)]
+                     human-feedback-pstate-sym
+                     :> {:keys [*description *rubrics]})
+      (loop<- [*keep []
+               *next-rubrics *rubrics
+               :> *keep-rubrics]
+        (<<if (empty? *next-rubrics)
+          (:> *keep)
+         (else>)
+          (first *next-rubrics :> {:keys [*human-metric *required?]})
+          (local-select> [:metrics (keypath *human-metric)]
+                         human-feedback-pstate-sym
+                         :> {:keys [*metric *description]})
+          (<<if (nil? *metric)
+            (identity *keep :> *next-keep)
+           (else>)
+            (conj *keep
+                  {:name        *human-metric
+                   :description *description
+                   :metric      *metric
+                   :required    *required?}
+                  :> *next-keep))
+          (continue> *next-keep (next *next-rubrics))
+        ))
+      (|origin)
+      (hash-map :description *description :rubrics *keep-rubrics :> *res)
+    )))
+
+(def TARGET-DOES-NOT-EXIST ::target-does-not-exist)
+
+;; - returns {:items [{:id ... :target ... :comment... :input ... :output ...} ...]
+;;            :pagination-params ...}
+;; - input/output will be TARGET-DOES-NOT-EXIST if that trace has been GC'd already
+(defn declare-human-feedback-queue-page
+  [topologies]
+  (let [human-feedback-pstate-sym (symbol (po/human-feedback-task-global-name))]
+    (<<query-topology topologies
+      (human-feedback-queue-page-name)
+      [*queue-name *limit *pagination-params :> *res]
+      (|global)
+      (<<ramafn %filter
+        [*id _]
+        (:> {:id *id} nil))
+      (search-loop human-feedback-pstate-sym
+                   (keypath :queues *queue-name :items)
+                   %filter
+                   *limit
+                   *pagination-params
+                   false
+                   :> *items *page-key)
+      (loop<- [*l []
+               *next-items *items
+               :> *enriched-items]
+        (<<if (empty? *next-items)
+          (:> *l)
+         (else>)
+          (first *next-items :> {:keys [*id *target *comment]})
+          (identity *target :> {:keys [*agent-name *agent-invoke *node-invoke]})
+          (<<if (nil? *node-invoke)
+            (get *agent-invoke :task-id :> *task-id)
+            (get *agent-invoke :agent-invoke-id :> *target-id)
+            (po/agent-root-task-global-name *agent-name :> *pstate-name)
+           (else>)
+            (get *node-invoke :task-id :> *task-id)
+            (get *node-invoke :node-invoke-id :> *target-id)
+            (po/agent-node-task-global-name *agent-name :> *pstate-name))
+          (|direct *task-id)
+          (<<if (contains? (po/agent-names-set) *agent-name)
+            (this-module-pobject-task-global *pstate-name :> $$p)
+            (local-select> (view contains? *target-id) $$p :> *exists?)
+           (else>)
+            (identity nil :> $$p)
+            (identity false :> *exists?))
+          (<<cond
+           (case> (not *exists?))
+            (identity TARGET-DOES-NOT-EXIST :> *input)
+            (identity TARGET-DOES-NOT-EXIST :> *output)
+
+           (case> (nil? *node-invoke))
+            (local-select> (keypath *target-id) $$p :> {*input :invoke-args *output :result})
+
+           (default>)
+            (local-select> (keypath *target-id)
+                           $$p
+                           :> {*input :input *node-emits :emits *node-result :result})
+            (h/node->output *node-result *node-emits :> *output))
+          (continue>
+           (conj *l {:id *id :target *target :comment *comment :input *input :output *output})
+           (next *next-items))
+        ))
+      (|origin)
+      (hash-map :items *enriched-items :pagination-params *page-key :> *res)
+    )))
 
 ;; direct queries on PStates
 

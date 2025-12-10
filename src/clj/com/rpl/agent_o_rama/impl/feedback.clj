@@ -8,9 +8,8 @@
 
 
 (defn add-feedback-path
-  ^:direct-nav [scores source]
-  (let [t (h/current-time-millis)
-        v (aor-types/->valid-FeedbackImpl scores source t t)]
+  ^:direct-nav [scores comment t source]
+  (let [v (aor-types/->valid-FeedbackImpl scores source comment t t)]
     (path :feedback :results NIL->VECTOR AFTER-ELEM (termval v))))
 
 (defn action-state-path

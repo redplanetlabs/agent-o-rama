@@ -1303,7 +1303,7 @@
            "All examples should be downloaded correctly with pagination")
 
        ;; test search with filters
-       (bind human-source (aor-types/->HumanSourceImpl "user"))
+       (bind human-source (aor-types/->HumanSourceImpl "user" (h/random-uuid7)))
        (bind ai-source (aor-types/->AiSourceImpl))
 
        (binding [aor-types/OPERATION-SOURCE human-source]

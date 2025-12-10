@@ -488,13 +488,15 @@
         (cond
           (aor-types/AgentInvokeImpl? target)
           (store/pstate-transform!
-           [(keypath (:agent-invoke-id target)) (fb/add-feedback-path res source)]
+           [(keypath (:agent-invoke-id target))
+            (fb/add-feedback-path res nil (h/current-time-millis) source)]
            (.getStore agent-node (po/agent-root-task-global-name agent-name))
            (aor-types/->DirectTaskId (:task-id target)))
 
           (aor-types/NodeInvokeImpl? target)
           (store/pstate-transform!
-           [(keypath (:node-invoke-id target)) (fb/add-feedback-path res source)]
+           [(keypath (:node-invoke-id target))
+            (fb/add-feedback-path res nil (h/current-time-millis) source)]
            (.getStore agent-node (po/agent-node-task-global-name agent-name))
            (aor-types/->DirectTaskId (:task-id target)))
 
