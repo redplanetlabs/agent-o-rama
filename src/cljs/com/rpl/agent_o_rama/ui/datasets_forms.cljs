@@ -508,7 +508,7 @@
                                                                                 ;; Summary section
                                                                                 ($ :div.mb-6
                                                                                    ($ :div.flex.items-center.gap-4.mb-4
-                                                                                      (if (zero? (.-failure_count data))
+                                                                                      (if (zero? (aget data "failure_count"))
                                                                                         ($ :div.flex.items-center.gap-2.text-green-700
                                                                                            ($ :svg.h-6.w-6.text-green-600 {:fill "currentColor" :viewBox "0 0 20 20"}
                                                                                               ($ :path {:fillRule "evenodd"
@@ -525,13 +525,13 @@
                                                                                    ($ :div.grid.grid-cols-2.gap-4.text-sm
                                                                                       ($ :div.bg-green-50.border.border-green-200.rounded-lg.p-3
                                                                                          ($ :div.text-green-800.font-medium "Successful")
-                                                                                         ($ :div.text-2xl.font-bold.text-green-900 (.-success_count data)))
+                                                                                         ($ :div.text-2xl.font-bold.text-green-900 (aget data "success_count")))
                                                                                       ($ :div.bg-red-50.border.border-red-200.rounded-lg.p-3
                                                                                          ($ :div.text-red-800.font-medium "Failed")
-                                                                                         ($ :div.text-2xl.font-bold.text-red-900 (.-failure_count data)))))
+                                                                                         ($ :div.text-2xl.font-bold.text-red-900 (aget data "failure_count")))))
                                                                                 ;; Errors section
-                                                                                (when (and (.-errors data) (> (.-failure_count data) 0))
-                                                                                  (let [errors (js->clj (.-errors data) :keywordize-keys true)]
+                                                                                (when (and (aget data "errors") (> (aget data "failure_count") 0))
+                                                                                  (let [errors (js->clj (aget data "errors") :keywordize-keys true)]
                                                                                     ($ :div.mt-6
                                                                                        ($ :h4.text-md.font-semibold.text-gray-900.mb-3 "Error Details")
                                                                                        ($ :div.max-h-96.overflow-y-auto.border.border-gray-200.rounded-lg

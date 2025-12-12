@@ -27,7 +27,7 @@
   (aor/stop-ui)
   (close! ipc))
 
-(defn launch-for-playwright
+(defn launch-dev
   "playwright tests assume these modules are launched"
   [ipc & {:keys [port build-id] :or {port 1974 build-id :frontend}}]
 
@@ -52,10 +52,37 @@
   (start-repl ipc {:port port :build-id build-id})
   (println "Setup complete. Server running with all modules ready."))
 
+(defn launch-no-frontend-build
+  "build ui with ./scripts/build-ui.sh, then run this."
+  [ipc]
+
+  (rtest/launch-module!
+   ipc
+   streaming-test-agent/StreamingTestAgentModule
+   {:tasks 1 :threads 1})
+  
+  (rtest/launch-module!
+   ipc
+   research-agent/ResearchAgentModule
+   {:tasks 1 :threads 1})
+
+  (aor/start-ui ipc {:port 1974}))
+
+(comment
+  "instructions for ai"
+  "./scripts/repl.sh to start repl"
+  "use your repl to evaluate these forms"
+  (require 'repl :reload)
+  (def ipc (rtest/create-ipc))
+  (launch-dev ipc)
+  "use inline def trick to see intermediate values"
+  )
+
 (comment
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (def ipc (rtest/create-ipc))
-  (launch-for-playwright ipc)
+  (launch-for-dev ipc)
+  (launch-no-frontend-build ipc)
   
   (aor/stop-ui)
 
@@ -66,7 +93,8 @@
   (shadow.cljs.devtools.server/reload!)
   (shadow/watch :dev)
 
-  (start-repl ipc {:port 1975 :build-id :dev})
+  (start-repl ipc {:port 1974 :build-id :dev})
+  (aor/start-ui u)
   
   (rtest/launch-module!
    ipc

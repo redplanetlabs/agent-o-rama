@@ -398,15 +398,14 @@
      (bind module2
        (aor/agentmodule
         [topology]
-        (aor/declare-cluster-agent topology "foo2" module-name1 "foo")
         (-> topology
             (aor/new-agent "foo")
             (aor/node
              "start"
              nil
              (fn [agent-node v]
-               (let [foo2 (aor/agent-client agent-node "foo2")]
-                 (aor/result! agent-node (aor/agent-invoke foo2 (* 10 v))))
+               (let [other-foo (aor/mirror-agent-client agent-node module-name1 "foo")]
+                 (aor/result! agent-node (aor/agent-invoke other-foo (* 10 v))))
              )))
        ))
      (bind module-name2 (get-module-name module2))

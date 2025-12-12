@@ -26,6 +26,10 @@
     RamaClientsTaskGlobal]
    [com.rpl.agent_o_rama.impl.types
     Node]
+   [com.rpl.rama
+    AckLevel
+    Depot
+    QueryTopologyClient]
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
@@ -198,6 +202,279 @@
   []
   (h/random-uuid7))
 
+(defn subagent-client
+  [^AgentNode agent-node ^AgentClient client module-name name]
+  (let [agent-info-tuple [module-name name]]
+    (reify
+     AgentClient
+     (invoke [this args]
+       (let [inv (.initiate this args)]
+         (.result this inv)))
+     (invokeAsync [this args]
+       (no-async!))
+     (initiate [this args]
+       (timed-agent-call
+        (.initiate client args)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"     "initiate"
+         "args"   (vec args) ; so it doesn't put a raw array in the trace
+         "result" res}))
+     (initiateAsync [this args]
+       (no-async!))
+     (fork [this invoke nodeInvokeIdToNewArgs]
+       (let [inv (.initiateFork this invoke nodeInvokeIdToNewArgs)]
+         (.result this inv)))
+     (forkAsync [this invoke nodeInvokeIdToNewArgs]
+       (no-async!))
+     (initiateFork [this invoke nodeInvokeIdToNewArgs]
+       (timed-agent-call
+        (.initiateFork client invoke nodeInvokeIdToNewArgs)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"           "initiateFork"
+         "invoke"       invoke
+         "new-args-map" nodeInvokeIdToNewArgs
+         "result"       res}))
+     (initiateForkAsync [this invoke invokeIdToNewArgs]
+       (no-async!))
+     (nextStep [this agent-invoke]
+       (let [start-time-millis (h/current-time-millis)
+             ret               (.get ^CompletableFuture
+                                     (aor-types/subagent-next-step-async client agent-invoke))
+             [stats res]       (if (instance? HumanInputRequest ret)
+                                 [nil ret]
+                                 [(:stats ret) (:result ret)])
+
+             finish-time-millis
+             (h/current-time-millis)
+             [agent-module-name agent-name]
+             agent-info-tuple
+             data-map
+             {"op"           "nextStep"
+              "agent-invoke" agent-invoke
+              "agent-module-name" agent-module-name
+              "agent-name"   agent-name}
+
+             data-map
+             (if stats (assoc data-map "stats" stats) data-map)
+             data-map
+             (if (instance? AgentFailedException res) data-map (assoc data-map "result" res))
+            ]
+         (record-nested-op!-impl
+          agent-node
+          :agent-call
+          start-time-millis
+          finish-time-millis
+          data-map)
+         (if (instance? AgentFailedException res)
+           (throw res))
+         res
+       ))
+     (nextStepAsync [this agent-invoke]
+       (no-async!))
+     (result [this agent-invoke]
+       (loop [step (.nextStep this agent-invoke)]
+         (if (instance? HumanInputRequest step)
+           (do
+             (.provideHumanInput
+              this
+              step
+              (.getHumanInput agent-node (:prompt step)))
+             (recur (.nextStep this agent-invoke)))
+           (:result step))))
+     (resultAsync [this agent-invoke]
+       (no-async!))
+     (stream [this agent-invoke node]
+       (no-stream!))
+     (stream [this agent-invoke node stream-callback]
+       (no-stream!))
+     (streamSpecific [this agent-invoke node node-invoke-id]
+       (no-stream!))
+     (streamSpecific
+       [this agent-invoke node node-invoke-id stream-callback]
+       (no-stream!))
+     (streamAll [this agent-invoke node]
+       (no-stream!))
+     (streamAll [this agent-invoke node stream-all-callback]
+       (no-stream!))
+     (pendingHumanInputs [this agent-invoke]
+       (timed-agent-call
+        (.pendingHumanInputs client agent-invoke)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"           "pendingHumanInputs"
+         "agent-invoke" agent-invoke
+         "result"       res}))
+     (pendingHumanInputsAsync [this invoke]
+       (no-async!))
+     (provideHumanInput [this request response]
+       (timed-agent-call
+        (.provideHumanInput client request response)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"       "provideHumanInput"
+         "request"  request
+         "response" response}))
+     (provideHumanInputAsync [this request response]
+       (no-async!))
+     (close [this]
+       (close! client))
+     aor-types/AgentClientInternal
+     (invoke-with-context-async-internal [this context args]
+       (aor-types/invoke-with-context-async-internal client context args))
+     (initiate-with-context-async-internal [this context args]
+       (aor-types/initiate-with-context-async-internal client context args))
+     (subagent-next-step-async [this agent-invoke]
+       (aor-types/subagent-next-step-async client agent-invoke))
+     aor-types/UnderlyingObjects
+     (underlying-objects [this]
+       (aor-types/underlying-objects client))
+    )))
+
+(defn mk-store
+  [store-info-map module-name pstate-name agent-name agent-task-id agent-id
+   retry-num pstate-client pstate-write-depot nested-ops-vol]
+  (let [store-params
+        (simpl/->valid-StoreParams
+         module-name
+         pstate-name
+         agent-name
+         agent-task-id
+         agent-id
+         retry-num
+         pstate-client
+         pstate-write-depot
+         nested-ops-vol)]
+    (condp = (get store-info-map pstate-name)
+      simpl/KV
+      (simpl/mk-kv-store store-params)
+
+      simpl/DOC
+      (simpl/mk-doc-store store-params)
+
+      nil
+      (simpl/mk-pstate-store store-params)
+
+      (throw (h/ex-info "Unknown store type"
+                        {:module-name module-name
+                         :name        pstate-name
+                         :type        (get store-info-map pstate-name)}))
+    )))
+
+(defn ack-level->str
+  [ack-level]
+  (condp = ack-level
+    AckLevel/ACK "ack"
+    AckLevel/APPEND_ACK "appendAck"
+    AckLevel/NONE "none"
+    (throw (h/ex-info "Unrecognized ack level" {:ack-level ack-level}))))
+
+(defmacro traced-other-call
+  ([expr nested-ops-vol info-map]
+   `(traced-other-call true ~expr ~nested-ops-vol ~info-map))
+  ([capture-response? expr nested-ops-vol info-map]
+   `(let [info-map# ~info-map
+          start-time-millis# (h/current-time-millis)
+          ret#      ~expr]
+      (vswap! ~nested-ops-vol
+              conj
+              (aor-types/->NestedOpInfoImpl
+               start-time-millis#
+               (h/current-time-millis)
+               :other
+               (if ~capture-response?
+                 (assoc info-map# "response" ret#)
+                 info-map#)
+              ))
+      ret#
+    )))
+
+(defn traced-depot
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
+  (let [depot (.getForeignDepot
+               declared-objects-tg
+               module-name
+               name)]
+    (reify
+     Depot
+     (append [this data]
+       (traced-other-call
+        (.append depot data)
+        nested-ops-vol
+        {"op"         "depotAppend"
+         "moduleName" module-name
+         "name"       name
+         "data"       data
+         "ackLevel"   "ack"
+        }))
+     (append [this data ack-level]
+       (traced-other-call
+        (.append depot data ack-level)
+        nested-ops-vol
+        {"op"         "depotAppend"
+         "moduleName" module-name
+         "name"       name
+         "data"       data
+         "ackLevel"   (ack-level->str ack-level)
+        }))
+     (getObjectInfo [this]
+       (traced-other-call
+        false
+        (.getObjectInfo depot)
+        nested-ops-vol
+        {"op"         "getObjectInfo"
+         "moduleName" module-name
+         "name"       name
+        })
+     )
+     (getPartitionInfo [this partition-index]
+       (traced-other-call
+        false
+        (.getPartitionInfo depot partition-index)
+        nested-ops-vol
+        {"op"         "getPartitionInfo"
+         "moduleName" module-name
+         "name"       name
+         "partitionIndex" partition-index
+        }))
+     (read [this partition-index start-offset end-offset]
+       (traced-other-call
+        false
+        (.read depot partition-index start-offset end-offset)
+        nested-ops-vol
+        {"op"             "depotRead"
+         "moduleName"     module-name
+         "name"           name
+         "partitionIndex" partition-index
+         "startOffset"    start-offset
+         "endOffset"      end-offset
+        }))
+    )))
+
+(defn traced-qt-client
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
+  (let [q (.getForeignQuery
+           declared-objects-tg
+           module-name
+           name)]
+    (reify
+     QueryTopologyClient
+     (invoke [this args]
+       (traced-other-call
+        (.invoke q args)
+        nested-ops-vol
+        {"op"         "queryTopology"
+         "moduleName" module-name
+         "name"       name
+         "args"       (vec args)
+        }))
+    )))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id execution-context curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
@@ -269,168 +546,63 @@
        (:metadata execution-context))
      (getAgentObject [this name]
        (.getAgentObject fetcher name))
-     (getStore [this name]
-       (let [store-params
-             (simpl/->valid-StoreParams
-              name
-              agent-name
-              agent-task-id
-              agent-id
-              retry-num
-              false
-              (.getLocalPState rama-clients name)
-              (.getPStateWriteDepot rama-clients)
-              nested-ops-vol)]
-         ;; TODO: not sure this is the right approach for mirrors
-         (condp = (get (:store-info store-info) name)
-           simpl/KV
-           (simpl/mk-kv-store store-params)
-
-           simpl/DOC
-           (simpl/mk-doc-store store-params)
-
-           nil
-           (simpl/mk-pstate-store store-params)
-
-           (throw (h/ex-info "Unknown store type"
-                             {:name name
-                              :type (get store-info name)}))
-         )))
      (getAgentClient [agent-node name]
-       (let [client (.getAgentClient declared-objects-tg name)
-
-             agent-info-tuple
-             (.getAgentInfo declared-objects-tg name)]
-         (reify
-          AgentClient
-          (invoke [this args]
-            (let [inv (.initiate this args)]
-              (.result this inv)))
-          (invokeAsync [this args]
-            (no-async!))
-          (initiate [this args]
-            (timed-agent-call
-             (.initiate client args)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"     "initiate"
-              "args"   (vec args) ; so it doesn't put a raw array in the trace
-              "result" res}))
-          (initiateAsync [this args]
-            (no-async!))
-          (fork [this invoke nodeInvokeIdToNewArgs]
-            (let [inv (.initiateFork this invoke nodeInvokeIdToNewArgs)]
-              (.result this inv)))
-          (forkAsync [this invoke nodeInvokeIdToNewArgs]
-            (no-async!))
-          (initiateFork [this invoke nodeInvokeIdToNewArgs]
-            (timed-agent-call
-             (.initiateFork client invoke nodeInvokeIdToNewArgs)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"           "initiateFork"
-              "invoke"       invoke
-              "new-args-map" nodeInvokeIdToNewArgs
-              "result"       res}))
-          (initiateForkAsync [this invoke invokeIdToNewArgs]
-            (no-async!))
-          (nextStep [this agent-invoke]
-            (let [start-time-millis (h/current-time-millis)
-                  ret               (.get ^CompletableFuture
-                                          (aor-types/subagent-next-step-async client agent-invoke))
-                  [stats res]       (if (instance? HumanInputRequest ret)
-                                      [nil ret]
-                                      [(:stats ret) (:result ret)])
-
-                  finish-time-millis
-                  (h/current-time-millis)
-                  [agent-module-name agent-name]
-                  agent-info-tuple
-                  data-map
-                  {"op"           "nextStep"
-                   "agent-invoke" agent-invoke
-                   "agent-module-name" agent-module-name
-                   "agent-name"   agent-name}
-
-                  data-map
-                  (if stats (assoc data-map "stats" stats) data-map)
-                  data-map
-                  (if (instance? AgentFailedException res) data-map (assoc data-map "result" res))
-                 ]
-              (record-nested-op!-impl
-               agent-node
-               :agent-call
-               start-time-millis
-               finish-time-millis
-               data-map)
-              (if (instance? AgentFailedException res)
-                (throw res))
-              res
-            ))
-          (nextStepAsync [this agent-invoke]
-            (no-async!))
-          (result [this agent-invoke]
-            (loop [step (.nextStep this agent-invoke)]
-              (if (instance? HumanInputRequest step)
-                (do
-                  (.provideHumanInput
-                   this
-                   step
-                   (.getHumanInput agent-node (:prompt step)))
-                  (recur (.nextStep this agent-invoke)))
-                (:result step))))
-          (resultAsync [this agent-invoke]
-            (no-async!))
-          (stream [this agent-invoke node]
-            (no-stream!))
-          (stream [this agent-invoke node stream-callback]
-            (no-stream!))
-          (streamSpecific [this agent-invoke node node-invoke-id]
-            (no-stream!))
-          (streamSpecific
-            [this agent-invoke node node-invoke-id stream-callback]
-            (no-stream!))
-          (streamAll [this agent-invoke node]
-            (no-stream!))
-          (streamAll [this agent-invoke node stream-all-callback]
-            (no-stream!))
-          (pendingHumanInputs [this agent-invoke]
-            (timed-agent-call
-             (.pendingHumanInputs client agent-invoke)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"           "pendingHumanInputs"
-              "agent-invoke" agent-invoke
-              "result"       res}))
-          (pendingHumanInputsAsync [this invoke]
-            (no-async!))
-          (provideHumanInput [this request response]
-            (timed-agent-call
-             (.provideHumanInput client request response)
-             agent-node
-             agent-info-tuple
-             [res]
-             {"op"       "provideHumanInput"
-              "request"  request
-              "response" response}))
-          (provideHumanInputAsync [this request response]
-            (no-async!))
-          (close [this]
-            (close! client))
-          aor-types/AgentClientInternal
-          (invoke-with-context-async-internal [this context args]
-            (aor-types/invoke-with-context-async-internal client context args))
-          (initiate-with-context-async-internal [this context args]
-            (aor-types/initiate-with-context-async-internal client context args))
-          (subagent-next-step-async [this agent-invoke]
-            (aor-types/subagent-next-step-async client agent-invoke))
-          aor-types/UnderlyingObjects
-          (underlying-objects [this]
-            (aor-types/underlying-objects client))
-         )))
+       (subagent-client agent-node
+                        (.getAgentClient declared-objects-tg name)
+                        (.getThisModuleName declared-objects-tg)
+                        name))
+     (getMirrorAgentClient [agent-node module-name name]
+       (subagent-client agent-node
+                        (.getMirrorAgentClient declared-objects-tg module-name name)
+                        module-name
+                        name))
+     (getStore [this name]
+       (mk-store (:store-info store-info)
+                 (.getThisModuleName declared-objects-tg)
+                 name
+                 agent-name
+                 agent-task-id
+                 agent-id
+                 retry-num
+                 (.getLocalPState rama-clients name)
+                 (.getPStateWriteDepot rama-clients)
+                 nested-ops-vol))
+     (getMirrorStore [this module-name name]
+       (let [store-info-map (.getMirrorStoreInfo declared-objects-tg module-name)]
+         (mk-store store-info-map
+                   module-name
+                   name
+                   agent-name
+                   agent-task-id
+                   agent-id
+                   retry-num
+                   (.getForeignPState declared-objects-tg module-name name)
+                   nil
+                   nested-ops-vol)))
+     (getDepot [this name]
+       (traced-depot
+        declared-objects-tg
+        (.getThisModuleName declared-objects-tg)
+        name
+        nested-ops-vol))
+     (getMirrorDepot [this module-name name]
+       (traced-depot
+        declared-objects-tg
+        module-name
+        name
+        nested-ops-vol))
+     (getQueryTopologyClient [this name]
+       (traced-qt-client
+        declared-objects-tg
+        (.getThisModuleName declared-objects-tg)
+        name
+        nested-ops-vol))
+     (getMirrorQueryTopologyClient [this module-name name]
+       (traced-qt-client
+        declared-objects-tg
+        module-name
+        name
+        nested-ops-vol))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
      (recordNestedOp [this type start-time-millis finish-time-millis info]

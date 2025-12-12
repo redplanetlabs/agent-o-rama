@@ -200,29 +200,20 @@
        :exception e}
     )))
 
-(defn mk-agents-info
-  [agent-graphs mirror-agents]
-  (reduce-kv
-   (fn [m agent-name _]
-     (assoc m agent-name [nil agent-name]))
-   mirror-agents
-   agent-graphs))
-
 (defn hook:analytics-tick [])
 
 (defn define-agents!
-  [setup topologies stream-topology mb-topology analytics-mb-topology agent-graphs mirror-agents
+  [setup topologies stream-topology mb-topology analytics-mb-topology agent-graphs
    store-info declared-objects evaluator-builders action-builders]
   (declare-object* setup
                    (symbol (po/agents-store-info-name))
-                   (aor-types/->valid-StoreInfo store-info {}))
+                   (aor-types/->valid-StoreInfo store-info))
   (declare-object* setup
                    (symbol (po/agents-clients-name))
                    (RamaClientsTaskGlobal.
                     (-> agent-graphs
                         keys
-                        vec)
-                    []))
+                        vec)))
   (declare-object* setup
                    (symbol (po/agent-node-executor-name))
                    (AgentNodeExecutorTaskGlobal.))
@@ -233,7 +224,6 @@
                     declared-objects
                     evaluator-builders
                     action-builders
-                    (mk-agents-info agent-graphs mirror-agents)
                     (transform MAP-VALS
                                graph/resolve-agent-graph
                                agent-graphs)
@@ -344,6 +334,8 @@
   (queries/declare-search-evaluators-query-topology topologies)
   (queries/declare-search-experiments-query-topology topologies)
   (queries/declare-experiment-results-query-topology topologies)
+
+  (queries/declare-get-module-store-info topologies)
 
   (queries/declare-fork-affected-aggs-query-topology topologies)
   (queries/declare-get-current-graph topologies)

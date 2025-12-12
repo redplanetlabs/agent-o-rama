@@ -15,7 +15,6 @@ import com.rpl.rama.test.LaunchConfig;
  *
  * <ul>
  *   <li>Multiple agent module definitions
- *   <li>declareClusterAgent: Create mirror reference to agent in another module
  *   <li>getAgentClient: Get client for mirror agent within agent node
  *   <li>invoke: Invoke mirror agent across modules
  *   <li>getModuleName: Get module name for cross-module references
@@ -48,20 +47,13 @@ public class MirrorAgent {
    * cross-module agent invocation.
    */
   public static class MirrorModule extends AgentModule {
-    private final String greeterModuleName;
-
-    public MirrorModule(String greeterModuleName) {
-      this.greeterModuleName = greeterModuleName;
-    }
+    private final String GREETER_MODULE_NAME = new GreeterModule().getModuleName();
 
     @Override
     protected void defineAgents(AgentTopology topology) {
-      // Declare mirror reference to Greeter agent in GreeterModule
-      topology.declareClusterAgent("GreeterMirror", greeterModuleName, "Greeter");
-
       topology.newAgent("MirrorAgent").node("process", null, (AgentNode agentNode, String name) -> {
         // Get client for the mirror agent
-        AgentClient greeterClient = agentNode.getAgentClient("GreeterMirror");
+        AgentClient greeterClient = agentNode.getMirrorAgentClient(GREETER_MODULE_NAME, "Greeter");
 
         // Invoke the mirror agent (cross-module call)
         String greeting = (String) greeterClient.invoke(name);

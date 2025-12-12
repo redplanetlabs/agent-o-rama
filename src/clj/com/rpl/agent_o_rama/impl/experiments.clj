@@ -280,8 +280,20 @@
                (.getAgentObject agent-node name))
              (getAgentClient [this name]
                (.getAgentClient agent-node name))
+             (getMirrorAgentClient [this module-name agent-name]
+               (.getMirrorAgentClient agent-node module-name agent-name))
              (getStore [this name]
                (.getStore agent-node name))
+             (getMirrorStore [this module-name name]
+               (.getMirrorStore agent-node module-name name))
+             (getDepot [this name]
+               (.getDepot agent-node name))
+             (getMirrorDepot [this module-name name]
+               (.getMirrorDepot agent-node module-name name))
+             (getQueryTopologyClient [this name]
+               (.getQueryTopologyClient agent-node name))
+             (getMirrorQueryTopologyClient [this module-name name]
+               (.getMirrorQueryTopologyClient agent-node module-name name))
              (streamChunk [this chunk])
              (recordNestedOp [this nestedOpType startTimeMillis finishTimeMillis info])
              (getHumanInput [this prompt]

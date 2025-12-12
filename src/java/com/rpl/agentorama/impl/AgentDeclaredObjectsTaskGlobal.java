@@ -4,26 +4,36 @@ import java.io.IOException;
 
 import com.rpl.agentorama.*;
 import com.rpl.rama.cluster.ClusterManagerBase;
+import com.rpl.rama.*;
 import com.rpl.rama.integration.*;
 
 import clojure.lang.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+
+import rpl.rama.generated.TopologyDoesNotExistException;
 
 public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
+  public static final String MODULE_GET_STORE_INFO_QUERY_NAME = "_module-get-store-info";
   public static ThreadLocal<Long> ACQUIRE_TIMEOUT_MILLIS = new ThreadLocal<>();
   Map<String, Map<String, Object>> _builders;
   Map<String, Map<Keyword, Object>> _evaluatorBuilders;
   Map<String, Map<Keyword, Object>> _actionBuilders;
-  Map<String, List<String>> _agentsInfo;
   Map<String, Object> _agentGraphs;
 
   Map<String, WorkerManagedResource> _objects;
   Map<String, List> _evaluators;
   String _thisModuleName;
   WorkerManagedResource<Map<String, AgentClient>> _agents;
+  WorkerManagedResource<ConcurrentHashMap<String, AgentManager>> _managers;
+  WorkerManagedResource<ConcurrentHashMap<List, AgentClient>> _mirrorAgents;
   ClusterManagerBase _clusterRetriever;
   WorkerManagedResource<AgentManager> _thisManager;
+  WorkerManagedResource<ConcurrentHashMap<List, Depot>> _depots;
+  WorkerManagedResource<ConcurrentHashMap<List, PState>> _pstates;
+  WorkerManagedResource<ConcurrentHashMap<String, Map>> _mirrorStoreInfo;
+  WorkerManagedResource<ConcurrentHashMap<List, QueryTopologyClient>> _queries;
 
 
   // agents is localName -> [moduleName, agentName] (nil for local module)
@@ -31,12 +41,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     Map<String, Map<String, Object>> builders,
     Map<String, Map<Keyword, Object>> evaluatorBuilders,
     Map<String, Map<Keyword, Object>> actionBuilders,
-    Map<String, List<String>> agentsInfo,
     Map<String, Object> agentGraphs) {
     _builders = builders;
     _evaluatorBuilders = evaluatorBuilders;
     _actionBuilders = actionBuilders;
-    _agentsInfo = agentsInfo;
     _agentGraphs = agentGraphs;
   }
 
@@ -105,14 +113,60 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     return ret;
   }
 
-  public List<String> getAgentInfo(String localName) {
-    List<String> ret = _agentsInfo.get(localName);
-    if(ret==null) throw new RuntimeException("Could not find agent " + localName);
-    if(ret.get(0)==null) {
-      return Arrays.asList(_thisModuleName, ret.get(1));
-    } else {
-      return ret;
-    }
+  public AgentClient getMirrorAgentClient(String moduleName, String agentName) {
+    ConcurrentHashMap<String, AgentManager> managers = _managers.getResource();
+    ConcurrentHashMap<List, AgentClient> mirrors = _mirrorAgents.getResource();
+
+    AgentManager manager = managers.computeIfAbsent(moduleName, new Function<String, AgentManager>() {
+      public AgentManager apply(String mn) {
+        return AgentManager.create(_clusterRetriever, moduleName);
+      }
+    });
+
+    return mirrors.computeIfAbsent(Arrays.asList(moduleName, agentName), new Function<List, AgentClient>() {
+      public AgentClient apply(List tuple) {
+        return manager.getAgentClient(agentName);
+      }
+    });
+  }
+
+  public Depot getForeignDepot(String moduleName, String name) {
+    return _depots.getResource().computeIfAbsent(Arrays.asList(moduleName, name), new Function<List, Depot>() {
+      public Depot apply(List tuple) {
+        return _clusterRetriever.clusterDepot(moduleName, name);
+      }
+    });
+  }
+
+  public PState getForeignPState(String moduleName, String name) {
+    return _pstates.getResource().computeIfAbsent(Arrays.asList(moduleName, name), new Function<List, PState>() {
+      public PState apply(List tuple) {
+        return _clusterRetriever.clusterPState(moduleName, name);
+      }
+    });
+  }
+
+  public Map getMirrorStoreInfo(String moduleName) {
+    return _mirrorStoreInfo.getResource().computeIfAbsent(moduleName, new Function<String, Map>() {
+      public Map apply(String mn) {
+        try {
+          QueryTopologyClient<Map> q = _clusterRetriever.clusterQuery(moduleName, MODULE_GET_STORE_INFO_QUERY_NAME);
+          return q.invoke();
+        } catch(Exception e) {
+          if(e instanceof TopologyDoesNotExistException || e.getCause() instanceof TopologyDoesNotExistException)
+            return new HashMap();
+          else throw e;
+        }
+      }
+    });
+  }
+
+  public QueryTopologyClient getForeignQuery(String moduleName, String name) {
+    return _queries.getResource().computeIfAbsent(Arrays.asList(moduleName, name), new Function<List, QueryTopologyClient>() {
+      public QueryTopologyClient apply(List tuple) {
+        return _clusterRetriever.clusterQuery(moduleName, name);
+      }
+    });
   }
 
   public ClusterManagerBase getClusterRetriever() {
@@ -159,23 +213,28 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
 
     _agents = new WorkerManagedResource("__agentClients", context, () -> {
       Map m = new CloseableMap();
-      Set<String> moduleNames = new HashSet();
-      for(List<String> tuple: _agentsInfo.values()) {
-        String moduleName = tuple.get(0);
-        moduleNames.add(moduleName);
-      }
-      Map<String, AgentManager> managers = new HashMap();
-      for(String moduleName: moduleNames) {
-        String mn = moduleName == null ? context.getModuleInstanceInfo().getModuleName() : moduleName;
-        managers.put(moduleName, AgentManager.create(context.getClusterRetriever(), mn));
-      }
-      for(String localName: _agentsInfo.keySet()) {
-        List<String> tuple = _agentsInfo.get(localName);
-        String moduleName = tuple.get(0);
-        String agentName = tuple.get(1);
-        m.put(localName, managers.get(moduleName).getAgentClient(agentName));
+      for(String agentName: _agentGraphs.keySet()) {
+        m.put(agentName, _thisManager.getResource().getAgentClient(agentName));
       }
       return m;
+    });
+    _managers = new WorkerManagedResource("__agentManagers", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _mirrorAgents = new WorkerManagedResource("__mirrorAgentClients", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _depots = new WorkerManagedResource("__foreignDepotClients", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _pstates = new WorkerManagedResource("__foreignPStateClients", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _mirrorStoreInfo = new WorkerManagedResource("__mirrorStoreInfo", context, () -> {
+      return new CloseableConcurrentMap();
+    });
+    _queries = new WorkerManagedResource("__foreignQueryClients", context, () -> {
+      return new CloseableConcurrentMap();
     });
   }
 
@@ -186,5 +245,10 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
       resource.close();
     }
     _agents.close();
+    _mirrorAgents.close();
+    _depots.close();
+    _pstates.close();
+    _mirrorStoreInfo.close();
+    _queries.close();
   }
 }

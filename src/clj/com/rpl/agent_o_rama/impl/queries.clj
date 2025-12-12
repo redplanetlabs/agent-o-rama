@@ -49,6 +49,10 @@
   []
   "_agent-get-current-graph")
 
+(defn module-get-store-info-name
+  []
+  AgentDeclaredObjectsTaskGlobal/MODULE_GET_STORE_INFO_QUERY_NAME)
+
 (defn action-log-page-name
   []
   "_agent-get-action-log-page")
@@ -417,6 +421,15 @@
     (graph/graph->historical-graph-info (po/agent-graph-task-global *agent-name)
                                         :> *res)
   ))
+
+(defn declare-get-module-store-info
+  [topologies]
+  (let [store-info-sym (symbol (po/agents-store-info-name))]
+    (<<query-topology topologies
+      (module-get-store-info-name)
+      [:> *res]
+      (|origin)
+      (get store-info-sym :store-info :> *res))))
 
 ;; Datasets
 

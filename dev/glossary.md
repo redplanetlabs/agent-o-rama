@@ -213,7 +213,7 @@ in distributed execution.
 
 ## [Mirror Agent](terms/mirror-agent.md)
 
-Local proxy for an agent defined in another module, enabling cross-module agent interactions. Declared via `declare-cluster-agent` to reference remote agents.
+Local proxy for an agent defined in another module, enabling cross-module agent interactions.
 
 ## [Multi-Agg](terms/multi-agg.md)
 

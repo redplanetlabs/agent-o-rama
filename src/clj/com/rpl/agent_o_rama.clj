@@ -56,9 +56,8 @@
     TopologyDoesNotExistException]))
 
 (defn- check-unique-agent-name!
-  [agents-vol mirror-agents-vol name]
-  (when (or (contains? @agents-vol name)
-            (contains? @mirror-agents-vol name))
+  [agents-vol name]
+  (when (contains? @agents-vol name)
     (throw (h/ex-info "Agent already exists" {:name name}))))
 
 (defn agent-topology
@@ -70,7 +69,6 @@ The topology provides the configuration context for:\n
   - Declaring agent objects: [[declare-agent-object]], [[declare-agent-object-builder]]
   - Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]
   - Declaring actions: [[declare-action-builder]]
-  - Declaring cluster agents: [[declare-cluster-agent]]
 \n
 Args:\n
   - setup - Rama module setup instance from defmodule parameters
@@ -82,19 +80,18 @@ Returns:\n
   (let [^StreamTopology stream-topology (stream-topology
                                          topologies
                                          aor-types/AGENT-TOPOLOGY-NAME)
-        mb-topology            (microbatch-topology
-                                topologies
-                                aor-types/AGENT-MB-TOPOLOGY-NAME)
-        analytics-mb-topology  (microbatch-topology
-                                topologies
-                                aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
-        defined?-vol           (volatile! false)
-        agents-vol             (volatile! {})
-        mirror-agents-vol      (volatile! {})
-        store-info-vol         (volatile! {})
-        declared-objects-vol   (volatile! {})
+        mb-topology           (microbatch-topology
+                               topologies
+                               aor-types/AGENT-MB-TOPOLOGY-NAME)
+        analytics-mb-topology (microbatch-topology
+                               topologies
+                               aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+        defined?-vol          (volatile! false)
+        agents-vol            (volatile! {})
+        store-info-vol        (volatile! {})
+        declared-objects-vol  (volatile! {})
         evaluator-builders-vol (volatile! {})
-        action-builders-vol    (volatile! {})]
+        action-builders-vol   (volatile! {})]
     (set-launch-topology-dynamic-option! setup
                                          aor-types/AGENT-MB-TOPOLOGY-NAME
                                          "topology.microbatch.phase.timeout.seconds"
@@ -106,7 +103,7 @@ Returns:\n
     (reify
      AgentTopology
      (newAgent [this name]
-       (check-unique-agent-name! agents-vol mirror-agents-vol name)
+       (check-unique-agent-name! agents-vol name)
        (let [ret (graph/mk-agent-graph)]
          (vswap! agents-vol assoc name ret)
          ret))
@@ -208,15 +205,6 @@ Returns:\n
                                                   description
                                                   (aor-types/convert-java-builder-fn builder-jfn)
                                                   (if options @options)))
-     (declareClusterAgent [this localName moduleName agentName]
-       (check-unique-agent-name! agents-vol mirror-agents-vol localName)
-       ;; this connects the modules so a module update removing an agent needed
-       ;; by another module fails
-       (mirror-depot* setup
-                      (gensym (str "*_mirrorAgentDepot" agentName))
-                      moduleName
-                      (po/agent-depot-name agentName))
-       (vswap! mirror-agents-vol assoc localName [moduleName agentName]))
      (define [this]
        (when @defined?-vol
          (throw (h/ex-info "Agent topology already defined" {})))
@@ -230,7 +218,6 @@ Returns:\n
         mb-topology
         analytics-mb-topology
         @agents-vol
-        @mirror-agents-vol
         @store-info-vol
         @declared-objects-vol
         @evaluator-builders-vol
@@ -627,26 +614,6 @@ Example:\n
   ([agent-topology name description builder-fn options]
    (aor-types/declare-action-builder-internal agent-topology name description builder-fn options)))
 
-(defn declare-cluster-agent
-  "Declares a reference to an agent from another module.\n
-\n
-Mirror agents enable cross-module agent interactions by creating a local proxy for an agent defined in a different module. This allows agents to invoke other agents across module boundaries.\n
-\n
-Subagents are fetched inside agent node functions with [[agent-client]]\n
-\n
-Args:\n
-  - agent-topology - agent topology instance
-  - local-name - String name for the local mirror agent
-  - module-name - String name of the module containing the target agent
-  - agent-name - String name of the target agent in the remote module
-\n
-Example:\n
-<pre>
-(declare-cluster-agent topology \"remote-chat\" \"chat-module\" \"chat-agent\")
-</pre>"
-  [^AgentTopology agent-topology local-name module-name agent-name]
-  (.declareClusterAgent agent-topology local-name module-name agent-name))
-
 (defn setup-object-name
   "Gets the name of an agent object from its setup context.\n
 \n
@@ -881,7 +848,7 @@ Args:\n
   - name - String name of the store (declared with declare-*-store functions)
 \n
 Returns:\n
-  - Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, delete!, etc.)
+  - Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, etc.)
 \n
 Example:\n
 <pre>
@@ -891,6 +858,107 @@ Example:\n
 </pre>"
   [^AgentNode agent-node name]
   (.getStore agent-node name))
+
+(defn get-mirror-store
+  "Gets a store instance from another module.\n
+\n
+Stores provide distributed, persistent, replicated storage. Mirror stores are read-only.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - module-name – module where the store exists
+  - name - String name of the store (declared with declare-*-store functions in the target module)
+\n
+Returns:\n
+  - Store instance with API methods in the com.rpl.agent-o-rama.store namespace (get, put!, etc.)
+\n
+Example:\n
+<pre>
+(let [store (get-mirror-store agent-node \"com.mycompany/OtherModule\" \"$$some-kv-store\")]
+  (store/get store \"user-123\"))
+</pre>"
+  [^AgentNode agent-node module-name name]
+  (.getMirrorStore agent-node module-name name))
+
+(defn get-depot
+  "Gets a depot client within a node.\n
+\n
+Depots are Rama's append-only logs that can be consumed by any number of topologies.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - name - String name of the depot (declared in the module)
+\n
+Returns:\n
+  - Depot instance for appending data using foreign-append! or similar Rama functions
+\n
+Example:\n
+<pre>
+(let [depot (get-depot agent-node \"*my-depot\")]
+  (foreign-append! depot {:event \"user-action\" :data data}))
+</pre>"
+  [^AgentNode agent-node name]
+  (.getDepot agent-node name))
+
+(defn get-mirror-depot
+  "Gets a depot instance from another module.\n
+\n
+Depots are Rama's append-only logs that can be consumed by any number of topologies.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - module-name – module where the depot exists
+  - name - String name of the depot (declared in the target module)
+\n
+Returns:\n
+  - Depot instance for appending data using foreign-append! or similar Rama functions
+\n
+Example:\n
+<pre>
+(let [depot (get-mirror-depot agent-node \"com.mycompany/OtherModule\" \"*events-depot\")]
+  (foreign-append! depot {:event \"cross-module-event\" :data data}))
+</pre>"
+  [^AgentNode agent-node module-name name]
+  (.getMirrorDepot agent-node module-name name))
+
+(defn get-query-topology-client
+  "Gets a query topology client for invoking queries within a node.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - name - String name of the query topology
+\n
+Returns:\n
+  - QueryTopologyClient instance
+\n
+Example:\n
+<pre>
+(let [query-client (get-query-topology-client agent-node \"my-query-topology\")]
+  (let [result (foreign-invoke-query query-client \"arg1\" 100)]
+    (process-results result)))
+</pre>"
+  [^AgentNode agent-node name]
+  (.getQueryTopologyClient agent-node name))
+
+(defn get-mirror-query-topology-client
+  "Gets a query topology client from another module.\n
+\n
+Args:\n
+  - agent-node - agent node instance from the current node function
+  - module-name – module where the query topology exists
+  - name - String name of the query topology
+\n
+Returns:\n
+  - QueryTopologyClient instance
+\n
+Example:\n
+<pre>
+(let [query-client (get-mirror-query-topology-client agent-node \"com.mycompany/OtherModule\" \"analytics-query\")]
+  (let [result (foreign-invoke-query query-client \"arg1\" 100)]
+    (process-analytics result)))
+</pre>"
+  [^AgentNode agent-node module-name name]
+  (.getMirrorQueryTopologyClient agent-node module-name name))
 
 (defn get-agent-object
   "Gets a shared agent object (AI models, database clients, etc.) within a node, evaluator, or action function.\n
@@ -1012,7 +1080,6 @@ The topology provides the configuration context for:\n
   - Declaring agent objects: [[declare-agent-object]], [[declare-agent-object-builder]]
   - Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]
   - Declaring actions: [[declare-action-builder]]
-  - Declaring cluster agents: [[declare-cluster-agent]]
 \n
 Args:\n
   - options - Optional map with configuration:
@@ -1053,7 +1120,6 @@ The topology provides the configuration context for:\n
   - Declaring agent objects: [[declare-agent-object]], [[declare-agent-object-builder]]
   - Declaring evaluators: [[declare-evaluator-builder]], [[declare-comparative-evaluator-builder]], [[declare-summary-evaluator-builder]]
   - Declaring actions: [[declare-action-builder]]
-  - Declaring cluster agents: [[declare-cluster-agent]]
 \n
 Args:\n
   - sym - Symbol name for the module (becomes the module name)
@@ -1746,6 +1812,22 @@ Example:\n
 </pre>"
   ^AgentClient [^IFetchAgentClient agent-client-fetcher agent-name]
   (.getAgentClient agent-client-fetcher agent-name))
+
+(defn mirror-agent-client
+  "Gets and agent client for an agent in another module.\n
+\n
+Agent clients provide the interface for invoking agents, streaming data, handling human input, and managing agent executions.\n
+\n
+Example:\n
+<pre>
+;; From within an agent node (subagent execution)
+(fn [agent-node input]
+  (let [subagent-client (aor/mirror-agent-client agent-node \"com.mycompany/SomeAgentModule \"\"other-agent\")
+        result (aor/agent-invoke subagent-client input)]
+    (aor/result! agent-node result)))
+</pre>"
+  [^AgentNode agent-node module-name agent-name]
+  (.getMirrorAgentClient agent-node module-name agent-name))
 
 (defn agent-names
   "Gets the names of all available agents in a module.\n
