@@ -68,7 +68,6 @@
 (defmethod -event-msg-handler :chsk/uidport-open [_ _])
 (defmethod -event-msg-handler :chsk/uidport-close
   [_data uid]
-  (println "[SENTE] Client disconnected, cleaning up streams for uid:" uid)
   ;; Call streaming cleanup - require dynamically to avoid circular deps
   (when-let [cleanup-fn (try
                           (requiring-resolve 'com.rpl.agent-o-rama.impl.ui.handlers.streaming/close-all-streams-for-uid!)
