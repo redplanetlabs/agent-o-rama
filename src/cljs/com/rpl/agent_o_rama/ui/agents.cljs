@@ -263,7 +263,71 @@
        ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
        ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
 
-(defui agent-graph []
+(defui node-stats-panel [{:keys [selected-node module-id agent-name]}]
+  (let [node-id (when selected-node (aget selected-node "id"))
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:node-stats module-id agent-name]
+          :sente-event [:invocations/get-node-stats {:module-id module-id
+                                                     :agent-name agent-name
+                                                     :granularity 3600  ;; hour granularity
+                                                     :time-range-hours 24}]
+          :refetch-interval-ms 30000  ;; refresh every 30 seconds
+          :enabled? (boolean (and module-id agent-name))})]
+
+    (cond
+      (nil? selected-node)
+      ($ :div.p-6.text-center.text-gray-500
+         "Select a node to view stats")
+
+      loading?
+      ($ :div.p-6.text-center
+         ($ common/spinner {:size :medium}))
+
+      error
+      ($ :div.p-6.text-center.text-red-500
+         (str "Error loading stats: " error))
+
+      :else
+      (let [node-stats (:node-stats data)
+            node-data (get node-stats node-id)]
+        (if node-data
+          ($ :div.p-6.space-y-4
+             ($ :div.border-b.pb-4
+                ($ :h3.text-lg.font-semibold.text-gray-900 node-id)
+                ($ :p.text-sm.text-gray-500
+                   (str "Last " (:time-range-hours data) " hours")))
+
+             ($ :div.grid.grid-cols-2.gap-4
+                ($ :div.bg-gray-50.p-4.rounded-md
+                   ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Avg Latency")
+                   ($ :div.text-2xl.font-semibold.text-gray-900
+                      (str (when (:mean node-data) (int (:mean node-data))) "ms")))
+
+                ($ :div.bg-gray-50.p-4.rounded-md
+                   ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Invocations")
+                   ($ :div.text-2xl.font-semibold.text-gray-900
+                      (or (:count node-data) 0)))
+
+                ($ :div.bg-gray-50.p-4.rounded-md
+                   ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Min Latency")
+                   ($ :div.text-2xl.font-semibold.text-gray-900
+                      (str (when (:min node-data) (int (:min node-data))) "ms")))
+
+                ($ :div.bg-gray-50.p-4.rounded-md
+                   ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Max Latency")
+                   ($ :div.text-2xl.font-semibold.text-gray-900
+                      (str (when (:max node-data) (int (:max node-data))) "ms")))
+
+                ($ :div.bg-gray-50.p-4.rounded-md
+                   ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "P99 Latency")
+                   ($ :div.text-2xl.font-semibold.text-gray-900
+                      (str (when (:p99 node-data) (int (:p99 node-data))) "ms")))))
+
+          ($ :div.p-6.text-center.text-gray-500
+             (str "No stats available for \"" node-id "\"")))))))
+
+(defui agent-graph [{:keys [selected-node set-selected-node]}]
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         {:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:graph module-id agent-name]
@@ -277,8 +341,8 @@
                ($ :div.text-red-500 "Error loading graph: " error))
       :else ($ agent-graph/graph {:initial-data data
                                   :height "500px"
-                                  :selected-node nil
-                                  :set-selected-node (fn [_])}))))
+                                  :selected-node selected-node
+                                  :set-selected-node set-selected-node}))))
 
 (defui stats-summary [{:keys [module-id agent-name]}]
   ($ :div.p-4.flex.gap-1
@@ -392,7 +456,10 @@
 (defui agent []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         ;; Use a simple keyword for the form-id (schema expects Keyword, not vector)
-        form-id :manual-run-agent]
+        form-id :manual-run-agent
+
+        ;; State for selected node
+        [selected-node set-selected-node] (uix/use-state nil)]
 
     ;; Initialize the form when the component mounts or when module-id/agent-name changes
     (uix/use-effect
@@ -406,11 +473,14 @@
 
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
-       ($ :div.flex
-          ($ :div {:className "w-1/2"} ($ agent-graph))
+       ($ :div.flex.gap-4
           ($ :div {:className "w-1/2"}
-             #_($ stats-summary {:module-id module-id :agent-name agent-name})
-             #_($ alerts {:module-id module-id :agent-name agent-name})))
+             ($ agent-graph {:selected-node selected-node
+                             :set-selected-node set-selected-node}))
+          ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm {:className "w-1/2"}
+             ($ node-stats-panel {:selected-node selected-node
+                                  :module-id module-id
+                                  :agent-name agent-name})))
        ($ :div.p-4.flex.gap-1
           ($ :div
              {:style {:flex-grow "1"}}

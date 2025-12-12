@@ -2,6 +2,8 @@
   (:use [com.rpl.rama] [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
@@ -151,3 +153,42 @@
         invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
     (aor/remove-metadata! client invoke key)
     {:success true}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-node-stats
+  [{:keys [client agent-name granularity time-range-hours]} uid]
+  (when client
+    (let [client-objects (aor-types/underlying-objects client)
+          telemetry-pstate (:telemetry-pstate client-objects)
+
+          ;; Default to last 24 hours if not specified
+          hours (or time-range-hours 24)
+          now (System/currentTimeMillis)
+          start-time (- now (* hours 60 60 1000))
+
+          ;; Default to hour granularity
+          gran (or granularity po/HOUR-GRANULARITY)
+
+          ;; Query telemetry for node latencies
+          telemetry-data (ana/select-telemetry
+                          telemetry-pstate
+                          agent-name
+                          gran
+                          [:agent :node-latencies]
+                          start-time
+                          now
+                          [:mean :count :min :max 0.99]
+                          nil)]
+
+      ;; Transform telemetry data to per-node stats
+      {:node-stats
+       (into {}
+             (for [[bucket-time bucket-data] telemetry-data
+                   [node-name stats] bucket-data]
+               [node-name
+                {:mean (:mean stats)
+                 :count (:count stats)
+                 :min (:min stats)
+                 :max (:max stats)
+                 :p99 (get stats 0.99)}]))
+       :time-range-hours hours
+       :granularity gran})))
