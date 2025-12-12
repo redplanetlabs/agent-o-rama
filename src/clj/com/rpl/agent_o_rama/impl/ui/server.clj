@@ -20,9 +20,16 @@
    [ring.middleware.cors :refer [wrap-cors]]))
 
 (defn spa-index-handler
-  [_request]
-  (-> (resp/resource-response "index.html")
-      (resp/content-type "text/html")))
+  "Serves the SPA index.html and ensures session cookie is set.
+   This is critical for Firefox AJAX mode - the session must be established
+   on the initial page load since Sente's async responses can't set cookies."
+  [request]
+  (let [response (-> (resp/resource-response "index.html")
+                     (resp/content-type "text/html"))]
+    ;; Always set session on index.html response to establish cookie
+    (if (get-in request [:session :uid])
+      response
+      (assoc response :session {:uid (str (random-uuid))}))))
 
 (def file-handler
   (-> (fn [_] nil)
