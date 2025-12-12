@@ -20,13 +20,16 @@
   []
   (let [rama-client (ui/get-object :rama-client)
         modules     (deployed-module-names rama-client)]
-    (when (empty? modules) (setval [ATOM :aor-cache] {} ui/system))
+    
+    ;; so that get-object doesn't throw on :aor-cache on fresh startup
+    (setval [ATOM :aor-cache nil?] {} ui/system)
+    
     (cljlogging/trace "Refreshing agent from modules" {:modules modules})
     (doseq [mod modules]
       (let [manager (try
                       (aor/agent-manager rama-client mod)
                       (catch Exception e
-                        (cljlogging/trace e "AOR not found in module" {:module mod})
+                        (cljlogging/error "AOR not found in module" {:module mod})
                         ::no-aor))]
         (when-not (= ::no-aor manager)
           (setval [ATOM :aor-cache (keypath mod) :manager]
