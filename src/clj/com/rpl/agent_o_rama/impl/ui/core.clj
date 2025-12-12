@@ -29,7 +29,7 @@
       (let [manager (try
                       (aor/agent-manager rama-client mod)
                       (catch Exception e
-                        (cljlogging/error "AOR not found in module" {:module mod})
+                        (cljlogging/trace "AOR not found in module" {:module mod})
                         ::no-aor))]
         (when-not (= ::no-aor manager)
           (setval [ATOM :aor-cache (keypath mod) :manager]
