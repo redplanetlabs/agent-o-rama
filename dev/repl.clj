@@ -81,7 +81,7 @@
 (comment
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (def ipc (rtest/create-ipc))
-  (launch-for-dev ipc)
+  (launch-dev ipc)
   (launch-no-frontend-build ipc)
   
   (aor/stop-ui)
