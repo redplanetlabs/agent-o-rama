@@ -163,7 +163,8 @@
           ;; Default to last 24 hours if not specified
           hours (or time-range-hours 24)
           now (System/currentTimeMillis)
-          start-time (- now (* hours 60 60 1000))
+          ;; Add buffer to ensure we catch the current bucket
+          start-time (- now (* (+ hours 1) 60 60 1000))
 
           ;; Default to hour granularity
           gran (or granularity po/HOUR-GRANULARITY)
