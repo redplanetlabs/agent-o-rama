@@ -144,12 +144,11 @@
        "elk.layered.spacing.nodeNodeBetweenLayers" "100"
        "elk.spacing.nodeNode" "80"
        "elk.direction" "DOWN"
-       "feedbackEdges" "true"
-       "edgeRouting" "POLYLINE"
+       "elk.edgeRouting" "SPLINES"
        "spacing.edgeEdgeBetweenLayers" "100"
-       "crossingMinimization.strategy" "LAYER_SWEEP"
-       "nodePlacement.strategy" "BRANDES_KOEPF"
-       "elk.layered.considerModelOrder.strategy" "PREFER_NODES"
+       "elk.layered.crossingMinimization.semiInteractive" "true"
+       "elk.layered.nodePlacement.strategy" "NETWORK_SIMPLEX"
+       "elk.layered.considerModelOrder.strategy" "PREFER_EDGES"
        "elk.layered.considerModelOrder.noModelOrder" "false"})
 
 (defn extract-graph-elements [{:keys [graph]}]
@@ -250,7 +249,8 @@
                    :layoutOptions options
                    :children (clj->js
                               (map (fn [node]
-                                     (let [is-start? (= start-id (:id node))]
+                                     (let [is-dummy? (= "__dummy_start__" (:id node))
+                                           is-start? (= start-id (:id node))]
                                        (-> node
                                            (assoc :layoutOptions
                                                   (if is-dummy?
