@@ -345,11 +345,13 @@
         decoded-agent-name (common/url-decode agent-name)
 
         ;; Fetch graph topology
-        {:keys [data loading? error]}
-        (queries/use-sente-query {:query-key [:graph module-id agent-name]
-                                  :sente-event [:invocations/get-graph {:module-id module-id
-                                                                        :agent-name agent-name}]
-                                  :refetch-interval-ms 2000})
+        graph-query (queries/use-sente-query {:query-key [:graph module-id agent-name]
+                                              :sente-event [:invocations/get-graph {:module-id module-id
+                                                                                    :agent-name agent-name}]
+                                              :refetch-interval-ms 2000})
+        data (:data graph-query)
+        loading? (:loading? graph-query)
+        error (:error graph-query)
 
         ;; Fetch node stats for display on nodes
         time-range-hours (cond
@@ -358,13 +360,13 @@
                            (= granularity 86400) 720
                            :else 24)
 
-        {:keys [data stats-data]}
-        (queries/use-sente-query {:query-key [:node-stats-for-graph module-id agent-name granularity]
-                                  :sente-event [:invocations/get-node-stats {:module-id module-id
-                                                                             :agent-name decoded-agent-name
-                                                                             :granularity granularity
-                                                                             :time-range-hours time-range-hours}]
-                                  :refetch-interval-ms 30000})]
+        stats-query (queries/use-sente-query {:query-key [:node-stats-for-graph module-id agent-name granularity]
+                                              :sente-event [:invocations/get-node-stats {:module-id module-id
+                                                                                         :agent-name decoded-agent-name
+                                                                                         :granularity granularity
+                                                                                         :time-range-hours time-range-hours}]
+                                              :refetch-interval-ms 30000})
+        node-stats (:node-stats (:data stats-query))]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
                   ($ :div.text-gray-500 "Loading graph..."))
@@ -374,7 +376,7 @@
                                   :height "500px"
                                   :selected-node selected-node
                                   :set-selected-node set-selected-node
-                                  :node-stats (:node-stats stats-data)
+                                  :node-stats node-stats
                                   :selected-stat selected-stat}))))
 
 (defui stats-summary [{:keys [module-id agent-name]}]
