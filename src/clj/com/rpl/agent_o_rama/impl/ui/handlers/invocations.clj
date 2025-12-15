@@ -163,9 +163,11 @@
           ;; Default to hour granularity if not specified
           gran (or granularity po/HOUR-GRANULARITY)
           
-          ;; Query a wide time range to ensure we get the most recent bucket
+          ;; Calculate time window based on granularity to ensure we get recent buckets
+          ;; Query back ~2-3 buckets worth of time
           now (System/currentTimeMillis)
-          start-time (- now (* 48 60 60 1000)) ;; 48 hours ago
+          lookback-seconds (* gran 3)
+          start-time (- now (* lookback-seconds 1000))
 
           ;; Query telemetry for node latencies with all percentiles
           telemetry-data (ana/select-telemetry
