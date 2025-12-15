@@ -156,17 +156,19 @@
   "Extract nodes, edges, and start node from graph data without layout"
   (let [start-id (:start-node graph)
         ;; Build nodes with extra metadata for coloring (node-type and start?)
-        nodes (->> (get graph :node-map)
-                   (map (fn [[k v]]
-                          {:id k
-                           :type "custom"
-                           :draggable false
-                           :data {:label k
-                                  :node-id k
-                                  :node-type (:node-type v)
-                                  :is-start? (= k start-id)}
-                           :width 170
-                           :height 55})))
+        all-nodes (->> (get graph :node-map)
+                       (map (fn [[k v]]
+                              {:id k
+                               :type "custom"
+                               :draggable false
+                               :data {:label k
+                                      :node-id k
+                                      :node-type (:node-type v)
+                                      :is-start? (= k start-id)}
+                               :width 170
+                               :height 55})))
+        ;; Sort nodes so start node comes FIRST (for considerModelOrder)
+        nodes (sort-by (fn [node] (if (= (:id node) start-id) 0 1)) all-nodes)
 
         edges (s/select
                [:node-map
