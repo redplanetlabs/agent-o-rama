@@ -2,6 +2,8 @@
   (:use [com.rpl.rama] [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
@@ -151,3 +153,55 @@
         invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
     (aor/remove-metadata! client invoke key)
     {:success true}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-node-stats
+  [{:keys [client agent-name granularity time-range-hours]} uid]
+  (when client
+    (let [client-objects (aor-types/underlying-objects client)
+          telemetry-pstate (:telemetry-pstate client-objects)
+
+          ;; Default to last 24 hours if not specified
+          hours (or time-range-hours 24)
+          now (System/currentTimeMillis)
+          start-time (- now (* hours 60 60 1000))
+
+          ;; Default to hour granularity
+          gran (or granularity po/HOUR-GRANULARITY)
+
+          ;; Query telemetry for node latencies
+          telemetry-data (ana/select-telemetry
+                          telemetry-pstate
+                          agent-name
+                          gran
+                          [:agent :node-latencies]
+                          start-time
+                          now
+                          [:mean :count :min :max 0.99]
+                          nil)]
+
+      ;; Aggregate stats across all time buckets for each node
+      {:node-stats
+       (reduce
+        (fn [acc [bucket-time bucket-data]]
+          (reduce
+           (fn [acc [node-name stats]]
+             (let [existing (get acc node-name)
+                   ;; Aggregate across buckets
+                   new-count (+ (or (:count existing) 0) (:count stats))
+                   new-total-latency (+ (or (:total-latency existing) 0) (* (:mean stats) (:count stats)))
+                   new-min (if existing (min (:min existing) (:min stats)) (:min stats))
+                   new-max (if existing (max (:max existing) (:max stats)) (:max stats))
+                   new-p99 (if existing (max (:p99 existing) (get stats 0.99)) (get stats 0.99))]
+               (assoc acc node-name
+                      {:count new-count
+                       :total-latency new-total-latency
+                       :mean (if (pos? new-count) (/ new-total-latency new-count) 0)
+                       :min new-min
+                       :max new-max
+                       :p99 new-p99})))
+           acc
+           bucket-data))
+        {}
+        telemetry-data)
+       :time-range-hours hours
+       :granularity gran})))
