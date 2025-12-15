@@ -162,7 +162,7 @@
 
           ;; Default to hour granularity if not specified
           gran-seconds (or granularity po/HOUR-GRANULARITY)
-          
+
           ;; Calculate time window: look back 3 buckets from now
           now-millis (System/currentTimeMillis)
           bucket-size-millis (* gran-seconds 1000)
@@ -184,36 +184,47 @@
 
       ;; Aggregate last 2 buckets to avoid data gaps at bucket transitions
       ;; E.g., at 10:01, hour bucket has only 1 min of data; previous bucket has full hour
-      {:node-stats
-       (if (seq telemetry-data)
-         (let [buckets (vec telemetry-data)
-               recent-buckets (take-last 2 buckets)
-               bucket-data-maps (map second recent-buckets)]
-           ;; Aggregate stats across buckets for each node
-           (reduce
-            (fn [acc bucket-data]
+      (let [current-bucket (quot now-millis bucket-size-millis)
+            prev-bucket (dec current-bucket)
+
+            ;; Get data for the 2 most recent bucket numbers (not just last 2 with data)
+            current-bucket-data (get telemetry-data current-bucket)
+            prev-bucket-data (get telemetry-data prev-bucket)
+
+            ;; Aggregate the two buckets (handling nils)
+            aggregated-stats
+            (cond
+              ;; Both buckets have data - aggregate them
+              (and current-bucket-data prev-bucket-data)
               (reduce
-               (fn [acc [node-name stats]]
-                 (let [existing (get acc node-name)]
-                   (if existing
-                     ;; Merge stats from this bucket with existing
-                     (let [total-count (+ (:count existing) (:count stats))
-                           total-latency (+ (* (:mean existing) (:count existing))
-                                            (* (:mean stats) (:count stats)))]
+               (fn [acc node-name]
+                 (let [curr-stats (get current-bucket-data node-name)
+                       prev-stats (get prev-bucket-data node-name)]
+                   (if (and curr-stats prev-stats)
+                     (let [total-count (+ (:count curr-stats) (:count prev-stats))
+                           total-latency (+ (* (:mean curr-stats) (:count curr-stats))
+                                            (* (:mean prev-stats) (:count prev-stats)))]
                        (assoc acc node-name
                               {:count total-count
                                :mean (/ total-latency total-count)
-                               :min (min (:min existing) (:min stats))
-                               :max (max (:max existing) (:max stats))
-                               ;; For percentiles, take max as conservative estimate
-                               0.5 (max (get existing 0.5 0) (get stats 0.5 0))
-                               0.9 (max (get existing 0.9 0) (get stats 0.9 0))
-                               0.99 (max (get existing 0.99 0) (get stats 0.99 0))}))
-                     ;; First time seeing this node
-                     (assoc acc node-name stats))))
-               acc
-               bucket-data))
-            {}
-            bucket-data-maps))
-         {})
-       :granularity gran-seconds})))
+                               :min (min (:min curr-stats) (:min prev-stats))
+                               :max (max (:max curr-stats) (:max prev-stats))
+                               0.5 (max (get curr-stats 0.5 0) (get prev-stats 0.5 0))
+                               0.9 (max (get curr-stats 0.9 0) (get prev-stats 0.9 0))
+                               0.99 (max (get curr-stats 0.99 0) (get prev-stats 0.99 0))}))
+                     ;; Only one bucket has this node
+                     (assoc acc node-name (or curr-stats prev-stats)))))
+               {}
+               (set (concat (keys current-bucket-data) (keys prev-bucket-data))))
+
+              ;; Only current bucket has data
+              current-bucket-data current-bucket-data
+
+              ;; Only previous bucket has data
+              prev-bucket-data prev-bucket-data
+
+              ;; No data in either bucket
+              :else {})]
+
+        {:node-stats aggregated-stats
+         :granularity gran-seconds}))))
