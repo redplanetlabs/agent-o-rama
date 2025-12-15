@@ -182,9 +182,38 @@
                           [:mean :count :min :max 0.25 0.5 0.75 0.9 0.99]
                           nil)]
 
-      ;; Return the most recent bucket's data (already aggregated by telemetry)
+      ;; Aggregate last 2 buckets to avoid data gaps at bucket transitions
+      ;; E.g., at 10:01, hour bucket has only 1 min of data; previous bucket has full hour
       {:node-stats
        (if (seq telemetry-data)
-         (second (last telemetry-data))
+         (let [buckets (vec telemetry-data)
+               recent-buckets (take-last 2 buckets)
+               bucket-data-maps (map second recent-buckets)]
+           ;; Aggregate stats across buckets for each node
+           (reduce
+            (fn [acc bucket-data]
+              (reduce
+               (fn [acc [node-name stats]]
+                 (let [existing (get acc node-name)]
+                   (if existing
+                     ;; Merge stats from this bucket with existing
+                     (let [total-count (+ (:count existing) (:count stats))
+                           total-latency (+ (* (:mean existing) (:count existing))
+                                            (* (:mean stats) (:count stats)))]
+                       (assoc acc node-name
+                              {:count total-count
+                               :mean (/ total-latency total-count)
+                               :min (min (:min existing) (:min stats))
+                               :max (max (:max existing) (:max stats))
+                               ;; For percentiles, take max as conservative estimate
+                               0.5 (max (get existing 0.5 0) (get stats 0.5 0))
+                               0.9 (max (get existing 0.9 0) (get stats 0.9 0))
+                               0.99 (max (get existing 0.99 0) (get stats 0.99 0))}))
+                     ;; First time seeing this node
+                     (assoc acc node-name stats))))
+               acc
+               bucket-data))
+            {}
+            bucket-data-maps))
          {})
        :granularity gran-seconds})))

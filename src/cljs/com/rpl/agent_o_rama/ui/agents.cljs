@@ -512,15 +512,13 @@
                      "Recent")
 
         ;; Stat selector options
-        stat-items [{:key :min :label "Min" :selected? (= selected-stat :min) :on-select #(set-selected-stat :min)}
-                    {:key 0.25 :label "P25" :selected? (= selected-stat 0.25) :on-select #(set-selected-stat 0.25)}
-                    {:key 0.5 :label "P50" :selected? (= selected-stat 0.5) :on-select #(set-selected-stat 0.5)}
-                    {:key 0.75 :label "P75" :selected? (= selected-stat 0.75) :on-select #(set-selected-stat 0.75)}
-                    {:key 0.9 :label "P90" :selected? (= selected-stat 0.9) :on-select #(set-selected-stat 0.9)}
-                    {:key 0.99 :label "P99" :selected? (= selected-stat 0.99) :on-select #(set-selected-stat 0.99)}
+        stat-items [{:key :mean :label "Mean" :selected? (= selected-stat :mean) :on-select #(set-selected-stat :mean)}
+                    {:key :count :label "Count" :selected? (= selected-stat :count) :on-select #(set-selected-stat :count)}
+                    {:key :min :label "Min" :selected? (= selected-stat :min) :on-select #(set-selected-stat :min)}
                     {:key :max :label "Max" :selected? (= selected-stat :max) :on-select #(set-selected-stat :max)}
-                    {:key :mean :label "Mean" :selected? (= selected-stat :mean) :on-select #(set-selected-stat :mean)}
-                    {:key :count :label "Count" :selected? (= selected-stat :count) :on-select #(set-selected-stat :count)}]
+                    {:key 0.5 :label "P50" :selected? (= selected-stat 0.5) :on-select #(set-selected-stat 0.5)}
+                    {:key 0.9 :label "P90" :selected? (= selected-stat 0.9) :on-select #(set-selected-stat 0.9)}
+                    {:key 0.99 :label "P99" :selected? (= selected-stat 0.99) :on-select #(set-selected-stat 0.99)}]
 
         granularity-label (or (:label (first (filter :selected? granularity-items))) "Last Hour")
         stat-label (or (:label (first (filter :selected? stat-items))) "Mean")]

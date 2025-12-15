@@ -307,9 +307,7 @@
                                                      (= selected-stat :min) "Min"
                                                      (= selected-stat :max) "Max"
                                                      (= selected-stat :count) "Count"
-                                                     (= selected-stat 0.25) "P25"
                                                      (= selected-stat 0.5) "P50"
-                                                     (= selected-stat 0.75) "P75"
                                                      (= selected-stat 0.9) "P90"
                                                      (= selected-stat 0.99) "P99"
                                                      :else "")
