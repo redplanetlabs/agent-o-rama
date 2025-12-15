@@ -148,7 +148,9 @@
        "edgeRouting" "POLYLINE"
        "spacing.edgeEdgeBetweenLayers" "100"
        "crossingMinimization.strategy" "LAYER_SWEEP"
-       "nodePlacement.strategy" "BRANDES_KOEPF"})
+       "nodePlacement.strategy" "BRANDES_KOEPF"
+       "elk.layered.considerModelOrder.strategy" "PREFER_NODES"
+       "elk.layered.considerModelOrder.noModelOrder" "false"})
 
 (defn extract-graph-elements [{:keys [graph]}]
   "Extract nodes, edges, and start node from graph data without layout"
@@ -164,7 +166,7 @@
                                   :node-type (:node-type v)
                                   :is-start? (= k start-id)}
                            :width 170
-                           :height 40})))
+                           :height 55})))
 
         edges (s/select
                [:node-map
@@ -219,11 +221,13 @@
                               (map (fn [node]
                                      (-> node
                                          (cond-> (= start-id (:id node))
-                                           (assoc :layoutOptions {"elk.layered.layering.layerConstraint" "FIRST"}))
+                                           (assoc :layoutOptions {"elk.layered.layering.layerConstraint" "FIRST"
+                                                                  "elk.priority" "100"
+                                                                  "elk.layered.priority" "100"}))
                                          (assoc :targetPosition (if is-horizontal "left" "top"))
                                          (assoc :sourcePosition (if is-horizontal "right" "bottom"))
                                          (assoc :width 170)
-                                         (assoc :height 40)))
+                                         (assoc :height 55)))
                                    nodes))
                    :edges (clj->js edges)}]
     (-> (.layout elk graph)
