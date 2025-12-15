@@ -301,10 +301,22 @@
                                         ;; Get stats for this node
                                         stats (when node-stats (get node-stats node-id))
                                         stat-value (when stats (get stats selected-stat))
+                                        ;; Convert stat key to readable label
+                                        stat-label (cond
+                                                     (= selected-stat :mean) "Mean"
+                                                     (= selected-stat :min) "Min"
+                                                     (= selected-stat :max) "Max"
+                                                     (= selected-stat :count) "Count"
+                                                     (= selected-stat 0.25) "P25"
+                                                     (= selected-stat 0.5) "P50"
+                                                     (= selected-stat 0.75) "P75"
+                                                     (= selected-stat 0.9) "P90"
+                                                     (= selected-stat 0.99) "P99"
+                                                     :else "")
                                         stat-display (when stat-value
                                                        (if (= selected-stat :count)
-                                                         (str stat-value)
-                                                         (str (int stat-value) "ms")))
+                                                         (str stat-value " " stat-label)
+                                                         (str (int stat-value) "ms " stat-label)))
 
                                         base-classes (cond
                                                        (= "agg-start-node" node-type)

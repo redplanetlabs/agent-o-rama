@@ -319,7 +319,7 @@
            (if node-data
              ($ :div.grid.grid-cols-2.gap-4
                 ($ :div.bg-gray-50.p-4.rounded-md
-                   ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Avg Latency")
+                   ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Mean Latency")
                    ($ :div.text-2xl.font-semibold.text-gray-900
                       (str (when (:mean node-data) (int (:mean node-data))) "ms")))
 
@@ -345,7 +345,7 @@
                       (println "node-data-keys" (keys node-data))
                       (str (when (get node-data 0.99) (int (get node-data  0.99))) "ms"))))
              ($ :div.p-6.text-center.text-gray-500
-                (str "No stats available for \"" node-id "\""))))))))
+                (str "No data for \"" node-id "\" at " time-label))))))))
 
 (defui agent-graph [{:keys [selected-node set-selected-node granularity selected-stat]}]
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
