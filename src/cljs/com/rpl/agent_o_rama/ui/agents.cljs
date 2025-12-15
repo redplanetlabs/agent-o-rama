@@ -315,13 +315,12 @@
 
          :else
          (let [node-stats (:node-stats data)
-               node-data (get node-stats node-id)]
+               node-data (get node-stats node-id)
+               _ (when (nil? node-data)
+                   (println "DEBUG: node-id=" node-id)
+                   (println "DEBUG: available keys=" (keys node-stats))
+                   (println "DEBUG: data=" data))]
            (if node-data
-             ($ :div.p-6.space-y-4
-                ($ :div.border-b.pb-4
-                   ($ :h3.text-lg.font-semibold.text-gray-900 node-id)
-                   ($ :p.text-sm.text-gray-500 time-label)))
-
              ($ :div.grid.grid-cols-2.gap-4
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Avg Latency")
@@ -346,10 +345,9 @@
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "P99 Latency")
                    ($ :div.text-2xl.font-semibold.text-gray-900
-                      (str (when (:p99 node-data) (int (:p99 node-data))) "ms")))))
-
-           ($ :div.p-6.text-center.text-gray-500
-              (str "No stats available for \"" node-id "\"")))))))
+                      (str (when (:p99 node-data) (int (:p99 node-data))) "ms"))))
+             ($ :div.p-6.text-center.text-gray-500
+                (str "No stats available for \"" node-id "\""))))))))
 
 (defui agent-graph [{:keys [selected-node set-selected-node granularity selected-stat]}]
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
@@ -365,7 +363,7 @@
         error (:error graph-query)
 
         ;; Fetch node stats for display on nodes
-        stats-query (queries/use-sente-query {:query-key [:node-stats-for-graph module-id agent-name granularity]
+        stats-query (queries/use-sente-query {:query-key [:node-stats module-id agent-name granularity]
                                               :sente-event [:invocations/get-node-stats {:module-id module-id
                                                                                          :agent-name decoded-agent-name
                                                                                          :granularity granularity}]
