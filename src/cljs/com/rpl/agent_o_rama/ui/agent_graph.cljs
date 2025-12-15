@@ -245,7 +245,7 @@
                         :edges layouted-edges})))
         (.catch js/console.error))))
 
-(defui graph-flow [{:keys [initial-data height selected-node set-selected-node]}]
+(defui graph-flow [{:keys [initial-data height selected-node set-selected-node node-stats selected-stat]}]
   (let [;; Extract initial nodes and edges
         {:keys [nodes edges start-id]} (extract-graph-elements initial-data)
 
@@ -297,6 +297,18 @@
                                         node-id (:node-id data)
                                         node-type (:node-type data)
                                         selected (= (when selected-node (aget selected-node "id")) id)
+
+                                        ;; Get stats for this node
+                                        stats (when node-stats (get node-stats node-id))
+                                        stat-value (when stats
+                                                     (cond
+                                                       (number? selected-stat) (get stats selected-stat) ;; percentile
+                                                       :else (get stats selected-stat)))
+                                        stat-display (when stat-value
+                                                       (if (= selected-stat :count)
+                                                         (str stat-value)
+                                                         (str (int stat-value) "ms")))
+
                                         base-classes (cond
                                                        (= "agg-start-node" node-type)
                                                        ["bg-green-500" "text-white" "border-2" "border-green-600"]
@@ -307,14 +319,17 @@
                                         selection-classes (if selected
                                                             ["ring-4" "ring-blue-400" "ring-opacity-75" "shadow-2xl" "transform" "scale-105"]
                                                             ["shadow-lg"])
-                                        common-classes ["p-3" "rounded-md" "transition-all" "duration-200"]
+                                        common-classes ["p-2" "rounded-md" "transition-all" "duration-200"]
                                         node-className (str/join " " (concat base-classes selection-classes common-classes))]
                                     ($ :div {:className "relative"}
                                        ($ :div {:className node-className
-                                                :style {:width "170px" :height "40px"}
+                                                :style {:width "170px" :height (if stat-display "55px" "40px")}
                                                 :data-id (str "agent-graph-node-" node-id)}
-                                          ($ :div {:className "truncate" :title label}
-                                             label))
+                                          ($ :div {:className "truncate text-sm font-medium" :title label}
+                                             label)
+                                          (when stat-display
+                                            ($ :div {:className "text-xs text-gray-600 mt-1 font-mono"}
+                                               stat-display)))
                                        ($ Handle {:type "target" :position "top" :style {:display "none"}})
                                        ($ Handle {:type "source" :position "bottom" :style {:display "none"}})))))})
                      :edgeTypes

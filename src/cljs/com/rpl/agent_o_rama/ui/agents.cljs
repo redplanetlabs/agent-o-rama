@@ -263,15 +263,24 @@
        ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
        ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
 
-(defui node-stats-panel [{:keys [selected-node module-id agent-name]}]
+(defui node-stats-panel [{:keys [selected-node module-id agent-name granularity]}]
   (let [node-id (when selected-node (aget selected-node "id"))
+        decoded-agent-name (common/url-decode agent-name)
+
+        ;; Determine time range based on granularity
+        time-range-hours (cond
+                           (= granularity 60) 1      ;; minute gran = last hour
+                           (= granularity 3600) 24   ;; hour gran = last day
+                           (= granularity 86400) 720 ;; day gran = last month
+                           :else 24)
+
         {:keys [data loading? error]}
         (queries/use-sente-query
-         {:query-key [:node-stats module-id agent-name]
+         {:query-key [:node-stats module-id agent-name granularity]
           :sente-event [:invocations/get-node-stats {:module-id module-id
-                                                      :agent-name agent-name
-                                                      :granularity 60
-                                                      :time-range-hours 24}]
+                                                     :agent-name decoded-agent-name
+                                                     :granularity granularity
+                                                     :time-range-hours time-range-hours}]
           :refetch-interval-ms 30000
           :enabled? (boolean (and module-id agent-name))})]
 
@@ -290,13 +299,17 @@
 
       :else
       (let [node-stats (:node-stats data)
-            node-data (get node-stats node-id)]
+            node-data (get node-stats node-id)
+            time-label (cond
+                         (= granularity 60) "Last Hour"
+                         (= granularity 3600) "Last Day"
+                         (= granularity 86400) "Last Month"
+                         :else "Recent")]
         (if node-data
           ($ :div.p-6.space-y-4
              ($ :div.border-b.pb-4
                 ($ :h3.text-lg.font-semibold.text-gray-900 node-id)
-                ($ :p.text-sm.text-gray-500
-                   (str "Last " (:time-range-hours data) " hours")))
+                ($ :p.text-sm.text-gray-500 time-label))
 
              ($ :div.grid.grid-cols-2.gap-4
                 ($ :div.bg-gray-50.p-4.rounded-md
@@ -327,13 +340,31 @@
           ($ :div.p-6.text-center.text-gray-500
              (str "No stats available for \"" node-id "\"")))))))
 
-(defui agent-graph [{:keys [selected-node set-selected-node]}]
+(defui agent-graph [{:keys [selected-node set-selected-node granularity selected-stat]}]
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+        decoded-agent-name (common/url-decode agent-name)
+
+        ;; Fetch graph topology
         {:keys [data loading? error]}
         (queries/use-sente-query {:query-key [:graph module-id agent-name]
                                   :sente-event [:invocations/get-graph {:module-id module-id
                                                                         :agent-name agent-name}]
-                                  :refetch-interval-ms 2000})]
+                                  :refetch-interval-ms 2000})
+
+        ;; Fetch node stats for display on nodes
+        time-range-hours (cond
+                           (= granularity 60) 1
+                           (= granularity 3600) 24
+                           (= granularity 86400) 720
+                           :else 24)
+
+        {:keys [data stats-data]}
+        (queries/use-sente-query {:query-key [:node-stats-for-graph module-id agent-name granularity]
+                                  :sente-event [:invocations/get-node-stats {:module-id module-id
+                                                                             :agent-name decoded-agent-name
+                                                                             :granularity granularity
+                                                                             :time-range-hours time-range-hours}]
+                                  :refetch-interval-ms 30000})]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
                   ($ :div.text-gray-500 "Loading graph..."))
@@ -342,7 +373,9 @@
       :else ($ agent-graph/graph {:initial-data data
                                   :height "500px"
                                   :selected-node selected-node
-                                  :set-selected-node set-selected-node}))))
+                                  :set-selected-node set-selected-node
+                                  :node-stats (:node-stats stats-data)
+                                  :selected-stat selected-stat}))))
 
 (defui stats-summary [{:keys [module-id agent-name]}]
   ($ :div.p-4.flex.gap-1
@@ -458,8 +491,29 @@
         ;; Use a simple keyword for the form-id (schema expects Keyword, not vector)
         form-id :manual-run-agent
 
-        ;; State for selected node
-        [selected-node set-selected-node] (uix/use-state nil)]
+        ;; State for selected node and graph controls
+        [selected-node set-selected-node] (uix/use-state nil)
+        [granularity set-granularity] (uix/use-state 60) ;; minute granularity
+        [selected-stat set-selected-stat] (uix/use-state :mean) ;; default to mean
+
+        ;; Granularity options
+        granularity-items [{:key 60 :label "Hour" :selected? (= granularity 60) :on-select #(set-granularity 60)}
+                           {:key 3600 :label "Day" :selected? (= granularity 3600) :on-select #(set-granularity 3600)}
+                           {:key 86400 :label "Month" :selected? (= granularity 86400) :on-select #(set-granularity 86400)}]
+
+        ;; Stat selector options
+        stat-items [{:key :min :label "Min" :selected? (= selected-stat :min) :on-select #(set-selected-stat :min)}
+                    {:key 0.25 :label "P25" :selected? (= selected-stat 0.25) :on-select #(set-selected-stat 0.25)}
+                    {:key 0.5 :label "P50" :selected? (= selected-stat 0.5) :on-select #(set-selected-stat 0.5)}
+                    {:key 0.75 :label "P75" :selected? (= selected-stat 0.75) :on-select #(set-selected-stat 0.75)}
+                    {:key 0.9 :label "P90" :selected? (= selected-stat 0.9) :on-select #(set-selected-stat 0.9)}
+                    {:key 0.99 :label "P99" :selected? (= selected-stat 0.99) :on-select #(set-selected-stat 0.99)}
+                    {:key :max :label "Max" :selected? (= selected-stat :max) :on-select #(set-selected-stat :max)}
+                    {:key :mean :label "Mean" :selected? (= selected-stat :mean) :on-select #(set-selected-stat :mean)}
+                    {:key :count :label "Count" :selected? (= selected-stat :count) :on-select #(set-selected-stat :count)}]
+
+        granularity-label (or (:label (first (filter :selected? granularity-items))) "Hour")
+        stat-label (or (:label (first (filter :selected? stat-items))) "Mean")]
 
     ;; Initialize the form when the component mounts or when module-id/agent-name changes
     (uix/use-effect
@@ -473,14 +527,40 @@
 
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
+
+       ;; Controls for graph display
+       ($ :div.bg-white.p-4.rounded-lg.shadow-sm.border.border-gray-200.mb-4
+          ($ :div.flex.items-center.gap-4
+             ($ :div.flex.items-center.gap-2
+                ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
+                   "Granularity:")
+                ($ :div.w-32
+                   ($ common/Dropdown
+                      {:label "Granularity"
+                       :display-text granularity-label
+                       :items granularity-items
+                       :data-testid "node-granularity-selector"})))
+             ($ :div.flex.items-center.gap-2
+                ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
+                   "Show on nodes:")
+                ($ :div.w-32
+                   ($ common/Dropdown
+                      {:label "Stat"
+                       :display-text stat-label
+                       :items stat-items
+                       :data-testid "node-stat-selector"})))))
+
        ($ :div.flex.gap-4
           ($ :div {:className "w-1/2"}
              ($ agent-graph {:selected-node selected-node
-                             :set-selected-node set-selected-node}))
+                             :set-selected-node set-selected-node
+                             :granularity granularity
+                             :selected-stat selected-stat}))
           ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm {:className "w-1/2"}
              ($ node-stats-panel {:selected-node selected-node
                                   :module-id module-id
-                                  :agent-name agent-name})))
+                                  :agent-name agent-name
+                                  :granularity granularity})))
        ($ :div.p-4.flex.gap-1
           ($ :div
              {:style {:flex-grow "1"}}
