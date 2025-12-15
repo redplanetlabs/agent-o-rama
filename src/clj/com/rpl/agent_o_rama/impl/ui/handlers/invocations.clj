@@ -161,24 +161,24 @@
           telemetry-pstate (:telemetry-pstate client-objects)
 
           ;; Default to hour granularity if not specified
-          gran (or granularity po/HOUR-GRANULARITY)
+          gran-seconds (or granularity po/HOUR-GRANULARITY)
           
-          ;; Calculate time window based on granularity to ensure we get recent buckets
-          ;; Query back ~2-3 buckets worth of time
-          now (System/currentTimeMillis)
-          lookback-seconds (* gran 3)
-          start-time (- now (* lookback-seconds 1000))
-          ;; sorted-map-range is exclusive of end, so add one full bucket to ensure current bucket is included
-          end-time (+ now (* gran 1000))
+          ;; Calculate time window: look back 3 buckets from now
+          now-millis (System/currentTimeMillis)
+          bucket-size-millis (* gran-seconds 1000)
+          lookback-millis (* 3 bucket-size-millis)
+          start-time-millis (- now-millis lookback-millis)
+          ;; sorted-map-range is exclusive of end, so add one bucket to include current bucket
+          end-time-millis (+ now-millis bucket-size-millis)
 
           ;; Query telemetry for node latencies with all percentiles
           telemetry-data (ana/select-telemetry
                           telemetry-pstate
                           agent-name
-                          gran
+                          gran-seconds
                           [:agent :node-latencies]
-                          start-time
-                          end-time
+                          start-time-millis
+                          end-time-millis
                           [:mean :count :min :max 0.25 0.5 0.75 0.9 0.99]
                           nil)]
 
@@ -187,4 +187,4 @@
        (if (seq telemetry-data)
          (second (last telemetry-data))
          {})
-       :granularity gran})))
+       :granularity gran-seconds})))
