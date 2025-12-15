@@ -420,6 +420,23 @@
                  1 {"start" {:count 2 :rest-sum 518} "a" {:count 2 :rest-sum 35}}}
                 (fetch-day [:agent :node-latencies] nil))))
 
+       (testing "node latencies at hour granularity"
+         (let [fetch-hour (fn [metric-id]
+                            (ana/select-telemetry telemetry
+                                                  "foo"
+                                                  po/HOUR-GRANULARITY
+                                                  metric-id
+                                                  0
+                                                  (day-millis 1)
+                                                  [:count :rest-sum :mean]
+                                                  nil))
+               hour-node-data (fetch-hour [:agent :node-latencies])
+               hour-success-data (fetch-hour [:agent :success-rate])]
+           (is (seq hour-success-data)
+               "Success rate should have data at hour granularity (control)")
+           (is (seq hour-node-data)
+               "Node latencies should have data at hour granularity")))
+
        (testing "concise? eval"
          (is (= {0 {"_aor/default" {:count 2 :rest-sum 2}}
                  1 {"_aor/default" {:count 2 :rest-sum 1}}}
