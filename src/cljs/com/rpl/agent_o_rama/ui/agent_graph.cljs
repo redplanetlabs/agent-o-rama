@@ -300,10 +300,7 @@
 
                                         ;; Get stats for this node
                                         stats (when node-stats (get node-stats node-id))
-                                        stat-value (when stats
-                                                     (cond
-                                                       (number? selected-stat) (get stats selected-stat) ;; percentile
-                                                       :else (get stats selected-stat)))
+                                        stat-value (when stats (get stats selected-stat))
                                         stat-display (when stat-value
                                                        (if (= selected-stat :count)
                                                          (str stat-value)

@@ -168,7 +168,7 @@
           ;; Default to hour granularity
           gran (or granularity po/HOUR-GRANULARITY)
 
-          ;; Query telemetry for node latencies
+          ;; Query telemetry for node latencies with all percentiles
           telemetry-data (ana/select-telemetry
                           telemetry-pstate
                           agent-name
@@ -176,32 +176,14 @@
                           [:agent :node-latencies]
                           start-time
                           now
-                          [:mean :count :min :max 0.99]
+                          [:mean :count :min :max 0.25 0.5 0.75 0.9 0.99]
                           nil)]
 
-      ;; Aggregate stats across all time buckets for each node
+      ;; Return the most recent bucket's data (telemetry already aggregates within buckets)
       {:node-stats
-       (reduce
-        (fn [acc [bucket-time bucket-data]]
-          (reduce
-           (fn [acc [node-name stats]]
-             (let [existing (get acc node-name)
-                   ;; Aggregate across buckets
-                   new-count (+ (or (:count existing) 0) (:count stats))
-                   new-total-latency (+ (or (:total-latency existing) 0) (* (:mean stats) (:count stats)))
-                   new-min (if existing (min (:min existing) (:min stats)) (:min stats))
-                   new-max (if existing (max (:max existing) (:max stats)) (:max stats))
-                   new-p99 (if existing (max (:p99 existing) (get stats 0.99)) (get stats 0.99))]
-               (assoc acc node-name
-                      {:count new-count
-                       :total-latency new-total-latency
-                       :mean (if (pos? new-count) (/ new-total-latency new-count) 0)
-                       :min new-min
-                       :max new-max
-                       :p99 new-p99})))
-           acc
-           bucket-data))
-        {}
-        telemetry-data)
+       (if (seq telemetry-data)
+         ;; Get the last (most recent) bucket - data already has all percentiles as float keys
+         (second (last telemetry-data))
+         {})
        :time-range-hours hours
        :granularity gran})))

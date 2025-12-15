@@ -303,7 +303,8 @@
             time-label (cond
                          (= granularity 60) "Last Hour"
                          (= granularity 3600) "Last Day"
-                         (= granularity 86400) "Last Month"
+                         (= granularity 86400) "Last 30 Days"
+                         (= granularity 2592000) "Last 30 Days"
                          :else "Recent")]
         (if node-data
           ($ :div.p-6.space-y-4
@@ -355,9 +356,10 @@
 
         ;; Fetch node stats for display on nodes
         time-range-hours (cond
-                           (= granularity 60) 1
-                           (= granularity 3600) 24
-                           (= granularity 86400) 720
+                           (= granularity 60) 1        ;; minute gran = last hour
+                           (= granularity 3600) 24     ;; hour gran = last day
+                           (= granularity 86400) 720   ;; day gran = last 30 days
+                           (= granularity 2592000) 720 ;; 30-day gran = last 30 days
                            :else 24)
 
         stats-query (queries/use-sente-query {:query-key [:node-stats-for-graph module-id agent-name granularity]
@@ -495,13 +497,14 @@
 
         ;; State for selected node and graph controls
         [selected-node set-selected-node] (uix/use-state nil)
-        [granularity set-granularity] (uix/use-state 60) ;; minute granularity
+        [granularity set-granularity] (uix/use-state 60) ;; minute granularity (has data)
         [selected-stat set-selected-stat] (uix/use-state :mean) ;; default to mean
 
         ;; Granularity options
-        granularity-items [{:key 60 :label "Hour" :selected? (= granularity 60) :on-select #(set-granularity 60)}
-                           {:key 3600 :label "Day" :selected? (= granularity 3600) :on-select #(set-granularity 3600)}
-                           {:key 86400 :label "Month" :selected? (= granularity 86400) :on-select #(set-granularity 86400)}]
+        granularity-items [{:key 60 :label "Minute" :selected? (= granularity 60) :on-select #(set-granularity 60)}
+                           {:key 3600 :label "Hour" :selected? (= granularity 3600) :on-select #(set-granularity 3600)}
+                           {:key 86400 :label "Day" :selected? (= granularity 86400) :on-select #(set-granularity 86400)}
+                           {:key 2592000 :label "30 Days" :selected? (= granularity 2592000) :on-select #(set-granularity 2592000)}]
 
         ;; Stat selector options
         stat-items [{:key :min :label "Min" :selected? (= selected-stat :min) :on-select #(set-selected-stat :min)}
