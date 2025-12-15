@@ -191,40 +191,40 @@
             current-bucket-data (get telemetry-data current-bucket)
             prev-bucket-data (get telemetry-data prev-bucket)
 
-            ;; Aggregate the two buckets (handling nils)
+            ;; Merge stats from 2 buckets for each node
+            merge-node-stats
+            (fn [curr-stats prev-stats]
+              (cond
+                ;; Both buckets have data for this node - aggregate
+                (and curr-stats prev-stats)
+                (let [total-count (+ (:count curr-stats) (:count prev-stats))
+                      total-latency (+ (* (:mean curr-stats) (:count curr-stats))
+                                       (* (:mean prev-stats) (:count prev-stats)))]
+                  {:count total-count
+                   :mean (/ total-latency total-count)
+                   :min (min (:min curr-stats) (:min prev-stats))
+                   :max (max (:max curr-stats) (:max prev-stats))
+                   0.5 (max (get curr-stats 0.5 0) (get prev-stats 0.5 0))
+                   0.9 (max (get curr-stats 0.9 0) (get prev-stats 0.9 0))
+                   0.99 (max (get curr-stats 0.99 0) (get prev-stats 0.99 0))})
+
+                ;; Only one bucket has data - use it
+                curr-stats curr-stats
+                prev-stats prev-stats
+                :else nil))
+
+            ;; Get all unique node names
+            all-nodes (set (concat (keys current-bucket-data) (keys prev-bucket-data)))
+
+            ;; Merge stats for each node
             aggregated-stats
-            (cond
-              ;; Both buckets have data - aggregate them
-              (and current-bucket-data prev-bucket-data)
-              (reduce
-               (fn [acc node-name]
-                 (let [curr-stats (get current-bucket-data node-name)
-                       prev-stats (get prev-bucket-data node-name)]
-                   (if (and curr-stats prev-stats)
-                     (let [total-count (+ (:count curr-stats) (:count prev-stats))
-                           total-latency (+ (* (:mean curr-stats) (:count curr-stats))
-                                            (* (:mean prev-stats) (:count prev-stats)))]
-                       (assoc acc node-name
-                              {:count total-count
-                               :mean (/ total-latency total-count)
-                               :min (min (:min curr-stats) (:min prev-stats))
-                               :max (max (:max curr-stats) (:max prev-stats))
-                               0.5 (max (get curr-stats 0.5 0) (get prev-stats 0.5 0))
-                               0.9 (max (get curr-stats 0.9 0) (get prev-stats 0.9 0))
-                               0.99 (max (get curr-stats 0.99 0) (get prev-stats 0.99 0))}))
-                     ;; Only one bucket has this node
-                     (assoc acc node-name (or curr-stats prev-stats)))))
-               {}
-               (set (concat (keys current-bucket-data) (keys prev-bucket-data))))
-
-              ;; Only current bucket has data
-              current-bucket-data current-bucket-data
-
-              ;; Only previous bucket has data
-              prev-bucket-data prev-bucket-data
-
-              ;; No data in either bucket
-              :else {})]
+            (into {}
+                  (keep (fn [node-name]
+                          (when-let [merged (merge-node-stats
+                                             (get current-bucket-data node-name)
+                                             (get prev-bucket-data node-name))]
+                            [node-name merged]))
+                        all-nodes))]
 
         {:node-stats aggregated-stats
          :granularity gran-seconds}))))
