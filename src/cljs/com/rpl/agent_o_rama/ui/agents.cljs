@@ -315,11 +315,7 @@
 
          :else
          (let [node-stats (:node-stats data)
-               node-data (get node-stats node-id)
-               _ (when (nil? node-data)
-                   (println "DEBUG: node-id=" node-id)
-                   (println "DEBUG: available keys=" (keys node-stats))
-                   (println "DEBUG: data=" data))]
+               node-data (get node-stats node-id)]
            (if node-data
              ($ :div.grid.grid-cols-2.gap-4
                 ($ :div.bg-gray-50.p-4.rounded-md
@@ -345,7 +341,9 @@
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "P99 Latency")
                    ($ :div.text-2xl.font-semibold.text-gray-900
-                      (str (when (:p99 node-data) (int (:p99 node-data))) "ms"))))
+                      (println "node-data" node-data)
+                      (println "node-data-keys" (keys node-data))
+                      (str (when (get node-data 0.99) (int (get node-data  0.99))) "ms"))))
              ($ :div.p-6.text-center.text-gray-500
                 (str "No stats available for \"" node-id "\""))))))))
 
