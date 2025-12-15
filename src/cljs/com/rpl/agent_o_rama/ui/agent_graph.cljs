@@ -92,7 +92,7 @@
                                             (apply str
                                                    (map (fn [pt]
                                                           (str " L " (:x pt) " " (:y pt)))
-                                                        (rest path-points))))))))))
+                                                        (rest path-points)))))))))
 
         ;; Build SVG path from ELK points
         edge-path (if (and elk-points (seq elk-points))
@@ -219,15 +219,18 @@
                    :layoutOptions options
                    :children (clj->js
                               (map (fn [node]
-                                     (-> node
-                                         (cond-> (= start-id (:id node))
-                                           (assoc :layoutOptions {"elk.layered.layering.layerConstraint" "FIRST"
-                                                                  "elk.priority" "100"
-                                                                  "elk.layered.priority" "100"}))
-                                         (assoc :targetPosition (if is-horizontal "left" "top"))
-                                         (assoc :sourcePosition (if is-horizontal "right" "bottom"))
-                                         (assoc :width 170)
-                                         (assoc :height 55)))
+                                     (let [is-start? (= start-id (:id node))]
+                                       (-> node
+                                           (assoc :layoutOptions
+                                                  (if is-start?
+                                                    {"elk.layered.layering.layerConstraint" "FIRST"
+                                                     "elk.layered.layering.layerId" "0"}
+                                                    {"elk.layered.layering.layerConstraint" "NONE"
+                                                     "elk.layered.layering.layerId" "1"}))
+                                           (assoc :targetPosition (if is-horizontal "left" "top"))
+                                           (assoc :sourcePosition (if is-horizontal "right" "bottom"))
+                                           (assoc :width 170)
+                                           (assoc :height 55))))
                                    nodes))
                    :edges (clj->js edges)}]
     (-> (.layout elk graph)
@@ -300,7 +303,7 @@
                                         label (:label data)
                                         node-id (:node-id data)
                                         node-type (:node-type data)
-                                        selected (= (when selected-node (aget selected-node "id")) id)
+                                        selected (= (when selected-node (aget selected-node "id") ) id)
 
                                         ;; Get stats for this node
                                         stats (when node-stats (get node-stats node-id))
@@ -357,7 +360,7 @@
                                       (set-selected-node nil)
                                       (set-selected-node node)))}
           ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
-          ($ Controls {:className "fill-gray-500 stroke-gray-500"})))))
+          ($ Controls {:className "fill-gray-500 stroke-gray-500"}))))
 
 (defui graph [props]
   ($ ReactFlowProvider
