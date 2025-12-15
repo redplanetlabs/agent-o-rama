@@ -283,7 +283,7 @@
           ($ :div.flex.items-center.gap-2
              ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
                 "Time window:")
-             ($ :div.flex-1
+             ($ :div
                 ($ common/Dropdown
                    {:label "Granularity"
                     :display-text granularity-label
@@ -292,7 +292,7 @@
           ($ :div.flex.items-center.gap-2
              ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
                 "Show on nodes:")
-             ($ :div.flex-1
+             ($ :div
                 ($ common/Dropdown
                    {:label "Stat"
                     :display-text stat-label
