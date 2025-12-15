@@ -155,7 +155,21 @@
 (defn extract-graph-elements [{:keys [graph]}]
   "Extract nodes, edges, and start node from graph data without layout"
   (let [start-id (:start-node graph)
-        ;; Build nodes with extra metadata for coloring (node-type and start?)
+        dummy-id "__dummy_start__"
+        
+        ;; Create a dummy node that will be at the very top
+        dummy-node {:id dummy-id
+                    :type "custom"
+                    :draggable false
+                    :data {:label ""
+                           :node-id dummy-id
+                           :node-type :dummy
+                           :is-start? false
+                           :is-dummy? true}
+                    :width 170
+                    :height 1}  ;; Make it very small
+        
+        ;; Build real nodes with extra metadata for coloring (node-type and start?)
         all-nodes (->> (get graph :node-map)
                        (map (fn [[k v]]
                               {:id k
@@ -167,19 +181,27 @@
                                       :is-start? (= k start-id)}
                                :width 170
                                :height 55})))
-        ;; Sort nodes so start node comes FIRST (for considerModelOrder)
-        nodes (sort-by (fn [node] (if (= (:id node) start-id) 0 1)) all-nodes)
+        
+        ;; Put dummy node FIRST, then sort rest with start node coming before others
+        nodes (concat [dummy-node]
+                      (sort-by (fn [node] (if (= (:id node) start-id) 0 1)) all-nodes))
 
-        edges (s/select
-               [:node-map
-                s/ALL
-                (s/collect-one s/FIRST)
-                s/LAST
-                :output-nodes
-                s/ALL]
-               graph)]
+        real-edges (s/select
+                    [:node-map
+                     s/ALL
+                     (s/collect-one s/FIRST)
+                     s/LAST
+                     :output-nodes
+                     s/ALL]
+                    graph)
+        
+        ;; Add edge from dummy to start node
+        dummy-edge [dummy-id start-id]
+        
+        all-edges (concat [dummy-edge] real-edges)]
+    
     {:nodes nodes
-     :edges (for [[frm to] edges]
+     :edges (for [[frm to] all-edges]
               {:id (str frm "-" to) :source frm :target to
                :markerEnd {:type "arrowclosed" :width 20 :height 20}})
      :start-id start-id}))
@@ -224,7 +246,7 @@
                                      (let [is-start? (= start-id (:id node))]
                                        (-> node
                                            (assoc :layoutOptions
-                                                  (if is-start?
+                                                  (if is-dummy?
                                                     {"elk.layered.layering.layerConstraint" "FIRST"
                                                      "elk.layered.layering.layerId" "0"}
                                                     {"elk.layered.layering.layerConstraint" "NONE"
