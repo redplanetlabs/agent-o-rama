@@ -20,77 +20,87 @@
    (aor/new-agent "RecursiveClassifierAgent")
 
     ;; Entry point: execute-recursively
-    ;; Routes to either answer or plan-search
+    ;; execute-recursive -> plan-search
+    ;; execute-recursive -> answer
    (aor/node
     "execute-recursively"
-    ["answer" "plan-search"]
+    ["plan-search" "answer"]
     (fn [agent-node input]
-      (let [{:keys [path iteration] :or {iteration 0}} input]
-        (if (>= iteration 2)
-           ;; Max iterations reached, go to answer
-          (aor/emit! agent-node "answer"
-                     (str path " -> execute-recursively[final]")
-                     iteration)
-           ;; Route to plan-search
+      (let [{:keys [path iteration] :or {iteration 0}} input
+            choice (mod (hash path) 2)]
+        (if (= choice 0)
           (aor/emit! agent-node "plan-search"
-                     (str path " -> execute-recursively")
-                     iteration)))))
+                    (str path " -> execute-recursively")
+                    iteration)
+          (aor/emit! agent-node "answer"
+                    (str path " -> execute-recursively")
+                    iteration)))))
 
-    ;; Answer node: Can terminate only (remove loop for now)
-   (aor/node
-    "answer"
-    nil
-    (fn [agent-node path iteration]
-      (let [new-path (str path " -> answer")]
-        (aor/result! agent-node new-path))))
-
-    ;; Plan search node: Routes to classify-question
+    ;; plan-search -> execute-recursive
    (aor/node
     "plan-search"
-    "classify-question"
+    "execute-recursively"
     (fn [agent-node path iteration]
-      (aor/emit! agent-node "classify-question"
-                 (str path " -> plan-search")
-                 iteration)))
+      (if (< iteration 2)
+        (aor/emit! agent-node "execute-recursively"
+                  {:path (str path " -> plan-search")
+                   :iteration (inc iteration)})
+        (aor/result! agent-node (str path " -> plan-search [max iterations]")))))
 
-    ;; Classify question node: Routes to one of three response handlers
+    ;; classify-question -> plan-search
+    ;; classify-question -> respond-dataflow
+    ;; classify-question -> ask-for-more-info
+    ;; classify-question -> respond-general
    (aor/node
     "classify-question"
-    ["respond-dataflow" "ask-for-more-info" "respond-general"]
+    ["plan-search" "respond-dataflow" "ask-for-more-info" "respond-general"]
     (fn [agent-node path iteration]
-      (let [choice (mod (hash path) 3)]
+      (let [choice (mod (hash path) 4)]
         (case choice
-          0 (aor/emit! agent-node "respond-dataflow"
-                       (str path " -> classify-question")
-                       iteration)
-          1 (aor/emit! agent-node "ask-for-more-info"
-                       (str path " -> classify-question")
-                       iteration)
-          2 (aor/emit! agent-node "respond-general"
-                       (str path " -> classify-question")
-                       iteration)))))
+          0 (aor/emit! agent-node "plan-search"
+                      (str path " -> classify-question")
+                      iteration)
+          1 (aor/emit! agent-node "respond-dataflow"
+                      (str path " -> classify-question")
+                      iteration)
+          2 (aor/emit! agent-node "ask-for-more-info"
+                      (str path " -> classify-question")
+                      iteration)
+          3 (aor/emit! agent-node "respond-general"
+                      (str path " -> classify-question")
+                      iteration)))))
 
-    ;; Respond with dataflow information (terminal)
+    ;; ask-for-more-info -> classify-question
+   (aor/node
+    "ask-for-more-info"
+    "classify-question"
+    (fn [agent-node path iteration]
+      (if (< iteration 2)
+        (aor/emit! agent-node "classify-question"
+                  (str path " -> ask-for-more-info")
+                  (inc iteration))
+        (aor/result! agent-node (str path " -> ask-for-more-info [max iterations]")))))
+
+    ;; respond-dataflow (terminal)
    (aor/node
     "respond-dataflow"
     nil
     (fn [agent-node path iteration]
       (aor/result! agent-node (str path " -> respond-dataflow"))))
 
-    ;; Ask for more information (terminal)
-   (aor/node
-    "ask-for-more-info"
-    nil
-    (fn [agent-node path iteration]
-      (aor/result! agent-node (str path " -> ask-for-more-info"))))
-
-    ;; Respond with general information (terminal only for now)
+    ;; respond-general (terminal)
    (aor/node
     "respond-general"
     nil
     (fn [agent-node path iteration]
-      (let [new-path (str path " -> respond-general")]
-        (aor/result! agent-node new-path))))))
+      (aor/result! agent-node (str path " -> respond-general"))))
+
+    ;; answer (terminal)
+   (aor/node
+    "answer"
+    nil
+    (fn [agent-node path iteration]
+      (aor/result! agent-node (str path " -> answer"))))))
 
 (defn -main
   "Run the recursive classifier agent with example inputs"
