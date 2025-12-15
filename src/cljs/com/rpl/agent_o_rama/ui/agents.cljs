@@ -263,7 +263,8 @@
        ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
        ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
 
-(defui node-stats-panel [{:keys [selected-node module-id agent-name granularity time-label]}]
+(defui node-stats-panel [{:keys [selected-node module-id agent-name granularity time-label
+                                 granularity-items granularity-label stat-items stat-label]}]
   (let [node-id (when selected-node (aget selected-node "id"))
         decoded-agent-name (common/url-decode agent-name)
 
@@ -276,27 +277,50 @@
           :refetch-interval-ms 30000
           :enabled? (boolean (and module-id agent-name))})]
 
-    (cond
-      (nil? selected-node)
-      ($ :div.p-6.text-center.text-gray-500
-         "Select a node to view stats")
+    ($ :div
+       ;; Dropdowns at top of panel
+       ($ :div.p-4.border-b.border-gray-200.space-y-3
+          ($ :div.flex.items-center.gap-2
+             ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
+                "Time window:")
+             ($ :div.flex-1
+                ($ common/Dropdown
+                   {:label "Granularity"
+                    :display-text granularity-label
+                    :items granularity-items
+                    :data-testid "node-granularity-selector"})))
+          ($ :div.flex.items-center.gap-2
+             ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
+                "Show on nodes:")
+             ($ :div.flex-1
+                ($ common/Dropdown
+                   {:label "Stat"
+                    :display-text stat-label
+                    :items stat-items
+                    :data-testid "node-stat-selector"}))))
 
-      loading?
-      ($ :div.p-6.text-center
-         ($ common/spinner {:size :medium}))
+       ;; Stats content
+       (cond
+         (nil? selected-node)
+         ($ :div.p-6.text-center.text-gray-500
+            "Select a node to view stats")
 
-      error
-      ($ :div.p-6.text-center.text-red-500
-         (str "Error loading stats: " error))
+         loading?
+         ($ :div.p-6.text-center
+            ($ common/spinner {:size :medium}))
 
-      :else
-      (let [node-stats (:node-stats data)
-            node-data (get node-stats node-id)]
-        (if node-data
-          ($ :div.p-6.space-y-4
-             ($ :div.border-b.pb-4
-                ($ :h3.text-lg.font-semibold.text-gray-900 node-id)
-                ($ :p.text-sm.text-gray-500 time-label))
+         error
+         ($ :div.p-6.text-center.text-red-500
+            (str "Error loading stats: " error))
+
+         :else
+         (let [node-stats (:node-stats data)
+               node-data (get node-stats node-id)]
+           (if node-data
+             ($ :div.p-6.space-y-4
+                ($ :div.border-b.pb-4
+                   ($ :h3.text-lg.font-semibold.text-gray-900 node-id)
+                   ($ :p.text-sm.text-gray-500 time-label)))
 
              ($ :div.grid.grid-cols-2.gap-4
                 ($ :div.bg-gray-50.p-4.rounded-md
@@ -324,8 +348,8 @@
                    ($ :div.text-2xl.font-semibold.text-gray-900
                       (str (when (:p99 node-data) (int (:p99 node-data))) "ms")))))
 
-          ($ :div.p-6.text-center.text-gray-500
-             (str "No stats available for \"" node-id "\"")))))))
+           ($ :div.p-6.text-center.text-gray-500
+              (str "No stats available for \"" node-id "\"")))))))
 
 (defui agent-graph [{:keys [selected-node set-selected-node granularity selected-stat]}]
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
@@ -518,28 +542,6 @@
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
 
-       ;; Controls for graph display
-       ($ :div.bg-white.p-4.rounded-lg.shadow-sm.border.border-gray-200.mb-4
-          ($ :div.flex.items-center.gap-4
-             ($ :div.flex.items-center.gap-2
-                ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
-                   "Granularity:")
-                ($ :div.w-32
-                   ($ common/Dropdown
-                      {:label "Granularity"
-                       :display-text granularity-label
-                       :items granularity-items
-                       :data-testid "node-granularity-selector"})))
-             ($ :div.flex.items-center.gap-2
-                ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
-                   "Show on nodes:")
-                ($ :div.w-32
-                   ($ common/Dropdown
-                      {:label "Stat"
-                       :display-text stat-label
-                       :items stat-items
-                       :data-testid "node-stat-selector"})))))
-
        ($ :div.flex.gap-4
           ($ :div {:className "w-1/2"}
              ($ agent-graph {:selected-node selected-node
@@ -551,7 +553,11 @@
                                   :module-id module-id
                                   :agent-name agent-name
                                   :granularity granularity
-                                  :time-label time-label})))
+                                  :time-label time-label
+                                  :granularity-items granularity-items
+                                  :granularity-label granularity-label
+                                  :stat-items stat-items
+                                  :stat-label stat-label})))
        ($ :div.p-4.flex.gap-1
           ($ :div
              {:style {:flex-grow "1"}}
