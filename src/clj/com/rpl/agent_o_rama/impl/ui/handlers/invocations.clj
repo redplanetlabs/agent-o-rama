@@ -155,19 +155,17 @@
     {:success true}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-node-stats
-  [{:keys [client agent-name granularity time-range-hours]} uid]
+  [{:keys [client agent-name granularity]} uid]
   (when client
     (let [client-objects (aor-types/underlying-objects client)
           telemetry-pstate (:telemetry-pstate client-objects)
 
-          ;; Default to last 24 hours if not specified
-          hours (or time-range-hours 24)
-          now (System/currentTimeMillis)
-          ;; Add buffer to ensure we catch the current bucket
-          start-time (- now (* (+ hours 1) 60 60 1000))
-
-          ;; Default to hour granularity
+          ;; Default to hour granularity if not specified
           gran (or granularity po/HOUR-GRANULARITY)
+          
+          ;; Query a wide time range to ensure we get the most recent bucket
+          now (System/currentTimeMillis)
+          start-time (- now (* 48 60 60 1000)) ;; 48 hours ago
 
           ;; Query telemetry for node latencies with all percentiles
           telemetry-data (ana/select-telemetry
@@ -180,11 +178,9 @@
                           [:mean :count :min :max 0.25 0.5 0.75 0.9 0.99]
                           nil)]
 
-      ;; Return the most recent bucket's data (telemetry already aggregates within buckets)
+      ;; Return the most recent bucket's data (already aggregated by telemetry)
       {:node-stats
        (if (seq telemetry-data)
-         ;; Get the last (most recent) bucket - data already has all percentiles as float keys
          (second (last telemetry-data))
          {})
-       :time-range-hours hours
        :granularity gran})))

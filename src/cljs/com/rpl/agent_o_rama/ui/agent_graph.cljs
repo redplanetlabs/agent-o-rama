@@ -300,12 +300,7 @@
 
                                         ;; Get stats for this node
                                         stats (when node-stats (get node-stats node-id))
-                                        ;; Handle both keyword keys and numeric keys (floats might be strings after JSON)
-                                        stat-value (when stats
-                                                     (or (get stats selected-stat)
-                                                         ;; Try string key if numeric
-                                                         (when (number? selected-stat)
-                                                           (get stats (str selected-stat)))))
+                                        stat-value (when stats (get stats selected-stat))
                                         stat-display (when stat-value
                                                        (if (= selected-stat :count)
                                                          (str stat-value)

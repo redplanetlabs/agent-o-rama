@@ -263,24 +263,16 @@
        ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
        ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
 
-(defui node-stats-panel [{:keys [selected-node module-id agent-name granularity]}]
+(defui node-stats-panel [{:keys [selected-node module-id agent-name granularity time-label]}]
   (let [node-id (when selected-node (aget selected-node "id"))
         decoded-agent-name (common/url-decode agent-name)
-
-        ;; Determine time range based on granularity
-        time-range-hours (cond
-                           (= granularity 60) 1      ;; minute gran = last hour
-                           (= granularity 3600) 24   ;; hour gran = last day
-                           (= granularity 86400) 720 ;; day gran = last month
-                           :else 24)
 
         {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:node-stats module-id agent-name granularity]
           :sente-event [:invocations/get-node-stats {:module-id module-id
                                                      :agent-name decoded-agent-name
-                                                     :granularity granularity
-                                                     :time-range-hours time-range-hours}]
+                                                     :granularity granularity}]
           :refetch-interval-ms 30000
           :enabled? (boolean (and module-id agent-name))})]
 
@@ -299,13 +291,7 @@
 
       :else
       (let [node-stats (:node-stats data)
-            node-data (get node-stats node-id)
-            time-label (cond
-                         (= granularity 60) "Last Hour"
-                         (= granularity 3600) "Last Day"
-                         (= granularity 86400) "Last 30 Days"
-                         (= granularity 2592000) "Last 30 Days"
-                         :else "Recent")]
+            node-data (get node-stats node-id)]
         (if node-data
           ($ :div.p-6.space-y-4
              ($ :div.border-b.pb-4
@@ -355,18 +341,10 @@
         error (:error graph-query)
 
         ;; Fetch node stats for display on nodes
-        time-range-hours (cond
-                           (= granularity 60) 1        ;; minute gran = last hour
-                           (= granularity 3600) 24     ;; hour gran = last day
-                           (= granularity 86400) 720   ;; day gran = last 30 days
-                           (= granularity 2592000) 720 ;; 30-day gran = last 30 days
-                           :else 24)
-
         stats-query (queries/use-sente-query {:query-key [:node-stats-for-graph module-id agent-name granularity]
                                               :sente-event [:invocations/get-node-stats {:module-id module-id
                                                                                          :agent-name decoded-agent-name
-                                                                                         :granularity granularity
-                                                                                         :time-range-hours time-range-hours}]
+                                                                                         :granularity granularity}]
                                               :refetch-interval-ms 30000})
         node-stats (:node-stats (:data stats-query))]
     (cond
@@ -497,14 +475,21 @@
 
         ;; State for selected node and graph controls
         [selected-node set-selected-node] (uix/use-state nil)
-        [granularity set-granularity] (uix/use-state 60) ;; minute granularity (has data)
+        [granularity set-granularity] (uix/use-state 3600) ;; hour granularity = last hour
         [selected-stat set-selected-stat] (uix/use-state :mean) ;; default to mean
 
         ;; Granularity options
-        granularity-items [{:key 60 :label "Minute" :selected? (= granularity 60) :on-select #(set-granularity 60)}
-                           {:key 3600 :label "Hour" :selected? (= granularity 3600) :on-select #(set-granularity 3600)}
-                           {:key 86400 :label "Day" :selected? (= granularity 86400) :on-select #(set-granularity 86400)}
-                           {:key 2592000 :label "30 Days" :selected? (= granularity 2592000) :on-select #(set-granularity 2592000)}]
+        ;; Granularity selector - each bucket is already aggregated by telemetry
+        granularity-items [{:key 3600 :label "Last Hour" :selected? (= granularity 3600) :on-select #(set-granularity 3600)}
+                           {:key 86400 :label "Last Day" :selected? (= granularity 86400) :on-select #(set-granularity 86400)}
+                           {:key 2592000 :label "Last Month" :selected? (= granularity 2592000) :on-select #(set-granularity 2592000)}]
+
+        ;; Time label for display
+        time-label (condp = granularity
+                     3600 "Last Hour"
+                     86400 "Last Day"
+                     2592000 "Last Month"
+                     "Recent")
 
         ;; Stat selector options
         stat-items [{:key :min :label "Min" :selected? (= selected-stat :min) :on-select #(set-selected-stat :min)}
@@ -517,7 +502,7 @@
                     {:key :mean :label "Mean" :selected? (= selected-stat :mean) :on-select #(set-selected-stat :mean)}
                     {:key :count :label "Count" :selected? (= selected-stat :count) :on-select #(set-selected-stat :count)}]
 
-        granularity-label (or (:label (first (filter :selected? granularity-items))) "Hour")
+        granularity-label (or (:label (first (filter :selected? granularity-items))) "Last Hour")
         stat-label (or (:label (first (filter :selected? stat-items))) "Mean")]
 
     ;; Initialize the form when the component mounts or when module-id/agent-name changes
@@ -565,7 +550,8 @@
              ($ node-stats-panel {:selected-node selected-node
                                   :module-id module-id
                                   :agent-name agent-name
-                                  :granularity granularity})))
+                                  :granularity granularity
+                                  :time-label time-label})))
        ($ :div.p-4.flex.gap-1
           ($ :div
              {:style {:flex-grow "1"}}
