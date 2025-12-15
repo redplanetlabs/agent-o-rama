@@ -332,13 +332,16 @@
                                         node-className (str/join " " (concat base-classes selection-classes common-classes))]
                                     ($ :div {:className "relative"}
                                        ($ :div {:className node-className
-                                                :style {:width "170px" :height (if stat-display "55px" "40px")}
+                                                :style {:width "170px" :height "55px"}
                                                 :data-id (str "agent-graph-node-" node-id)}
                                           ($ :div {:className "truncate text-sm font-medium" :title label}
                                              label)
-                                          (when stat-display
+                                          (if stat-display
                                             ($ :div {:className "text-xs text-gray-600 mt-1 font-mono"}
-                                               stat-display)))
+                                               stat-display)
+                                            (when (and node-stats (not stats))  ; Node exists but has no stats
+                                              ($ :div {:className "text-xs text-gray-400 mt-1 italic"}
+                                                 "No data"))))
                                        ($ Handle {:type "target" :position "top" :style {:display "none"}})
                                        ($ Handle {:type "source" :position "bottom" :style {:display "none"}})))))})
                      :edgeTypes
