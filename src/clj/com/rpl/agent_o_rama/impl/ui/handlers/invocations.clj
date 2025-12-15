@@ -168,6 +168,8 @@
           now (System/currentTimeMillis)
           lookback-seconds (* gran 3)
           start-time (- now (* lookback-seconds 1000))
+          ;; sorted-map-range is exclusive of end, so add one full bucket to ensure current bucket is included
+          end-time (+ now (* gran 1000))
 
           ;; Query telemetry for node latencies with all percentiles
           telemetry-data (ana/select-telemetry
@@ -176,7 +178,7 @@
                           gran
                           [:agent :node-latencies]
                           start-time
-                          now
+                          end-time
                           [:mean :count :min :max 0.25 0.5 0.75 0.9 0.99]
                           nil)]
 
