@@ -1,11 +1,5 @@
 (ns com.rpl.agent.recursive-classifier-agent
-  "Recursive question-answering agent with classification and search planning.
-  
-  This agent demonstrates a complex flow with:
-  - Recursive execution (execute-recursively loops back to itself)
-  - Classification of questions into different response types
-  - Planning and search workflows
-  - Multiple converging and diverging paths"
+  "Chat agent with classification, recursive search, and multiple response types"
   (:require
    [clojure.string :as str]
    [com.rpl.agent-o-rama :as aor]
@@ -17,93 +11,97 @@
 
   (->
    topology
-   (aor/new-agent "RecursiveClassifierAgent")
+   (aor/new-agent "chat-agent")
 
-    ;; Entry point: execute-recursively
-    ;; execute-recursive -> plan-search
-    ;; execute-recursive -> answer
-   (aor/node
-    "execute-recursively"
-    ["plan-search" "answer"]
-    (fn [agent-node input]
-      (let [{:keys [path iteration] :or {iteration 0}} input
-            choice (mod (hash path) 2)]
-        (if (= choice 0)
-          (aor/emit! agent-node "plan-search"
-                    (str path " -> execute-recursively")
-                    iteration)
-          (aor/emit! agent-node "answer"
-                    (str path " -> execute-recursively")
-                    iteration)))))
-
-    ;; plan-search -> execute-recursive
-   (aor/node
-    "plan-search"
-    "execute-recursively"
-    (fn [agent-node path iteration]
-      (if (< iteration 2)
-        (aor/emit! agent-node "execute-recursively"
-                  {:path (str path " -> plan-search")
-                   :iteration (inc iteration)})
-        (aor/result! agent-node (str path " -> plan-search [max iterations]")))))
-
-    ;; classify-question -> plan-search
-    ;; classify-question -> respond-dataflow
-    ;; classify-question -> ask-for-more-info
-    ;; classify-question -> respond-general
+   ;; classify-question is the entry point (first node)
+   ;; Routes to: ask-for-more-info, respond-general, respond-dataflow, plan-search
    (aor/node
     "classify-question"
-    ["plan-search" "respond-dataflow" "ask-for-more-info" "respond-general"]
-    (fn [agent-node path iteration]
-      (let [choice (mod (hash path) 4)]
+    ["ask-for-more-info" "respond-general" "respond-dataflow" "plan-search"]
+    (fn [agent-node input]
+      (let [{:keys [path iteration] :or {path "start" iteration 0}} input
+            choice (mod (hash path) 4)]
         (case choice
-          0 (aor/emit! agent-node "plan-search"
+          0 (aor/emit! agent-node "ask-for-more-info"
                       (str path " -> classify-question")
                       iteration)
-          1 (aor/emit! agent-node "respond-dataflow"
+          1 (aor/emit! agent-node "respond-general"
                       (str path " -> classify-question")
                       iteration)
-          2 (aor/emit! agent-node "ask-for-more-info"
+          2 (aor/emit! agent-node "respond-dataflow"
                       (str path " -> classify-question")
                       iteration)
-          3 (aor/emit! agent-node "respond-general"
+          3 (aor/emit! agent-node "plan-search"
                       (str path " -> classify-question")
                       iteration)))))
 
-    ;; ask-for-more-info -> classify-question
+   ;; plan-search -> execute-recursive-search
+   (aor/node
+    "plan-search"
+    "execute-recursive-search"
+    (fn [agent-node path iteration]
+      (aor/emit! agent-node "execute-recursive-search"
+                (str path " -> plan-search")
+                iteration)))
+
+   ;; execute-recursive-search -> plan-search OR answer (loop back or proceed)
+   (aor/node
+    "execute-recursive-search"
+    ["plan-search" "answer"]
+    (fn [agent-node path iteration]
+      (if (< iteration 2)
+        ;; Loop back to plan-search
+        (aor/emit! agent-node "plan-search"
+                  (str path " -> execute-recursive-search")
+                  (inc iteration))
+        ;; Proceed to answer
+        (aor/emit! agent-node "answer"
+                  (str path " -> execute-recursive-search")
+                  iteration))))
+
+   ;; answer -> summarize-conversation
+   (aor/node
+    "answer"
+    "summarize-conversation"
+    (fn [agent-node path iteration]
+      (aor/emit! agent-node "summarize-conversation"
+                (str path " -> answer")
+                iteration)))
+
+   ;; summarize-conversation (terminal)
+   (aor/node
+    "summarize-conversation"
+    nil
+    (fn [agent-node path iteration]
+      (aor/result! agent-node (str path " -> summarize-conversation"))))
+
+   ;; ask-for-more-info -> classify-question (loop back)
    (aor/node
     "ask-for-more-info"
     "classify-question"
     (fn [agent-node path iteration]
       (if (< iteration 2)
         (aor/emit! agent-node "classify-question"
-                  (str path " -> ask-for-more-info")
-                  (inc iteration))
+                  {:path (str path " -> ask-for-more-info")
+                   :iteration (inc iteration)})
         (aor/result! agent-node (str path " -> ask-for-more-info [max iterations]")))))
 
-    ;; respond-dataflow (terminal)
-   (aor/node
-    "respond-dataflow"
-    nil
-    (fn [agent-node path iteration]
-      (aor/result! agent-node (str path " -> respond-dataflow"))))
-
-    ;; respond-general (terminal)
+   ;; respond-general (terminal)
    (aor/node
     "respond-general"
     nil
     (fn [agent-node path iteration]
       (aor/result! agent-node (str path " -> respond-general"))))
 
-    ;; answer (terminal)
+   ;; respond-dataflow (terminal)
    (aor/node
-    "answer"
+    "respond-dataflow"
     nil
     (fn [agent-node path iteration]
-      (aor/result! agent-node (str path " -> answer"))))))
+      (aor/result! agent-node (str path " -> respond-dataflow"))))))
 
 (defn -main
-  "Run the recursive classifier agent with example inputs"
+  "Run the chat agent with example inputs"
   [& _args]
   (with-open [ipc (rtest/create-ipc)
               ui (aor/start-ui ipc)]
@@ -112,9 +110,9 @@
     (let [manager (aor/agent-manager
                    ipc
                    (rama/get-module-name RecursiveClassifierAgentModule))
-          agent   (aor/agent-client manager "RecursiveClassifierAgent")]
+          agent   (aor/agent-client manager "chat-agent")]
 
-      (println "Recursive Classifier Agent - Example Runs")
+      (println "Chat Agent - Example Runs")
       (println "==========================================\n")
 
       ;; Example 1: Simple path
