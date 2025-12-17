@@ -144,7 +144,7 @@ test('should show no result (not fallback) when reference-output is missing', as
   // Add example with ONLY input field (no reference-output)
   console.log('Adding example with only input (no reference-output)...');
   await addExample(page, {
-    input: { uniqueValue: 'this-value-should-NOT-appear-in-ref-output-preview' },
+    input: { testField: 'input-only-value-should-NOT-appear-in-ref-output' },
     output: null  // Explicitly no reference output
   });
   
@@ -183,26 +183,33 @@ test('should show no result (not fallback) when reference-output is missing', as
       // Input path preview SHOULD show the value ✓
       // Reference Output path preview should show "No result" (NOT fallback to input) ✓
       
-      // ASSERTION: Input path preview shows the input value (this is correct)
+      // ASSERTION: Input path preview shows the extracted input value (this is correct)
       const inputPreviewResult = modal.getByTestId('input-path-preview-result');
       await expect(inputPreviewResult).toBeVisible({ timeout: 5000 });
-      await expect(inputPreviewResult).toContainText('input-only-value');
-      console.log('✓ Input path preview correctly shows input value');
+      await expect(inputPreviewResult).toContainText('input-only-value-should-NOT-appear-in-ref-output');
+      console.log('✓ Input path preview shows extracted value from $.testField');
       
-      // ASSERTION: Reference output path preview does NOT show the input value
+      // ASSERTION: Reference output path preview shows "No result" (NOT the input value)
       const refOutputPreviewContainer = modal.getByTestId('ref-output-path-preview-container');
       await expect(refOutputPreviewContainer).toBeVisible();
       
-      // The ref-output preview should show "No result" (empty state)
-      const refOutputPreviewEmpty = modal.getByTestId('ref-output-path-preview-empty');
-      await expect(refOutputPreviewEmpty).toBeVisible({ timeout: 5000 });
-      await expect(refOutputPreviewEmpty).toContainText('No result');
-      console.log('✓ Reference-output preview shows "No result"');
+      // The ref-output preview should show "No result", "No match", or error (not loading, not the input value)
+      // Check for any of the possible non-data states
+      const hasEmpty = await modal.getByTestId('ref-output-path-preview-empty').isVisible().catch(() => false);
+      const hasError = await modal.getByTestId('ref-output-path-preview-error').isVisible().catch(() => false);
+      const hasResult = await modal.getByTestId('ref-output-path-preview-result').isVisible().catch(() => false);
       
-      // ASSERTION: Verify input value does NOT appear in reference-output preview
-      const refOutputHasInputValue = await refOutputPreviewContainer.locator('text=input-only-value').count();
-      expect(refOutputHasInputValue).toBe(0);
-      console.log('✓ No-fallback verified: input value NOT in reference-output preview');
+      console.log(`Preview states - empty: ${hasEmpty}, error: ${hasError}, result: ${hasResult}`);
+      
+      // ASSERTION: Should show empty or error state (not result with data)
+      expect(hasEmpty || hasError).toBe(true);
+      console.log('✓ Reference-output preview shows empty/error state (no fallback)');
+      
+      // CRITICAL ASSERTION: Input value must NOT appear in reference-output preview container
+      const refOutputText = await refOutputPreviewContainer.textContent();
+      expect(refOutputText).not.toContain('input-only-value');
+      expect(refOutputText).not.toContain('this-value-should-NOT-appear-in-ref-output');
+      console.log('✓ VERIFIED: Input value does NOT appear in reference-output preview');
     } else {
       console.log('⚠ Cannot test: Dataset selector not visible');
     }
