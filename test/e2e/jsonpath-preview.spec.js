@@ -78,7 +78,7 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   console.log('Testing preview with new layout (preview under each field)...');
   
   // Assert dataset selector is visible (now using DatasetCombobox)
-  const datasetSelectorLabel = modal.locator('text=Preview Dataset (optional)');
+  const datasetSelectorLabel = modal.locator('text=Preview on example from dataset');
   await expect(datasetSelectorLabel).toBeVisible();
   
   // Use the DatasetCombobox (search-based combobox) via placeholder

@@ -187,7 +187,7 @@
 
             ;; Shared dataset selector for all previews
             ($ :div.mb-4.p-3.bg-gray-50.rounded-lg
-               ($ :label.block.text-xs.font-medium.text-gray-700.mb-2 "Preview Dataset (optional)")
+               ($ :label.block.text-xs.font-medium.text-gray-700.mb-2 "Preview on example from dataset")
                ($ DatasetCombobox {:module-id module-id
                                    :value preview-dataset
                                    :on-change set-preview-dataset}))
