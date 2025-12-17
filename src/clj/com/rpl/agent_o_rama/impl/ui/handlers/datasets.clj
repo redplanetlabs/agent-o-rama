@@ -315,7 +315,7 @@
               source-data (case source-field
                             :input (:input example)
                             :reference-output (:reference-output example)
-                            (:input example)) ;; Default to input
+                            nil)
 
               ;; 4. Apply logic based on type (:path or :template)
               preview-result 
