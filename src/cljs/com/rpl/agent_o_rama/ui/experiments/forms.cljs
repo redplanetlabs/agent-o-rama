@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.ui.experiments.events]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]
+   [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [reitit.frontend.easy :as rfe]
@@ -212,7 +213,7 @@
 
 (defui TargetEditor [{:keys [form-id index]}]
   (let [path [:spec :targets index]
-        {:keys [module-id] :as form} (forms/use-form form-id)
+        {:keys [module-id dataset-id snapshot] :as form} (forms/use-form form-id)
         target-spec-type-field (forms/use-form-field form-id (conj path :target-spec :type))
         agent-name-field (forms/use-form-field form-id (conj path :target-spec :agent-name))
         node-name-field (forms/use-form-field form-id (conj path :target-spec :node))
@@ -274,18 +275,31 @@
              ($ :a.text-blue-600.hover:underline {:href "https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates" :target "_blank"} "JSON Path templates") ".")
           (if (empty? input-mappings)
             ($ :div.text-xs.text-gray-500.italic.py-2 "No arguments yet. Add one to provide arguments.")
-            ($ :div.space-y-2
+            ($ :div.space-y-4
                (for [[i {:keys [id value]}] (map-indexed vector input-mappings)]
-                 ($ :div.flex.items-center.gap-2 {:key id}
-                    ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
-                       (str "Arg " (inc i)))
-                    ($ :input.flex-1.p-1.border.border-gray-300.rounded-md.font-mono.text-sm
-                       {:value value
-                        :on-change (fn [e] (state/dispatch [:form/update-field form-id (conj path :input->args i :value) (.. e -target -value)]))})
-                    ($ :button.p-1.text-red-500.hover:text-red-700
-                       {:type "button"
-                        :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (vec (remove #(= (:id %) id) input-mappings))]))}
-                       ($ TrashIcon {:className "h-4 w-4"}))))))
+                 ($ :div {:key id}
+                    ($ :div.flex.items-center.gap-2
+                       ($ :label.text-sm.font-medium.text-gray-700.whitespace-nowrap
+                          (str "Arg " (inc i)))
+                       ($ :input.flex-1.p-1.border.border-gray-300.rounded-md.font-mono.text-sm
+                          {:value value
+                           :on-change (fn [e] (state/dispatch [:form/update-field form-id (conj path :input->args i :value) (.. e -target -value)]))})
+                       ($ :button.p-1.text-red-500.hover:text-red-700
+                          {:type "button"
+                           :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (vec (remove #(= (:id %) id) input-mappings))]))}
+                          ($ TrashIcon {:className "h-4 w-4"})))
+                    
+                    ;; Add preview below the input
+                    (when (and dataset-id (not (str/blank? value)))
+                      ($ :div.ml-16.mt-1
+                         ($ :div.text-[10px].text-gray-500.mb-1 "Preview (Example 1):")
+                         ($ ExpressionPreview 
+                            {:module-id module-id
+                             :dataset-id dataset-id
+                             :snapshot-name snapshot
+                             :expression value
+                             :type :template
+                             :source-field :input})))))))
           ($ :button.mt-2.text-sm.text-blue-600.hover:underline
              {:type "button"
               :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings {:id (random-uuid) :value "$"})]))}
