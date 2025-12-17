@@ -703,8 +703,8 @@
                                   ($ :code.font-mono.text-xs.text-gray-600 builder-name))
                                ($ :td {:className (:td common/table-classes)}
                                   ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                     {:className (get-evaluator-type-badge-style type)}
-                                     (get-evaluator-type-display type)))
+                                     {:className (common/get-evaluator-type-badge-style type)}
+                                     (common/get-evaluator-type-display type)))
                                ($ :td {:className (:td-right common/table-classes)}
                                   ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
                                      {:onClick (fn [e]

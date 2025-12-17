@@ -81,12 +81,12 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   const datasetSelectorLabel = modal.locator('text=Preview Dataset (optional)');
   await expect(datasetSelectorLabel).toBeVisible();
   
-  // Use the DatasetCombobox (search-based combobox)
-  const comboboxInput = modal.locator('input[role="combobox"]').first();
+  // Use the DatasetCombobox (search-based combobox) via placeholder
+  const comboboxInput = modal.getByPlaceholder('Type to search datasets...');
   await expect(comboboxInput).toBeVisible();
   await comboboxInput.click();
   await comboboxInput.fill(datasetName);
-  await page.waitForTimeout(500); // Wait for search
+  await page.waitForTimeout(500); // Wait for search debounce
   
   // Click the dataset option
   await page.getByText(datasetName, { exact: true }).click();
@@ -175,7 +175,7 @@ test('should show no result (not fallback) when reference-output is missing', as
   if (await jsonpathSection.isVisible()) {
     console.log('✓ JSONPath section found');
     
-    const comboboxInput = modal.locator('input[role="combobox"]').first();
+    const comboboxInput = modal.getByPlaceholder('Type to search datasets...');
     if (await comboboxInput.isVisible()) {
       console.log('✓ Dataset selector found');
       
