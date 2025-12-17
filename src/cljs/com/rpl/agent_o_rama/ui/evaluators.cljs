@@ -9,7 +9,8 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.forms :as forms]
-   [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [SimpleDatasetSelector ExpressionPreview]]
+   [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
+   [com.rpl.agent-o-rama.ui.rules-forms :refer [DatasetCombobox]]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -46,8 +47,8 @@
           ($ DetailItem {:label "Builder"} ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded builder-name))
           ($ DetailItem {:label "Type"}
              ($ :span.inline-flex.px-2.py-0.5.rounded-full.text-xs.font-medium
-                {:className (get-evaluator-type-badge-style type)}
-                (get-evaluator-type-display type)))
+                {:className (common/get-evaluator-type-badge-style type)}
+                (common/get-evaluator-type-display type)))
 
           (when (seq builder-params)
             ($ DetailItem {:label "Parameters"}
@@ -91,20 +92,8 @@
                                         "Learn more on Wikipedia."))}))
 
 ;; =============================================================================
-
-(defn get-evaluator-type-badge-style [type]
-  (case type
-    :regular "bg-green-100 text-green-800"
-    :comparative "bg-blue-100 text-blue-800"
-    :summary "bg-purple-100 text-purple-800"
-    "bg-gray-100 text-gray-800"))
-
-(defn get-evaluator-type-display [type]
-  (case type
-    :regular "Regular"
-    :comparative "Comparative"
-    :summary "Summary"
-    (str type)))
+;; Note: get-evaluator-type-badge-style and get-evaluator-type-display
+;; moved to common.cljs to avoid circular dependencies
 
 ;; =============================================================================
 ;; CREATE EVALUATOR MODAL COMPONENTS
@@ -137,8 +126,8 @@
                      ($ :div.flex.justify-between.items-start.mb-2
                         ($ :h3.font-medium.text-gray-900 (str builder-name))
                         ($ :span.inline-flex.px-2.py-1.text-xs.font-medium.rounded-full
-                           {:className (get-evaluator-type-badge-style type)}
-                           (get-evaluator-type-display type)))
+                           {:className (common/get-evaluator-type-badge-style type)}
+                           (common/get-evaluator-type-display type)))
                      ($ :p.text-sm.text-gray-600 (str description)))))))))))
 
 (defui CreateEvaluatorForm [{:keys [form-id]}]
@@ -199,9 +188,9 @@
             ;; Shared dataset selector for all previews
             ($ :div.mb-4.p-3.bg-gray-50.rounded-lg
                ($ :label.block.text-xs.font-medium.text-gray-700.mb-2 "Preview Dataset (optional)")
-               ($ SimpleDatasetSelector {:module-id module-id
-                                         :value preview-dataset
-                                         :on-change set-preview-dataset}))
+               ($ DatasetCombobox {:module-id module-id
+                                   :value preview-dataset
+                                   :on-change set-preview-dataset}))
 
             ($ :div.space-y-6
                ;; Input JSON Path + preview (A-B)
@@ -448,8 +437,8 @@
             ($ :div.p-3.bg-gray-100.rounded-md.border.border-gray-300
                ($ :span.font-medium (:name pre-selected-evaluator))
                ($ :span.ml-2.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
-                  {:className (get-evaluator-type-badge-style (:type pre-selected-evaluator))}
-                  (get-evaluator-type-display (:type pre-selected-evaluator))))
+                  {:className (common/get-evaluator-type-badge-style (:type pre-selected-evaluator))}
+                  (common/get-evaluator-type-display (:type pre-selected-evaluator))))
 
             loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
             error ($ :div.text-sm.text-red-600 "Error loading evaluators")
@@ -470,8 +459,8 @@
                                                 :on-select #(do (set-selected-evaluator evaluator) (set-dropdown-open false))
                                                 :extra-content ($ :div.px-4.pb-2.text-xs.text-gray-500
                                                                   ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                                                     {:className (get-evaluator-type-badge-style (:type evaluator))}
-                                                                     (get-evaluator-type-display (:type evaluator))))}))))))))
+                                                                     {:className (common/get-evaluator-type-badge-style (:type evaluator))}
+                                                                     (common/get-evaluator-type-display (:type evaluator))))}))))))))
 
        ;; 2. Example Input (conditionally rendered) - only for single mode
        (when (and (= mode :single) show-input-path?)

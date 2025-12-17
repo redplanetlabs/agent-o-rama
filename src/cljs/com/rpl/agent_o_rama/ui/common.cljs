@@ -6,6 +6,24 @@
    ["@heroicons/react/24/outline" :refer [ChevronDownIcon InformationCircleIcon]]))
 
 ;; =============================================================================
+;; EVALUATOR TYPE HELPERS (moved here to avoid circular dependencies)
+;; =============================================================================
+
+(defn get-evaluator-type-badge-style [type]
+  (case type
+    :regular "bg-green-100 text-green-800"
+    :comparative "bg-blue-100 text-blue-800"
+    :summary "bg-purple-100 text-purple-800"
+    "bg-gray-100 text-gray-800"))
+
+(defn get-evaluator-type-display [type]
+  (case type
+    :regular "Regular"
+    :comparative "Comparative"
+    :summary "Summary"
+    (str type)))
+
+;; =============================================================================
 ;; TOOLTIP COMPONENT
 ;; =============================================================================
 

@@ -3,7 +3,6 @@
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.evaluators :as evaluators-ui]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [MagnifyingGlassIcon]]))
@@ -126,21 +125,21 @@
               :onChange #(do (set-search-term! (.. % -target -value))
                              (set-open! true))
               :disabled disabled?}))
-      (when is-open?
-        ($ :div {:role "listbox"
-                 :aria-label "Evaluator search results"
-                 :aria-busy loading?
-                 :className "absolute z-10 mt-1 w-full rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 max-h-60 overflow-y-auto"}
+       (when is-open?
+         ($ :div {:role "listbox"
+                  :aria-label "Evaluator search results"
+                  :aria-busy loading?
+                  :className "absolute z-10 mt-1 w-full rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 max-h-60 overflow-y-auto"}
 
             (cond
               loading? ($ :div.p-3.text-sm.text-gray-500 "Loading...")
               query-error ($ :div.p-3.text-sm.text-red-500 "Error fetching evaluators.")
               (empty? evaluators) ($ :div.p-3.text-sm.text-gray-500 "No evaluators found.")
               :else (for [e evaluators]
-                    ($ :div.p-3.cursor-pointer.hover:bg-gray-100
+                      ($ :div.p-3.cursor-pointer.hover:bg-gray-100
                          {:key (:name e)
-                        :role "option"
-                        :aria-selected (= value (:name e))
+                          :role "option"
+                          :aria-selected (= value (:name e))
                           :aria-label (:name e)
                           :onClick #(handle-select e)}
                          ($ :div.flex.justify-between.items-start
@@ -149,7 +148,7 @@
                                (when (not (str/blank? (:description e)))
                                  ($ :p.text-xs.text-gray-500.mt-1 (:description e))))
                             ($ :span {:className (common/cn "px-2 py-0.5 rounded-full text-xs font-medium"
-                                                            (evaluators-ui/get-evaluator-type-badge-style (:type e)))}
-                               (evaluators-ui/get-evaluator-type-display (:type e)))))))))
+                                                            (common/get-evaluator-type-badge-style (:type e)))}
+                               (common/get-evaluator-type-display (:type e)))))))))
        (when error
          ($ :p.text-sm.text-red-600.mt-1 error)))))

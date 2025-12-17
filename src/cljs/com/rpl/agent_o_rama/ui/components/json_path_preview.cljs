@@ -4,6 +4,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.rules-forms :refer [DatasetCombobox]]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]))
 
@@ -59,25 +60,8 @@
         :empty-msg (if (not dataset-id) "Select a dataset to preview" "No match found")
         :data-testid data-testid})))
 
-(defui SimpleDatasetSelector
-  "Simple dataset selector for preview (avoids circular dependency)"
-  [{:keys [module-id value on-change]}]
-  (let [{:keys [data loading?]}
-        (queries/use-sente-query
-         {:query-key [:datasets-for-preview module-id]
-          :sente-event [:datasets/get-all
-                        {:module-id module-id
-                         :filters {}}]
-          :enabled? (boolean module-id)})]
-    ($ :select.w-full.p-2.border.border-gray-300.rounded-md.text-sm
-       {:value (or value "")
-        :on-change #(on-change (.. % -target -value))
-        :disabled loading?}
-       ($ :option {:value ""} (if loading? "Loading..." "Select a dataset..."))
-       (for [dataset (:datasets data)]
-         ($ :option {:key (str (:dataset-id dataset))
-                     :value (str (:dataset-id dataset))}
-            (:name dataset))))))
+;; Note: Now using DatasetCombobox from rules-forms
+;; Circular dependency resolved by moving evaluator helper functions to common.cljs
 
 (defui EvaluatorPreviewSection [{:keys [module-id input-path output-path ref-path show-input? show-output? show-ref?]}]
   (let [[selected-dataset set-selected-dataset] (uix/use-state nil)]

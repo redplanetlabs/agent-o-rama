@@ -77,14 +77,19 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   // NOW TEST THE PREVIEW with ABABAB layout!
   console.log('Testing preview with new layout (preview under each field)...');
   
-  // Assert dataset selector is visible
+  // Assert dataset selector is visible (now using DatasetCombobox)
   const datasetSelectorLabel = modal.locator('text=Preview Dataset (optional)');
   await expect(datasetSelectorLabel).toBeVisible();
   
-  // Select the dataset
-  const datasetSelector = modal.locator('select').first();
-  await expect(datasetSelector).toBeVisible();
-  await datasetSelector.selectOption({ label: datasetName });
+  // Use the DatasetCombobox (search-based combobox)
+  const comboboxInput = modal.locator('input[role="combobox"]').first();
+  await expect(comboboxInput).toBeVisible();
+  await comboboxInput.click();
+  await comboboxInput.fill(datasetName);
+  await page.waitForTimeout(500); // Wait for search
+  
+  // Click the dataset option
+  await page.getByText(datasetName, { exact: true }).click();
 
   // Wait for preview to load (debounce + request)
   await page.waitForTimeout(1500);
@@ -170,12 +175,15 @@ test('should show no result (not fallback) when reference-output is missing', as
   if (await jsonpathSection.isVisible()) {
     console.log('✓ JSONPath section found');
     
-    const datasetSelector = modal.locator('text=Preview Dataset').locator('..').locator('select').first();
-    if (await datasetSelector.isVisible()) {
+    const comboboxInput = modal.locator('input[role="combobox"]').first();
+    if (await comboboxInput.isVisible()) {
       console.log('✓ Dataset selector found');
       
-      // Select our test dataset
-      await datasetSelector.selectOption({ label: testDatasetName });
+      // Select our test dataset using combobox
+      await comboboxInput.click();
+      await comboboxInput.fill(testDatasetName);
+      await page.waitForTimeout(500);
+      await page.getByText(testDatasetName, { exact: true }).click();
       await page.waitForTimeout(1500);
       
       // CRITICAL TEST: Verify no-fallback behavior with data-testid selectors
