@@ -7,27 +7,34 @@
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]))
 
-(defui PreviewBox [{:keys [label result error loading? empty-msg]}]
+(defui PreviewBox [{:keys [label result error loading? empty-msg data-testid]}]
   ($ :div.mt-1.text-xs
+     {:data-testid data-testid}
      (when label ($ :div.text-gray-500.mb-1 label))
      (cond
        loading?
-       ($ :div.text-gray-400.italic "Evaluating...")
+       ($ :div.text-gray-400.italic
+          {:data-testid (str data-testid "-loading")}
+          "Evaluating...")
 
        error
        ($ :div.text-red-500.bg-red-50.p-2.rounded.border.border-red-100
+          {:data-testid (str data-testid "-error")}
           (str "Error: " error))
 
        (nil? result)
-       ($ :div.text-gray-400.italic (or empty-msg "No result"))
+       ($ :div.text-gray-400.italic
+          {:data-testid (str data-testid "-empty")}
+          (or empty-msg "No result"))
 
        :else
        ($ :pre.bg-gray-100.p-2.rounded.border.border-gray-200.overflow-x-auto.font-mono.text-gray-800
+          {:data-testid (str data-testid "-result")}
           (if (string? result) result (common/pp-json result))))))
 
 (defui ExpressionPreview
   "Computes and displays a preview of a JSON path or template against a dataset."
-  [{:keys [module-id dataset-id snapshot-name expression type source-field]
+  [{:keys [module-id dataset-id snapshot-name expression type source-field data-testid]
     :or {type :path source-field :input}}]
 
   (let [[debounced-expression] (useDebounce expression 500)
@@ -49,7 +56,8 @@
        {:result (:result data)
         :error (or error (:error data))
         :loading? loading?
-        :empty-msg (if (not dataset-id) "Select a dataset to preview" "No match found")})))
+        :empty-msg (if (not dataset-id) "Select a dataset to preview" "No match found")
+        :data-testid data-testid})))
 
 (defui SimpleDatasetSelector
   "Simple dataset selector for preview (avoids circular dependency)"

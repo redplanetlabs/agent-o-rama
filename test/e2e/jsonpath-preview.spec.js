@@ -74,10 +74,10 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   await modal.getByLabel('Output JSON Path', { exact: true }).fill('$.answer');
   await modal.getByLabel('Reference Output JSON Path', { exact: true }).fill('$.answer');
 
-  // NOW TEST THE PREVIEW with new ABABAB layout!
+  // NOW TEST THE PREVIEW with ABABAB layout!
   console.log('Testing preview with new layout (preview under each field)...');
   
-  // Check for the dataset selector (new location)
+  // Assert dataset selector is visible
   const datasetSelectorLabel = modal.locator('text=Preview Dataset (optional)');
   await expect(datasetSelectorLabel).toBeVisible();
   
@@ -85,29 +85,29 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   const datasetSelector = modal.locator('select').first();
   await expect(datasetSelector).toBeVisible();
   await datasetSelector.selectOption({ label: datasetName });
-  console.log('✓ Dataset selected in shared selector');
 
   // Wait for preview to load (debounce + request)
   await page.waitForTimeout(1500);
 
-  // Verify individual previews appear under each field
-  console.log('Verifying inline previews...');
-  
-  // Count preview boxes (should have 3: one for each path)
-  const previewBoxes = modal.locator('div.bg-blue-50 >> text=Preview:');
-  const previewCount = await previewBoxes.count();
-  console.log(`Found ${previewCount} inline preview sections`);
-  
-  // Verify Input path shows extracted data
-  await expect(modal.getByText('What is 2+2?')).toBeVisible({ timeout: 5000 });
-  console.log('✓ Input path preview shows extracted data: "What is 2+2?"');
+  // ASSERTIONS: Verify all three preview containers exist
+  await expect(modal.getByTestId('input-path-preview-container')).toBeVisible();
+  await expect(modal.getByTestId('output-path-preview-container')).toBeVisible();
+  await expect(modal.getByTestId('ref-output-path-preview-container')).toBeVisible();
+  console.log('✓ All three preview containers visible');
 
-  // Verify Reference Output shows extracted data (the preview shows "4")
-  const previewBoxWithFour = modal.locator('pre.bg-gray-100').filter({ hasText: '4' }).first();
-  await expect(previewBoxWithFour).toBeVisible({ timeout: 5000 });
-  console.log('✓ Reference output path preview shows extracted data: "4"');
+  // ASSERTION: Input path preview shows extracted data
+  const inputPreviewResult = modal.getByTestId('input-path-preview-result');
+  await expect(inputPreviewResult).toBeVisible({ timeout: 5000 });
+  await expect(inputPreviewResult).toContainText('What is 2+2?');
+  console.log('✓ Input path preview contains: "What is 2+2?"');
 
-  console.log('✓ JSONPath preview with ABABAB layout working correctly!');
+  // ASSERTION: Reference output path preview shows extracted data
+  const refOutputPreviewResult = modal.getByTestId('ref-output-path-preview-result');
+  await expect(refOutputPreviewResult).toBeVisible({ timeout: 5000 });
+  await expect(refOutputPreviewResult).toContainText('4');
+  console.log('✓ Reference output path preview contains: "4"');
+
+  console.log('✓ JSONPath preview with ABABAB layout verified!');
 
   // Close modal without submitting
   await modal.locator('button:has-text("×")').first().click();
@@ -165,43 +165,46 @@ test('should show no result (not fallback) when reference-output is missing', as
   await modal.getByLabel('Name').fill(testEvalName);
   await modal.getByLabel('Description').fill('Testing no-fallback');
 
-  // Check if we can test the preview
+  // Check if we can test the preview with new ABABAB layout
   const jsonpathSection = modal.locator('text=JSONPath Configuration');
   if (await jsonpathSection.isVisible()) {
     console.log('✓ JSONPath section found');
     
-    const previewSection = modal.locator('text=Preview on Data');
-    if (await previewSection.isVisible()) {
-      console.log('✓ Preview section found');
+    const datasetSelector = modal.locator('text=Preview Dataset').locator('..').locator('select').first();
+    if (await datasetSelector.isVisible()) {
+      console.log('✓ Dataset selector found');
       
       // Select our test dataset
-      const datasetSelector = modal.locator('select').first();
-      if (await datasetSelector.isVisible()) {
-        await datasetSelector.selectOption({ label: testDatasetName });
-        await page.waitForTimeout(1500);
-        
-        // The preview should show "No result" for reference-output
-        // NOT show the input value "this-value-should-NOT-appear-in-ref-output-preview"
-        const refOutputPreview = modal.locator('text=Reference Output Path Result:').locator('..');
-        
-        // Check that it does NOT contain the input value
-        const inputValueVisible = await refOutputPreview.locator('text=this-value-should-NOT-appear-in-ref-output-preview').count();
-        
-        if (inputValueVisible === 0) {
-          console.log('✓ No-fallback verified: input value NOT shown in reference-output preview');
-        } else {
-          console.log('✗ FAIL: Input value incorrectly shown in reference-output preview (fallback occurred)');
-          throw new Error('Fallback behavior detected - input shown instead of null');
-        }
-        
-        // Should show "No result" or similar
-        const noResultVisible = await refOutputPreview.locator('text=/No result|null/i').count();
-        if (noResultVisible > 0) {
-          console.log('✓ Preview correctly shows "No result" for missing field');
-        }
-      }
+      await datasetSelector.selectOption({ label: testDatasetName });
+      await page.waitForTimeout(1500);
+      
+      // CRITICAL TEST: Verify no-fallback behavior with data-testid selectors
+      // The example has ONLY input (no reference-output)
+      // Input path preview SHOULD show the value ✓
+      // Reference Output path preview should show "No result" (NOT fallback to input) ✓
+      
+      // ASSERTION: Input path preview shows the input value (this is correct)
+      const inputPreviewResult = modal.getByTestId('input-path-preview-result');
+      await expect(inputPreviewResult).toBeVisible({ timeout: 5000 });
+      await expect(inputPreviewResult).toContainText('input-only-value');
+      console.log('✓ Input path preview correctly shows input value');
+      
+      // ASSERTION: Reference output path preview does NOT show the input value
+      const refOutputPreviewContainer = modal.getByTestId('ref-output-path-preview-container');
+      await expect(refOutputPreviewContainer).toBeVisible();
+      
+      // The ref-output preview should show "No result" (empty state)
+      const refOutputPreviewEmpty = modal.getByTestId('ref-output-path-preview-empty');
+      await expect(refOutputPreviewEmpty).toBeVisible({ timeout: 5000 });
+      await expect(refOutputPreviewEmpty).toContainText('No result');
+      console.log('✓ Reference-output preview shows "No result"');
+      
+      // ASSERTION: Verify input value does NOT appear in reference-output preview
+      const refOutputHasInputValue = await refOutputPreviewContainer.locator('text=input-only-value').count();
+      expect(refOutputHasInputValue).toBe(0);
+      console.log('✓ No-fallback verified: input value NOT in reference-output preview');
     } else {
-      console.log('⚠ Cannot test: Preview section not visible for this evaluator');
+      console.log('⚠ Cannot test: Dataset selector not visible');
     }
   } else {
     console.log('⚠ Cannot test: JSONPath section not visible for aor/llm-judge');

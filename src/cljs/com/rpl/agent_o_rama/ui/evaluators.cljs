@@ -213,12 +213,14 @@
                                          :error (:input-json-path field-errors)})
                     (when (and preview-dataset (not (str/blank? input-json-path)))
                       ($ :div.ml-2.mt-2.p-2.bg-blue-50.rounded.border.border-blue-100
+                         {:data-testid "input-path-preview-container"}
                          ($ :div.text-xs.font-medium.text-blue-700.mb-1 "Preview:")
                          ($ ExpressionPreview {:module-id module-id
                                                :dataset-id preview-dataset
                                                :expression input-json-path
                                                :type :path
-                                               :source-field :input})))))
+                                               :source-field :input
+                                               :data-testid "input-path-preview"})))))
 
                ;; Output JSON Path + preview (A-B)
                (when show-output-path?
@@ -229,12 +231,14 @@
                                          :error (:output-json-path field-errors)})
                     (when (and preview-dataset (not (str/blank? output-json-path)))
                       ($ :div.ml-2.mt-2.p-2.bg-blue-50.rounded.border.border-blue-100
+                         {:data-testid "output-path-preview-container"}
                          ($ :div.text-xs.font-medium.text-blue-700.mb-1 "Preview:")
                          ($ ExpressionPreview {:module-id module-id
                                                :dataset-id preview-dataset
                                                :expression output-json-path
                                                :type :path
-                                               :source-field :input})))))
+                                               :source-field :input
+                                               :data-testid "output-path-preview"})))))
 
                ;; Reference Output JSON Path + preview (A-B)
                (when show-ref-output-path?
@@ -245,12 +249,14 @@
                                          :error (:reference-output-json-path field-errors)})
                     (when (and preview-dataset (not (str/blank? reference-output-json-path)))
                       ($ :div.ml-2.mt-2.p-2.bg-blue-50.rounded.border.border-blue-100
+                         {:data-testid "ref-output-path-preview-container"}
                          ($ :div.text-xs.font-medium.text-blue-700.mb-1 "Preview:")
                          ($ ExpressionPreview {:module-id module-id
                                                :dataset-id preview-dataset
                                                :expression reference-output-json-path
                                                :type :path
-                                               :source-field :reference-output})))))))))))
+                                               :source-field :reference-output
+                                               :data-testid "ref-output-path-preview"})))))))))))
 
 (forms/reg-form
  :create-evaluator
