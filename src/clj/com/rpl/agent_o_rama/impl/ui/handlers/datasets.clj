@@ -319,25 +319,66 @@
 
               ;; 4. Apply logic based on type (:path or :template)
               preview-result 
-              (case type
-                :path 
-                (h/read-json-path source-data expression)
+              (if (nil? source-data)
+                ::no-source-data
+                (try
+                  (case type
+                    :path 
+                    (h/read-json-path source-data expression)
 
-                :template 
-                (let [template-obj (if (string? expression)
-                                     ;; If it looks like a JSON object/array string, parse it
-                                     ;; Otherwise treat as a raw string template
-                                     (try 
-                                       (if (or (str/starts-with? (str/trim expression) "{")
-                                               (str/starts-with? (str/trim expression) "["))
-                                         (j/read-value expression)
-                                         expression)
-                                       (catch Exception _ expression))
-                                     expression)]
-                  (h/resolve-json-path-template template-obj source-data)))]
+                    :template 
+                    (let [template-obj (if (string? expression)
+                                         ;; If it looks like a JSON object/array string, parse it
+                                         ;; Otherwise treat as a raw string template
+                                         (try 
+                                           (if (or (str/starts-with? (str/trim expression) "{")
+                                                   (str/starts-with? (str/trim expression) "["))
+                                             (j/read-value expression)
+                                             expression)
+                                           (catch Exception _ expression))
+                                         expression)]
+                      (h/resolve-json-path-template template-obj source-data)))
+                  (catch Exception e
+                    (let [msg (or (.getMessage e) "")]
+                      (cond
+                        ;; JSONPath errors when path doesn't exist in data
+                        (or (str/includes? msg "can not be null")
+                            (str/includes? msg "cannot be null")
+                            (str/includes? msg "No results")
+                            (str/includes? msg "Missing property"))
+                        ::path-not-found
+                        
+                        ;; Re-throw other exceptions
+                        :else
+                        (throw e))))))]
 
-          {:status :ok 
-           :result (common/->ui-serializable preview-result)
-           :example-preview (common/->ui-serializable source-data)})))
+          (cond
+            (= preview-result ::no-source-data)
+            {:status :ok :result nil :error (str "No " (name source-field) " data in this example")}
+            
+            (= preview-result ::path-not-found)
+            {:status :ok :result nil :error "Path not found in data"}
+            
+            :else
+            {:status :ok 
+             :result (common/->ui-serializable preview-result)
+             :example-preview (common/->ui-serializable source-data)})))
     (catch Exception e
-      {:status :ok :result nil :error (.getMessage e)})))
+      (let [msg (or (.getMessage e) "")]
+        {:status :ok 
+         :result nil 
+         :error (cond
+                  ;; Common JSONPath null errors - make them friendlier
+                  (or (str/includes? msg "can not be null")
+                      (str/includes? msg "cannot be null"))
+                  (str "No " (name source-field) " data in this example")
+                  
+                  ;; Other path-related errors
+                  (or (str/includes? msg "No results")
+                      (str/includes? msg "path")
+                      (str/includes? msg "Path"))
+                  "Path not found in data"
+                  
+                  ;; Return original message for other errors
+                  :else
+                  msg)}))))

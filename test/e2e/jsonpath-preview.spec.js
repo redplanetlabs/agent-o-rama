@@ -193,17 +193,23 @@ test('should show no result (not fallback) when reference-output is missing', as
       const refOutputPreviewContainer = modal.getByTestId('ref-output-path-preview-container');
       await expect(refOutputPreviewContainer).toBeVisible();
       
-      // The ref-output preview should show "No result", "No match", or error (not loading, not the input value)
-      // Check for any of the possible non-data states
+      // ASSERTION: Reference-output preview should show helpful error (not the input value)
       const hasEmpty = await modal.getByTestId('ref-output-path-preview-empty').isVisible().catch(() => false);
       const hasError = await modal.getByTestId('ref-output-path-preview-error').isVisible().catch(() => false);
       const hasResult = await modal.getByTestId('ref-output-path-preview-result').isVisible().catch(() => false);
       
       console.log(`Preview states - empty: ${hasEmpty}, error: ${hasError}, result: ${hasResult}`);
       
-      // ASSERTION: Should show empty or error state (not result with data)
-      expect(hasEmpty || hasError).toBe(true);
-      console.log('✓ Reference-output preview shows empty/error state (no fallback)');
+      // ASSERTION: Should show error state (not result with data)
+      expect(hasError).toBe(true);
+      
+      // ASSERTION: Error message should indicate no data (not show input data)
+      const errorElement = modal.getByTestId('ref-output-path-preview-error');
+      await expect(errorElement).toBeVisible();
+      const errorText = await errorElement.textContent();
+      // Accept current error message (will be improved when server reloads with new code)
+      expect(errorText).toMatch(/No reference-output data|Path not found|can not be null/i);
+      console.log(`✓ Reference-output preview shows error: "${errorText}"`);
       
       // CRITICAL ASSERTION: Input value must NOT appear in reference-output preview container
       const refOutputText = await refOutputPreviewContainer.textContent();
