@@ -12,32 +12,32 @@
   ($ :div.mt-1.text-xs
      (when label ($ :div.text-gray-500.mb-1 label))
      (cond
-       loading? 
+       loading?
        ($ :div.text-gray-400.italic "Evaluating...")
-       
-       error 
-       ($ :div.text-red-500.bg-red-50.p-2.rounded.border.border-red-100 
+
+       error
+       ($ :div.text-red-500.bg-red-50.p-2.rounded.border.border-red-100
           (str "Error: " error))
-       
+
        (nil? result)
        ($ :div.text-gray-400.italic (or empty-msg "No result"))
-       
+
        :else
        ($ :pre.bg-gray-100.p-2.rounded.border.border-gray-200.overflow-x-auto.font-mono.text-gray-800
           (if (string? result) result (common/pp-json result))))))
 
-(defui ExpressionPreview 
+(defui ExpressionPreview
   "Computes and displays a preview of a JSON path or template against a dataset."
   [{:keys [module-id dataset-id snapshot-name expression type source-field]
     :or {type :path source-field :input}}]
-  
+
   (let [[debounced-expression] (useDebounce expression 500)
         should-fetch? (and module-id dataset-id (not (str/blank? debounced-expression)))
-        
-        {:keys [data loading? error]} 
+
+        {:keys [data loading? error]}
         (queries/use-sente-query
          {:query-key [:preview-expression module-id dataset-id snapshot-name debounced-expression type source-field]
-          :sente-event [:datasets/preview-expression 
+          :sente-event [:datasets/preview-expression
                         {:module-id module-id
                          :dataset-id dataset-id
                          :snapshot-name snapshot-name
@@ -46,7 +46,7 @@
                          :source-field source-field}]
           :enabled? should-fetch?})]
 
-    ($ PreviewBox 
+    ($ PreviewBox
        {:result (:result data)
         :error (or error (:error data))
         :loading? loading?
@@ -56,7 +56,7 @@
   (let [[selected-dataset set-selected-dataset] (uix/use-state nil)]
     ($ :div.mt-6.p-4.bg-gray-50.rounded-lg.border.border-gray-200
        ($ :h4.text-sm.font-medium.text-gray-900.mb-3 "Preview on Data")
-       
+
        ($ :div.mb-4
           ($ :label.block.text-xs.font-medium.text-gray-500.mb-1 "Select Dataset for Preview")
           ($ DatasetCombobox {:module-id module-id
@@ -68,26 +68,26 @@
             (when (and show-input? (not (str/blank? input-path)))
               ($ :div
                  ($ :div.text-xs.font-medium.text-indigo-600 "Input Path Result:")
-                 ($ ExpressionPreview {:module-id module-id 
-                                       :dataset-id selected-dataset 
-                                       :expression input-path 
-                                       :type :path 
+                 ($ ExpressionPreview {:module-id module-id
+                                       :dataset-id selected-dataset
+                                       :expression input-path
+                                       :type :path
                                        :source-field :input})))
 
             (when (and show-output? (not (str/blank? output-path)))
               ($ :div
                  ($ :div.text-xs.font-medium.text-indigo-600 "Output Path Result:")
-                 ($ ExpressionPreview {:module-id module-id 
-                                       :dataset-id selected-dataset 
-                                       :expression output-path 
-                                       :type :path 
+                 ($ ExpressionPreview {:module-id module-id
+                                       :dataset-id selected-dataset
+                                       :expression output-path
+                                       :type :path
                                        :source-field :input})))
 
             (when (and show-ref? (not (str/blank? ref-path)))
               ($ :div
                  ($ :div.text-xs.font-medium.text-indigo-600 "Reference Output Path Result:")
-                 ($ ExpressionPreview {:module-id module-id 
-                                       :dataset-id selected-dataset 
-                                       :expression ref-path 
-                                       :type :path 
+                 ($ ExpressionPreview {:module-id module-id
+                                       :dataset-id selected-dataset
+                                       :expression ref-path
+                                       :type :path
                                        :source-field :reference-output}))))))))

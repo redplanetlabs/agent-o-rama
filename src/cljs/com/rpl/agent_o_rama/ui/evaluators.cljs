@@ -208,16 +208,16 @@
                                       :value reference-output-json-path
                                       :on-change #(set-field! [:reference-output-json-path] %)
                                       :error (:reference-output-json-path field-errors)})))
-            
+
             ;; Add Preview Section
-            ($ EvaluatorPreviewSection 
+            ($ EvaluatorPreviewSection
                {:module-id module-id
                 :input-path input-json-path
                 :output-path output-json-path
                 :ref-path reference-output-json-path
                 :show-input? show-input-path?
                 :show-output? show-output-path?
-                :show-ref? show-ref-output-path?}))))))))
+                :show-ref? show-ref-output-path?}))))))
 
 (forms/reg-form
  :create-evaluator
