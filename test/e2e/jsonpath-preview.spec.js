@@ -13,7 +13,7 @@ const evaluatorName = `e2e-eval-preview-${uniqueId}`;
 // Note: We test with aor/llm-judge which has all JSONPath fields enabled (input, output, reference-output)
 
 test('should display JSONPath preview when creating evaluator', async ({ page }) => {
-  console.log('--- Starting JSONPath Preview Creation Test ---');
+  console.log('--- Starting JSONPath Preview Test ---');
   
   // SETUP: Navigate and create dataset with structured examples
   await page.goto('/');
@@ -37,38 +37,83 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   await page.getByRole('link', { name: 'Examples' }).click();
   await expect(page.getByRole('heading', { name: datasetName })).toBeVisible();
 
-  console.log('Adding examples with nested JSON structure...');
+  console.log('Adding example with nested JSON structure...');
   await addExample(page, {
-    input: { question: 'What is 2+2?', nested: { field: 'value' } },
+    input: { question: 'What is 2+2?', nested: { deep: 'value' } },
     output: { answer: '4', confidence: 0.95 }
   });
 
-  console.log('✓ Dataset created with structured example');
+  console.log('✓ Dataset created with example');
 
-  // Create evaluator with JSONPath fields
-  console.log('--- Testing Preview in Evaluator Creation Form ---');
+  // Now manually create evaluator and TEST THE PREVIEW
+  console.log('--- Testing JSONPath Preview UI ---');
   await page.getByText('Evaluators').click();
   await expect(page).toHaveURL(/evaluations/);
 
-  // Use createEvaluator helper with aor/llm-judge which has all JSONPath fields enabled
-  await createEvaluator(page, { 
-    name: evaluatorName, 
-    builderName: 'aor/llm-judge', 
-    description: 'Testing JSONPath preview with all fields',
-    params: { 
-      prompt: 'Evaluate %input vs %output and %referenceOutput',
-      model: 'gpt-4o-mini',
-      temperature: '0.0',
-      outputSchema: '{"type":"object","properties":{"score":{"type":"number"}}}'
-    },
-    inputJsonPath: '$.question',
-    outputJsonPath: '$.answer',
-    referenceOutputJsonPath: '$.answer'
-  });
+  // Start creating evaluator
+  await page.getByRole('button', { name: 'Create Evaluator' }).first().click();
+  const modal = page.locator('[role="dialog"]');
+  await expect(modal).toBeVisible();
 
-  console.log('✓ Evaluator created with JSONPath configuration');
-  console.log('--- Note: Preview UI components are integrated ---');
-  console.log('--- Manual verification: Preview should appear when JSONPath fields are configured ---');
+  // Select aor/llm-judge (has all JSONPath fields)
+  await modal.getByText('aor/llm-judge', { exact: true }).click();
+  await expect(modal.getByLabel('Name')).toBeVisible();
+
+  // Fill basic info
+  await modal.getByLabel('Name').fill(evaluatorName);
+  await modal.getByLabel('Description').fill('Testing JSONPath preview');
+
+  // Fill required params
+  await modal.getByLabel('prompt', { exact: true }).fill('Evaluate');
+  await modal.getByLabel('model', { exact: true }).fill('gpt-4o-mini');
+  await modal.getByLabel('temperature', { exact: true }).fill('0.0');
+
+  // Fill JSONPath fields
+  console.log('Filling JSONPath fields...');
+  await modal.getByLabel('Input JSON Path', { exact: true }).fill('$.question');
+  await modal.getByLabel('Output JSON Path', { exact: true }).fill('$.answer');
+  await modal.getByLabel('Reference Output JSON Path', { exact: true }).fill('$.answer');
+
+  // NOW TEST THE PREVIEW!
+  console.log('Testing preview section...');
+  const previewSection = modal.locator('text=Preview on Data');
+  await expect(previewSection).toBeVisible();
+
+  // Select the dataset
+  const datasetSelector = modal.locator('select').first();
+  await expect(datasetSelector).toBeVisible();
+  await datasetSelector.selectOption({ label: datasetName });
+  console.log('✓ Dataset selected');
+
+  // Wait for preview to load (debounce + request)
+  await page.waitForTimeout(1500);
+
+  // Verify preview shows the extracted data
+  console.log('Verifying preview results...');
+  
+  // Check that all three preview sections are visible
+  await expect(modal.getByText('Input Path Result:')).toBeVisible();
+  await expect(modal.getByText('Output Path Result:', { exact: true })).toBeVisible();
+  await expect(modal.getByText('Reference Output Path Result:')).toBeVisible();
+  console.log('✓ All three preview sections are visible');
+
+  // Verify Input path shows extracted data
+  await expect(modal.getByText('What is 2+2?')).toBeVisible({ timeout: 5000 });
+  console.log('✓ Input path preview shows extracted data: "What is 2+2?"');
+
+  // Verify Reference Output shows extracted data (the preview shows "4")
+  // Use exact match to avoid matching dataset IDs
+  const previewBoxWithFour = modal.locator('pre.bg-gray-100').filter({ hasText: '4' }).first();
+  await expect(previewBoxWithFour).toBeVisible({ timeout: 5000 });
+  console.log('✓ Reference output path preview shows extracted data: "4"');
+
+  console.log('✓ JSONPath preview functionality working correctly!');
+
+  // Close modal without submitting
+  await modal.locator('button:has-text("×")').first().click();
+  await expect(modal).not.toBeVisible();
+
+  console.log('--- JSONPath Preview Test Complete ✓ ---');
 });
 
 test('should show no result (not fallback) when reference-output is missing', async ({ page }) => {
