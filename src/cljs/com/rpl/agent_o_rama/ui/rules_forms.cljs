@@ -234,8 +234,9 @@
              
              ;; Clear button (X) when dataset is selected
              (when (and value (not (str/blank? value)))
-               ($ :button.absolute.right-2.top-1/2.-translate-y-1/2.text-gray-400.hover:text-gray-600
+               ($ :button
                   {:type "button"
+                   :className "absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                    :onClick handle-clear
                    :onMouseDown #(.preventDefault %)} ; Prevent input blur
                   ($ XMarkIcon {:className "h-4 w-4"}))))
