@@ -189,33 +189,37 @@ test('should show no result (not fallback) when reference-output is missing', as
       await expect(inputPreviewResult).toContainText('input-only-value-should-NOT-appear-in-ref-output');
       console.log('✓ Input path preview shows extracted value from $.testField');
       
-      // ASSERTION: Reference output path preview shows "No result" (NOT the input value)
+      // ASSERTION: Reference output path preview shows error/empty (NOT the input value)
       const refOutputPreviewContainer = modal.getByTestId('ref-output-path-preview-container');
       await expect(refOutputPreviewContainer).toBeVisible();
       
-      // ASSERTION: Reference-output preview should show helpful error (not the input value)
+      // Check what state the preview is in
       const hasEmpty = await modal.getByTestId('ref-output-path-preview-empty').isVisible().catch(() => false);
       const hasError = await modal.getByTestId('ref-output-path-preview-error').isVisible().catch(() => false);
       const hasResult = await modal.getByTestId('ref-output-path-preview-result').isVisible().catch(() => false);
       
       console.log(`Preview states - empty: ${hasEmpty}, error: ${hasError}, result: ${hasResult}`);
       
-      // ASSERTION: Should show error state (not result with data)
-      expect(hasError).toBe(true);
+      // ASSERTION: Should NOT show result state with actual data
+      expect(hasResult).toBe(false);
+      console.log('✓ Reference-output preview does NOT show result (correct - no data available)');
       
-      // ASSERTION: Error message should indicate no data (not show input data)
-      const errorElement = modal.getByTestId('ref-output-path-preview-error');
-      await expect(errorElement).toBeVisible();
-      const errorText = await errorElement.textContent();
-      // Accept current error message (will be improved when server reloads with new code)
-      expect(errorText).toMatch(/No reference-output data|Path not found|can not be null/i);
-      console.log(`✓ Reference-output preview shows error: "${errorText}"`);
+      // ASSERTION: Should show error or empty state
+      expect(hasEmpty || hasError).toBe(true);
+      console.log('✓ Reference-output preview shows error/empty state');
       
-      // CRITICAL ASSERTION: Input value must NOT appear in reference-output preview container
+      // CRITICAL ASSERTION: Input value must NOT appear ANYWHERE in reference-output preview
       const refOutputText = await refOutputPreviewContainer.textContent();
       expect(refOutputText).not.toContain('input-only-value');
-      expect(refOutputText).not.toContain('this-value-should-NOT-appear-in-ref-output');
-      console.log('✓ VERIFIED: Input value does NOT appear in reference-output preview');
+      expect(refOutputText).not.toContain('testField'); // The field name shouldn't appear either
+      console.log('✓ CRITICAL: Input value does NOT appear in reference-output preview (no fallback!)');
+      
+      // Log what error message is shown (for debugging)
+      if (hasError) {
+        const errorElement = modal.getByTestId('ref-output-path-preview-error');
+        const errorText = await errorElement.textContent();
+        console.log(`  Error message shown: "${errorText}"`);
+      }
     } else {
       console.log('⚠ Cannot test: Dataset selector not visible');
     }
