@@ -326,16 +326,15 @@
                   (h/read-json-path source-data expression)
 
                   :template 
-                  (let [template-obj (if (string? expression)
-                                       ;; If it looks like a JSON object/array string, parse it
-                                       ;; Otherwise treat as a raw string template
-                                       (try 
-                                         (if (or (str/starts-with? (str/trim expression) "{")
-                                                 (str/starts-with? (str/trim expression) "["))
-                                           (j/read-value expression)
-                                           expression)
-                                         (catch Exception _ expression))
-                                       expression)]
+                  (let [template-obj
+                        (if (string? expression)
+                          ;; If it looks like a JSON object/array string, parse it
+                          ;; Otherwise treat as a raw string template
+                          (if (or (str/starts-with? (str/trim expression) "{")
+                                  (str/starts-with? (str/trim expression) "["))
+                            (j/read-value expression)
+                            expression)
+                          expression)]
                     (h/resolve-json-path-template template-obj source-data)))
                 (catch Exception e
                   (let [msg (or (.getMessage e) "")]
