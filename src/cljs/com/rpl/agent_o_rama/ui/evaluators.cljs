@@ -9,7 +9,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.forms :as forms]
-   [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [EvaluatorPreviewSection]]
+   [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [SimpleDatasetSelector ExpressionPreview]]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -150,7 +150,10 @@
         builder-options (get-in selected-builder [:spec :options] {})
         show-input-path? (get builder-options :input-path? true)
         show-output-path? (get builder-options :output-path? true)
-        show-ref-output-path? (get builder-options :reference-output-path? true)]
+        show-ref-output-path? (get builder-options :reference-output-path? true)
+
+        ;; Shared state for preview dataset selection
+        [preview-dataset set-preview-dataset] (uix/use-state nil)]
 
     ($ forms/form
        ($ forms/form-field {:label "Name"
@@ -192,32 +195,62 @@
        (when (or show-input-path? show-output-path? show-ref-output-path?)
          ($ :div.mt-6.pt-4.border-t
             ($ :h3.text-lg.font-medium.text-gray-900.mb-4 "JSONPath Configuration")
-            ($ :div.space-y-4
-               (when show-input-path?
-                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
-                                      :value input-json-path
-                                      :on-change #(set-field! [:input-json-path] %)
-                                      :error (:input-json-path field-errors)}))
-               (when show-output-path?
-                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
-                                      :value output-json-path
-                                      :on-change #(set-field! [:output-json-path] %)
-                                      :error (:output-json-path field-errors)}))
-               (when show-ref-output-path?
-                 ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
-                                      :value reference-output-json-path
-                                      :on-change #(set-field! [:reference-output-json-path] %)
-                                      :error (:reference-output-json-path field-errors)})))
 
-            ;; Add Preview Section
-            ($ EvaluatorPreviewSection
-               {:module-id module-id
-                :input-path input-json-path
-                :output-path output-json-path
-                :ref-path reference-output-json-path
-                :show-input? show-input-path?
-                :show-output? show-output-path?
-                :show-ref? show-ref-output-path?}))))))
+            ;; Shared dataset selector for all previews
+            ($ :div.mb-4.p-3.bg-gray-50.rounded-lg
+               ($ :label.block.text-xs.font-medium.text-gray-700.mb-2 "Preview Dataset (optional)")
+               ($ SimpleDatasetSelector {:module-id module-id
+                                         :value preview-dataset
+                                         :on-change set-preview-dataset}))
+
+            ($ :div.space-y-6
+               ;; Input JSON Path + preview (A-B)
+               (when show-input-path?
+                 ($ :div
+                    ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Input JSON Path" ($ JsonPathTooltip))
+                                         :value input-json-path
+                                         :on-change #(set-field! [:input-json-path] %)
+                                         :error (:input-json-path field-errors)})
+                    (when (and preview-dataset (not (str/blank? input-json-path)))
+                      ($ :div.ml-2.mt-2.p-2.bg-blue-50.rounded.border.border-blue-100
+                         ($ :div.text-xs.font-medium.text-blue-700.mb-1 "Preview:")
+                         ($ ExpressionPreview {:module-id module-id
+                                               :dataset-id preview-dataset
+                                               :expression input-json-path
+                                               :type :path
+                                               :source-field :input})))))
+
+               ;; Output JSON Path + preview (A-B)
+               (when show-output-path?
+                 ($ :div
+                    ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Output JSON Path" ($ JsonPathTooltip))
+                                         :value output-json-path
+                                         :on-change #(set-field! [:output-json-path] %)
+                                         :error (:output-json-path field-errors)})
+                    (when (and preview-dataset (not (str/blank? output-json-path)))
+                      ($ :div.ml-2.mt-2.p-2.bg-blue-50.rounded.border.border-blue-100
+                         ($ :div.text-xs.font-medium.text-blue-700.mb-1 "Preview:")
+                         ($ ExpressionPreview {:module-id module-id
+                                               :dataset-id preview-dataset
+                                               :expression output-json-path
+                                               :type :path
+                                               :source-field :input})))))
+
+               ;; Reference Output JSON Path + preview (A-B)
+               (when show-ref-output-path?
+                 ($ :div
+                    ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
+                                         :value reference-output-json-path
+                                         :on-change #(set-field! [:reference-output-json-path] %)
+                                         :error (:reference-output-json-path field-errors)})
+                    (when (and preview-dataset (not (str/blank? reference-output-json-path)))
+                      ($ :div.ml-2.mt-2.p-2.bg-blue-50.rounded.border.border-blue-100
+                         ($ :div.text-xs.font-medium.text-blue-700.mb-1 "Preview:")
+                         ($ ExpressionPreview {:module-id module-id
+                                               :dataset-id preview-dataset
+                                               :expression reference-output-json-path
+                                               :type :path
+                                               :source-field :reference-output})))))))))))
 
 (forms/reg-form
  :create-evaluator
