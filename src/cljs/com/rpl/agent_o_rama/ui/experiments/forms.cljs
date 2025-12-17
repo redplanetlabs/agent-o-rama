@@ -183,8 +183,8 @@
                               ($ :span
                                  {:className (common/cn
                                               "inline-flex px-2 py-0.5 rounded-full text-xs font-medium"
-                                              (evaluators/get-evaluator-type-badge-style (:type evaluator-info)))}
-                                 (evaluators/get-evaluator-type-display (:type evaluator-info)))))
+                                              (common/get-evaluator-type-badge-style (:type evaluator-info)))}
+                                 (common/get-evaluator-type-display (:type evaluator-info)))))
                          (when (and evaluator-info (not (str/blank? (:description evaluator-info))))
                            ($ :span.text-indigo-600.max-w-xs.truncate (:description evaluator-info))))
                       ($ :button.p-1.rounded-full.transition-colors
