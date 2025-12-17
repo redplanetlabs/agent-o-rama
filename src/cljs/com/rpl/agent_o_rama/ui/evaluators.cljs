@@ -190,7 +190,8 @@
                ($ :label.block.text-xs.font-medium.text-gray-700.mb-2 "Preview on example from dataset")
                ($ DatasetCombobox {:module-id module-id
                                    :value preview-dataset
-                                   :on-change set-preview-dataset}))
+                                   :on-change set-preview-dataset
+                                   :hide-label? true}))
 
             ($ :div.space-y-6
                ;; Input JSON Path + preview (A-B)

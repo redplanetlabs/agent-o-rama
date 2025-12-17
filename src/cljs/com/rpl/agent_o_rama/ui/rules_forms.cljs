@@ -9,7 +9,8 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]
    [clojure.string :as str]
-   ["use-debounce" :refer [useDebounce]]))
+   ["use-debounce" :refer [useDebounce]]
+   ["@heroicons/react/24/outline" :refer [XMarkIcon]]))
 
 (defn action-friendly-name
   "Returns a user-friendly display name for an action builder ID."
@@ -122,8 +123,9 @@
   - :value - Current dataset ID value
   - :on-change - Callback when selection changes
   - :error - Error message to display
-  - :required? - Whether field is required"
-  [{:keys [module-id value on-change error required?]}]
+  - :required? - Whether field is required
+  - :hide-label? - If true, hides the 'Dataset ID' label"
+  [{:keys [module-id value on-change error required? hide-label?]}]
   (let [[search-term set-search-term!] (uix/use-state "")
         [debounced-search] (useDebounce search-term 300)
         [is-open? set-open!] (uix/use-state false)
@@ -163,6 +165,11 @@
                         (on-change (str (:dataset-id dataset)))
                         (set-search-term! (:name dataset))
                         (set-open! false))
+
+        handle-clear (fn []
+                       (on-change nil)
+                       (set-search-term! "")
+                       (set-open! false))
 
         handle-input-focus (fn []
                              (set-open! true)
@@ -207,19 +214,31 @@
 
     ($ :div.relative
        ($ :div.space-y-1
-          ($ :label.block.text-sm.font-medium.text-gray-700
-             "Dataset ID"
-             (when required? ($ :span.text-red-500.ml-1 "*")))
+          ;; Conditionally render label
+          (when-not hide-label?
+            ($ :label.block.text-sm.font-medium.text-gray-700
+               "Dataset ID"
+               (when required? ($ :span.text-red-500.ml-1 "*"))))
 
-          ($ :input {:ref input-ref
-                     :type "text"
-                     :className input-classes
-                     :value search-term
-                     :placeholder "Type to search datasets..."
-                     :onChange handle-input-change
-                     :onFocus handle-input-focus
-                     :onBlur handle-input-blur
-                     :onKeyDown handle-keydown})
+          ;; Input with clear button
+          ($ :div.relative
+             ($ :input {:ref input-ref
+                        :type "text"
+                        :className input-classes
+                        :value search-term
+                        :placeholder "Type to search datasets..."
+                        :onChange handle-input-change
+                        :onFocus handle-input-focus
+                        :onBlur handle-input-blur
+                        :onKeyDown handle-keydown})
+             
+             ;; Clear button (X) when dataset is selected
+             (when (and value (not (str/blank? value)))
+               ($ :button.absolute.right-2.top-1/2.-translate-y-1/2.text-gray-400.hover:text-gray-600
+                  {:type "button"
+                   :onClick handle-clear
+                   :onMouseDown #(.preventDefault %)} ; Prevent input blur
+                  ($ XMarkIcon {:className "h-4 w-4"}))))
 
           (if error
             ($ :p.text-sm.text-red-600.mt-1 error)
@@ -301,6 +320,7 @@
            :error (:error field)
            :allowed-types #{:regular}
            :placeholder "Search for an evaluator..."}))))
+
 
 (defui ActionParamsForm
   [{:keys [form-id action-builders module-id]}]
