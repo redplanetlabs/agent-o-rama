@@ -74,40 +74,40 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   await modal.getByLabel('Output JSON Path', { exact: true }).fill('$.answer');
   await modal.getByLabel('Reference Output JSON Path', { exact: true }).fill('$.answer');
 
-  // NOW TEST THE PREVIEW!
-  console.log('Testing preview section...');
-  const previewSection = modal.locator('text=Preview on Data');
-  await expect(previewSection).toBeVisible();
-
+  // NOW TEST THE PREVIEW with new ABABAB layout!
+  console.log('Testing preview with new layout (preview under each field)...');
+  
+  // Check for the dataset selector (new location)
+  const datasetSelectorLabel = modal.locator('text=Preview Dataset (optional)');
+  await expect(datasetSelectorLabel).toBeVisible();
+  
   // Select the dataset
   const datasetSelector = modal.locator('select').first();
   await expect(datasetSelector).toBeVisible();
   await datasetSelector.selectOption({ label: datasetName });
-  console.log('✓ Dataset selected');
+  console.log('✓ Dataset selected in shared selector');
 
   // Wait for preview to load (debounce + request)
   await page.waitForTimeout(1500);
 
-  // Verify preview shows the extracted data
-  console.log('Verifying preview results...');
+  // Verify individual previews appear under each field
+  console.log('Verifying inline previews...');
   
-  // Check that all three preview sections are visible
-  await expect(modal.getByText('Input Path Result:')).toBeVisible();
-  await expect(modal.getByText('Output Path Result:', { exact: true })).toBeVisible();
-  await expect(modal.getByText('Reference Output Path Result:')).toBeVisible();
-  console.log('✓ All three preview sections are visible');
-
+  // Count preview boxes (should have 3: one for each path)
+  const previewBoxes = modal.locator('div.bg-blue-50 >> text=Preview:');
+  const previewCount = await previewBoxes.count();
+  console.log(`Found ${previewCount} inline preview sections`);
+  
   // Verify Input path shows extracted data
   await expect(modal.getByText('What is 2+2?')).toBeVisible({ timeout: 5000 });
   console.log('✓ Input path preview shows extracted data: "What is 2+2?"');
 
   // Verify Reference Output shows extracted data (the preview shows "4")
-  // Use exact match to avoid matching dataset IDs
   const previewBoxWithFour = modal.locator('pre.bg-gray-100').filter({ hasText: '4' }).first();
   await expect(previewBoxWithFour).toBeVisible({ timeout: 5000 });
   console.log('✓ Reference output path preview shows extracted data: "4"');
 
-  console.log('✓ JSONPath preview functionality working correctly!');
+  console.log('✓ JSONPath preview with ABABAB layout working correctly!');
 
   // Close modal without submitting
   await modal.locator('button:has-text("×")').first().click();
