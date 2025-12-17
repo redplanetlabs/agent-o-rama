@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.forms :as forms]
+   [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [EvaluatorPreviewSection]]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -142,7 +143,7 @@
 
 (defui CreateEvaluatorForm [{:keys [form-id]}]
   (let [form-state (forms/use-form form-id)
-        {:keys [set-field! field-errors selected-builder params input-json-path output-json-path reference-output-json-path]} form-state
+        {:keys [set-field! field-errors selected-builder params input-json-path output-json-path reference-output-json-path module-id]} form-state
         name-field (forms/use-form-field form-id :name)
         description-field (forms/use-form-field form-id :description)
         builder-params (get-in selected-builder [:spec :options :params] {})
@@ -206,7 +207,17 @@
                  ($ forms/form-field {:label ($ :div.flex.items-center.gap-2 "Reference Output JSON Path" ($ JsonPathTooltip))
                                       :value reference-output-json-path
                                       :on-change #(set-field! [:reference-output-json-path] %)
-                                      :error (:reference-output-json-path field-errors)}))))))))
+                                      :error (:reference-output-json-path field-errors)})))
+            
+            ;; Add Preview Section
+            ($ EvaluatorPreviewSection 
+               {:module-id module-id
+                :input-path input-json-path
+                :output-path output-json-path
+                :ref-path reference-output-json-path
+                :show-input? show-input-path?
+                :show-output? show-output-path?
+                :show-ref? show-ref-output-path?}))))))))
 
 (forms/reg-form
  :create-evaluator

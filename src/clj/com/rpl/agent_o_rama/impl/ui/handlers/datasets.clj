@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
    [clojure.string :as str]
    [jsonista.core :as j])
   (:import [java.util UUID])
@@ -279,3 +280,64 @@
                     (aor/add-dataset-example! manager dataset-id input
                                               {:reference-output output}))
                   {:status :ok}))))))
+
+;; =============================================================================
+;; JSONPATH PREVIEW HANDLER
+;; =============================================================================
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/preview-expression
+  [{:keys [manager dataset-id snapshot-name source-field expression type]} uid]
+  (try
+    (let [{:keys [search-examples-query multi-examples-query]}
+          (aor-types/underlying-objects manager)
+
+          ;; 1. Fetch the first example ID from the dataset/snapshot
+          ;; We use the search query with limit 1 to get an ID efficiently
+          search-result (foreign-invoke-query search-examples-query
+                                              dataset-id
+                                              (when-not (str/blank? snapshot-name) snapshot-name)
+                                              {} ; no filters
+                                              1  ; limit 1
+                                              nil)
+          example-summary (first (:examples search-result))]
+
+      (if-not example-summary
+        {:status :ok :result nil :error "No examples found in dataset"}
+        
+        ;; 2. Fetch the full example data
+        (let [full-examples (foreign-invoke-query multi-examples-query
+                                                  dataset-id
+                                                  (when-not (str/blank? snapshot-name) snapshot-name)
+                                                  [(:id example-summary)])
+              example (get full-examples (:id example-summary))
+              
+              ;; 3. Select the source data (input or reference-output)
+              source-data (case source-field
+                            :input (:input example)
+                            :reference-output (:reference-output example)
+                            (:input example)) ;; Default to input
+
+              ;; 4. Apply logic based on type (:path or :template)
+              preview-result 
+              (case type
+                :path 
+                (h/read-json-path source-data expression)
+
+                :template 
+                (let [template-obj (if (string? expression)
+                                     ;; If it looks like a JSON object/array string, parse it
+                                     ;; Otherwise treat as a raw string template
+                                     (try 
+                                       (if (or (str/starts-with? (str/trim expression) "{")
+                                               (str/starts-with? (str/trim expression) "["))
+                                         (j/read-value expression)
+                                         expression)
+                                       (catch Exception _ expression))
+                                     expression)]
+                  (h/resolve-json-path-template template-obj source-data)))]
+
+          {:status :ok 
+           :result (common/->ui-serializable preview-result)
+           :example-preview (common/->ui-serializable source-data)})))
+    (catch Exception e
+      {:status :ok :result nil :error (.getMessage e)})))
