@@ -292,8 +292,8 @@
                     ;; Add preview below the input
                     (when (and dataset-id (not (str/blank? value)))
                       ($ :div.ml-16.mt-1
-                         ($ :div.text-[10px].text-gray-500.mb-1 "Preview (Example 1):")
-                         ($ ExpressionPreview 
+                         ($ :div.text-xs.text-gray-500.mb-1 "Preview (Example 1):")
+                         ($ ExpressionPreview
                             {:module-id module-id
                              :dataset-id dataset-id
                              :snapshot-name snapshot
