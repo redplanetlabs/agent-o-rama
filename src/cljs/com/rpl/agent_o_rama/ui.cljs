@@ -87,15 +87,6 @@
          ;; Render a fallback if no views are matched
          ($ :div.p-8.text-center "Route not found or has no associated view.")))))
 
-(defui main-layout []
-  ($ :div.flex.h-screen.bg-gray-50
-     ($ sidebar-nav)
-     ($ :div.flex-1.flex.flex-col.min-h-0.min-w-0
-        ($ breadcrumb)
-        ($ :div.flex-1.overflow-auto
-           ($ ViewStack))
-        ($ global-modal-component))))
-
 (defonce router-instance (atom nil))
 
 (defui with-router [{:keys [routes children]}]
@@ -368,6 +359,15 @@
 ;; =============================================================================
 ;; MAIN APP COMPONENT
 ;; =============================================================================
+
+(defui main-layout []
+  ($ :div.flex.h-screen.bg-gray-50
+     ($ sidebar-nav)
+     ($ :div.flex-1.flex.flex-col.min-h-0.min-w-0
+        ($ breadcrumb)
+        ($ :div.flex-1.overflow-auto
+           ($ ViewStack))
+        ($ global-modal-component))))
 
 (defui app [] ($ with-router {:routes routes} ($ main-layout)))
 
