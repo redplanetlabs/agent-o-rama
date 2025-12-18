@@ -40,7 +40,7 @@
         ;; 2. The single useEffect to initiate data loading
         _ (uix/use-effect
            (fn []
-             (when (and invoke-id module-id agent-name)
+             (when (and invoke-id module-id agent-name connected?)
                (state/dispatch [:invocation/start-graph-loading
                                 {:invoke-id invoke-id
                                  :module-id module-id
@@ -48,7 +48,7 @@
              ;; Cleanup function
              (fn []
                (state/dispatch [:invocation/cleanup {:invoke-id invoke-id}])))
-           [invoke-id module-id agent-name])
+           [invoke-id module-id agent-name connected?])
 
         ;; Auto-select the first node when graph data loads
         _ (uix/use-effect
