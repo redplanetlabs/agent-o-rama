@@ -94,11 +94,11 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   // Wait for preview to load (debounce + request)
   await page.waitForTimeout(1500);
 
-  // ASSERTIONS: Verify all three preview containers exist
+  // ASSERTIONS: Verify preview containers exist (input and ref-output only)
   await expect(modal.getByTestId('input-path-preview-container')).toBeVisible();
-  await expect(modal.getByTestId('output-path-preview-container')).toBeVisible();
   await expect(modal.getByTestId('ref-output-path-preview-container')).toBeVisible();
-  console.log('✓ All three preview containers visible');
+  // Note: Output path preview was removed from UI (datasets don't have agent output)
+  console.log('✓ Input and reference-output preview containers visible');
 
   // ASSERTION: Input path preview shows extracted data
   const inputPreviewResult = modal.getByTestId('input-path-preview-result');
