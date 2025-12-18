@@ -135,7 +135,7 @@
       (= status :error)
       ($ :div.flex.items-center.justify-center.p-8
          (.log js/console "error" error)
-         ($ :div.text-red-500 "Failed to load invocation: " (str error)))
+         ($ :div.text-red-500 "Failed to load invocation: " (or (when error (str error)) "Unknown error - module or agent may not be loaded")))
 
       ;; Success state but no graph data yet (still loading graph)
       (and (= status :success) (not graph-data))

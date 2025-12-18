@@ -136,7 +136,7 @@
                     (fn [reply]
                       (if (:success reply)
                         (state/dispatch [:invocation/process-graph-page invoke-id (:data reply)])
-                        (state/dispatch [:invocation/fetch-graph-error invoke-id (:error reply)]))))
+                        (state/dispatch [:invocation/fetch-graph-error invoke-id (or (:error reply) "Unknown error occurred")]))))
                    nil))
 
 (state/reg-event :invocation/fetch-graph-error

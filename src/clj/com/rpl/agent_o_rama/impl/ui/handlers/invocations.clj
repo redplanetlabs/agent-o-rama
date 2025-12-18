@@ -29,7 +29,8 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph-page
   [{:keys [client invoke-pair]} _uid]
-  (when client
+  (if-not client
+    (throw (ex-info "No client available - module or agent may not be loaded" {:invoke-pair invoke-pair}))
     (let [;; Get all underlying objects from the agent-specific client
           client-objects (aor-types/underlying-objects client)
           tracing-query (:tracing-query client-objects)

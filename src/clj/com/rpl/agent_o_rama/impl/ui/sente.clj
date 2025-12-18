@@ -58,7 +58,8 @@
         (catch Exception e
           (cljlogging/error e "Error executing handler")
           (when ?reply-fn
-            (?reply-fn {:success false :error (.getMessage e)})))))))
+            (let [error-msg (or (.getMessage e) (str e) "Unknown error occurred")]
+              (?reply-fn {:success false :error error-msg}))))))))
 
 ;; A more robust default handler
 (defmethod -event-msg-handler :default [_])
