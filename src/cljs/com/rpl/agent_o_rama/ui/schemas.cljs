@@ -144,6 +144,9 @@
    (s/optional-key :rules)
    {:refetch-trigger {s/Any s/Any}}})
 
+(s/defschema StreamingStateSchema
+  {:buffers (s/maybe {s/Str s/Any})})
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Top-Level App DB Schema
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -157,4 +160,4 @@
    :forms {s/Keyword FormStateSchema}
    :ui UiSchema
    :sente s/Any ;; don't want to schematize all of sente
-   })
+   (s/optional-key :streaming) StreamingStateSchema})
