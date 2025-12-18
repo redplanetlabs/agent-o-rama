@@ -380,6 +380,8 @@
                   ($ :div.text-gray-500 "Loading graph..."))
       error ($ :div.flex.justify-center.items-center.py-8
                ($ :div.text-red-500 "Error loading graph: " error))
+      (nil? (:graph data)) ($ :div.flex.justify-center.items-center.py-8
+                               ($ :div.text-gray-500 "No graph available"))
       :else ($ agent-graph/graph {:initial-data data
                                   :height "500px"
                                   :selected-node selected-node
