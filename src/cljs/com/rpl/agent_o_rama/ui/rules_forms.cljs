@@ -443,7 +443,7 @@
              "Failed to fetch action builders:"
              (:error reply)))))
        js/undefined)
-     [])
+     [module-id agent-name])
 
     ($ :div.space-y-1
        ($ :label.block.text-sm.font-medium.text-gray-700

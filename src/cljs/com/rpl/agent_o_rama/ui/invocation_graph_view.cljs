@@ -1245,7 +1245,7 @@
                                          (assoc edge :style #js {:strokeDasharray "5 5"
                                                                  :stroke "#aaa"})
                                          edge)))))))
-           [graph-data real-edges implicit-edges])
+           [graph-data real-edges implicit-edges set-nodes set-edges])
 
         ;; Update selected node when selected-node-id changes
         _ (uix/use-effect

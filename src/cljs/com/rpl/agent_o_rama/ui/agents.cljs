@@ -543,7 +543,7 @@
        ;; Cleanup: Clear the form when the component unmounts or agent changes
        (fn []
          (state/dispatch [:form/clear form-id])))
-     [module-id agent-name])
+     [module-id agent-name form-id])
 
     ($ :div.p-4
        ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
