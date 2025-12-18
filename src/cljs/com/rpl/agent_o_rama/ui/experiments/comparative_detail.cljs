@@ -73,7 +73,7 @@
                  (set-selected-selector (first selector-eval-names)))
                (when (some? selected-selector)
                  (set-selected-selector nil))))
-           #js [(count selector-eval-names) (pr-str (sort selector-eval-names)) selected-selector])
+           [(count selector-eval-names) (pr-str (sort selector-eval-names)) selected-selector])
 
         ;; Collect all evaluator metrics for metadata
         all-evals (reduce (fn [acc run]

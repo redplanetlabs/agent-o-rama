@@ -97,7 +97,7 @@
                         (on-change (:name evaluator))
                         (set-search-term! "")
                         (set-open! false)
-                        (when-let [el (.-current input-ref)] (.blur el)))
+                        (when-let [el @input-ref] (.blur el)))
 
         handle-blur #(js/setTimeout (fn [] (set-open! false)) 200)]
 

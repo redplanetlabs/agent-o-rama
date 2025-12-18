@@ -40,7 +40,7 @@
         schedule-close (fn schedule-close []
                          (clear-close!)
                          (let [new-timeout (js/setTimeout (fn []
-                                                            (if (.-current hovering-ref)
+                                                            (if @hovering-ref
                                                               (schedule-close)
                                                               (do (set-open! false)
                                                                   (set-timeout-id! nil))))
@@ -52,30 +52,30 @@
                                  :onClick (fn [] (set-open! (not open?)))
                                  :tabIndex 0
                                  :onMouseEnter (fn []
-                                                 (set! (.-current hovering-ref) true)
+                                                 (reset! hovering-ref true)
                                                  (clear-close!)
                                                  (set-open! true))
                                  :onMouseLeave (fn []
-                                                 (set! (.-current hovering-ref) false)
+                                                 (reset! hovering-ref false)
                                                  (schedule-close))})
        (when open?
          (if html?
            ;; Render as HTML using dangerouslySetInnerHTML
            ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
               {:onMouseEnter (fn []
-                               (set! (.-current hovering-ref) true)
+                               (reset! hovering-ref true)
                                (clear-close!))
                :onMouseLeave (fn []
-                               (set! (.-current hovering-ref) false)
+                               (reset! hovering-ref false)
                                (schedule-close))
                :dangerouslySetInnerHTML {:__html content}})
            ;; Render as React elements/children
            ($ :div.absolute.bottom-full.mb-2.w-64.bg-gray-800.text-white.text-xs.rounded.py-2.px-3.shadow-lg.z-50
               {:onMouseEnter (fn []
-                               (set! (.-current hovering-ref) true)
+                               (reset! hovering-ref true)
                                (clear-close!))
                :onMouseLeave (fn []
-                               (set! (.-current hovering-ref) false)
+                               (reset! hovering-ref false)
                                (schedule-close))}
               content))))))
 
@@ -309,7 +309,7 @@
        (let [handle-click (fn [_] (when open? (close-dropdown)))]
          (.addEventListener js/document "click" handle-click)
          #(.removeEventListener js/document "click" handle-click)))
-     [open?])
+     [open? close-dropdown])
 
     ($ :div.relative.inline-block.text-left.w-full
        ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.disabled:bg-gray-100.cursor-pointer

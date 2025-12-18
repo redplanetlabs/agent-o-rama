@@ -145,7 +145,7 @@
                  (set-dropdown-position {:top (+ (.-bottom rect) 4)
                                          :right (- js/window.innerWidth (.-right rect))})))
              js/undefined)
-           #js [dropdown-open?])
+           [dropdown-open?])
 
         ;; Close dropdown when clicking outside
         _ (uix/use-effect
@@ -157,7 +157,7 @@
                  (fn []
                    (.removeEventListener js/document "click" handle-click))))
              js/undefined)
-           #js [dropdown-open?])
+           [dropdown-open?])
 
         ;; Helper to format metric label
         format-metric-label (fn [m]
