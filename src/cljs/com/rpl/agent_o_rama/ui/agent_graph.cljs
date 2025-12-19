@@ -349,10 +349,10 @@
                                             stat-value (when stats (get stats selected-stat))
                                             ;; Convert stat key to readable label
                                             stat-label (cond
-                                                         (= selected-stat :mean) "Mean"
-                                                         (= selected-stat :min) "Min"
-                                                         (= selected-stat :max) "Max"
-                                                         (= selected-stat :count) "Count"
+                                                         (= selected-stat :mean) "mean"
+                                                         (= selected-stat :min) "min"
+                                                         (= selected-stat :max) "max"
+                                                         (= selected-stat :count) "count"
                                                          (= selected-stat 0.25) "P25"
                                                          (= selected-stat 0.5) "P50"
                                                          (= selected-stat 0.75) "P75"

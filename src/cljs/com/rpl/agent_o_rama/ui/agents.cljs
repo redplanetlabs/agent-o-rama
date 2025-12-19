@@ -278,6 +278,10 @@
           :enabled? (boolean (and module-id agent-name))})]
 
     ($ :div
+       ;; Header
+       ($ :div.p-4.border-b.border-gray-200
+          ($ :h3.text-lg.font-semibold.text-gray-800 "Node Stats"))
+       
        ;; Dropdowns at top of panel
        ($ :div.p-4.border-b.border-gray-200.space-y-3
           ($ :div.flex.items-center.gap-2
@@ -546,7 +550,7 @@
      [module-id agent-name form-id])
 
     ($ :div.p-4
-       ($ :div.text-xl.font-semibold.mb-4 "Agent Details")
+       
 
        ($ :div.flex.gap-4
           ($ :div {:className "w-1/2"}
