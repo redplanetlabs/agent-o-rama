@@ -260,7 +260,7 @@
 
 (defui DropdownRow [{:keys [label selected? on-select delete-button action? icon extra-content data-testid disabled?]}]
   (let [row-classes (cn
-                     "flex items-center justify-between w-full px-4 py-2 text-sm"
+                     "flex items-center justify-between w-full px-4 py-2 text-xs"
                      (if disabled?
                        "text-gray-400 cursor-not-allowed"
                        "cursor-pointer hover:bg-gray-100 focus:bg-gray-100")
@@ -312,7 +312,7 @@
      [open? close-dropdown])
 
     ($ :div.relative.inline-block.text-left.w-full
-       ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.disabled:bg-gray-100.cursor-pointer
+       ($ :button.inline-flex.items-center.justify-between.w-full.px-3.py-2.text-xs.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.disabled:bg-gray-100.cursor-pointer
           {:type "button"
            :disabled disabled?
            :data-testid data-testid
@@ -325,8 +325,8 @@
             {:onClick #(.stopPropagation %)}
             ($ :div.py-1.max-h-60.overflow-y-auto
                (cond
-                 loading? ($ :div.px-4.py-2.text-sm.text-gray-500 "Loading...")
-                 error? ($ :div.px-4.py-2.text-sm.text-red-500 "Error")
+                 loading? ($ :div.px-4.py-2.text-xs.text-gray-500 "Loading...")
+                 error? ($ :div.px-4.py-2.text-xs.text-red-500 "Error")
                  (seq items) (for [{:keys [key label selected? disabled? on-select]} items]
                                ($ DropdownRow {:key key
                                                :label label
@@ -334,7 +334,7 @@
                                                :disabled? disabled?
                                                :on-select #(handle-select on-select)}))
                  empty-content empty-content
-                 :else ($ :div.px-4.py-2.text-sm.text-gray-500 "No options available."))))))))
+                 :else ($ :div.px-4.py-2.text-xs.text-gray-500 "No options available."))))))))
 
 ;; A simple modal component to display pre-formatted text content.
 (defui ContentDetailModal [{:keys [title content]}]

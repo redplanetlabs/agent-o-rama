@@ -324,37 +324,37 @@
              ($ :div.grid.grid-cols-2.gap-4
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Mean Latency")
-                   ($ :div.text-2xl.font-semibold.text-gray-900
+                   ($ :div.text-base.font-semibold.text-gray-900
                       (str (when (:mean node-data) (int (:mean node-data))) "ms")))
 
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Invocations")
-                   ($ :div.text-2xl.font-semibold.text-gray-900
+                   ($ :div.text-base.font-semibold.text-gray-900
                       (or (:count node-data) 0)))
 
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Min Latency")
-                   ($ :div.text-2xl.font-semibold.text-gray-900
+                   ($ :div.text-base.font-semibold.text-gray-900
                       (str (when (:min node-data) (int (:min node-data))) "ms")))
 
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "Max Latency")
-                   ($ :div.text-2xl.font-semibold.text-gray-900
+                   ($ :div.text-base.font-semibold.text-gray-900
                       (str (when (:max node-data) (int (:max node-data))) "ms")))
 
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "P50 Latency")
-                   ($ :div.text-2xl.font-semibold.text-gray-900
+                   ($ :div.text-base.font-semibold.text-gray-900
                       (str (when (get node-data 0.5) (int (get node-data 0.5))) "ms")))
 
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "P90 Latency")
-                   ($ :div.text-2xl.font-semibold.text-gray-900
+                   ($ :div.text-base.font-semibold.text-gray-900
                       (str (when (get node-data 0.9) (int (get node-data 0.9))) "ms")))
 
                 ($ :div.bg-gray-50.p-4.rounded-md
                    ($ :div.text-xs.text-gray-500.uppercase.tracking-wide "P99 Latency")
-                   ($ :div.text-2xl.font-semibold.text-gray-900
+                   ($ :div.text-base.font-semibold.text-gray-900
                       (str (when (get node-data 0.99) (int (get node-data 0.99))) "ms"))))
              ($ :div.p-6.text-center.text-gray-500
                 (str "No data for \"" node-id "\" at " time-label))))))))
