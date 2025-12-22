@@ -21,7 +21,7 @@
    [reitit.coercion :as coercion]
    [reitit.coercion.malli :as malli]
    ["@heroicons/react/24/outline" :refer [HomeIcon CpuChipIcon CircleStackIcon ChevronLeftIcon ChevronRightIcon
-                                          RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon BoltIcon]]
+                                          RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon BoltIcon UserIcon ClipboardDocumentListIcon]]
 
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.sente :as sente]
@@ -32,7 +32,9 @@
    [com.rpl.agent-o-rama.ui.experiments.forms]
    [com.rpl.agent-o-rama.ui.datasets.add-from-trace]
    [com.rpl.agent-o-rama.ui.rules :as rules]
-   [com.rpl.agent-o-rama.ui.action-log :as action-log]))
+   [com.rpl.agent-o-rama.ui.action-log :as action-log]
+   [com.rpl.agent-o-rama.ui.human-metrics :as human-metrics]
+   [com.rpl.agent-o-rama.ui.human-feedback-queues :as human-feedback-queues]))
 
 (def routes
   [""
@@ -52,6 +54,8 @@
        ["/comparative-experiments" {:name :module/dataset-detail.comparative-experiments, :views [comparative-experiments/index]}]
        ["/comparative-experiments/:experiment-id" {:name :module/dataset-detail.comparative-experiment-detail, :views [comparative-experiments-detail/detail-page]}]]]
      ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
+     ["/human-metrics" {:name :module/human-metrics, :views [human-metrics/index]}]
+     ["/human-feedback-queues" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
      ["/global-config" {:name :module/global-config, :views [global-config-page/page]}]
      ["/agent/:agent-name"
       ["" {:name :agent/detail, :views [agents/agent]}]
@@ -168,6 +172,16 @@
                     :location location :collapsed? collapsed? :title "Evaluations"}
           ($ BeakerIcon {:className "h-5 w-5 flex-shrink-0"})
           (when-not collapsed? ($ :span.ml-3 "Evaluators")))
+
+       ($ nav-link {:href (rfe/href :module/human-metrics {:module-id module-id})
+                    :location location :collapsed? collapsed? :title "Human Metrics"}
+          ($ UserIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Human Metrics")))
+
+       ($ nav-link {:href (rfe/href :module/human-feedback-queues {:module-id module-id})
+                    :location location :collapsed? collapsed? :title "Human Feedback Queues"}
+          ($ ClipboardDocumentListIcon {:className "h-5 w-5 flex-shrink-0"})
+          (when-not collapsed? ($ :span.ml-3 "Human Feedback Queues")))
 
        ($ nav-link {:href (rfe/href :module/global-config {:module-id module-id})
                     :location location :collapsed? collapsed? :title "Global Config"}
@@ -318,6 +332,8 @@
                                  {:label (case route-name
                                            :module/datasets "Datasets"
                                            :module/evaluations "Evaluations"
+                                           :module/human-metrics "Human Metrics"
+                                           :module/human-feedback-queues "Human Feedback Queues"
                                            :module/detail "Dashboard"
                                            "Module")
                                   :path nil}] ; Current page
