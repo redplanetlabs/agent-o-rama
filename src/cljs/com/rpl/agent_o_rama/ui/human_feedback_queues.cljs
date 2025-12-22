@@ -330,7 +330,7 @@
          ;; Comment
          (when (:comment current-item)
            ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4.mb-6
-              ($ :div.text-sm.font-medium.text-blue-900 "Context")
+              ($ :div.text-sm.font-medium.text-blue-900 "Feedback Request Comment")
               ($ :div.text-sm.text-blue-800 (:comment current-item))))
          
          ;; Input/Output Display
