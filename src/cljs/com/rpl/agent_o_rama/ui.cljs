@@ -59,11 +59,12 @@
       ["" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
       ["/:queue-id"
        ["" {:name :module/human-feedback-queue-detail, :views [human-feedback-queues/detail]}]
-       ["/end" {:name :module/human-feedback-queue-end, :views [human-feedback-queues/queue-end]}]
-       ["/items/:item-id" {:name :module/human-feedback-queue-item, :views [human-feedback-queues/item-detail]}]]]
+       ["/items/:item-id" {:name :module/human-feedback-queue-item, :views [human-feedback-queues/item-detail]}]
+       ["/end" {:name :module/human-feedback-queue-end, :views [human-feedback-queues/queue-end]}]]]
      ["/global-config" {:name :module/global-config, :views [global-config-page/page]}]
      ["/agent/:agent-name"
       ["" {:name :agent/detail, :views [agents/agent]}]
+
       ["/invocations"
        ["" {:name :agent/invocations, :views [agents/invocations]}]
        ["/:invoke-id" {:name :agent/invocation-detail, :views [agents/invoke]}]]
