@@ -55,7 +55,9 @@
        ["/comparative-experiments/:experiment-id" {:name :module/dataset-detail.comparative-experiment-detail, :views [comparative-experiments-detail/detail-page]}]]]
      ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
      ["/human-metrics" {:name :module/human-metrics, :views [human-metrics/index]}]
-     ["/human-feedback-queues" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
+     ["/human-feedback-queues"
+      ["" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
+      ["/:queue-id" {:name :module/human-feedback-queue-detail, :views [human-feedback-queues/detail]}]]
      ["/global-config" {:name :module/global-config, :views [global-config-page/page]}]
      ["/agent/:agent-name"
       ["" {:name :agent/detail, :views [agents/agent]}]
@@ -272,7 +274,7 @@
 
 (defui breadcrumb []
   (let [match (state/use-sub [:route])
-        {:keys [module-id agent-name dataset-id invoke-id rule-name]} (or (:path-params match) {})
+        {:keys [module-id agent-name dataset-id invoke-id rule-name queue-id]} (or (:path-params match) {})
         route-name (get-in match [:data :name])
 
         ;; Build breadcrumb items based on current route
@@ -314,6 +316,15 @@
                                            :agent/config "Config"
                                            :agent/stats "Stats"
                                            "Agent")
+                                  :path nil}] ; Current page
+
+                                ;; Queue detail
+                                (and module-id queue-id)
+                                [{:label (common/url-decode module-id)
+                                  :path (rfe/href :module/detail {:module-id module-id})}
+                                 {:label "Human Feedback Queues"
+                                  :path (rfe/href :module/human-feedback-queues {:module-id module-id})}
+                                 {:label (common/url-decode queue-id)
                                   :path nil}] ; Current page
 
                                 ;; Dataset detail
