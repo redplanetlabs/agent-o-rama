@@ -398,8 +398,21 @@
                             props))
    :validators {:name [forms/required]
                 :rubrics [(fn [rubrics _form-state]
-                            (when (empty? rubrics)
-                              "At least one rubric is required"))]}
+                            (cond
+                              (empty? rubrics)
+                              "At least one rubric is required"
+
+                              :else
+                              ;; Check for duplicate metrics
+                              (let [metric-names (->> rubrics
+                                                      (map :metric)
+                                                      (filter some?))
+                                    duplicates (->> metric-names
+                                                    frequencies
+                                                    (filter #(> (val %) 1))
+                                                    (map key))]
+                                (when (seq duplicates)
+                                  (str "Duplicate metrics: " (str/join ", " duplicates))))))]}
    :ui (fn [{:keys [form-id props]}]
          (let [{:keys [module-id]} props
                name-field (forms/use-form-field form-id :name)
