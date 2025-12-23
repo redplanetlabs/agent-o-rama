@@ -265,11 +265,27 @@
                                                   :placeholder "10"}
                                                  max-field))))
                 
-                ;; Categorical field
-                ($ forms/form-field (merge {:label "Options (comma separated)"
-                                            :required? true
-                                            :placeholder "Good, Bad, Average"}
-                                           categories-field))))))
+                ;; Categorical field with preview
+                ($ :div
+                   ($ forms/form-field (merge {:label "Options (comma separated)"
+                                               :required? true
+                                               :placeholder "Good, Bad, Average"}
+                                              categories-field))
+                   
+                   ;; Preview pillboxes
+                   (let [cat-value (:value categories-field)
+                         categories (when-not (str/blank? cat-value)
+                                     (->> (str/split cat-value #",")
+                                          (map str/trim)
+                                          (filter #(not (str/blank? %)))))]
+                     (when (seq categories)
+                       ($ :div.mt-2
+                          ($ :div.text-xs.text-gray-500.mb-1 "Preview:")
+                          ($ :div.flex.flex-wrap.gap-2
+                             (for [category categories]
+                               ($ :span.inline-flex.items-center.px-3.py-1.rounded-full.text-sm.font-medium.bg-purple-100.text-purple-700
+                                  {:key category}
+                                  category)))))))))))
    :modal-props {:title "Create Human Metric"
                 :submit-text "Create"}}
   
