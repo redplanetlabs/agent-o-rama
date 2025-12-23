@@ -930,5 +930,5 @@
              {:onClick #(rfe/push-state :module/human-feedback-queue-detail
                                         {:module-id module-id
                                          :queue-id queue-id})}
-             "Back to Queue")))))
+             "Back to Queue"))))))
 
