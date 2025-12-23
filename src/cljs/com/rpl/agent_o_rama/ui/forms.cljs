@@ -244,25 +244,28 @@
                   (:component data)))))
        (.-body js/document)))))
 
-(defn required [value] (when (str/blank? value) "This field is required"))
+(defn required 
+  "Validator for required fields. Accepts optional field-data for consistency."
+  [value & _field-data] 
+  (when (str/blank? value) "This field is required"))
 
 (defn min-length
   "Validator for minimum string length"
   [n]
-  (fn [value]
+  (fn [value & _field-data]
     (when (and (string? value) (< (count value) n))
       (str "Must be at least " n " characters long"))))
 
 (defn max-length
   "Validator for maximum string length"
   [n]
-  (fn [value]
+  (fn [value & _field-data]
     (when (and (string? value) (> (count value) n))
       (str "Must be no more than " n " characters long"))))
 
 (defn valid-json
-  "Validator for JSON strings"
-  [value]
+  "Validator for JSON strings. Accepts optional field-data for consistency."
+  [value & _field-data]
   (when-not (str/blank? value)
     (try
       (js/JSON.parse value)
@@ -275,14 +278,17 @@
    Returns a map {:valid? boolean :errors {nested-error-map}}
 
    The form-state contains both field data and metadata. We need to extract
-   only the field data for validation by excluding known metadata keys."
+   only the field data for validation by excluding known metadata keys.
+   
+   Validators receive both the field value and the full field-data for cross-field validation."
   [form-state validators]
   (let [metadata-keys #{:field-errors :valid? :submitting? :error :current-step :steps :set-field! :next-step! :prev-step! :submit!}
         field-data (apply dissoc form-state metadata-keys)]
     (reduce-kv
      (fn [acc path validator-fns]
        (let [value (s/select-one path field-data)
-             first-error (some #(% value) validator-fns)]
+             ;; Pass both value and field-data to validator functions
+             first-error (some #(% value field-data) validator-fns)]
          (if first-error
            (-> acc
                (assoc :valid? false)
