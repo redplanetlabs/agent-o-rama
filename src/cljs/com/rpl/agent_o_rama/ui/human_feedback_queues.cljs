@@ -355,6 +355,7 @@
   ($ :div.flex.items-start.gap-2 {:data-testid (str "rubric-" index)}
      ;; Searchable metric selector
      ($ :div.flex-1
+        {:key "selector"}
         ($ ss/SearchableSelector
            {:module-id module-id
             :value value
@@ -373,6 +374,7 @@
 
      ;; Required checkbox
      ($ :label.flex.items-center.gap-1.pt-2
+        {:key "checkbox"}
         ($ :input.rounded.border-gray-300
            {:data-testid "metric-required-checkbox"
             :type "checkbox"
@@ -382,7 +384,8 @@
 
      ;; Remove button
      ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
-        {:data-testid "remove-rubric-button"
+        {:key "remove"
+         :data-testid "remove-rubric-button"
          :type "button"
          :onClick on-remove}
         ($ TrashIcon {:className "h-5 w-5"}))))

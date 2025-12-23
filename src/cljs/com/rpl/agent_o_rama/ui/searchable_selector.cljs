@@ -97,8 +97,7 @@
                             (do
                               (on-change item-id)
                               (set-search-term! (item-label-fn item))
-                              (set-open! false)
-                              (when-let [el @input-ref] (.blur el))))))
+                              (set-open! false)))))
 
         handle-clear (fn []
                        (on-change (if multi-select? [] nil))
