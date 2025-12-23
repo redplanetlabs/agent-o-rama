@@ -320,6 +320,46 @@ export function shouldSkipCleanup() {
 }
 
 /**
+ * Deletes a human metric via the UI.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @param {string} name - The name of the metric to delete.
+ * @returns {Promise<void>}
+ */
+export async function deleteHumanMetric(page, name) {
+  if (shouldSkipCleanup()) {
+    console.log(`⏭️  Skipping cleanup: Keeping metric "${name}" (set SKIP_CLEANUP=false to enable cleanup)`);
+    return;
+  }
+  
+  console.log(`Deleting metric: ${name}`);
+  
+  // Set up dialog handler before clicking delete
+  let dialogHandled = false;
+  const dialogHandler = async (dialog) => {
+    if (!dialogHandled) {
+      dialogHandled = true;
+      console.log(`Accepting confirmation dialog: ${dialog.message()}`);
+      try {
+        await dialog.accept();
+      } catch (e) {
+        console.log(`Dialog already handled: ${e.message}`);
+      }
+    }
+  };
+  page.once('dialog', dialogHandler);
+  
+  const metricRow = page.locator('table tbody tr').filter({ hasText: name });
+  await metricRow.getByRole('button', { name: 'Delete' }).click();
+  
+  // Wait a bit for dialog to appear and be handled
+  await page.waitForTimeout(500);
+  
+  // Wait for the row to disappear after deletion
+  await expect(metricRow).not.toBeVisible({ timeout: 10000 });
+  console.log(`Successfully deleted metric: ${name}`);
+}
+
+/**
  * Adds an evaluator to an experiment form using the new search-based selector.
  * This function works with the searchable evaluator selector introduced in the UI refactoring.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
