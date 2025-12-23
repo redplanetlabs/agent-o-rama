@@ -79,11 +79,11 @@
 (defui metrics-index []
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
         decoded-module-id (common/url-decode module-id)
-        
+
         ;; Search state
         [search-term set-search-term] (useState "")
         [debounced-search] (useDebounce search-term 300)
-        
+
         ;; Use paginated query
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
         (queries/use-paginated-query
@@ -94,21 +94,21 @@
                                     {:search-string debounced-search})}]
           :page-size 20
           :enabled? (boolean module-id)})
-        
+
         handle-delete (uix/use-callback
                        (fn [metric-name]
                          (when (js/confirm (str "Delete metric '" metric-name "'?"))
                            (sente/request!
                             [:human-feedback/delete-metric {:module-id module-id
-                                                           :name metric-name}]
+                                                            :name metric-name}]
                             10000
                             (fn [reply]
                               (if (:success reply)
                                 (state/dispatch [:query/invalidate
-                                               {:query-key-pattern [:human-metrics module-id]}])
+                                                 {:query-key-pattern [:human-metrics module-id]}])
                                 (js/alert (str "Error: " (:error reply))))))))
                        [module-id])]
-    
+
     ($ :div.p-6
        ;; Header
        ($ :div.flex.justify-between.items-center.mb-6
@@ -117,7 +117,7 @@
              {:data-testid "create-metric-button"
               :onClick #(state/dispatch [:modal/show-form :create-human-metric {:module-id module-id}])}
              "+ Create Metric"))
-       
+
        ;; Search
        ($ :div.mb-4
           ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
@@ -125,22 +125,22 @@
               :placeholder "Search metrics..."
               :value search-term
               :onChange #(set-search-term (.. % -target -value))}))
-       
+
        ;; Table
        (cond
          isLoading
          ($ :div.flex.justify-center.items-center.py-12
             ($ common/spinner {:size :medium}))
-         
+
          error
          ($ :div.text-red-600 "Error loading metrics: " (str error))
-         
+
          (empty? data)
          ($ :div.text-center.py-12.text-gray-500
             (if (str/blank? search-term)
               "No metrics defined yet. Create one to get started."
               "No metrics match your search."))
-         
+
          :else
          ($ :div {:className (:container common/table-classes)}
             ($ :table {:className (:table common/table-classes)}
@@ -172,17 +172,17 @@
                                 (cond
                                   is-numeric?
                                   (str "Range: " (:min metric-def) " - " (:max metric-def))
-                                  
+
                                   is-category?
                                   (str "Options: " (str/join ", " (:categories metric-def)))))
                              ($ :td {:className (:td-right common/table-classes)}
                                 ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
                                    {:onClick (fn [e]
-                                              (.stopPropagation e)
-                                              (handle-delete metric-name))}
+                                               (.stopPropagation e)
+                                               (handle-delete metric-name))}
                                    ($ TrashIcon {:className "h-4 w-4 mr-1"})
                                    "Delete")))))))
-            
+
             ;; Load More button
             (when hasMore
               ($ :tfoot.bg-gray-50.border-t.border-gray-200
@@ -213,52 +213,52 @@
                             props))
    :validators {:name [forms/required]
                 :categories [(fn [v form-state]
-                              (when (= (:type form-state) :categorical)
-                                (cond
-                                  (str/blank? v)
-                                  "Categories are required for categorical metrics"
-                                  
-                                  :else
-                                  (let [categories (->> (str/split v #",")
-                                                       (map str/trim)
-                                                       (filter #(not (str/blank? %))))]
-                                    (cond
-                                      (empty? categories)
-                                      "At least two categories are required"
-                                      
-                                      (= (count categories) 1)
-                                      "At least two categories are required"
-                                      
-                                      (not= (count categories) (count (set categories)))
-                                      "Duplicate categories are not allowed"
-                                      
-                                      :else nil)))))]
+                               (when (= (:type form-state) :categorical)
+                                 (cond
+                                   (str/blank? v)
+                                   "Categories are required for categorical metrics"
+
+                                   :else
+                                   (let [categories (->> (str/split v #",")
+                                                         (map str/trim)
+                                                         (filter #(not (str/blank? %))))]
+                                     (cond
+                                       (empty? categories)
+                                       "At least two categories are required"
+
+                                       (= (count categories) 1)
+                                       "At least two categories are required"
+
+                                       (not= (count categories) (count (set categories)))
+                                       "Duplicate categories are not allowed"
+
+                                       :else nil)))))]
                 :min [(fn [v form-state]
-                       (when (= (:type form-state) :numeric)
-                         (cond
-                           (or (str/blank? (str v))
-                               (js/isNaN (js/parseFloat v)))
-                           "Min must be a number"
-                           
-                           :else
-                           (let [min-val (js/parseFloat v)
-                                 max-val (js/parseFloat (:max form-state))]
-                             (when (and (not (js/isNaN max-val))
-                                       (>= min-val max-val))
-                               "Min must be less than Max")))))]
+                        (when (= (:type form-state) :numeric)
+                          (cond
+                            (or (str/blank? (str v))
+                                (js/isNaN (js/parseFloat v)))
+                            "Min must be a number"
+
+                            :else
+                            (let [min-val (js/parseFloat v)
+                                  max-val (js/parseFloat (:max form-state))]
+                              (when (and (not (js/isNaN max-val))
+                                         (>= min-val max-val))
+                                "Min must be less than Max")))))]
                 :max [(fn [v form-state]
-                       (when (= (:type form-state) :numeric)
-                         (cond
-                           (or (str/blank? (str v))
-                               (js/isNaN (js/parseFloat v)))
-                           "Max must be a number"
-                           
-                           :else
-                           (let [min-val (js/parseFloat (:min form-state))
-                                 max-val (js/parseFloat v)]
-                             (when (and (not (js/isNaN min-val))
-                                       (<= max-val min-val))
-                               "Max must be greater than Min")))))]}
+                        (when (= (:type form-state) :numeric)
+                          (cond
+                            (or (str/blank? (str v))
+                                (js/isNaN (js/parseFloat v)))
+                            "Max must be a number"
+
+                            :else
+                            (let [min-val (js/parseFloat (:min form-state))
+                                  max-val (js/parseFloat v)]
+                              (when (and (not (js/isNaN min-val))
+                                         (<= max-val min-val))
+                                "Max must be greater than Min")))))]}
    :ui (fn [{:keys [form-id]}]
          (let [type-field (forms/use-form-field form-id :type)
                name-field (forms/use-form-field form-id :name)
@@ -271,7 +271,7 @@
                                           :required? true
                                           :placeholder "e.g., helpfulness, accuracy"}
                                          name-field))
-              
+
               ;; Type selector
               ($ :div.space-y-1
                  ($ :label.block.text-sm.font-medium.text-gray-700
@@ -282,7 +282,7 @@
                      :onChange #((:on-change type-field) (keyword (.. % -target -value)))}
                     ($ :option {:value "numeric"} "Numeric Range")
                     ($ :option {:value "categorical"} "Categorical (Options)")))
-              
+
               ;; Conditional fields based on type
               (if (= (:value type-field) :numeric)
                 ;; Numeric fields
@@ -299,20 +299,20 @@
                                                   :required? true
                                                   :placeholder "10"}
                                                  max-field))))
-                
+
                 ;; Categorical field with preview
                 ($ :div
                    ($ forms/form-field (merge {:label "Options (comma separated)"
                                                :required? true
                                                :placeholder "Good, Bad, Average"}
                                               categories-field))
-                   
+
                    ;; Preview pillboxes
                    (let [cat-value (:value categories-field)
                          categories (when-not (str/blank? cat-value)
-                                     (->> (str/split cat-value #",")
-                                          (map str/trim)
-                                          (filter #(not (str/blank? %)))))]
+                                      (->> (str/split cat-value #",")
+                                           (map str/trim)
+                                           (filter #(not (str/blank? %)))))]
                      (when (seq categories)
                        ($ :div.mt-2
                           ($ :div.text-xs.text-gray-500.mb-1 "Preview:")
@@ -322,8 +322,8 @@
                                   {:key category}
                                   category)))))))))))
    :modal-props {:title "Create Human Metric"
-                :submit-text "Create"}}
-  
+                 :submit-text "Create"}}
+
   :on-submit
   {:event (fn [db form-state]
             (let [{:keys [name type min max categories module-id]} form-state]
@@ -334,7 +334,7 @@
                  (= type :numeric)
                  (assoc :min (js/parseFloat min)
                         :max (js/parseFloat max))
-                 
+
                  (= type :categorical)
                  (assoc :categories categories))]))
    :on-success-invalidate (fn [db {:keys [module-id]} _reply]
@@ -357,9 +357,9 @@
             :value value
             :on-change on-change
             :sente-event-fn (fn [mid search-string]
-                             [:human-feedback/get-metrics
-                              {:module-id mid
-                               :filters {:search-string search-string}}])
+                              [:human-feedback/get-metrics
+                               {:module-id mid
+                                :filters {:search-string search-string}}])
             :items-key :items
             :item-id-fn :name
             :item-label-fn :name
@@ -367,7 +367,7 @@
             :label "Metric"
             :hide-label? true
             :data-testid "metric-selector"}))
-     
+
      ;; Required checkbox
      ($ :label.flex.items-center.gap-1.pt-2
         ($ :input.rounded.border-gray-300
@@ -376,29 +376,13 @@
             :checked (boolean required?)
             :onChange #(on-change value {:required (.. % -target -checked)})})
         ($ :span.text-sm.text-gray-600 "Required"))
-     
+
      ;; Remove button
      ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
         {:data-testid "remove-rubric-button"
          :type "button"
          :onClick on-remove}
         ($ TrashIcon {:className "h-5 w-5"}))))
-     
-     ;; Required checkbox
-     ($ :label.flex.items-center.gap-1.pt-2
-        ($ :input.rounded.border-gray-300
-           {:data-testid "metric-required-checkbox"
-            :type "checkbox"
-            :checked (boolean required?)
-            :onChange #(on-change value {:required (.. % -target -checked)})})
-        ($ :span.text-sm.text-gray-600 "Required"))
-     
-     ;; Remove button
-     ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
-        {:data-testid "remove-rubric-button"
-         :type "button"
-         :onClick on-remove}
-        ($ TrashIcon {:className "h-5 w-5"}))
 
 (forms/reg-form
  :create-human-feedback-queue
@@ -411,30 +395,32 @@
                             props))
    :validators {:name [forms/required]
                 :rubrics [(fn [rubrics _form-state]
-                           (when (empty? rubrics)
-                             "At least one rubric is required"))]}
+                            (when (empty? rubrics)
+                              "At least one rubric is required"))]}
    :ui (fn [{:keys [form-id form-state]}]
-         (let [module-id (:module-id form-state)
+         (let [_  (println "Full form-state keys:" (keys form-state))
+               _  (println "Form-state module-id:" (:module-id form-state))
+               module-id (:module-id form-state)
                name-field (forms/use-form-field form-id :name)
                desc-field (forms/use-form-field form-id :description)
                rubrics-field (forms/use-form-field form-id :rubrics)
                rubrics (:value rubrics-field)
-               
+
                add-rubric (fn []
-                           ((:on-change rubrics-field)
-                            (conj rubrics {:metric nil :required false})))
-               
+                            ((:on-change rubrics-field)
+                             (conj rubrics {:metric nil :required false})))
+
                update-rubric (fn [idx metric-name opts]
-                              (let [updated (assoc-in rubrics [idx]
-                                                     (merge {:metric metric-name}
-                                                           opts))]
-                                ((:on-change rubrics-field) updated)))
-               
+                               (let [updated (assoc-in rubrics [idx]
+                                                       (merge {:metric metric-name}
+                                                              opts))]
+                                 ((:on-change rubrics-field) updated)))
+
                remove-rubric (fn [idx]
-                              (let [updated (vec (concat (subvec rubrics 0 idx)
-                                                        (subvec rubrics (inc idx))))]
-                                ((:on-change rubrics-field) updated)))]
-           
+                               (let [updated (vec (concat (subvec rubrics 0 idx)
+                                                          (subvec rubrics (inc idx))))]
+                                 ((:on-change rubrics-field) updated)))]
+
            ($ :div.space-y-4.p-4
               ;; Name field
               ($ forms/form-field (merge {:label "Queue Name"
@@ -442,22 +428,22 @@
                                           :data-testid "queue-name-input"
                                           :placeholder "e.g., support-quality"}
                                          name-field))
-              
+
               ;; Description field
               ($ forms/form-field (merge {:label "Description"
                                           :data-testid "queue-description-input"
                                           :placeholder "What is this queue for?"}
                                          desc-field))
-              
+
               ;; Rubrics section
               ($ :div.space-y-2
                  ($ :label.block.text-sm.font-medium.text-gray-700
                     "Rubrics"
                     ($ :span.text-red-500.ml-1 "*"))
-                 
+
                  ($ :div.text-sm.text-gray-500.mb-2
                     "Add metrics that reviewers should evaluate")
-                 
+
                  ;; Rubric list
                  ($ :div.space-y-2
                     (map-indexed
@@ -469,23 +455,23 @@
                            :value (:metric rubric)
                            :required? (:required rubric)
                            :on-change (fn [metric-name & [opts]]
-                                       (update-rubric idx metric-name opts))
+                                        (update-rubric idx metric-name opts))
                            :on-remove #(remove-rubric idx)}))
                      rubrics))
-                 
+
                  ;; Add rubric button
                  ($ :button.w-full.px-3.py-2.border-2.border-dashed.border-gray-300.rounded-md.text-gray-600.hover:border-gray-400.hover:text-gray-700.transition-colors
                     {:data-testid "add-rubric-button"
                      :type "button"
                      :onClick add-rubric}
                     "+ Add Rubric")
-                 
+
                  ;; Error message
                  (when (:error rubrics-field)
                    ($ :p.text-sm.text-red-600.mt-1 (:error rubrics-field)))))))
    :modal-props {:title "Create Human Feedback Queue"
-                :submit-text "Create"}}
-  
+                 :submit-text "Create"}}
+
   :on-submit
   {:event (fn [db form-state]
             (let [{:keys [name description rubrics module-id]} form-state]
@@ -504,20 +490,20 @@
 (defui index []
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
         decoded-module-id (common/url-decode module-id)
-        
+
         ;; Search state
         [search-term set-search-term] (useState "")
         [debounced-search] (useDebounce search-term 300)
-        
+
         ;; Use paginated query
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
         (queries/use-paginated-query
          {:query-key [:human-feedback-queues module-id debounced-search]
-          :sente-event [:human-feedback/get-queues 
+          :sente-event [:human-feedback/get-queues
                         {:module-id decoded-module-id
                          :filters {:search-string debounced-search}}]
           :page-size 20})]
-    
+
     ($ :div.p-6
        ;; Header with Create Button
        ($ :div.flex.justify-between.items-center.mb-6
@@ -526,7 +512,7 @@
              {:data-testid "create-queue-button"
               :onClick #(state/dispatch [:modal/show-form :create-human-feedback-queue {:module-id module-id}])}
              "+ Create Queue"))
-       
+
        ;; Search bar
        ($ :div.mb-4
           ($ :input.w-full.px-4.py-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
@@ -535,13 +521,13 @@
               :placeholder "Search queues..."
               :value search-term
               :onChange #(set-search-term (-> % .-target .-value))}))
-       
+
        ;; Table or empty state
        (if (and (not isLoading) (empty? data))
          ($ :div.text-center.py-12.bg-gray-50.rounded-md
             {:data-testid "empty-state"}
             ($ :p.text-gray-500 "No queues found"))
-         
+
          ($ :div {:className (:container common/table-classes)}
             ($ :table {:className (:table common/table-classes)}
                ($ :thead {:className (:thead common/table-classes)}
@@ -550,7 +536,7 @@
                      ($ :th {:className (:th common/table-classes)} "Description")
                      ($ :th {:className (:th common/table-classes)} "Rubrics")
                      ($ :th {:className (:th common/table-classes)} "Actions")))
-               
+
                ($ :tbody {:className (:tbody common/table-classes)}
                   (for [queue data]
                     (let [queue-name (:name queue)]
@@ -561,52 +547,51 @@
                          ($ :td {:className (:td common/table-classes)}
                             ($ :a.text-blue-600.hover:text-blue-800.font-medium
                                {:data-testid "queue-name-link"
-                                :href (rfe/href :module/human-feedback-queue-detail 
-                                               {:module-id module-id 
-                                                :queue-id (common/url-encode queue-name)})
+                                :href (rfe/href :module/human-feedback-queue-detail
+                                                {:module-id module-id
+                                                 :queue-id (common/url-encode queue-name)})
                                 :onClick (fn [e]
-                                          (.preventDefault e)
-                                          (rfe/push-state :module/human-feedback-queue-detail
-                                                         {:module-id module-id
-                                                          :queue-id (common/url-encode queue-name)}))}
+                                           (.preventDefault e)
+                                           (rfe/push-state :module/human-feedback-queue-detail
+                                                           {:module-id module-id
+                                                            :queue-id (common/url-encode queue-name)}))}
                                queue-name))
-                         
+
                          ;; Description
                          ($ :td {:className (:td common/table-classes)}
                             ($ :span.text-gray-600 (or (:description queue) "")))
-                         
+
                          ;; Rubrics count
                          ($ :td {:className (:td common/table-classes)}
                             ($ :span.text-gray-600
                                {:data-testid "queue-rubric-count"}
-                               (str (count (:rubrics queue)) " rubric" 
-                                   (if (= 1 (count (:rubrics queue))) "" "s"))))
-                         
+                               (str (count (:rubrics queue)) " rubric"
+                                    (if (= 1 (count (:rubrics queue))) "" "s"))))
+
                          ;; Actions
                          ($ :td {:className (:td common/table-classes)}
                             ($ :button.text-red-600.hover:text-red-800.p-2.rounded
                                {:data-testid "delete-queue-button"
                                 :onClick (fn [e]
-                                          (.stopPropagation e)
-                                          (state/dispatch [:modal/show-confirmation
-                                                          {:title "Delete Queue"
-                                                           :message (str "Are you sure you want to delete \"" queue-name "\"?")
-                                                           :on-confirm #(do
-                                                                         (sente/send! [:human-feedback/delete-queue
-                                                                                      {:module-id decoded-module-id
-                                                                                       :name queue-name}])
-                                                                         (queries/invalidate-query [:human-feedback-queues module-id]))}]))}
+                                           (.stopPropagation e)
+                                           (state/dispatch [:modal/show-confirmation
+                                                            {:title "Delete Queue"
+                                                             :message (str "Are you sure you want to delete \"" queue-name "\"?")
+                                                             :on-confirm #(do
+                                                                            (sente/send! [:human-feedback/delete-queue
+                                                                                          {:module-id decoded-module-id
+                                                                                           :name queue-name}])
+                                                                            (queries/invalidate-query [:human-feedback-queues module-id]))}]))}
                                ($ TrashIcon {:className "h-5 w-5"})))))))
-                  
-                  ;; Load more row
-                  (when hasMore
-                    ($ :tr
-                       ($ :td {:colSpan 4 :className "px-6 py-4 text-center"}
-                          ($ :button.text-blue-600.hover:text-blue-800.font-medium
-                             {:onClick loadMore
-                              :disabled isFetchingMore}
-                             (if isFetchingMore "Loading..." "Load More")))))))))))
 
+                  ;; Load more row
+               (when hasMore
+                 ($ :tr
+                    ($ :td {:colSpan 4 :className "px-6 py-4 text-center"}
+                       ($ :button.text-blue-600.hover:text-blue-800.font-medium
+                          {:onClick loadMore
+                           :disabled isFetchingMore}
+                          (if isFetchingMore "Loading..." "Load More")))))))))))
 
 ;; =============================================================================
 ;; QUEUE DETAIL PAGE
@@ -616,14 +601,14 @@
   ($ :div.bg-white.rounded-md.border.border-gray-200.p-6.mb-6
      ($ :div.flex.justify-between.items-start
         ($ :div
-           ($ :h3.text-lg.font-semibold.text-gray-900.mb-2 
+           ($ :h3.text-lg.font-semibold.text-gray-900.mb-2
               (str "Queue: " queue-id))
            ($ :p.text-gray-600 (:description queue-info)))
         ($ :button.inline-flex.items-center.px-3.py-2.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors
            {:onClick #(js/alert "Edit queue - not yet implemented")}
            ($ PencilIcon {:className "h-5 w-5 mr-2"})
            "Edit Queue"))
-     
+
      ;; Rubrics
      ($ :div.mt-4
         ($ :h4.text-sm.font-medium.text-gray-700.mb-2 "Rubrics:")
@@ -634,8 +619,8 @@
                    is-numeric? (= (:__typename metric) "HumanNumericMetric")]
                ($ :div.flex.items-start.gap-2 {:key (:name rubric)}
                   ($ :span.inline-flex.px-2.py-1.rounded.text-xs.font-medium
-                     {:className (if (:required rubric) 
-                                   "bg-blue-100 text-blue-700" 
+                     {:className (if (:required rubric)
+                                   "bg-blue-100 text-blue-700"
                                    "bg-gray-100 text-gray-600")}
                      (if (:required rubric) "Required" "Optional"))
                   ($ :div
@@ -651,9 +636,9 @@
 (defui queue-item-row [{:keys [item module-id queue-id]}]
   ($ :tr.hover:bg-gray-50.cursor-pointer
      {:onClick #(rfe/push-state :module/human-feedback-queue-item
-                                 {:module-id module-id
-                                  :queue-id queue-id
-                                  :item-id (:id item)})}
+                                {:module-id module-id
+                                 :queue-id queue-id
+                                 :item-id (:id item)})}
      ($ :td.px-4.py-3.text-sm.text-gray-900.font-mono (:id item))
      ($ :td.px-4.py-3.text-sm.text-gray-600 (:comment item))
      ($ :td.px-4.py-3.text-sm.text-gray-600.max-w-xs.truncate
@@ -665,17 +650,17 @@
   (let [{:keys [module-id queue-id]} (state/use-sub [:route :path-params])
         decoded-module-id (common/url-decode module-id)
         decoded-queue-id (common/url-decode queue-id)
-        
+
         ;; Dummy data
         queue-info dummy-queue-info
         queue-items dummy-queue-items]
-    
+
     ($ :div.p-6
        ;; Queue info header
-       ($ queue-info-header {:queue-info queue-info 
+       ($ queue-info-header {:queue-info queue-info
                              :queue-id decoded-queue-id
                              :module-id module-id})
-       
+
        ;; Queue items table
        ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm
           ($ :table.w-full.text-sm
@@ -714,7 +699,7 @@
             ($ :span.text-red-500.ml-1 "*"))
           ($ :div.text-xs.text-gray-500.font-normal.mt-1
              (:description rubric)))
-       
+
        (cond
          is-category?
          ($ :select.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
@@ -724,7 +709,7 @@
             ($ :option {:value ""} "-- Select --")
             (for [category (sort (:categories metric))]
               ($ :option {:key category :value category} category)))
-         
+
          is-numeric?
          ($ :div
             ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
@@ -737,13 +722,13 @@
                 :className (if error "border-red-500" "")})
             ($ :div.text-xs.text-gray-500.mt-1
                (str "Valid range: " (:min metric) " - " (:max metric)))))
-       
+
        (when error
          ($ :div.text-sm.text-red-600.mt-1 error)))))
 
 (defui item-detail []
   (let [{:keys [module-id queue-id item-id]} (state/use-sub [:route :path-params])
-        
+
         ;; Dummy data
         queue-info dummy-queue-info
         items (:items dummy-queue-items)
@@ -753,14 +738,14 @@
         has-next? (< current-idx (dec (count items)))
         prev-item-id (when has-prev? (:id (nth items (dec current-idx))))
         next-item-id (when has-next? (:id (nth items (inc current-idx))))
-        
+
         ;; Form state
         [scores set-scores] (uix/use-state {})
         [comment set-comment] (uix/use-state "")
         [reviewer-name set-reviewer-name] (uix/use-state (get-reviewer-name-from-cookie))
         [errors set-errors] (uix/use-state {})
         [show-dismiss-confirm? set-show-dismiss-confirm] (uix/use-state false)
-        
+
         validate-form (fn []
                         (let [errs (reduce (fn [acc rubric]
                                              (let [metric-name (:name rubric)
@@ -769,7 +754,7 @@
                                                (cond
                                                  (and (:required rubric) (or (nil? value) (= value "")))
                                                  (assoc acc metric-name "This field is required")
-                                                 
+
                                                  (and (= (:__typename metric) "HumanNumericMetric")
                                                       value
                                                       (not= value ""))
@@ -777,22 +762,22 @@
                                                    (cond
                                                      (js/isNaN num-val)
                                                      (assoc acc metric-name "Must be a number")
-                                                     
+
                                                      (< num-val (:min metric))
                                                      (assoc acc metric-name (str "Must be at least " (:min metric)))
-                                                     
+
                                                      (> num-val (:max metric))
                                                      (assoc acc metric-name (str "Must be at most " (:max metric)))
-                                                     
+
                                                      :else acc))
-                                                 
+
                                                  :else acc)))
                                            {}
                                            (:rubrics queue-info))]
                           (if (clojure.string/blank? reviewer-name)
                             (assoc errs :reviewer-name "Reviewer name is required")
                             errs)))
-        
+
         handle-submit (fn []
                         (let [validation-errors (validate-form)]
                           (if (empty? validation-errors)
@@ -809,7 +794,7 @@
                                                 {:module-id module-id
                                                  :queue-id queue-id})))
                             (set-errors validation-errors))))
-        
+
         handle-dismiss (fn []
                          (set-show-dismiss-confirm false)
                          (js/alert "Item dismissed!")
@@ -822,11 +807,11 @@
                            (rfe/push-state :module/human-feedback-queue-detail
                                            {:module-id module-id
                                             :queue-id queue-id})))]
-    
+
     (if-not current-item
       ($ :div.p-6
          ($ :div.text-center.text-gray-500 "Item not found"))
-      
+
       ($ :div.p-6.max-w-5xl.mx-auto
          ;; Header with navigation
          ($ :div.flex.justify-between.items-center.mb-6
@@ -849,13 +834,13 @@
                                                 :queue-id queue-id
                                                 :item-id next-item-id}))}
                   ($ ChevronRightIcon {:className "h-5 w-5"}))))
-         
+
          ;; Comment
          (when (:comment current-item)
            ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4.mb-6
               ($ :div.text-sm.font-medium.text-blue-900 "Feedback Request Comment")
               ($ :div.text-sm.text-blue-800 (:comment current-item))))
-         
+
          ;; Input/Output Display
          ($ :div.grid.grid-cols-2.gap-4.mb-6
             ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
@@ -866,11 +851,11 @@
                ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Output")
                ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64
                   (common/to-json (:output current-item)))))
-         
+
          ;; Evaluation Form
          ($ :div.bg-white.border.border-gray-200.rounded-md.p-6.mb-6
             ($ :h3.text-lg.font-semibold.text-gray-900.mb-4 "Evaluation")
-            
+
             ;; Metric fields
             (for [rubric (:rubrics queue-info)]
               ($ metric-field {:key (:name rubric)
@@ -878,7 +863,7 @@
                                :value (get scores (:name rubric))
                                :on-change #(set-scores (assoc scores (:name rubric) %))
                                :error (get errors (:name rubric))}))
-            
+
             ;; Comment field
             ($ :div.mb-4
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
@@ -888,7 +873,7 @@
                    :onChange #(set-comment (.. % -target -value))
                    :rows 3
                    :placeholder "Add any additional notes..."}))
-            
+
             ;; Reviewer name
             ($ :div.mb-4
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
@@ -902,7 +887,7 @@
                    :className (if (:reviewer-name errors) "border-red-500" "")})
                (when (:reviewer-name errors)
                  ($ :div.text-sm.text-red-600.mt-1 (:reviewer-name errors)))))
-         
+
          ;; Action buttons
          ($ :div.flex.justify-between
             ($ :button.px-4.py-2.border.border-red-300.text-red-700.rounded-md.hover:bg-red-50.transition-colors.inline-flex.items-center
@@ -912,7 +897,7 @@
             ($ :button.px-6.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
                {:onClick handle-submit}
                "Submit & Continue"))
-         
+
          ;; Dismiss confirmation dialog
          (when show-dismiss-confirm?
            ($ :div.fixed.inset-0.bg-black.bg-opacity-50.flex.items-center.justify-center.z-50
