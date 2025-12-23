@@ -349,24 +349,26 @@
    
    Uses SearchableSelector under the hood."
   [{:keys [module-id value on-change on-remove required? index]}]
-  ($ :div.flex.items-start.gap-2 {:data-testid (str "rubric-" index)}
-     ;; Searchable metric selector
-     ($ :div.flex-1
-        ($ ss/SearchableSelector
-           {:module-id module-id
-            :value value
-            :on-change on-change
-            :sente-event-fn (fn [module-id search-string]
-                             [:human-feedback/get-metrics
-                              {:module-id module-id
-                               :filters {:search-string search-string}}])
-            :items-key :items
-            :item-id-fn :name
-            :item-label-fn :name
-            :placeholder "Select metric..."
-            :label "Metric"
-            :hide-label? true
-            :data-testid "metric-selector"}))
+  (let [_ (println "metric-selector module-id:" module-id "index:" index)]
+    ($ :div.flex.items-start.gap-2 {:data-testid (str "rubric-" index)}
+       ;; Searchable metric selector
+       ($ :div.flex-1
+          ($ ss/SearchableSelector
+             {:module-id module-id
+              :value value
+              :on-change on-change
+              :sente-event-fn (fn [mid search-string]
+                               (println "sente-event-fn called with module-id:" mid "search:" search-string)
+                               [:human-feedback/get-metrics
+                                {:module-id mid
+                                 :filters {:search-string search-string}}])
+              :items-key :items
+              :item-id-fn :name
+              :item-label-fn :name
+              :placeholder "Select metric..."
+              :label "Metric"
+              :hide-label? true
+              :data-testid "metric-selector"}))
      
      ;; Required checkbox
      ($ :label.flex.items-center.gap-1.pt-2
@@ -508,7 +510,7 @@
           ($ :h2.text-2xl.font-bold.text-gray-900 "Human Feedback Queues")
           ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.hover:bg-blue-700.transition-colors
              {:data-testid "create-queue-button"
-              :onClick #(state/dispatch [:modal/show-form :create-human-feedback-queue {:module-id decoded-module-id}])}
+              :onClick #(state/dispatch [:modal/show-form :create-human-feedback-queue {:module-id module-id}])}
              "+ Create Queue"))
        
        ;; Search bar
