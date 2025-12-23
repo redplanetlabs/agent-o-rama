@@ -349,26 +349,24 @@
    
    Uses SearchableSelector under the hood."
   [{:keys [module-id value on-change on-remove required? index]}]
-  (let [_ (println "metric-selector module-id:" module-id "index:" index)]
-    ($ :div.flex.items-start.gap-2 {:data-testid (str "rubric-" index)}
-       ;; Searchable metric selector
-       ($ :div.flex-1
-          ($ ss/SearchableSelector
-             {:module-id module-id
-              :value value
-              :on-change on-change
-              :sente-event-fn (fn [mid search-string]
-                               (println "sente-event-fn called with module-id:" mid "search:" search-string)
-                               [:human-feedback/get-metrics
-                                {:module-id mid
-                                 :filters {:search-string search-string}}])
-              :items-key :items
-              :item-id-fn :name
-              :item-label-fn :name
-              :placeholder "Select metric..."
-              :label "Metric"
-              :hide-label? true
-              :data-testid "metric-selector"}))
+  ($ :div.flex.items-start.gap-2 {:data-testid (str "rubric-" index)}
+     ;; Searchable metric selector
+     ($ :div.flex-1
+        ($ ss/SearchableSelector
+           {:module-id module-id
+            :value value
+            :on-change on-change
+            :sente-event-fn (fn [mid search-string]
+                             [:human-feedback/get-metrics
+                              {:module-id mid
+                               :filters {:search-string search-string}}])
+            :items-key :items
+            :item-id-fn :name
+            :item-label-fn :name
+            :placeholder "Select metric..."
+            :label "Metric"
+            :hide-label? true
+            :data-testid "metric-selector"}))
      
      ;; Required checkbox
      ($ :label.flex.items-center.gap-1.pt-2
@@ -385,6 +383,22 @@
          :type "button"
          :onClick on-remove}
         ($ TrashIcon {:className "h-5 w-5"}))))
+     
+     ;; Required checkbox
+     ($ :label.flex.items-center.gap-1.pt-2
+        ($ :input.rounded.border-gray-300
+           {:data-testid "metric-required-checkbox"
+            :type "checkbox"
+            :checked (boolean required?)
+            :onChange #(on-change value {:required (.. % -target -checked)})})
+        ($ :span.text-sm.text-gray-600 "Required"))
+     
+     ;; Remove button
+     ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
+        {:data-testid "remove-rubric-button"
+         :type "button"
+         :onClick on-remove}
+        ($ TrashIcon {:className "h-5 w-5"}))
 
 (forms/reg-form
  :create-human-feedback-queue
@@ -930,5 +944,5 @@
              {:onClick #(rfe/push-state :module/human-feedback-queue-detail
                                         {:module-id module-id
                                          :queue-id queue-id})}
-             "Back to Queue"))))))
+             "Back to Queue")))))
 
