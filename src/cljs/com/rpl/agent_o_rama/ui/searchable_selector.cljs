@@ -195,14 +195,14 @@
           (when error
             ($ :p.text-sm.text-red-600.mt-1 {:data-testid (str data-testid "-error")} error)))
 
-       ;; Dropdown list
+       ;; Dropdown list  
        (when is-open?
-         ($ :div.absolute.w-full.mt-1.bg-white.border.border-gray-300.rounded-md.shadow-lg.max-h-60.overflow-y-auto
-            {:role "listbox"
-             :aria-label (str label " search results")
-             :aria-busy loading?
-             :data-testid (str data-testid "-dropdown")
-             :style {:z-index 9999}}
+         ($ :div {:role "listbox"
+                  :aria-label (str label " search results")
+                  :aria-busy loading?
+                  :data-testid (str data-testid "-dropdown")
+                  :className "absolute w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                  :style {:z-index 999999}}
 
             (cond
               loading?
