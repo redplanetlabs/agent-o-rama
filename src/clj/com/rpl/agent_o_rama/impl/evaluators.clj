@@ -373,7 +373,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
   (:> *pstate-name *task-id *root-id))
 
 (deframaop update-feedback!>
-  [*target *feedback-id *path]
+  [{:keys [*agent-name] :as *target} *feedback-id *path]
   (<<if (not (contains? (po/agent-names-set) *agent-name))
     (:no-agent>)
    (else>)
@@ -412,8 +412,6 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
      (depot-partition-append!
       *human-analytics-depot
       (aor-types/->valid-HumanAnalyticsEvent *target
-                                             nil
-                                             nil
                                              *scores
                                              *current-time-millis)
       :append-ack))
@@ -498,17 +496,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                           [:modified-at (termval *modified-at)]
                           [:source :name (termval *human-name)]
                           [:source :id (termval *new-feedback-id)]
-                         ))
-                        :> *existing)
-     (filter> (some? *existing))
-     (depot-partition-append!
-      *human-analytics-depot
-      (aor-types/->valid-HumanAnalyticsEvent *target
-                                             (get *existing :scores)
-                                             (get *existing :modified-at)
-                                             *scores
-                                             *modified-at)
-      :append-ack)
+                         )))
 
     (case> DeleteHumanFeedback :> {:keys [*target *feedback-id]})
      (update-feedback!> *target
@@ -517,17 +505,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                          :feedback
                          :results
                          (matching-human-feedback *feedback-id)
-                         NONE>)
-                        :> *existing)
-     (filter> (some? *existing))
-     (depot-partition-append!
-      *human-analytics-depot
-      (aor-types/->valid-HumanAnalyticsEvent *target
-                                             (get *existing :scores)
-                                             (get *existing :modified-at)
-                                             nil
-                                             nil)
-      :append-ack)
+                         NONE>))
    )))
 
 ;; for use by AgentManager
