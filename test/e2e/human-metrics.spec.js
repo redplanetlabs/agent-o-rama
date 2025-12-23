@@ -69,15 +69,22 @@ test.describe('Human Metrics', () => {
     await expect(createButton).toBeDisabled();
     console.log('✓ Empty categories validation works');
     
-    // TEST 3: Categorical - duplicate categories validation
-    console.log('Test 3: Validating duplicate categories error');
+    // TEST 3: Categorical - single category validation
+    console.log('Test 3: Validating single category error');
+    await modal.getByLabel('Options (comma separated)').fill('OnlyOne');
+    await expect(modal.getByText('At least two categories are required')).toBeVisible();
+    await expect(createButton).toBeDisabled();
+    console.log('✓ Single category validation works');
+    
+    // TEST 4: Categorical - duplicate categories validation
+    console.log('Test 4: Validating duplicate categories error');
     await modal.getByLabel('Options (comma separated)').fill('Good, Bad, Good');
     await expect(modal.getByText('Duplicate categories are not allowed')).toBeVisible();
     await expect(createButton).toBeDisabled();
     console.log('✓ Duplicate categories validation works');
     
-    // TEST 4: Categorical - preview pillboxes
-    console.log('Test 4: Testing category preview');
+    // TEST 5: Categorical - preview pillboxes
+    console.log('Test 5: Testing category preview');
     await modal.getByLabel('Options (comma separated)').fill('Good, Bad, Average');
     // Verify preview pillboxes appear
     await expect(modal.getByText('Preview:')).toBeVisible();
@@ -90,8 +97,8 @@ test.describe('Human Metrics', () => {
     await modal.getByRole('button', { name: '×' }).click();
     await expect(modal).not.toBeVisible();
 
-    // TEST 5: Numeric - invalid range validation (min >= max)
-    console.log('Test 5: Validating numeric range errors');
+    // TEST 6: Numeric - invalid range validation (min >= max)
+    console.log('Test 6: Validating numeric range errors');
     await page.getByRole('button', { name: '+ Create Metric' }).click();
     await expect(modal).toBeVisible();
     
@@ -109,8 +116,8 @@ test.describe('Human Metrics', () => {
     await expect(createButton).toBeDisabled();
     console.log('✓ Numeric range validation works');
     
-    // TEST 6: Numeric - equal values validation
-    console.log('Test 6: Validating equal min/max error');
+    // TEST 7: Numeric - equal values validation
+    console.log('Test 7: Validating equal min/max error');
     await modal.getByLabel('Min').fill('5');
     await modal.getByLabel('Max').fill('5');
     await expect(modal.getByText('Min must be less than Max')).toBeVisible();
@@ -126,8 +133,8 @@ test.describe('Human Metrics', () => {
     // CREATION TESTS
     // =============================================================================
     
-    // TEST 7: Successfully create a numeric metric
-    console.log('Test 7: Creating numeric metric');
+    // TEST 8: Successfully create a numeric metric
+    console.log('Test 8: Creating numeric metric');
     await page.getByRole('button', { name: '+ Create Metric' }).click();
     await expect(modal).toBeVisible();
     
@@ -148,8 +155,8 @@ test.describe('Human Metrics', () => {
     await expect(numericRow).toBeVisible({ timeout: 5000 });
     console.log(`✓ Successfully created metric: ${numericMetricName}`);
 
-    // TEST 8: Successfully create another metric with different name
-    console.log('Test 8: Creating second metric');
+    // TEST 9: Successfully create another metric with different name
+    console.log('Test 9: Creating second metric');
     await page.getByRole('button', { name: '+ Create Metric' }).click();
     await expect(modal).toBeVisible();
     
@@ -176,8 +183,8 @@ test.describe('Human Metrics', () => {
     // SEARCH TESTS
     // =============================================================================
     
-    // TEST 9: Search functionality
-    console.log('Test 9: Testing search functionality');
+    // TEST 10: Search functionality
+    console.log('Test 10: Testing search functionality');
     const searchInput = page.getByPlaceholder('Search metrics...');
     
     // Search for numeric metric
@@ -207,8 +214,8 @@ test.describe('Human Metrics', () => {
     // =============================================================================
     
     if (!shouldSkipCleanup()) {
-      // TEST 10: Delete metrics
-      console.log('Test 10: Deleting metrics');
+      // TEST 11: Delete metrics
+      console.log('Test 11: Deleting metrics');
       
       // Set up dialog handler
       page.on('dialog', dialog => {

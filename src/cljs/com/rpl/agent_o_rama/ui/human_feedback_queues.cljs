@@ -222,7 +222,10 @@
                                                        (filter #(not (str/blank? %))))]
                                     (cond
                                       (empty? categories)
-                                      "At least one category is required"
+                                      "At least two categories are required"
+                                      
+                                      (= (count categories) 1)
+                                      "At least two categories are required"
                                       
                                       (not= (count categories) (count (set categories)))
                                       "Duplicate categories are not allowed"
