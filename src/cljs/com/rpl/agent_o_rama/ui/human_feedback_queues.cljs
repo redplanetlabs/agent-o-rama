@@ -211,19 +211,49 @@
                             props))
    :validators {:name [forms/required]
                 :categories [(fn [v form-state]
-                              (when (and (= (:type form-state) :categorical)
-                                        (str/blank? v))
-                                "Categories are required for categorical metrics"))]
+                              (when (= (:type form-state) :categorical)
+                                (cond
+                                  (str/blank? v)
+                                  "Categories are required for categorical metrics"
+                                  
+                                  :else
+                                  (let [categories (->> (str/split v #",")
+                                                       (map str/trim)
+                                                       (filter #(not (str/blank? %))))]
+                                    (cond
+                                      (empty? categories)
+                                      "At least one category is required"
+                                      
+                                      (not= (count categories) (count (set categories)))
+                                      "Duplicate categories are not allowed"
+                                      
+                                      :else nil)))))]
                 :min [(fn [v form-state]
-                       (when (and (= (:type form-state) :numeric)
-                                 (or (str/blank? (str v))
-                                     (js/isNaN (js/parseFloat v))))
-                         "Min must be a number"))]
+                       (when (= (:type form-state) :numeric)
+                         (cond
+                           (or (str/blank? (str v))
+                               (js/isNaN (js/parseFloat v)))
+                           "Min must be a number"
+                           
+                           :else
+                           (let [min-val (js/parseFloat v)
+                                 max-val (js/parseFloat (:max form-state))]
+                             (when (and (not (js/isNaN max-val))
+                                       (>= min-val max-val))
+                               "Min must be less than Max")))))]
                 :max [(fn [v form-state]
-                       (when (and (= (:type form-state) :numeric)
-                                 (or (str/blank? (str v))
-                                     (js/isNaN (js/parseFloat v))))
-                         "Max must be a number"))]}
+                       (when (= (:type form-state) :numeric)
+                         (cond
+                           (or (str/blank? (str v))
+                               (js/isNaN (js/parseFloat v)))
+                           "Max must be a number"
+                           
+                           :else
+                           (let [min-val (js/parseFloat (:min form-state))
+                                 max-val (js/parseFloat v)]
+                             (when (and (not (js/isNaN min-val))
+                                       (<= max-val min-val))
+                               "Max must be greater than Min")))))]}
    :ui (fn [{:keys [form-id]}]
          (let [type-field (forms/use-form-field form-id :type)
                name-field (forms/use-form-field form-id :name)
