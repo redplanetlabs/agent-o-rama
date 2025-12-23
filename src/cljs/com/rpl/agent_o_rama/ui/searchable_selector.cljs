@@ -42,97 +42,97 @@
          item-label-fn :name
          multi-select? false
          with-icon? false}}]
-  
+
   (let [[search-term set-search-term!] (uix/use-state "")
         [debounced-search] (useDebounce search-term 300)
         [is-open? set-open!] (uix/use-state false)
         [highlighted-idx set-highlighted-idx!] (uix/use-state 0)
         input-ref (uix/use-ref nil)
-        
+
         ;; Query items
         {:keys [data loading? error query-error refetch]}
         (queries/use-sente-query
          {:query-key [:searchable-selector module-id (str items-key) debounced-search]
           :sente-event (sente-event-fn module-id debounced-search)
           :enabled? true})
-        
+
         items (or (get data items-key) [])
-        
+
         ;; Handle both single and multi-select values
         selected-values (if multi-select?
-                         (set value)
-                         #{value})
-        
+                          (set value)
+                          #{value})
+
         ;; Find selected items
         selected-items (filter #(selected-values (item-id-fn %)) items)
-        
+
         ;; Display value
         display-value (cond
-                       (and (not multi-select?) (seq selected-items))
-                       (item-label-fn (first selected-items))
-                       
-                       (not (str/blank? search-term))
-                       search-term
-                       
-                       :else "")
-        
+                        (and (not multi-select?) (seq selected-items))
+                        (item-label-fn (first selected-items))
+
+                        (not (str/blank? search-term))
+                        search-term
+
+                        :else "")
+
         input-classes (str "w-full p-2 border rounded-md text-sm transition-colors "
-                          (if with-icon? "pl-10 " "")
-                          (if error
-                            "border-red-300 focus:ring-red-500 focus:border-red-500"
-                            "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
-        
+                           (if with-icon? "pl-10 " "")
+                           (if error
+                             "border-red-300 focus:ring-red-500 focus:border-red-500"
+                             "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
+
         ;; Event handlers
         handle-select (fn [item]
-                       (let [item-id (item-id-fn item)]
-                         (if multi-select?
+                        (let [item-id (item-id-fn item)]
+                          (if multi-select?
                            ;; Multi-select: toggle item in set
-                           (if (selected-values item-id)
-                             (on-change (vec (disj selected-values item-id)))
-                             (on-change (vec (conj selected-values item-id))))
+                            (if (selected-values item-id)
+                              (on-change (vec (disj selected-values item-id)))
+                              (on-change (vec (conj selected-values item-id))))
                            ;; Single-select: set value and close
-                           (do
-                             (on-change item-id)
-                             (set-search-term! (item-label-fn item))
-                             (set-open! false)
-                             (when-let [el @input-ref] (.blur el))))))
-        
+                            (do
+                              (on-change item-id)
+                              (set-search-term! (item-label-fn item))
+                              (set-open! false)
+                              (when-let [el @input-ref] (.blur el))))))
+
         handle-clear (fn []
-                      (on-change (if multi-select? [] nil))
-                      (set-search-term! "")
-                      (set-open! false))
-        
+                       (on-change (if multi-select? [] nil))
+                       (set-search-term! "")
+                       (set-open! false))
+
         handle-input-change (fn [e]
-                             (let [v (.. e -target -value)]
-                               (set-search-term! v)
-                               (set-open! true)
-                               (set-highlighted-idx! 0)))
-        
+                              (let [v (.. e -target -value)]
+                                (set-search-term! v)
+                                (set-open! true)
+                                (set-highlighted-idx! 0)))
+
         handle-input-focus (fn []
-                            (set-open! true)
-                            (when (str/blank? search-term)
-                              (set-search-term! "")))
-        
+                             (set-open! true)
+                             (when (str/blank? search-term)
+                               (set-search-term! "")))
+
         handle-input-blur (fn []
                            ;; Delay to allow click on dropdown item
-                           (js/setTimeout #(set-open! false) 200))
-        
+                            (js/setTimeout #(set-open! false) 200))
+
         handle-keydown (fn [e]
-                        (when is-open?
-                          (case (.-key e)
-                            "ArrowDown" (do (.preventDefault e)
-                                            (set-highlighted-idx!
-                                             #(min (dec (count items)) (inc %))))
-                            "ArrowUp" (do (.preventDefault e)
-                                          (set-highlighted-idx!
-                                           #(max 0 (dec %))))
-                            "Enter" (do (.preventDefault e)
-                                        (when (< highlighted-idx (count items))
-                                          (handle-select (nth items highlighted-idx))))
-                            "Escape" (do (.preventDefault e)
-                                         (set-open! false))
-                            nil)))]
-    
+                         (when is-open?
+                           (case (.-key e)
+                             "ArrowDown" (do (.preventDefault e)
+                                             (set-highlighted-idx!
+                                              #(min (dec (count items)) (inc %))))
+                             "ArrowUp" (do (.preventDefault e)
+                                           (set-highlighted-idx!
+                                            #(max 0 (dec %))))
+                             "Enter" (do (.preventDefault e)
+                                         (when (< highlighted-idx (count items))
+                                           (handle-select (nth items highlighted-idx))))
+                             "Escape" (do (.preventDefault e)
+                                          (set-open! false))
+                             nil)))]
+
     ;; Update search term when value changes (single-select only)
     (uix/use-effect
      (fn []
@@ -142,7 +142,7 @@
              (set-search-term! label))))
        js/undefined)
      [value selected-items multi-select? search-term])
-    
+
     ;; Refetch when dropdown opens
     (uix/use-effect
      (fn []
@@ -150,7 +150,7 @@
          (refetch))
        js/undefined)
      [is-open? refetch])
-    
+
     ($ :div.relative
        {:data-testid (str data-testid "-container")}
        ($ :div.space-y-1
@@ -160,13 +160,13 @@
                {:data-testid (str data-testid "-label")}
                label
                (when required? ($ :span.text-red-500.ml-1 "*"))))
-          
+
           ;; Input with optional icon and clear button
           ($ :div.relative
              (when with-icon?
                ($ :div {:className "pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"}
                   ($ MagnifyingGlassIcon {:className "h-5 w-5 text-gray-400"})))
-             
+
              ($ :input {:ref input-ref
                         :data-testid (str data-testid "-input")
                         :type "text"
@@ -178,11 +178,11 @@
                         :onBlur handle-input-blur
                         :onKeyDown handle-keydown
                         :disabled disabled?})
-             
+
              ;; Clear button (X) when value is selected
-             (when (and (not disabled?) 
-                       (or (and (not multi-select?) value)
-                           (and multi-select? (seq value))))
+             (when (and (not disabled?)
+                        (or (and (not multi-select?) value)
+                            (and multi-select? (seq value))))
                ($ :button
                   {:type "button"
                    :data-testid (str data-testid "-clear-button")
@@ -190,37 +190,37 @@
                    :onClick handle-clear
                    :onMouseDown #(.preventDefault %)}
                   ($ XMarkIcon {:className "h-4 w-4"}))))
-          
-          ;; Error message or spacer
-          (if error
-            ($ :p.text-sm.text-red-600.mt-1 {:data-testid (str data-testid "-error")} error)
-            ($ :div.mt-1.h-5)))
-       
+
+          ;; Error message
+          (when error
+            ($ :p.text-sm.text-red-600.mt-1 {:data-testid (str data-testid "-error")} error)))
+
        ;; Dropdown list
        (when is-open?
-         ($ :div.absolute.z-50.w-full.mt-1.bg-white.border.border-gray-300.rounded-md.shadow-lg.max-h-60.overflow-y-auto
+         ($ :div.absolute.w-full.mt-1.bg-white.border.border-gray-300.rounded-md.shadow-lg.max-h-60.overflow-y-auto
             {:role "listbox"
              :aria-label (str label " search results")
              :aria-busy loading?
-             :data-testid (str data-testid "-dropdown")}
-            
+             :data-testid (str data-testid "-dropdown")
+             :style {:z-index 9999}}
+
             (cond
               loading?
               ($ :div.p-4.text-center.text-gray-500.flex.items-center.justify-center
                  {:data-testid (str data-testid "-loading")}
                  ($ common/spinner {:size :medium})
                  ($ :span.ml-2 "Loading..."))
-              
+
               query-error
               ($ :div.p-3.text-sm.text-red-500
                  {:data-testid (str data-testid "-error-state")}
                  "Error loading items.")
-              
+
               (empty? items)
               ($ :div.p-4.text-center.text-gray-500
                  {:data-testid (str data-testid "-empty-state")}
                  "No items found")
-              
+
               :else
               (for [[idx item] (map-indexed vector items)]
                 (let [item-id (item-id-fn item)
@@ -230,8 +230,8 @@
                            :role "option"
                            :aria-selected is-selected?
                            :className (str "p-3 cursor-pointer hover:bg-blue-50 "
-                                          (when (= idx highlighted-idx) "bg-blue-100 ")
-                                          (when is-selected? "bg-blue-50"))
+                                           (when (= idx highlighted-idx) "bg-blue-100 ")
+                                           (when is-selected? "bg-blue-50"))
                            :onMouseEnter #(set-highlighted-idx! idx)
                            :onClick #(handle-select item)}
                      ($ :div.flex.justify-between.items-start

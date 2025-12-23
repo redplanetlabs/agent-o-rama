@@ -409,7 +409,9 @@
 
                add-rubric (fn []
                             ((:on-change rubrics-field)
-                             (conj rubrics {:metric nil :required false})))
+                             (conj rubrics {:id (random-uuid)
+                                            :metric nil
+                                            :required false})))
 
                update-rubric (fn [idx metric-name opts]
                                (let [updated (assoc-in rubrics [idx]
@@ -447,18 +449,17 @@
 
                  ;; Rubric list
                  ($ :div.space-y-2
-                    (map-indexed
-                     (fn [idx rubric]
+                    (vec
+                     (for [[idx rubric] (map-indexed vector rubrics)]
                        ($ metric-selector
-                          {:key idx
+                          {:key (:id rubric)
                            :index idx
                            :module-id module-id
                            :value (:metric rubric)
                            :required? (:required rubric)
                            :on-change (fn [metric-name & [opts]]
                                         (update-rubric idx metric-name opts))
-                           :on-remove #(remove-rubric idx)}))
-                     rubrics))
+                           :on-remove #(remove-rubric idx)}))))
 
                  ;; Add rubric button
                  ($ :button.w-full.px-3.py-2.border-2.border-dashed.border-gray-300.rounded-md.text-gray-600.hover:border-gray-400.hover:text-gray-700.transition-colors
@@ -475,12 +476,14 @@
 
   :on-submit
   {:event (fn [db form-state]
-            (let [{:keys [name description rubrics module-id]} form-state]
+            (let [{:keys [name description rubrics module-id]} form-state
+                  ;; Strip out :id field used for React keys
+                  clean-rubrics (mapv #(dissoc % :id) rubrics)]
               [:human-feedback/create-queue
                {:module-id module-id
                 :name name
                 :description description
-                :rubrics rubrics}]))
+                :rubrics clean-rubrics}]))
    :on-success-invalidate (fn [db {:keys [module-id]} _reply]
                             {:query-key-pattern [:human-feedback-queues module-id]})}})
 
