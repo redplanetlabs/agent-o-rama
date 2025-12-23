@@ -232,11 +232,10 @@
                categories-field (forms/use-form-field form-id :categories)]
            ($ :div.space-y-4.p-4
               ;; Name field
-              ($ forms/form-field {:label "Metric Name"
-                                  :form-id form-id
-                                  :field-key :name
-                                  :required? true
-                                  :placeholder "e.g., helpfulness, accuracy"})
+              ($ forms/form-field (merge {:label "Metric Name"
+                                          :required? true
+                                          :placeholder "e.g., helpfulness, accuracy"}
+                                         name-field))
               
               ;; Type selector
               ($ :div.space-y-1
@@ -254,26 +253,23 @@
                 ;; Numeric fields
                 ($ :div.flex.gap-4
                    ($ :div.flex-1
-                      ($ forms/form-field {:label "Min"
-                                          :type :number
-                                          :form-id form-id
-                                          :field-key :min
-                                          :required? true
-                                          :placeholder "1"}))
+                      ($ forms/form-field (merge {:label "Min"
+                                                  :type :number
+                                                  :required? true
+                                                  :placeholder "1"}
+                                                 min-field)))
                    ($ :div.flex-1
-                      ($ forms/form-field {:label "Max"
-                                          :type :number
-                                          :form-id form-id
-                                          :field-key :max
-                                          :required? true
-                                          :placeholder "10"})))
+                      ($ forms/form-field (merge {:label "Max"
+                                                  :type :number
+                                                  :required? true
+                                                  :placeholder "10"}
+                                                 max-field))))
                 
                 ;; Categorical field
-                ($ forms/form-field {:label "Options (comma separated)"
-                                    :form-id form-id
-                                    :field-key :categories
-                                    :required? true
-                                    :placeholder "Good, Bad, Average"})))))
+                ($ forms/form-field (merge {:label "Options (comma separated)"
+                                            :required? true
+                                            :placeholder "Good, Bad, Average"}
+                                           categories-field))))))
    :modal-props {:title "Create Human Metric"
                 :submit-text "Create"}}
   
