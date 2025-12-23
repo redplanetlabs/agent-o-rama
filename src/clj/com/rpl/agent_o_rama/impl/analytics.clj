@@ -713,6 +713,10 @@
       :fail (not success?)
       (throw (h/ex-info "Unexpected status filter" {:status-filter status-filter})))))
 
+(deframafn expand-data-map
+  [*m *root?]
+  (:> (assoc (into {} *m) :run-type (ifexpr *root? :agent :node))))
+
 (deframafn fetch-data
   [*agent-name *target *offset *dep-end-offset]
   (<<if (AnaRootTarget? *target)
@@ -728,7 +732,7 @@
                             :> *scan-amt)
   (<<ramafn %add-run-type
     [*m]
-    (:> (assoc (into {} *m) :run-type (ifexpr (AnaRootTarget? *target) :agent :node))))
+    (:> (expand-data-map *m (AnaRootTarget? *target))))
   (po/agent-node-executor-task-global :> *node-exec)
   (<<if (>= (compare *offset *end-offset) 0)
     (sorted-map :> *m)
@@ -958,6 +962,12 @@
       {}
     )))
 
+(defn enriched-metadata
+  [{:keys [metadata] :as data-map}]
+  (assoc metadata
+   "aor/status"
+   (if (metrics/run-success? data-map) "run-success" "run-failure")))
+
 (deframaop compute-metrics!
   [*agent->rule->info]
   (ops/explode (po/agent-names-set) :> *agent-name)
@@ -990,20 +1000,14 @@
    :> *m *end-scan-offset)
   (local-transform> [(keypath *query-id) (termval *end-scan-offset)]
                     $$metric-cursors)
-  ;; TODO: factor from here to share with human analytics
-  ;;    - where to get metadata from?
-  ;;      - should be part of analytics event?
-  ;;    - also needs to know aor/status
-  (ops/explode-map *m :> *k {:keys [*start-time-millis *metadata] :as *data-map})
+  (ops/explode-map *m :> *k {:keys [*start-time-millis] :as *data-map})
   (filter> (some? *start-time-millis)) ; defensive
   (filter> (not (experiment-source? *data-map)))
-  (assoc *metadata
-   "aor/status"
-   (ifexpr (metrics/run-success? *data-map) "run-success" "run-failure")
-   :> *metadata)
+  (enriched-metadata *data-map :> *metadata)
   (ops/explode *metrics :> {:keys [*metrics-fn]})
   (invoke-metrics-fn *metrics-fn *data-map :> *metrics-map)
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
+  ;; TODO: <<<<>>>> factor from here to share with human analytics
   (ops/explode *metric-points :> *metric-point)
   (metric-point->category-values *metric-point :> *category-values)
   (filter> (not (empty? *category-values)))
@@ -1157,8 +1161,22 @@
 
 (deframaop handle-human-analytics
   [%mb]
-  (%mb :> {:keys [*old-scores *old-scores-millis *new-scores *new-scores-millis]})
-  ;; TODO:
+  (%mb :> {:keys [*target *old-scores *old-scores-millis *new-scores *new-scores-millis]})
+  (filter> (contains? (po/agent-names-set) (get *target :agent-name)))
+  (evals/target-location-info *target :> *pstate-name *task-id *root-id)
+  (|direct *task-id)
+  (this-module-pobject-task-global *pstate-name :> $$p)
+  (local-select> (keypath *root-id) $$p :> *data-map)
+  (<<if (nil? *data-map)
+    (identity nil :> *metadata)
+   (else>)
+    (expand-data-map *data-map (nil? (get *target :node-invoke)) :> *data-map)
+    (enriched-metadata (expand-data-map *data-map (nil? (get *target :node-invoke)))
+                       :> *metadata))
+
+
+
+  ;; TODO: <<<<>>>>
   ;;    - subtract old-scores from that bucket
   ;;    - add new-scores to that bucket
 )
