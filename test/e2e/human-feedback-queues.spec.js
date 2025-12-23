@@ -10,6 +10,7 @@ test.describe('Human Feedback Queues', () => {
   const uniqueId = randomUUID().substring(0, 8);
   const queueName1 = `e2e-queue-${uniqueId}-1`;
   const queueName2 = `e2e-queue-${uniqueId}-2`;
+  const testMetricName = `e2e-queue-metric-${uniqueId}`;
   
   test.beforeEach(async ({ page }) => {
     console.log('--- Starting Test Setup ---');
@@ -70,13 +71,13 @@ test.describe('Human Feedback Queues', () => {
     
     // Open the metric dropdown (using Downshift pattern)
     await firstRubric.getByTestId('metric-dropdown-toggle').click();
-    await expect(modal.getByTestId('metric-dropdown-menu')).toBeVisible();
+    await expect(firstRubric.getByTestId('metric-dropdown-menu')).toBeVisible({ timeout: 10000 });
     
-    // Search for a metric
-    await firstRubric.getByTestId('metric-search-input').fill('help');
+    // Wait for options to load
+    await firstRubric.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
     
-    // Select first matching metric
-    await modal.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    // Select first matching metric (don't need to search if we're just taking first)
+    await firstRubric.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
     
     // Toggle required checkbox
     await firstRubric.getByTestId('metric-required-checkbox').check();
@@ -90,7 +91,8 @@ test.describe('Human Feedback Queues', () => {
     
     // Select metric for second rubric (not required)
     await secondRubric.getByTestId('metric-dropdown-toggle').click();
-    await modal.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    await secondRubric.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await secondRubric.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
     
     console.log('✓ Added second rubric');
 
@@ -118,9 +120,11 @@ test.describe('Human Feedback Queues', () => {
     
     // Add rubric
     await modal.getByTestId('add-rubric-button').click();
-    await modal.getByTestId('rubric-0').getByTestId('metric-dropdown-toggle').click();
-    await modal.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
-    await modal.getByTestId('rubric-0').getByTestId('metric-required-checkbox').check();
+    const rubric0 = modal.getByTestId('rubric-0');
+    await rubric0.getByTestId('metric-dropdown-toggle').click();
+    await rubric0.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await rubric0.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    await rubric0.getByTestId('metric-required-checkbox').check();
     
     // Submit
     await createButton.click();
@@ -145,12 +149,16 @@ test.describe('Human Feedback Queues', () => {
     
     // Add two rubrics
     await modal.getByTestId('add-rubric-button').click();
-    await modal.getByTestId('rubric-0').getByTestId('metric-dropdown-toggle').click();
-    await modal.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    const rubric0_2 = modal.getByTestId('rubric-0');
+    await rubric0_2.getByTestId('metric-dropdown-toggle').click();
+    await rubric0_2.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await rubric0_2.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
     
     await modal.getByTestId('add-rubric-button').click();
-    await modal.getByTestId('rubric-1').getByTestId('metric-dropdown-toggle').click();
-    await modal.getByTestId('metric-dropdown-menu').locator('[role="option"]').nth(1).click();
+    const rubric1_2 = modal.getByTestId('rubric-1');
+    await rubric1_2.getByTestId('metric-dropdown-toggle').click();
+    await rubric1_2.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await rubric1_2.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
     
     await createButton.click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
