@@ -584,14 +584,15 @@
                                                                             (queries/invalidate-query [:human-feedback-queues module-id]))}]))}
                                ($ TrashIcon {:className "h-5 w-5"})))))))
 
-                  ;; Load more row
+               ;; Load more row
                (when hasMore
-                 ($ :tr
-                    ($ :td {:colSpan 4 :className "px-6 py-4 text-center"}
-                       ($ :button.text-blue-600.hover:text-blue-800.font-medium
-                          {:onClick loadMore
-                           :disabled isFetchingMore}
-                          (if isFetchingMore "Loading..." "Load More")))))))))))
+                 ($ :tfoot
+                    ($ :tr
+                       ($ :td {:colSpan 4 :className "px-6 py-4 text-center"}
+                          ($ :button.text-blue-600.hover:text-blue-800.font-medium
+                             {:onClick loadMore
+                              :disabled isFetchingMore}
+                             (if isFetchingMore "Loading..." "Load More"))))))))))))
 
 ;; =============================================================================
 ;; QUEUE DETAIL PAGE
