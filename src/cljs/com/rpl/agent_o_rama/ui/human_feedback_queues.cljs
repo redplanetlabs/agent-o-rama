@@ -339,24 +339,295 @@
                             {:query-key-pattern [:human-metrics module-id]})}})
 
 ;; =============================================================================
+;; QUEUE FORM - Create Human Feedback Queue
+;; =============================================================================
+
+;; TODO: Extract this into a reusable component - similar pattern to DatasetCombobox and EvaluatorSelector
+(defui metric-selector-stub
+  "Temporary stub for metric selection - needs proper abstraction later"
+  [{:keys [module-id value on-change on-remove required? index]}]
+  (let [[search-term set-search-term] (useState "")
+        [debounced-search] (useDebounce search-term 300)
+        [is-open set-open] (useState false)
+        
+        ;; Fetch metrics with search
+        {:keys [data loading?]}
+        (queries/use-sente-query
+         {:query-key [:metric-selector module-id debounced-search]
+          :sente-event [:human-feedback/get-metrics
+                        {:module-id module-id
+                         :filters {:search-string debounced-search}}]
+          :enabled? is-open})
+        
+        metrics (:items data)
+        selected-metric (when value
+                         (first (filter #(= (:name %) value) metrics)))]
+    
+    ($ :div.flex.items-start.gap-2 {:data-testid (str "rubric-" index)}
+       ($ :div.flex-1
+          ;; Dropdown button
+          ($ :button.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-left.bg-white.hover:bg-gray-50.flex.justify-between.items-center
+             {:data-testid "metric-dropdown-toggle"
+              :type "button"
+              :onClick #(set-open (not is-open))}
+             ($ :span (or (:name selected-metric) value "Select metric..."))
+             ($ :span.text-gray-400 "▼"))
+          
+          ;; Dropdown menu
+          (when is-open
+            ($ :div.absolute.z-10.mt-1.w-full.bg-white.border.border-gray-300.rounded-md.shadow-lg.max-h-60.overflow-auto
+               {:data-testid "metric-dropdown-menu"}
+               ;; Search input
+               ($ :div.p-2.border-b
+                  ($ :input.w-full.px-2.py-1.border.border-gray-300.rounded
+                     {:data-testid "metric-search-input"
+                      :type "text"
+                      :placeholder "Search metrics..."
+                      :value search-term
+                      :onChange #(set-search-term (.. % -target -value))}))
+               
+               ;; Options list
+               ($ :div {:role "listbox"}
+                  (if loading?
+                    ($ :div.p-3.text-sm.text-gray-500 "Loading...")
+                    (if (empty? metrics)
+                      ($ :div.p-3.text-sm.text-gray-500 "No metrics found")
+                      (for [metric metrics]
+                        ($ :button.w-full.px-3.py-2.text-left.hover:bg-gray-100.flex.items-center.justify-between
+                           {:key (:name metric)
+                            :role "option"
+                            :type "button"
+                            :onClick #(do
+                                       (on-change (:name metric))
+                                       (set-open false)
+                                       (set-search-term ""))}
+                           ($ :span (:name metric))
+                           (when (= (:name metric) value)
+                             ($ :span.text-blue-600 "✓"))))))))))
+       
+       ;; Required checkbox
+       ($ :label.flex.items-center.gap-1.pt-2
+          ($ :input.rounded.border-gray-300
+             {:data-testid "metric-required-checkbox"
+              :type "checkbox"
+              :checked (boolean required?)
+              :onChange #(on-change value {:required (.. % -target -checked)})})
+          ($ :span.text-sm.text-gray-600 "Required"))
+       
+       ;; Remove button
+       ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
+          {:data-testid "remove-rubric-button"
+           :type "button"
+           :onClick on-remove}
+          ($ TrashIcon {:className "h-5 w-5"})))))
+
+(forms/reg-form
+ :create-human-feedback-queue
+ {:steps [:main]
+  :main
+  {:initial-fields (fn [props]
+                     (merge {:name ""
+                             :description ""
+                             :rubrics []}
+                            props))
+   :validators {:name [forms/required]
+                :rubrics [(fn [rubrics _form-state]
+                           (when (empty? rubrics)
+                             "At least one rubric is required"))]}
+   :ui (fn [{:keys [form-id form-state]}]
+         (let [module-id (:module-id form-state)
+               name-field (forms/use-form-field form-id :name)
+               desc-field (forms/use-form-field form-id :description)
+               rubrics-field (forms/use-form-field form-id :rubrics)
+               rubrics (:value rubrics-field)
+               
+               add-rubric (fn []
+                           ((:on-change rubrics-field)
+                            (conj rubrics {:metric nil :required false})))
+               
+               update-rubric (fn [idx metric-name opts]
+                              (let [updated (assoc-in rubrics [idx]
+                                                     (merge {:metric metric-name}
+                                                           opts))]
+                                ((:on-change rubrics-field) updated)))
+               
+               remove-rubric (fn [idx]
+                              (let [updated (vec (concat (subvec rubrics 0 idx)
+                                                        (subvec rubrics (inc idx))))]
+                                ((:on-change rubrics-field) updated)))]
+           
+           ($ :div.space-y-4.p-4
+              ;; Name field
+              ($ forms/form-field (merge {:label "Queue Name"
+                                          :required? true
+                                          :data-testid "queue-name-input"
+                                          :placeholder "e.g., support-quality"}
+                                         name-field))
+              
+              ;; Description field
+              ($ forms/form-field (merge {:label "Description"
+                                          :data-testid "queue-description-input"
+                                          :placeholder "What is this queue for?"}
+                                         desc-field))
+              
+              ;; Rubrics section
+              ($ :div.space-y-2
+                 ($ :label.block.text-sm.font-medium.text-gray-700
+                    "Rubrics"
+                    ($ :span.text-red-500.ml-1 "*"))
+                 
+                 ($ :div.text-sm.text-gray-500.mb-2
+                    "Add metrics that reviewers should evaluate")
+                 
+                 ;; Rubric list
+                 ($ :div.space-y-2
+                    (map-indexed
+                     (fn [idx rubric]
+                       ($ metric-selector-stub
+                          {:key idx
+                           :index idx
+                           :module-id module-id
+                           :value (:metric rubric)
+                           :required? (:required rubric)
+                           :on-change (fn [metric-name & [opts]]
+                                       (update-rubric idx metric-name opts))
+                           :on-remove #(remove-rubric idx)}))
+                     rubrics))
+                 
+                 ;; Add rubric button
+                 ($ :button.w-full.px-3.py-2.border-2.border-dashed.border-gray-300.rounded-md.text-gray-600.hover:border-gray-400.hover:text-gray-700.transition-colors
+                    {:data-testid "add-rubric-button"
+                     :type "button"
+                     :onClick add-rubric}
+                    "+ Add Rubric")
+                 
+                 ;; Error message
+                 (when (:error rubrics-field)
+                   ($ :p.text-sm.text-red-600.mt-1 (:error rubrics-field)))))))
+   :modal-props {:title "Create Human Feedback Queue"
+                :submit-text "Create"}}
+  
+  :on-submit
+  {:event (fn [db form-state]
+            (let [{:keys [name description rubrics module-id]} form-state]
+              [:human-feedback/create-queue
+               {:module-id module-id
+                :name name
+                :description description
+                :rubrics rubrics}]))
+   :on-success-invalidate (fn [db {:keys [module-id]} _reply]
+                            {:query-key-pattern [:human-feedback-queues module-id]})}})
+
+;; =============================================================================
 ;; QUEUE LIST PAGE
 ;; =============================================================================
 
 (defui index []
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
         decoded-module-id (common/url-decode module-id)
-        ;; Hardcoded first queue ID
-        first-queue-id "queue-1"]
+        
+        ;; Search state
+        [search-term set-search-term] (useState "")
+        [debounced-search] (useDebounce search-term 300)
+        
+        ;; Use paginated query
+        {:keys [data isLoading isFetchingMore hasMore loadMore error]}
+        (queries/use-paginated-query
+         {:query-key [:human-feedback-queues module-id debounced-search]
+          :sente-event [:human-feedback/get-queues 
+                        {:module-id decoded-module-id
+                         :filters {:search-string debounced-search}}]
+          :page-size 20})]
+    
     ($ :div.p-6
-       ($ :h2.text-2xl.font-bold.text-gray-900.mb-4 "Human Feedback Queues")
-       ($ :div.text-gray-600.mb-4
-          (str "Module: " decoded-module-id))
+       ;; Header with Create Button
+       ($ :div.flex.justify-between.items-center.mb-6
+          ($ :h2.text-2xl.font-bold.text-gray-900 "Human Feedback Queues")
+          ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.hover:bg-blue-700.transition-colors
+             {:data-testid "create-queue-button"
+              :onClick #(state/dispatch [:modal/show-form :create-human-feedback-queue {:module-id decoded-module-id}])}
+             "+ Create Queue"))
        
-       ;; Hardcoded link to first queue
-       ($ :div.mt-8
-          ($ :a {:href (rfe/href :module/human-feedback-queue-detail {:module-id module-id :queue-id first-queue-id})
-                 :className "inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"}
-             "View Queue: " first-queue-id)))))
+       ;; Search bar
+       ($ :div.mb-4
+          ($ :input.w-full.px-4.py-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+             {:data-testid "search-queues-input"
+              :type "text"
+              :placeholder "Search queues..."
+              :value search-term
+              :onChange #(set-search-term (-> % .-target .-value))}))
+       
+       ;; Table or empty state
+       (if (and (not isLoading) (empty? data))
+         ($ :div.text-center.py-12.bg-gray-50.rounded-md
+            {:data-testid "empty-state"}
+            ($ :p.text-gray-500 "No queues found"))
+         
+         ($ :div {:className (:container common/table-classes)}
+            ($ :table {:className (:table common/table-classes)}
+               ($ :thead {:className (:thead common/table-classes)}
+                  ($ :tr
+                     ($ :th {:className (:th common/table-classes)} "Name")
+                     ($ :th {:className (:th common/table-classes)} "Description")
+                     ($ :th {:className (:th common/table-classes)} "Rubrics")
+                     ($ :th {:className (:th common/table-classes)} "Actions")))
+               
+               ($ :tbody {:className (:tbody common/table-classes)}
+                  (for [queue data]
+                    (let [queue-name (:name queue)]
+                      ($ :tr {:key queue-name
+                              :className (:tr common/table-classes)
+                              :data-testid (str "queue-row-" queue-name)}
+                         ;; Name (clickable)
+                         ($ :td {:className (:td common/table-classes)}
+                            ($ :a.text-blue-600.hover:text-blue-800.font-medium
+                               {:data-testid "queue-name-link"
+                                :href (rfe/href :module/human-feedback-queue-detail 
+                                               {:module-id module-id 
+                                                :queue-id (common/url-encode queue-name)})
+                                :onClick (fn [e]
+                                          (.preventDefault e)
+                                          (rfe/push-state :module/human-feedback-queue-detail
+                                                         {:module-id module-id
+                                                          :queue-id (common/url-encode queue-name)}))}
+                               queue-name))
+                         
+                         ;; Description
+                         ($ :td {:className (:td common/table-classes)}
+                            ($ :span.text-gray-600 (or (:description queue) "")))
+                         
+                         ;; Rubrics count
+                         ($ :td {:className (:td common/table-classes)}
+                            ($ :span.text-gray-600
+                               {:data-testid "queue-rubric-count"}
+                               (str (count (:rubrics queue)) " rubric" 
+                                   (if (= 1 (count (:rubrics queue))) "" "s"))))
+                         
+                         ;; Actions
+                         ($ :td {:className (:td common/table-classes)}
+                            ($ :button.text-red-600.hover:text-red-800.p-2.rounded
+                               {:data-testid "delete-queue-button"
+                                :onClick (fn [e]
+                                          (.stopPropagation e)
+                                          (state/dispatch [:modal/show-confirmation
+                                                          {:title "Delete Queue"
+                                                           :message (str "Are you sure you want to delete \"" queue-name "\"?")
+                                                           :on-confirm #(do
+                                                                         (sente/send! [:human-feedback/delete-queue
+                                                                                      {:module-id decoded-module-id
+                                                                                       :name queue-name}])
+                                                                         (queries/invalidate-query [:human-feedback-queues module-id]))}]))}
+                               ($ TrashIcon {:className "h-5 w-5"})))))))
+                  
+                  ;; Load more row
+                  (when hasMore
+                    ($ :tr
+                       ($ :td {:colSpan 4 :className "px-6 py-4 text-center"}
+                          ($ :button.text-blue-600.hover:text-blue-800.font-medium
+                             {:onClick loadMore
+                              :disabled isFetchingMore}
+                             (if isFetchingMore "Loading..." "Load More")))))))))))
+
 
 ;; =============================================================================
 ;; QUEUE DETAIL PAGE

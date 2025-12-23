@@ -4,6 +4,7 @@
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.queries :as queries]
+   [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [clojure.string :as str]
    [jsonista.core :as j])
   (:import [java.util UUID])
@@ -49,4 +50,40 @@
   [{:keys [manager name]} uid]
   (aor/remove-human-metric! manager name)
   {:status :ok})
+
+;; =============================================================================
+;; HUMAN FEEDBACK QUEUES HANDLERS
+;; =============================================================================
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queues
+  [{:keys [manager pagination filters]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        search-query (:search-human-feedback-queues-query underlying-objects)
+        search-string (get filters :search-string)
+        query-limit 20]
+    ;; Invoke the search query with optional search string filter
+    (foreign-invoke-query search-query
+                          (cond-> {}
+                            (not (str/blank? search-string))
+                            (assoc :search-string search-string))
+                          query-limit
+                          pagination)))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/create-queue
+  [{:keys [manager name description rubrics]} uid]
+  (let [global-actions-depot (aor-types/global-actions-depot (aor-types/underlying-objects manager))
+        ;; Convert rubrics from maps to HumanFeedbackQueueRubric records
+        rubric-records (mapv (fn [r]
+                               (aor-types/->valid-HumanFeedbackQueueRubric
+                                (:metric r)
+                                (boolean (:required r))))
+                             rubrics)]
+    (evals/create-human-feedback-queue! global-actions-depot name description rubric-records)
+    {:status :ok}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/delete-queue
+  [{:keys [manager name]} uid]
+  (let [global-actions-depot (aor-types/global-actions-depot (aor-types/underlying-objects manager))]
+    (evals/remove-human-feedback-queue! global-actions-depot name)
+    {:status :ok}))
 
