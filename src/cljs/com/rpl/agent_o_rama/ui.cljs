@@ -54,7 +54,7 @@
        ["/comparative-experiments" {:name :module/dataset-detail.comparative-experiments, :views [comparative-experiments/index]}]
        ["/comparative-experiments/:experiment-id" {:name :module/dataset-detail.comparative-experiment-detail, :views [comparative-experiments-detail/detail-page]}]]]
      ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
-     ["/human-metrics" {:name :module/human-metrics, :views [human-metrics/index]}]
+     ["/human-metrics" {:name :module/human-metrics, :views [human-feedback-queues/metrics-index]}]
      ["/human-feedback-queues"
       ["" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
       ["/:queue-id"

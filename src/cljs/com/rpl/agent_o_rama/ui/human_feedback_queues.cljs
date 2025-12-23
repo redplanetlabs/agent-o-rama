@@ -2,9 +2,15 @@
   (:require
    [uix.core :as uix :refer [defui $]]
    [reitit.frontend.easy :as rfe]
-   ["@heroicons/react/24/outline" :refer [PencilIcon ChevronLeftIcon ChevronRightIcon XMarkIcon]]
+   ["@heroicons/react/24/outline" :refer [PencilIcon ChevronLeftIcon ChevronRightIcon XMarkIcon TrashIcon]]
+   ["react" :refer [useState]]
+   ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]))
+   [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.forms :as forms]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
+   [clojure.string :as str]))
 
 ;; =============================================================================
 ;; DUMMY DATA
@@ -64,6 +70,228 @@
             :output {:response "I'll send a password reset link to your email. Please check your spam folder if you don't see it in a few minutes."
                      :action-taken "Initiated password reset"}}]
    :pagination-params nil})
+
+;; =============================================================================
+;; METRICS INDEX PAGE
+;; =============================================================================
+
+(defui metrics-index []
+  (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+        decoded-module-id (common/url-decode module-id)
+        
+        ;; Search state
+        [search-term set-search-term] (useState "")
+        [debounced-search] (useDebounce search-term 300)
+        
+        ;; Use paginated query
+        {:keys [data isLoading isFetchingMore hasMore loadMore error]}
+        (queries/use-paginated-query
+         {:query-key [:human-metrics module-id debounced-search]
+          :sente-event [:human-feedback/get-metrics
+                        {:module-id module-id
+                         :filters (when-not (str/blank? debounced-search)
+                                    {:search-string debounced-search})}]
+          :page-size 20
+          :enabled? (boolean module-id)})
+        
+        handle-delete (uix/use-callback
+                       (fn [metric-name]
+                         (when (js/confirm (str "Delete metric '" metric-name "'?"))
+                           (sente/request!
+                            [:human-feedback/delete-metric {:module-id module-id
+                                                           :name metric-name}]
+                            10000
+                            (fn [reply]
+                              (if (:success reply)
+                                (state/dispatch [:query/invalidate
+                                               {:query-key-pattern [:human-metrics module-id]}])
+                                (js/alert (str "Error: " (:error reply))))))))
+                       [module-id])]
+    
+    ($ :div.p-6
+       ;; Header
+       ($ :div.flex.justify-between.items-center.mb-6
+          ($ :h2.text-2xl.font-bold.text-gray-900 "Human Metrics")
+          ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.hover:bg-blue-700.transition-colors
+             {:onClick #(state/dispatch [:modal/show-form :create-human-metric {:module-id module-id}])}
+             "+ Create Metric"))
+       
+       ;; Search
+       ($ :div.mb-4
+          ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+             {:type "text"
+              :placeholder "Search metrics..."
+              :value search-term
+              :onChange #(set-search-term (.. % -target -value))}))
+       
+       ;; Table
+       (cond
+         isLoading
+         ($ :div.flex.justify-center.items-center.py-12
+            ($ common/spinner {:size :medium}))
+         
+         error
+         ($ :div.text-red-600 "Error loading metrics: " (str error))
+         
+         (empty? data)
+         ($ :div.text-center.py-12.text-gray-500
+            (if (str/blank? search-term)
+              "No metrics defined yet. Create one to get started."
+              "No metrics match your search."))
+         
+         :else
+         ($ :div {:className (:container common/table-classes)}
+            ($ :table {:className (:table common/table-classes)}
+               ($ :thead {:className (:thead common/table-classes)}
+                  ($ :tr
+                     ($ :th {:className (:th common/table-classes)} "Name")
+                     ($ :th {:className (:th common/table-classes)} "Type")
+                     ($ :th {:className (:th common/table-classes)} "Configuration")
+                     ($ :th {:className (:th common/table-classes)} "Actions")))
+               ($ :tbody
+                  (into []
+                        (for [metric data
+                              :let [metric-name (:name metric)
+                                    metric-def (:metric metric)
+                                    metric-type (:__typename metric-def)
+                                    is-numeric? (= metric-type "HumanNumericMetric")
+                                    is-category? (= metric-type "HumanCategoryMetric")]]
+                          ($ :tr {:key metric-name
+                                  :className "hover:bg-gray-50"}
+                             ($ :td {:className (:td common/table-classes)}
+                                metric-name)
+                             ($ :td {:className (:td common/table-classes)}
+                                ($ :span.inline-flex.px-2.py-1.rounded.text-xs.font-medium
+                                   {:className (if is-numeric?
+                                                 "bg-blue-100 text-blue-700"
+                                                 "bg-purple-100 text-purple-700")}
+                                   (if is-numeric? "Numeric" "Categorical")))
+                             ($ :td {:className (:td common/table-classes)}
+                                (cond
+                                  is-numeric?
+                                  (str "Range: " (:min metric-def) " - " (:max metric-def))
+                                  
+                                  is-category?
+                                  (str "Options: " (str/join ", " (:categories metric-def)))))
+                             ($ :td {:className (:td-right common/table-classes)}
+                                ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
+                                   {:onClick (fn [e]
+                                              (.stopPropagation e)
+                                              (handle-delete metric-name))}
+                                   ($ TrashIcon {:className "h-4 w-4 mr-1"})
+                                   "Delete")))))))
+            
+            ;; Load More button
+            (when hasMore
+              ($ :tfoot.bg-gray-50.border-t.border-gray-200
+                 ($ :tr.hover:bg-gray-100.transition-colors.duration-150
+                    {:onClick (when-not isFetchingMore loadMore)}
+                    ($ :td.px-6.py-3.text-center.text-sm.text-blue-600.font-medium.cursor-pointer
+                       {:colSpan "4"}
+                       (if isFetchingMore
+                         ($ :div.flex.justify-center.items-center.gap-2
+                            ($ common/spinner {:size :small})
+                            "Loading...")
+                         "Load More"))))))))))
+
+;; =============================================================================
+;; METRICS FORM
+;; =============================================================================
+
+(forms/reg-form
+ :create-human-metric
+ {:steps [:main]
+  :main
+  {:initial-fields (fn [props]
+                     (merge {:name ""
+                             :type :numeric
+                             :min 1
+                             :max 10
+                             :categories ""}
+                            props))
+   :validators {:name [forms/required]
+                :categories [(fn [v form-state]
+                              (when (and (= (:type form-state) :categorical)
+                                        (str/blank? v))
+                                "Categories are required for categorical metrics"))]
+                :min [(fn [v form-state]
+                       (when (and (= (:type form-state) :numeric)
+                                 (or (str/blank? (str v))
+                                     (js/isNaN (js/parseFloat v))))
+                         "Min must be a number"))]
+                :max [(fn [v form-state]
+                       (when (and (= (:type form-state) :numeric)
+                                 (or (str/blank? (str v))
+                                     (js/isNaN (js/parseFloat v))))
+                         "Max must be a number"))]}
+   :ui (fn [{:keys [form-id]}]
+         (let [type-field (forms/use-form-field form-id :type)
+               name-field (forms/use-form-field form-id :name)
+               min-field (forms/use-form-field form-id :min)
+               max-field (forms/use-form-field form-id :max)
+               categories-field (forms/use-form-field form-id :categories)]
+           ($ :div.space-y-4.p-4
+              ;; Name field
+              ($ forms/form-field {:label "Metric Name"
+                                  :form-id form-id
+                                  :field-key :name
+                                  :required? true
+                                  :placeholder "e.g., helpfulness, accuracy"})
+              
+              ;; Type selector
+              ($ :div.space-y-1
+                 ($ :label.block.text-sm.font-medium.text-gray-700
+                    "Metric Type"
+                    ($ :span.text-red-500.ml-1 "*"))
+                 ($ :select.w-full.p-3.border.border-gray-300.rounded-md.text-sm.focus:ring-blue-500.focus:border-blue-500
+                    {:value (name (:value type-field))
+                     :onChange #((:on-change type-field) (keyword (.. % -target -value)))}
+                    ($ :option {:value "numeric"} "Numeric Range")
+                    ($ :option {:value "categorical"} "Categorical (Options)")))
+              
+              ;; Conditional fields based on type
+              (if (= (:value type-field) :numeric)
+                ;; Numeric fields
+                ($ :div.flex.gap-4
+                   ($ :div.flex-1
+                      ($ forms/form-field {:label "Min"
+                                          :type :number
+                                          :form-id form-id
+                                          :field-key :min
+                                          :required? true
+                                          :placeholder "1"}))
+                   ($ :div.flex-1
+                      ($ forms/form-field {:label "Max"
+                                          :type :number
+                                          :form-id form-id
+                                          :field-key :max
+                                          :required? true
+                                          :placeholder "10"})))
+                
+                ;; Categorical field
+                ($ forms/form-field {:label "Options (comma separated)"
+                                    :form-id form-id
+                                    :field-key :categories
+                                    :required? true
+                                    :placeholder "Good, Bad, Average"})))))
+   :modal-props {:title "Create Human Metric"
+                :submit-text "Create"}}
+  
+  :on-submit
+  {:event (fn [db form-state]
+            (let [{:keys [name type min max categories module-id]} form-state]
+              [:human-feedback/create-metric
+               (cond-> {:module-id module-id
+                        :name name
+                        :type type}
+                 (= type :numeric)
+                 (assoc :min (js/parseFloat min)
+                        :max (js/parseFloat max))
+                 
+                 (= type :categorical)
+                 (assoc :categories categories))]))
+   :on-success-invalidate (fn [db {:keys [module-id]} _reply]
+                            {:query-key-pattern [:human-metrics module-id]})}})
 
 ;; =============================================================================
 ;; QUEUE LIST PAGE
