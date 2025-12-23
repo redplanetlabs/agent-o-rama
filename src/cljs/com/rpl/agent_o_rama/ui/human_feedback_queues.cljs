@@ -78,9 +78,8 @@
 
 (defui metrics-index []
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
-        decoded-module-id (common/url-decode module-id)
-
-        ;; Search state
+        decoded-module-id (when module-id (common/url-decode module-id))
+         ;; Search state
         [search-term set-search-term] (useState "")
         [debounced-search] (useDebounce search-term 300)
 
@@ -89,17 +88,17 @@
         (queries/use-paginated-query
          {:query-key [:human-metrics module-id debounced-search]
           :sente-event [:human-feedback/get-metrics
-                        {:module-id module-id
+                        {:module-id decoded-module-id
                          :filters (when-not (str/blank? debounced-search)
                                     {:search-string debounced-search})}]
           :page-size 20
-          :enabled? (boolean module-id)})
+          :enabled? (and module-id (boolean decoded-module-id))})
 
         handle-delete (uix/use-callback
                        (fn [metric-name]
                          (when (js/confirm (str "Delete metric '" metric-name "'?"))
                            (sente/request!
-                            [:human-feedback/delete-metric {:module-id module-id
+                            [:human-feedback/delete-metric {:module-id decoded-module-id
                                                             :name metric-name}]
                             10000
                             (fn [reply]
@@ -107,94 +106,98 @@
                                 (state/dispatch [:query/invalidate
                                                  {:query-key-pattern [:human-metrics module-id]}])
                                 (js/alert (str "Error: " (:error reply))))))))
-                       [module-id])]
+                       [decoded-module-id])]
 
-    ($ :div.p-6
-       ;; Header
-       ($ :div.flex.justify-between.items-center.mb-6
-          ($ :h2.text-2xl.font-bold.text-gray-900 "Human Metrics")
-          ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.hover:bg-blue-700.transition-colors
-             {:data-testid "create-metric-button"
-              :onClick #(state/dispatch [:modal/show-form :create-human-metric {:module-id module-id}])}
-             "+ Create Metric"))
+    (if-not decoded-module-id
+      ($ :div.p-6
+         ($ :div.text-center.text-gray-500 "No module specified"))
+
+      ($ :div.p-6
+         ;; Header
+         ($ :div.flex.justify-between.items-center.mb-6
+            ($ :h2.text-2xl.font-bold.text-gray-900 "Human Metrics")
+            ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.hover:bg-blue-700.transition-colors
+               {:data-testid "create-metric-button"
+                :onClick #(state/dispatch [:modal/show-form :create-human-metric {:module-id decoded-module-id}])}
+               "+ Create Metric"))
 
        ;; Search
-       ($ :div.mb-4
-          ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-             {:type "text"
-              :placeholder "Search metrics..."
-              :value search-term
-              :onChange #(set-search-term (.. % -target -value))}))
+         ($ :div.mb-4
+            ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+               {:type "text"
+                :placeholder "Search metrics..."
+                :value search-term
+                :onChange #(set-search-term (.. % -target -value))}))
 
        ;; Table
-       (cond
-         isLoading
-         ($ :div.flex.justify-center.items-center.py-12
-            ($ common/spinner {:size :medium}))
+         (cond
+           isLoading
+           ($ :div.flex.justify-center.items-center.py-12
+              ($ common/spinner {:size :medium}))
 
-         error
-         ($ :div.text-red-600 "Error loading metrics: " (str error))
+           error
+           ($ :div.text-red-600 "Error loading metrics: " (str error))
 
-         (empty? data)
-         ($ :div.text-center.py-12.text-gray-500
-            (if (str/blank? search-term)
-              "No metrics defined yet. Create one to get started."
-              "No metrics match your search."))
+           (empty? data)
+           ($ :div.text-center.py-12.text-gray-500
+              (if (str/blank? search-term)
+                "No metrics defined yet. Create one to get started."
+                "No metrics match your search."))
 
-         :else
-         ($ :div {:className (:container common/table-classes)}
-            ($ :table {:className (:table common/table-classes)}
-               ($ :thead {:className (:thead common/table-classes)}
-                  ($ :tr
-                     ($ :th {:className (:th common/table-classes)} "Name")
-                     ($ :th {:className (:th common/table-classes)} "Type")
-                     ($ :th {:className (:th common/table-classes)} "Configuration")
-                     ($ :th {:className (:th common/table-classes)} "Actions")))
-               ($ :tbody
-                  (into []
-                        (for [metric data
-                              :let [metric-name (:name metric)
-                                    metric-def (:metric metric)
-                                    metric-type (:__typename metric-def)
-                                    is-numeric? (= metric-type "HumanNumericMetric")
-                                    is-category? (= metric-type "HumanCategoryMetric")]]
-                          ($ :tr {:key metric-name
-                                  :className "hover:bg-gray-50"}
-                             ($ :td {:className (:td common/table-classes)}
-                                metric-name)
-                             ($ :td {:className (:td common/table-classes)}
-                                ($ :span.inline-flex.px-2.py-1.rounded.text-xs.font-medium
-                                   {:className (if is-numeric?
-                                                 "bg-blue-100 text-blue-700"
-                                                 "bg-purple-100 text-purple-700")}
-                                   (if is-numeric? "Numeric" "Categorical")))
-                             ($ :td {:className (:td common/table-classes)}
-                                (cond
-                                  is-numeric?
-                                  (str "Range: " (:min metric-def) " - " (:max metric-def))
+           :else
+           ($ :div {:className (:container common/table-classes)}
+              ($ :table {:className (:table common/table-classes)}
+                 ($ :thead {:className (:thead common/table-classes)}
+                    ($ :tr
+                       ($ :th {:className (:th common/table-classes)} "Name")
+                       ($ :th {:className (:th common/table-classes)} "Type")
+                       ($ :th {:className (:th common/table-classes)} "Configuration")
+                       ($ :th {:className (:th common/table-classes)} "Actions")))
+                 ($ :tbody
+                    (into []
+                          (for [metric data
+                                :let [metric-name (:name metric)
+                                      metric-def (:metric metric)
+                                      metric-type (:__typename metric-def)
+                                      is-numeric? (= metric-type "HumanNumericMetric")
+                                      is-category? (= metric-type "HumanCategoryMetric")]]
+                            ($ :tr {:key metric-name
+                                    :className "hover:bg-gray-50"}
+                               ($ :td {:className (:td common/table-classes)}
+                                  metric-name)
+                               ($ :td {:className (:td common/table-classes)}
+                                  ($ :span.inline-flex.px-2.py-1.rounded.text-xs.font-medium
+                                     {:className (if is-numeric?
+                                                   "bg-blue-100 text-blue-700"
+                                                   "bg-purple-100 text-purple-700")}
+                                     (if is-numeric? "Numeric" "Categorical")))
+                               ($ :td {:className (:td common/table-classes)}
+                                  (cond
+                                    is-numeric?
+                                    (str "Range: " (:min metric-def) " - " (:max metric-def))
 
-                                  is-category?
-                                  (str "Options: " (str/join ", " (:categories metric-def)))))
-                             ($ :td {:className (:td-right common/table-classes)}
-                                ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
-                                   {:onClick (fn [e]
-                                               (.stopPropagation e)
-                                               (handle-delete metric-name))}
-                                   ($ TrashIcon {:className "h-4 w-4 mr-1"})
-                                   "Delete")))))))
+                                    is-category?
+                                    (str "Options: " (str/join ", " (:categories metric-def)))))
+                               ($ :td {:className (:td-right common/table-classes)}
+                                  ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
+                                     {:onClick (fn [e]
+                                                 (.stopPropagation e)
+                                                 (handle-delete metric-name))}
+                                     ($ TrashIcon {:className "h-4 w-4 mr-1"})
+                                     "Delete")))))))
 
             ;; Load More button
-            (when hasMore
-              ($ :tfoot.bg-gray-50.border-t.border-gray-200
-                 ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                    {:onClick (when-not isFetchingMore loadMore)}
-                    ($ :td.px-6.py-3.text-center.text-sm.text-blue-600.font-medium.cursor-pointer
-                       {:colSpan "4"}
-                       (if isFetchingMore
-                         ($ :div.flex.justify-center.items-center.gap-2
-                            ($ common/spinner {:size :small})
-                            "Loading...")
-                         "Load More"))))))))))
+              (when hasMore
+                ($ :tfoot.bg-gray-50.border-t.border-gray-200
+                   ($ :tr.hover:bg-gray-100.transition-colors.duration-150
+                      {:onClick (when-not isFetchingMore loadMore)}
+                      ($ :td.px-6.py-3.text-center.text-sm.text-blue-600.font-medium.cursor-pointer
+                         {:colSpan "4"}
+                         (if isFetchingMore
+                           ($ :div.flex.justify-center.items-center.gap-2
+                              ($ common/spinner {:size :small})
+                              "Loading...")
+                           "Load More")))))))))))
 
 ;; =============================================================================
 ;; METRICS FORM
@@ -397,10 +400,8 @@
                 :rubrics [(fn [rubrics _form-state]
                             (when (empty? rubrics)
                               "At least one rubric is required"))]}
-   :ui (fn [{:keys [form-id form-state]}]
-         (let [_  (println "Full form-state keys:" (keys form-state))
-               _  (println "Form-state module-id:" (:module-id form-state))
-               module-id (:module-id form-state)
+   :ui (fn [{:keys [form-id props]}]
+         (let [{:keys [module-id]} props
                name-field (forms/use-form-field form-id :name)
                desc-field (forms/use-form-field form-id :description)
                rubrics-field (forms/use-form-field form-id :rubrics)
@@ -510,7 +511,7 @@
           ($ :h2.text-2xl.font-bold.text-gray-900 "Human Feedback Queues")
           ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.hover:bg-blue-700.transition-colors
              {:data-testid "create-queue-button"
-              :onClick #(state/dispatch [:modal/show-form :create-human-feedback-queue {:module-id module-id}])}
+              :onClick #(state/dispatch [:modal/show-form :create-human-feedback-queue {:module-id decoded-module-id}])}
              "+ Create Queue"))
 
        ;; Search bar
