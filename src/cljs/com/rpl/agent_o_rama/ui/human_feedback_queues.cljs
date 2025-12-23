@@ -10,6 +10,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -343,94 +344,45 @@
 ;; QUEUE FORM - Create Human Feedback Queue
 ;; =============================================================================
 
-;; TODO: Extract this into a reusable component - similar pattern to DatasetCombobox and EvaluatorSelector
-(defui metric-selector-stub
-  "Temporary stub for metric selection - needs proper abstraction later"
+(defui metric-selector
+  "Metric selector with required checkbox and remove button for rubric forms.
+   
+   Uses SearchableSelector under the hood."
   [{:keys [module-id value on-change on-remove required? index]}]
-  (let [[search-term set-search-term] (useState "")
-        [debounced-search] (useDebounce search-term 300)
-        [is-open set-open] (useState false)
-        
-        ;; Fetch metrics with search
-        {:keys [data loading? error refetch]}
-        (queries/use-sente-query
-         {:query-key [:metric-selector module-id debounced-search]
-          :sente-event [:human-feedback/get-metrics
-                        {:module-id module-id
-                         :filters {:search-string debounced-search}}]
-          :enabled? true})  ; Always enabled so data is available
-        
-        ;; Get metrics from query, or use empty array
-        metrics (or (:items data) [])
-        selected-metric (when value
-                         (first (filter #(= (:name %) value) metrics)))]
-    
-    ;; Refetch when dropdown opens
-    (uix/use-effect
-     (fn []
-       (when is-open
-         (refetch))
-       js/undefined)
-     [is-open refetch])
-    
-    ($ :div.flex.items-start.gap-2 {:data-testid (str "rubric-" index)}
-       ($ :div.flex-1.relative  ; Added .relative for absolute positioning of dropdown
-          ;; Dropdown button
-          ($ :button.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-left.bg-white.hover:bg-gray-50.flex.justify-between.items-center
-             {:data-testid "metric-dropdown-toggle"
-              :type "button"
-              :onClick #(set-open (not is-open))}
-             ($ :span (or (:name selected-metric) value "Select metric..."))
-             ($ :span.text-gray-400 "▼"))
-          
-          ;; Dropdown menu
-          (when is-open
-            ($ :div.absolute.z-50.mt-1.w-full.bg-white.border.border-gray-300.rounded-md.shadow-lg.max-h-60.overflow-auto
-               {:data-testid "metric-dropdown-menu"}
-               ;; Search input
-               ($ :div.p-2.border-b
-                  ($ :input.w-full.px-2.py-1.border.border-gray-300.rounded
-                     {:data-testid "metric-search-input"
-                      :type "text"
-                      :placeholder "Search metrics..."
-                      :value search-term
-                      :onChange #(set-search-term (.. % -target -value))
-                      :onClick #(. % stopPropagation)}))  ; Prevent closing dropdown
-               
-               ;; Options list
-               ($ :div {:role "listbox"}
-                  (if loading?
-                    ($ :div.p-3.text-sm.text-gray-500 "Loading...")
-                    (if (or (nil? metrics) (empty? metrics))
-                      ($ :div.p-3.text-sm.text-gray-500 "No metrics found")
-                      (for [metric metrics]
-                        ($ :button.w-full.px-3.py-2.text-left.hover:bg-gray-100.flex.items-center.justify-between
-                           {:key (:name metric)
-                            :role "option"
-                            :type "button"
-                            :onClick #(do
-                                       (on-change (:name metric))
-                                       (set-open false)
-                                       (set-search-term ""))}
-                           ($ :span (:name metric))
-                           (when (= (:name metric) value)
-                             ($ :span.text-blue-600 "✓"))))))))))
-       
-       ;; Required checkbox
-       ($ :label.flex.items-center.gap-1.pt-2
-          ($ :input.rounded.border-gray-300
-             {:data-testid "metric-required-checkbox"
-              :type "checkbox"
-              :checked (boolean required?)
-              :onChange #(on-change value {:required (.. % -target -checked)})})
-          ($ :span.text-sm.text-gray-600 "Required"))
-       
-       ;; Remove button
-       ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
-          {:data-testid "remove-rubric-button"
-           :type "button"
-           :onClick on-remove}
-          ($ TrashIcon {:className "h-5 w-5"})))))
+  ($ :div.flex.items-start.gap-2 {:data-testid (str "rubric-" index)}
+     ;; Searchable metric selector
+     ($ :div.flex-1
+        ($ ss/SearchableSelector
+           {:module-id module-id
+            :value value
+            :on-change on-change
+            :sente-event-fn (fn [module-id search-string]
+                             [:human-feedback/get-metrics
+                              {:module-id module-id
+                               :filters {:search-string search-string}}])
+            :items-key :items
+            :item-id-fn :name
+            :item-label-fn :name
+            :placeholder "Select metric..."
+            :label "Metric"
+            :hide-label? true
+            :data-testid "metric-selector"}))
+     
+     ;; Required checkbox
+     ($ :label.flex.items-center.gap-1.pt-2
+        ($ :input.rounded.border-gray-300
+           {:data-testid "metric-required-checkbox"
+            :type "checkbox"
+            :checked (boolean required?)
+            :onChange #(on-change value {:required (.. % -target -checked)})})
+        ($ :span.text-sm.text-gray-600 "Required"))
+     
+     ;; Remove button
+     ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
+        {:data-testid "remove-rubric-button"
+         :type "button"
+         :onClick on-remove}
+        ($ TrashIcon {:className "h-5 w-5"}))))
 
 (forms/reg-form
  :create-human-feedback-queue
@@ -494,7 +446,7 @@
                  ($ :div.space-y-2
                     (map-indexed
                      (fn [idx rubric]
-                       ($ metric-selector-stub
+                       ($ metric-selector
                           {:key idx
                            :index idx
                            :module-id module-id

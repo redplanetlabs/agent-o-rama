@@ -69,15 +69,27 @@ test.describe('Human Feedback Queues', () => {
     const firstRubric = modal.getByTestId('rubric-0');
     await expect(firstRubric).toBeVisible();
     
-    // Open the metric dropdown (using Downshift pattern)
-    await firstRubric.getByTestId('metric-dropdown-toggle').click();
-    await expect(firstRubric.getByTestId('metric-dropdown-menu')).toBeVisible({ timeout: 10000 });
+    // Click on the metric selector input to open dropdown
+    await firstRubric.getByTestId('metric-selector-input').click();
+    
+    // Wait for dropdown to appear
+    await expect(firstRubric.getByTestId('metric-selector-dropdown')).toBeVisible({ timeout: 10000 });
+    
+    // Wait a bit for the query to complete and items to load
+    await page.waitForTimeout(2000);
+    
+    // Check if there's a loading state or if options appeared
+    const hasOptions = await firstRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').count() > 0;
+    const hasLoading = await firstRubric.getByTestId('metric-selector-loading').isVisible().catch(() => false);
+    const hasEmpty = await firstRubric.getByTestId('metric-selector-empty-state').isVisible().catch(() => false);
+    
+    console.log(`Options: ${hasOptions ? 'YES' : 'NO'}, Loading: ${hasLoading ? 'YES' : 'NO'}, Empty: ${hasEmpty ? 'YES' : 'NO'}`);
     
     // Wait for options to load
-    await firstRubric.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await firstRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 15000 });
     
-    // Select first matching metric (don't need to search if we're just taking first)
-    await firstRubric.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    // Select first matching metric
+    await firstRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
     
     // Toggle required checkbox
     await firstRubric.getByTestId('metric-required-checkbox').check();
@@ -90,9 +102,9 @@ test.describe('Human Feedback Queues', () => {
     await expect(secondRubric).toBeVisible();
     
     // Select metric for second rubric (not required)
-    await secondRubric.getByTestId('metric-dropdown-toggle').click();
-    await secondRubric.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
-    await secondRubric.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    await secondRubric.getByTestId('metric-selector-input').click();
+    await secondRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await secondRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
     
     console.log('✓ Added second rubric');
 
@@ -121,9 +133,9 @@ test.describe('Human Feedback Queues', () => {
     // Add rubric
     await modal.getByTestId('add-rubric-button').click();
     const rubric0 = modal.getByTestId('rubric-0');
-    await rubric0.getByTestId('metric-dropdown-toggle').click();
-    await rubric0.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
-    await rubric0.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    await rubric0.getByTestId('metric-selector-input').click();
+    await rubric0.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await rubric0.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
     await rubric0.getByTestId('metric-required-checkbox').check();
     
     // Submit
@@ -150,15 +162,15 @@ test.describe('Human Feedback Queues', () => {
     // Add two rubrics
     await modal.getByTestId('add-rubric-button').click();
     const rubric0_2 = modal.getByTestId('rubric-0');
-    await rubric0_2.getByTestId('metric-dropdown-toggle').click();
-    await rubric0_2.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
-    await rubric0_2.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    await rubric0_2.getByTestId('metric-selector-input').click();
+    await rubric0_2.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await rubric0_2.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
     
     await modal.getByTestId('add-rubric-button').click();
     const rubric1_2 = modal.getByTestId('rubric-1');
-    await rubric1_2.getByTestId('metric-dropdown-toggle').click();
-    await rubric1_2.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().waitFor({ timeout: 10000 });
-    await rubric1_2.getByTestId('metric-dropdown-menu').locator('[role="option"]').first().click();
+    await rubric1_2.getByTestId('metric-selector-input').click();
+    await rubric1_2.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await rubric1_2.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
     
     await createButton.click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });

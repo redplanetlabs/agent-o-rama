@@ -3,6 +3,7 @@
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [MagnifyingGlassIcon]]))
@@ -70,85 +71,28 @@
          ($ :div.mt-1.h-5)))))
 
 (defui EvaluatorSelector
-  "A searchable combobox for selecting an evaluator."
-  [{:keys [module-id value on-change error allowed-types disabled? placeholder]}]
-  (let [[search-term set-search-term!] (uix/use-state "")
-        [debounced-search] (useDebounce search-term 300)
-        [is-open? set-open!] (uix/use-state false)
-        input-ref (uix/use-ref nil)
-
-        ;; Create a stable string key from filters to avoid schema nesting issues
-        filter-key (str (when allowed-types (str/join "," (sort allowed-types)))
-                        "|" debounced-search)
-
-        {:keys [data loading? error query-error]}
-        (queries/use-sente-query
-         {:query-key [:evaluator-instances-search module-id filter-key]
-          :sente-event [:evaluators/get-all-instances
+  "A searchable combobox for selecting an evaluator.
+   
+   Wrapper around SearchableSelector with evaluator-specific logic."
+  [{:keys [module-id value on-change error allowed-types disabled? placeholder data-testid]
+    :or {data-testid "evaluator-selector"}}]
+  ($ ss/SearchableSelector
+     {:module-id module-id
+      :value value
+      :on-change on-change
+      :sente-event-fn (fn [module-id search-string]
+                       [:evaluators/get-all-instances
                         {:module-id module-id
-                         :filters {:search-string debounced-search
-                                   :types allowed-types}}]
-          :enabled? (and is-open? (boolean module-id))})
-
-        evaluators (:items data)
-        selected-evaluator (first (filter #(= (:name %) value) evaluators))
-
-        handle-select (fn [evaluator]
-                        (on-change (:name evaluator))
-                        (set-search-term! "")
-                        (set-open! false)
-                        (when-let [el @input-ref] (.blur el)))
-
-        handle-blur #(js/setTimeout (fn [] (set-open! false)) 200)]
-
-    (uix/use-effect
-     (fn []
-       (when is-open?
-         (let [handler #(set-open! false)]
-           (.addEventListener js/document "click" handler)
-           #(.removeEventListener js/document "click" handler))))
-     [is-open?])
-
-    ($ :div.relative
-       ($ :div.relative
-          ($ :div {:className "pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"}
-             ($ MagnifyingGlassIcon {:className "h-5 w-5 text-gray-400"}))
-          ($ :input
-             {:ref input-ref
-              :type "text"
-              :className (common/cn "w-full rounded-md border-0 py-2 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm"
-                                    {"ring-red-500" error})
-              :placeholder (or placeholder "Search evaluators by name...")
-              :value (if is-open? search-term (or value ""))
-              :onFocus #(set-open! true)
-              :onBlur handle-blur
-              :onChange #(do (set-search-term! (.. % -target -value))
-                             (set-open! true))
-              :disabled disabled?}))
-       (when is-open?
-         ($ :div {:role "listbox"
-                  :aria-label "Evaluator search results"
-                  :aria-busy loading?
-                  :className "absolute z-10 mt-1 w-full rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 max-h-60 overflow-y-auto"}
-
-            (cond
-              loading? ($ :div.p-3.text-sm.text-gray-500 "Loading...")
-              query-error ($ :div.p-3.text-sm.text-red-500 "Error fetching evaluators.")
-              (empty? evaluators) ($ :div.p-3.text-sm.text-gray-500 "No evaluators found.")
-              :else (for [e evaluators]
-                      ($ :div.p-3.cursor-pointer.hover:bg-gray-100
-                         {:key (:name e)
-                          :role "option"
-                          :aria-selected (= value (:name e))
-                          :aria-label (:name e)
-                          :onClick #(handle-select e)}
-                         ($ :div.flex.justify-between.items-start
-                            ($ :div
-                               ($ :p.font-medium.text-gray-900 (:name e))
-                               (when (not (str/blank? (:description e)))
-                                 ($ :p.text-xs.text-gray-500.mt-1 (:description e))))
-                            ($ :span {:className (common/cn "px-2 py-0.5 rounded-full text-xs font-medium"
-                                                            (common/get-evaluator-type-badge-style (:type e)))}
-                               (common/get-evaluator-type-display (:type e)))))))))
-       (when error
-         ($ :p.text-sm.text-red-600.mt-1 error)))))
+                         :filters {:search-string search-string
+                                   :types allowed-types}}])
+      :items-key :items
+      :item-id-fn :name
+      :item-label-fn :name
+      :item-sublabel-fn :description
+      :placeholder (or placeholder "Search evaluators by name...")
+      :label "Evaluator"
+      :hide-label? true  ; EvaluatorSelector historically doesn't show a label
+      :error error
+      :disabled? disabled?
+      :with-icon? true
+      :data-testid data-testid}))
