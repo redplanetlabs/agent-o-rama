@@ -9,7 +9,8 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]
-   ["@heroicons/react/24/outline" :refer [XMarkIcon MagnifyingGlassIcon]]))
+   ["@heroicons/react/24/outline" :refer [XMarkIcon MagnifyingGlassIcon]]
+   ["react-dom" :refer [createPortal]]))
 
 (defui SearchableSelector
   "A unified searchable dropdown selector.
@@ -48,6 +49,8 @@
         [is-open? set-open!] (uix/use-state false)
         [highlighted-idx set-highlighted-idx!] (uix/use-state 0)
         input-ref (uix/use-ref nil)
+        container-ref (uix/use-ref nil)
+        [dropdown-pos set-dropdown-pos!] (uix/use-state nil)
 
         ;; Query items
         {:keys [data loading? error query-error refetch]}
@@ -151,8 +154,20 @@
        js/undefined)
      [is-open? refetch])
 
+    ;; Calculate dropdown position when it opens
+    (uix/use-effect
+     (fn []
+       (when (and is-open? @container-ref)
+         (let [rect (.getBoundingClientRect @container-ref)]
+           (set-dropdown-pos! {:top (+ (.-bottom rect) 4)
+                               :left (.-left rect)
+                               :width (.-width rect)})))
+       js/undefined)
+     [is-open?])
+
     ($ :div.relative
-       {:data-testid (str data-testid "-container")}
+       {:ref container-ref
+        :data-testid (str data-testid "-container")}
        ($ :div.space-y-1
           ;; Label
           (when-not hide-label?
@@ -195,52 +210,58 @@
           (when error
             ($ :p.text-sm.text-red-600.mt-1 {:data-testid (str data-testid "-error")} error)))
 
-       ;; Dropdown list  
-       (when is-open?
-         ($ :div {:role "listbox"
-                  :aria-label (str label " search results")
-                  :aria-busy loading?
-                  :data-testid (str data-testid "-dropdown")
-                  :className "absolute w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                  :style {:z-index 999999}}
+       ;; Dropdown list using portal
+       (when (and is-open? dropdown-pos)
+         (createPortal
+          ($ :div {:role "listbox"
+                   :aria-label (str label " search results")
+                   :aria-busy loading?
+                   :data-testid (str data-testid "-dropdown")
+                   :className "bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
+                   :style {:position "fixed"
+                           :top (str (:top dropdown-pos) "px")
+                           :left (str (:left dropdown-pos) "px")
+                           :width (str (:width dropdown-pos) "px")
+                           :z-index 999999}}
 
-            (cond
-              loading?
-              ($ :div.p-4.text-center.text-gray-500.flex.items-center.justify-center
-                 {:data-testid (str data-testid "-loading")}
-                 ($ common/spinner {:size :medium})
-                 ($ :span.ml-2 "Loading..."))
+             (cond
+               loading?
+               ($ :div.p-4.text-center.text-gray-500.flex.items-center.justify-center
+                  {:data-testid (str data-testid "-loading")}
+                  ($ common/spinner {:size :medium})
+                  ($ :span.ml-2 "Loading..."))
 
-              query-error
-              ($ :div.p-3.text-sm.text-red-500
-                 {:data-testid (str data-testid "-error-state")}
-                 "Error loading items.")
+               query-error
+               ($ :div.p-3.text-sm.text-red-500
+                  {:data-testid (str data-testid "-error-state")}
+                  "Error loading items.")
 
-              (empty? items)
-              ($ :div.p-4.text-center.text-gray-500
-                 {:data-testid (str data-testid "-empty-state")}
-                 "No items found")
+               (empty? items)
+               ($ :div.p-4.text-center.text-gray-500
+                  {:data-testid (str data-testid "-empty-state")}
+                  "No items found")
 
-              :else
-              (for [[idx item] (map-indexed vector items)]
-                (let [item-id (item-id-fn item)
-                      is-selected? (selected-values item-id)]
-                  ($ :div {:key (str item-id)
-                           :data-testid (str data-testid "-option-" item-id)
-                           :role "option"
-                           :aria-selected is-selected?
-                           :className (str "p-3 cursor-pointer hover:bg-blue-50 "
-                                           (when (= idx highlighted-idx) "bg-blue-100 ")
-                                           (when is-selected? "bg-blue-50"))
-                           :onMouseEnter #(set-highlighted-idx! idx)
-                           :onClick #(handle-select item)}
-                     ($ :div.flex.justify-between.items-start
-                        ($ :div.flex-1
-                           ($ :div.font-medium.text-sm (item-label-fn item))
-                           (when item-sublabel-fn
-                             (when-let [sublabel (item-sublabel-fn item)]
-                               (when-not (str/blank? sublabel)
-                                 ($ :div.text-xs.text-gray-500.mt-1 sublabel)))))
-                        (when is-selected?
-                          ($ :span.text-blue-600.ml-2 "✓"))))))))))))
+               :else
+               (for [[idx item] (map-indexed vector items)]
+                 (let [item-id (item-id-fn item)
+                       is-selected? (selected-values item-id)]
+                   ($ :div {:key (str item-id)
+                            :data-testid (str data-testid "-option-" item-id)
+                            :role "option"
+                            :aria-selected is-selected?
+                            :className (str "p-3 cursor-pointer hover:bg-blue-50 "
+                                            (when (= idx highlighted-idx) "bg-blue-100 ")
+                                            (when is-selected? "bg-blue-50"))
+                            :onMouseEnter #(set-highlighted-idx! idx)
+                            :onClick #(handle-select item)}
+                      ($ :div.flex.justify-between.items-start
+                         ($ :div.flex-1
+                            ($ :div.font-medium.text-sm (item-label-fn item))
+                            (when item-sublabel-fn
+                              (when-let [sublabel (item-sublabel-fn item)]
+                                (when-not (str/blank? sublabel)
+                                  ($ :div.text-xs.text-gray-500.mt-1 sublabel)))))
+                         (when is-selected?
+                           ($ :span.text-blue-600.ml-2 "✓"))))))))
+          (.-body js/document))))))
 
