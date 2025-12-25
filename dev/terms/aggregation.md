@@ -1,7 +1,12 @@
 # Aggregation
 
+**Layer**: 3 (Operational) — see [ONTOLOGY.md](ONTOLOGY.md)
+
 ## Definition
 Distributed computation pattern for collecting and combining results from multiple node executions, enabling scatter-gather operations and parallel processing within agent graphs.
+
+## Sheaf Interpretation
+Aggregation is the **gluing operation** that combines [sections](section.md) from different [stalks](stalk.md) into a global section. The aggregation function corresponds to verifying the cocycle condition and computing H⁰.
 
 ## Architecture Role
 Provides parallel processing capabilities within agent graphs by coordinating scatter-gather patterns where work is distributed across cluster resources and results are collected and combined.

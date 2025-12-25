@@ -1,0 +1,30 @@
+#!/bin/bash
+# mlxies - Codex with local MLX model (like newies but local)
+# Usage: mlxies [codex args...]
+#
+# Requires MLX server running: just mlx-server
+
+set -e
+
+MLX_URL="${OPENAI_BASE_URL:-http://localhost:8080/v1}"
+
+# Check if MLX is running
+if ! curl -s "${MLX_URL}/models" >/dev/null 2>&1; then
+    echo "⚠ MLX server not running at ${MLX_URL}"
+    echo ""
+    echo "Start it with:"
+    echo "  just mlx-server    # default 7B model"
+    echo "  just mlx-tiny      # small 0.5B for testing"
+    echo ""
+    echo "Or run newies (remote) instead:"
+    echo "  newies $*"
+    exit 1
+fi
+
+echo "🧠 mlxies: Local MLX model at ${MLX_URL}"
+echo ""
+
+export OPENAI_BASE_URL="${MLX_URL}"
+export OPENAI_API_KEY="mlx-local"
+
+exec codex --dangerously-bypass-approvals-and-sandbox "$@"

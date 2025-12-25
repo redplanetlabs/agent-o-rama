@@ -1,0 +1,409 @@
+{
+  "snapshot_time" : "2025-12-24T05:18:21.938271Z",
+  "thread_count" : 101,
+  "threads" : [ {
+    "agent" : "amp",
+    "id" : "T-019b3563-23d1-70fc-a93f-7998eba78b14",
+    "path" : "/Users/alice/.amp/file-changes/T-019b3563-23d1-70fc-a93f-7998eba78b14"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2225-fff7-721d-8140-e544736b4fdb",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2225-fff7-721d-8140-e544736b4fdb"
+  }, {
+    "agent" : "amp",
+    "id" : "T-656c74b6-47aa-4cb9-bf62-57421a0d6171",
+    "path" : "/Users/alice/.amp/file-changes/T-656c74b6-47aa-4cb9-bf62-57421a0d6171"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b35aa-7d6b-7408-972b-b6aee9f245be",
+    "path" : "/Users/alice/.amp/file-changes/T-019b35aa-7d6b-7408-972b-b6aee9f245be"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2228-61b8-71c9-bd50-6817366835f6",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2228-61b8-71c9-bd50-6817366835f6"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2225-d1f1-7682-8496-edd9ae660ede",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2225-d1f1-7682-8496-edd9ae660ede"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b220b-eb65-7500-b4be-759c8aec28eb",
+    "path" : "/Users/alice/.amp/file-changes/T-019b220b-eb65-7500-b4be-759c8aec28eb"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b35a6-4e82-74e4-96a5-748a837e0bc0",
+    "path" : "/Users/alice/.amp/file-changes/T-019b35a6-4e82-74e4-96a5-748a837e0bc0"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b47ac-b50c-75bf-a19e-627781eb6d36",
+    "path" : "/Users/alice/.amp/file-changes/T-019b47ac-b50c-75bf-a19e-627781eb6d36"
+  }, {
+    "agent" : "amp",
+    "id" : "T-2cb1c0db-e8e4-41a0-b824-ba6a95414633",
+    "path" : "/Users/alice/.amp/file-changes/T-2cb1c0db-e8e4-41a0-b824-ba6a95414633"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b39ec-feb8-77dd-a109-9077ff772a69",
+    "path" : "/Users/alice/.amp/file-changes/T-019b39ec-feb8-77dd-a109-9077ff772a69"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2225-e97d-76bc-9647-e1c7b371c9cc",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2225-e97d-76bc-9647-e1c7b371c9cc"
+  }, {
+    "agent" : "amp",
+    "id" : "T-65050710-55ca-4772-8c5c-4bdd59efed62",
+    "path" : "/Users/alice/.amp/file-changes/T-65050710-55ca-4772-8c5c-4bdd59efed62"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b22f5-05d4-73b5-b25d-5722944c2507",
+    "path" : "/Users/alice/.amp/file-changes/T-019b22f5-05d4-73b5-b25d-5722944c2507"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4829-3127-75d4-813e-5c8ae850f2be",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4829-3127-75d4-813e-5c8ae850f2be"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b449b-7354-74a3-902e-de7b612d3c29",
+    "path" : "/Users/alice/.amp/file-changes/T-019b449b-7354-74a3-902e-de7b612d3c29"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2231-77f1-7320-8823-d8ac79f2c3ff",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2231-77f1-7320-8823-d8ac79f2c3ff"
+  }, {
+    "agent" : "amp",
+    "id" : "T-c4fafc4b-31dd-4f21-a6bb-2228deb0ef5c",
+    "path" : "/Users/alice/.amp/file-changes/T-c4fafc4b-31dd-4f21-a6bb-2228deb0ef5c"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b35b4-df3e-71bd-b2f4-1583423268bc",
+    "path" : "/Users/alice/.amp/file-changes/T-019b35b4-df3e-71bd-b2f4-1583423268bc"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b222e-914e-7600-8e83-1151d41cb31f",
+    "path" : "/Users/alice/.amp/file-changes/T-019b222e-914e-7600-8e83-1151d41cb31f"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b222e-914d-7473-ba0b-16b74e89fed8",
+    "path" : "/Users/alice/.amp/file-changes/T-019b222e-914d-7473-ba0b-16b74e89fed8"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b23e9-9d08-75bc-bfa2-9d5007aa5c50",
+    "path" : "/Users/alice/.amp/file-changes/T-019b23e9-9d08-75bc-bfa2-9d5007aa5c50"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b354e-124a-748e-a888-17f83c117ec0",
+    "path" : "/Users/alice/.amp/file-changes/T-019b354e-124a-748e-a888-17f83c117ec0"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b359f-a37c-716b-be58-b1f79142f4f9",
+    "path" : "/Users/alice/.amp/file-changes/T-019b359f-a37c-716b-be58-b1f79142f4f9"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b35a9-bbb8-76fb-830c-7f7f1546bc6c",
+    "path" : "/Users/alice/.amp/file-changes/T-019b35a9-bbb8-76fb-830c-7f7f1546bc6c"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4e86-59fd-75ae-8a72-a6eb7c8c1744",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4e86-59fd-75ae-8a72-a6eb7c8c1744"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b44d8-cc2f-7738-bb69-b8e5a1c343d2",
+    "path" : "/Users/alice/.amp/file-changes/T-019b44d8-cc2f-7738-bb69-b8e5a1c343d2"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b3566-abf0-7605-aa91-061ec6867db6",
+    "path" : "/Users/alice/.amp/file-changes/T-019b3566-abf0-7605-aa91-061ec6867db6"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2228-31cc-74ab-8ab9-5c13ebc9761d",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2228-31cc-74ab-8ab9-5c13ebc9761d"
+  }, {
+    "agent" : "amp",
+    "id" : "T-f1a4824f-caf2-45a8-a39f-3187446b0698",
+    "path" : "/Users/alice/.amp/file-changes/T-f1a4824f-caf2-45a8-a39f-3187446b0698"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b225b-dfd8-71a3-8cb0-8ab60856ddc1",
+    "path" : "/Users/alice/.amp/file-changes/T-019b225b-dfd8-71a3-8cb0-8ab60856ddc1"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b224f-f843-71e8-afdd-61f50942541a",
+    "path" : "/Users/alice/.amp/file-changes/T-019b224f-f843-71e8-afdd-61f50942541a"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b222a-24b0-75ca-9cf5-d9fd3982d5d5",
+    "path" : "/Users/alice/.amp/file-changes/T-019b222a-24b0-75ca-9cf5-d9fd3982d5d5"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4eaa-2cbf-703b-8679-c06f483a28f9",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4eaa-2cbf-703b-8679-c06f483a28f9"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4e25-44df-778e-a328-09febf2bfa16",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4e25-44df-778e-a328-09febf2bfa16"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b22f0-3b09-77cc-95bc-662c849886d5",
+    "path" : "/Users/alice/.amp/file-changes/T-019b22f0-3b09-77cc-95bc-662c849886d5"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b359c-7b87-718c-b49a-1c5ab58fdfe1",
+    "path" : "/Users/alice/.amp/file-changes/T-019b359c-7b87-718c-b49a-1c5ab58fdfe1"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4e1f-f62e-74cd-ba45-4753d91469fa",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4e1f-f62e-74cd-ba45-4753d91469fa"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4844-62a0-727f-bb14-4df8cdbba8eb",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4844-62a0-727f-bb14-4df8cdbba8eb"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b22f6-c9ff-7005-a0d4-5fc1e91b79bc",
+    "path" : "/Users/alice/.amp/file-changes/T-019b22f6-c9ff-7005-a0d4-5fc1e91b79bc"
+  }, {
+    "agent" : "amp",
+    "id" : "T-030329b8-75fd-4d84-aa70-0193d6410f10",
+    "path" : "/Users/alice/.amp/file-changes/T-030329b8-75fd-4d84-aa70-0193d6410f10"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2229-6efd-749f-a9d5-18e84ade1bbc",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2229-6efd-749f-a9d5-18e84ade1bbc"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2225-d1f2-7180-b0f7-e063964a2403",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2225-d1f2-7180-b0f7-e063964a2403"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2231-3d75-751d-9390-80056bb43e69",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2231-3d75-751d-9390-80056bb43e69"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2229-6efd-749f-a9d5-255c6bd8b279",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2229-6efd-749f-a9d5-255c6bd8b279"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b359c-7b87-718c-b49a-0b907ccd2efc",
+    "path" : "/Users/alice/.amp/file-changes/T-019b359c-7b87-718c-b49a-0b907ccd2efc"
+  }, {
+    "agent" : "amp",
+    "id" : "T-4796c0fd-edf4-4748-a7a3-67041f5f9300",
+    "path" : "/Users/alice/.amp/file-changes/T-4796c0fd-edf4-4748-a7a3-67041f5f9300"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4466-aed5-730f-bec6-b8809b152768",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4466-aed5-730f-bec6-b8809b152768"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b1fe4-1bd7-762f-88ac-06daab6303b1",
+    "path" : "/Users/alice/.amp/file-changes/T-019b1fe4-1bd7-762f-88ac-06daab6303b1"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2225-cfb6-76d1-896b-abf7f9cbc7d1",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2225-cfb6-76d1-896b-abf7f9cbc7d1"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b3569-f384-7320-95de-56d233e5c819",
+    "path" : "/Users/alice/.amp/file-changes/T-019b3569-f384-7320-95de-56d233e5c819"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b35ac-7305-7101-8dce-ed7f2cd1332e",
+    "path" : "/Users/alice/.amp/file-changes/T-019b35ac-7305-7101-8dce-ed7f2cd1332e"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2300-69af-760b-bab5-d2beef6f890d",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2300-69af-760b-bab5-d2beef6f890d"
+  }, {
+    "agent" : "amp",
+    "id" : "T-9a9f2d8e-c73d-4101-8171-fd35b2075b4a",
+    "path" : "/Users/alice/.amp/file-changes/T-9a9f2d8e-c73d-4101-8171-fd35b2075b4a"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4da9-f8ba-707b-b2b7-704c58686b24",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4da9-f8ba-707b-b2b7-704c58686b24"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2238-b120-7503-8302-8c3203a13c2d",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2238-b120-7503-8302-8c3203a13c2d"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2228-c026-75b7-96d3-d42567022da9",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2228-c026-75b7-96d3-d42567022da9"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b35a6-4e82-74e4-96a5-7117136783bc",
+    "path" : "/Users/alice/.amp/file-changes/T-019b35a6-4e82-74e4-96a5-7117136783bc"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4e39-72f5-770d-a35e-de26479d4245",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4e39-72f5-770d-a35e-de26479d4245"
+  }, {
+    "agent" : "amp",
+    "id" : "T-519091df-5ea2-4bd3-9807-8ecf4a622358",
+    "path" : "/Users/alice/.amp/file-changes/T-519091df-5ea2-4bd3-9807-8ecf4a622358"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b3efc-2cad-70a3-b492-044c5ab340ad",
+    "path" : "/Users/alice/.amp/file-changes/T-019b3efc-2cad-70a3-b492-044c5ab340ad"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b44a4-0deb-70b8-83e7-6af995006505",
+    "path" : "/Users/alice/.amp/file-changes/T-019b44a4-0deb-70b8-83e7-6af995006505"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b222a-1c01-76bb-93dc-3fc0f95215d2",
+    "path" : "/Users/alice/.amp/file-changes/T-019b222a-1c01-76bb-93dc-3fc0f95215d2"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b224f-f843-71e8-afdd-707bbb2d8636",
+    "path" : "/Users/alice/.amp/file-changes/T-019b224f-f843-71e8-afdd-707bbb2d8636"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4e83-f404-76b9-83fa-052be1807447",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4e83-f404-76b9-83fa-052be1807447"
+  }, {
+    "agent" : "amp",
+    "id" : "T-5df2b17c-db0f-4884-a7a6-acbe3f108f1d",
+    "path" : "/Users/alice/.amp/file-changes/T-5df2b17c-db0f-4884-a7a6-acbe3f108f1d"
+  }, {
+    "agent" : "amp",
+    "id" : "T-ef0961ad-4e86-48ea-a3c9-06f560538cf6",
+    "path" : "/Users/alice/.amp/file-changes/T-ef0961ad-4e86-48ea-a3c9-06f560538cf6"
+  }, {
+    "agent" : "amp",
+    "id" : "T-0378a004-af73-4204-93b7-0bc39c1e5299",
+    "path" : "/Users/alice/.amp/file-changes/T-0378a004-af73-4204-93b7-0bc39c1e5299"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4e90-5e0d-7508-9815-20aa1b48d9d9",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4e90-5e0d-7508-9815-20aa1b48d9d9"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b22f6-c9ff-7005-a0d4-6c3668a1aa73",
+    "path" : "/Users/alice/.amp/file-changes/T-019b22f6-c9ff-7005-a0d4-6c3668a1aa73"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2231-6295-76b9-8167-b99f5a177a91",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2231-6295-76b9-8167-b99f5a177a91"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b21cb-4314-755c-85fe-561abaf75c71",
+    "path" : "/Users/alice/.amp/file-changes/T-019b21cb-4314-755c-85fe-561abaf75c71"
+  }, {
+    "agent" : "amp",
+    "id" : "T-e4c5e140-ad75-4278-9ab8-09c019e351ad",
+    "path" : "/Users/alice/.amp/file-changes/T-e4c5e140-ad75-4278-9ab8-09c019e351ad"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b449d-3992-7532-bf10-9e165c900812",
+    "path" : "/Users/alice/.amp/file-changes/T-019b449d-3992-7532-bf10-9e165c900812"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b22ee-1864-745c-8c3f-491d84b1a49e",
+    "path" : "/Users/alice/.amp/file-changes/T-019b22ee-1864-745c-8c3f-491d84b1a49e"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2227-5ccb-7132-8bb3-ebd3965d91f7",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2227-5ccb-7132-8bb3-ebd3965d91f7"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4e28-6522-7068-9d26-a98034c72524",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4e28-6522-7068-9d26-a98034c72524"
+  }, {
+    "agent" : "amp",
+    "id" : "T-8b623155-614b-4443-b5e5-9fabebbfbbf1",
+    "path" : "/Users/alice/.amp/file-changes/T-8b623155-614b-4443-b5e5-9fabebbfbbf1"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2227-5ccb-7132-8bb3-ce7966f3239f",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2227-5ccb-7132-8bb3-ce7966f3239f"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4db6-3f85-759c-afb6-3b8722c54efe",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4db6-3f85-759c-afb6-3b8722c54efe"
+  }, {
+    "agent" : "amp",
+    "id" : "T-edd861cd-239c-4867-95a5-efe82de6cff7",
+    "path" : "/Users/alice/.amp/file-changes/T-edd861cd-239c-4867-95a5-efe82de6cff7"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b22f5-05d5-76af-b9b0-264e0c9c6b6b",
+    "path" : "/Users/alice/.amp/file-changes/T-019b22f5-05d5-76af-b9b0-264e0c9c6b6b"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4481-12a2-75db-9df6-8a03440be0f4",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4481-12a2-75db-9df6-8a03440be0f4"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4d9f-99be-74e2-830e-f3594c893216",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4d9f-99be-74e2-830e-f3594c893216"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b359f-a37d-7366-a07e-3d818349f09f",
+    "path" : "/Users/alice/.amp/file-changes/T-019b359f-a37d-7366-a07e-3d818349f09f"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2225-d73e-75af-834c-8a93d8e93c2b",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2225-d73e-75af-834c-8a93d8e93c2b"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2233-0ae5-76a8-84dd-f8e52e21e524",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2233-0ae5-76a8-84dd-f8e52e21e524"
+  }, {
+    "agent" : "amp",
+    "id" : "T-1f32203d-01cd-4763-bdd5-0cdd46b814ef",
+    "path" : "/Users/alice/.amp/file-changes/T-1f32203d-01cd-4763-bdd5-0cdd46b814ef"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4ea0-211f-7126-8127-06c0ef6eaca6",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4ea0-211f-7126-8127-06c0ef6eaca6"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b472b-f7a9-702c-8137-2158223864a4",
+    "path" : "/Users/alice/.amp/file-changes/T-019b472b-f7a9-702c-8137-2158223864a4"
+  }, {
+    "agent" : "amp",
+    "id" : "T-75d86a79-11d6-48f6-b9cb-b939f6734802",
+    "path" : "/Users/alice/.amp/file-changes/T-75d86a79-11d6-48f6-b9cb-b939f6734802"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2231-6276-7142-aa9d-a9a32e96ef51",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2231-6276-7142-aa9d-a9a32e96ef51"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b4844-62a0-727f-bb14-44483b075544",
+    "path" : "/Users/alice/.amp/file-changes/T-019b4844-62a0-727f-bb14-44483b075544"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b35a6-4e82-74e4-96a5-609f866ee28f",
+    "path" : "/Users/alice/.amp/file-changes/T-019b35a6-4e82-74e4-96a5-609f866ee28f"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b222e-914f-70d8-9a1e-755b28e7f4ba",
+    "path" : "/Users/alice/.amp/file-changes/T-019b222e-914f-70d8-9a1e-755b28e7f4ba"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b356d-e46c-742b-8db4-9b6608f46e2c",
+    "path" : "/Users/alice/.amp/file-changes/T-019b356d-e46c-742b-8db4-9b6608f46e2c"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2231-77f0-743f-93da-e453ecca1c93",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2231-77f0-743f-93da-e453ecca1c93"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b44a8-7fbc-755a-95c6-f275affa7f93",
+    "path" : "/Users/alice/.amp/file-changes/T-019b44a8-7fbc-755a-95c6-f275affa7f93"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2231-2c19-75e9-ac1f-b2b5ec877ef9",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2231-2c19-75e9-ac1f-b2b5ec877ef9"
+  }, {
+    "agent" : "amp",
+    "id" : "T-019b2231-6295-76b9-8167-b738498a5d53",
+    "path" : "/Users/alice/.amp/file-changes/T-019b2231-6295-76b9-8167-b738498a5d53"
+  }, {
+    "agent" : "claude-code",
+    "id" : "history.jsonl",
+    "path" : "/Users/alice/.claude/history.jsonl"
+  } ]
+}

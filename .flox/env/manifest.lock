@@ -1,0 +1,253 @@
+{
+  "lockfile-version": 1,
+  "manifest": {
+    "version": 1,
+    "install": {
+      "clojure": {
+        "pkg-path": "clojure"
+      },
+      "openjdk": {
+        "pkg-path": "openjdk"
+      }
+    },
+    "hook": {},
+    "profile": {},
+    "options": {}
+  },
+  "packages": [
+    {
+      "attr_path": "clojure",
+      "broken": false,
+      "derivation": "/nix/store/nyb5n6xp1wi6py8drqmi56wkczs45fp7-clojure-1.12.3.1577.drv",
+      "description": "Lisp dialect for the JVM",
+      "install_id": "clojure",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "name": "clojure-1.12.3.1577",
+      "pname": "clojure",
+      "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "rev_count": 914755,
+      "rev_date": "2025-12-21T09:35:49Z",
+      "scrape_date": "2025-12-23T02:55:22.525175Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.12.3.1577",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/20407npw1qc6m8yqwqs7yhhjvyvqr0aa-clojure-1.12.3.1577"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "clojure",
+      "broken": false,
+      "derivation": "/nix/store/i1c83dm15pi3f4rk8bn4v7pq27qyxcl3-clojure-1.12.3.1577.drv",
+      "description": "Lisp dialect for the JVM",
+      "install_id": "clojure",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "name": "clojure-1.12.3.1577",
+      "pname": "clojure",
+      "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "rev_count": 914755,
+      "rev_date": "2025-12-21T09:35:49Z",
+      "scrape_date": "2025-12-23T03:04:23.386499Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.12.3.1577",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/l3cn9g4sbv8w9f7dwigrrcasbzby2vz2-clojure-1.12.3.1577"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "clojure",
+      "broken": false,
+      "derivation": "/nix/store/wrk4fjc8xqhbhn9q2vcvk1nbvcjqqdxl-clojure-1.12.3.1577.drv",
+      "description": "Lisp dialect for the JVM",
+      "install_id": "clojure",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "name": "clojure-1.12.3.1577",
+      "pname": "clojure",
+      "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "rev_count": 914755,
+      "rev_date": "2025-12-21T09:35:49Z",
+      "scrape_date": "2025-12-23T03:14:21.760924Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.12.3.1577",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/8hbqd1shbfdig8b526066szc58jgk8zx-clojure-1.12.3.1577"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "clojure",
+      "broken": false,
+      "derivation": "/nix/store/mqbzzz242bsaqqp019abi2fh9zx6hk66-clojure-1.12.3.1577.drv",
+      "description": "Lisp dialect for the JVM",
+      "install_id": "clojure",
+      "license": "EPL-1.0",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "name": "clojure-1.12.3.1577",
+      "pname": "clojure",
+      "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "rev_count": 914755,
+      "rev_date": "2025-12-21T09:35:49Z",
+      "scrape_date": "2025-12-23T03:23:14.024295Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "1.12.3.1577",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/whap12vkky54syv4gj5npj2fb782mwvy-clojure-1.12.3.1577"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "openjdk",
+      "broken": false,
+      "derivation": "/nix/store/v333xkra2sr8zw73hzfi5wi2n1kim52a-zulu-ca-jdk-21.0.8.drv",
+      "description": "Certified builds of OpenJDK",
+      "install_id": "openjdk",
+      "license": "GPL-2.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "name": "zulu-ca-jdk-21.0.8",
+      "pname": "openjdk",
+      "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "rev_count": 914755,
+      "rev_date": "2025-12-21T09:35:49Z",
+      "scrape_date": "2025-12-23T02:55:47.714400Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "21.0.8",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/zng56j969rl5xnkz5v5c7j9fsxpm7sm1-zulu-ca-jdk-21.0.8"
+      },
+      "system": "aarch64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "openjdk",
+      "broken": false,
+      "derivation": "/nix/store/g4a7q1b9rlpxkmnyma83c6cf1w7fmq4l-openjdk-21.0.9+10.drv",
+      "description": "Open-source Java Development Kit",
+      "install_id": "openjdk",
+      "license": "GPL-2.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "name": "openjdk-21.0.9+10",
+      "pname": "openjdk",
+      "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "rev_count": 914755,
+      "rev_date": "2025-12-21T09:35:49Z",
+      "scrape_date": "2025-12-23T03:05:05.272485Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "21.0.9+10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/qmczwsgqyfq49baj86rwza8nc49ag282-openjdk-21.0.9+10-debug",
+        "out": "/nix/store/jlxgl3k14x3zhfa00rsygfw3fgp6xgg8-openjdk-21.0.9+10"
+      },
+      "system": "aarch64-linux",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "openjdk",
+      "broken": false,
+      "derivation": "/nix/store/anf89016ggyfvz0rqa5a7kvpg9a3q87n-zulu-ca-jdk-21.0.8.drv",
+      "description": "Certified builds of OpenJDK",
+      "install_id": "openjdk",
+      "license": "GPL-2.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "name": "zulu-ca-jdk-21.0.8",
+      "pname": "openjdk",
+      "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "rev_count": 914755,
+      "rev_date": "2025-12-21T09:35:49Z",
+      "scrape_date": "2025-12-23T03:14:46.231388Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "21.0.8",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "out": "/nix/store/bkqa7q4jkrg69fmmik1sz8lszclmibdw-zulu-ca-jdk-21.0.8"
+      },
+      "system": "x86_64-darwin",
+      "group": "toplevel",
+      "priority": 5
+    },
+    {
+      "attr_path": "openjdk",
+      "broken": false,
+      "derivation": "/nix/store/annmcl0ds0b1wjl0wpas17zy1fxsba0a-openjdk-21.0.9+10.drv",
+      "description": "Open-source Java Development Kit",
+      "install_id": "openjdk",
+      "license": "GPL-2.0-only",
+      "locked_url": "https://github.com/flox/nixpkgs?rev=a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "name": "openjdk-21.0.9+10",
+      "pname": "openjdk",
+      "rev": "a6531044f6d0bef691ea18d4d4ce44d0daa6e816",
+      "rev_count": 914755,
+      "rev_date": "2025-12-21T09:35:49Z",
+      "scrape_date": "2025-12-23T03:23:58.330316Z",
+      "stabilities": [
+        "unstable"
+      ],
+      "unfree": false,
+      "version": "21.0.9+10",
+      "outputs_to_install": [
+        "out"
+      ],
+      "outputs": {
+        "debug": "/nix/store/iqrpym2396ppr5498xci88zf6kc37yxl-openjdk-21.0.9+10-debug",
+        "out": "/nix/store/65qpdkc33j5wqzxvz8c23zhgms8hl35y-openjdk-21.0.9+10"
+      },
+      "system": "x86_64-linux",
+      "group": "toplevel",
+      "priority": 5
+    }
+  ]
+}

@@ -1,6 +1,11 @@
 # Agent Node
 
+**Layer**: 3 (Operational) — see [ONTOLOGY.md](ONTOLOGY.md)
+
 Individual execution units within agent graphs that perform computation, access state, and control execution flow through emissions and results.
+
+## Sheaf Interpretation
+A node is a **section producer**: it wraps a [derivation](derivation.md) and outputs a [section](section.md) into its associated [stalk](stalk.md). The node's trit classification (-1/0/+1) determines which stalk receives its output.
 
 ## Purpose
 

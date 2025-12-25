@@ -1,6 +1,17 @@
 # Agent
 
+**Layer**: 4 (Emergent) — see [ONTOLOGY.md](ONTOLOGY.md)
+
 ## Definition
+A fiber bundle over the trit poset {-1, 0, +1}, observed as a distributed, stateful computational unit. Agents are not primitives—they emerge from the interplay of [derivations](derivation.md), [stalks](stalk.md), and [sections](section.md) when gluing succeeds.
+
+## Pre-Agent Decomposition
+```
+Agent = Observation(Bundle(Stalk₋₁, Stalk₀, Stalk₊₁))
+      = GlobalSection(Derivation Chain)
+```
+
+## Traditional Definition
 A distributed, stateful computational unit that executes through a directed graph of interconnected nodes. Agents represent autonomous processing entities that can maintain persistent state, communicate between execution steps, and integrate with external systems.
 
 ## Architecture Role

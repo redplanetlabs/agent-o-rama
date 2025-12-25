@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "macos-use": {
+      "command": "/Users/alice/.local/bin/mcp-server-macos-use"
+    }
+  }
+}

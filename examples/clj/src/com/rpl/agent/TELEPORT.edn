@@ -1,0 +1,73 @@
+{:teleportation-checkpoint
+ {:source-pid 5563
+  :checkpoint-seed "0x7D7AB988BA9AD7B9"
+  :thread-id "T-019b4ea0-211f-7126-8127-06c0ef6eaca6"
+  :timestamp #inst "2025-12-23T00:00:00.000Z"
+  
+  :spi-verification
+  {:verified true
+   :ordered-trits [1 0 1 0 -1]
+   :invariant "color(seed, i) == color(seed, i) regardless of computation order"}
+  
+  :gf3-state
+  {:checkpoint-sum 1
+   :agents-sum 0
+   :combined-conserved false
+   :rebalance-needed "+2 or -1 operation"}
+  
+  :three-agents
+  [{:id 0
+    :role :validator
+    :trit -1
+    :seed "0xCB82606E3254"
+    :skills [spi-parallel-verify bisimulation-game unworld]
+    :mcp-servers [tree-sitter babashka]
+    :verifies "Derivational chain determinism"
+    :color-band :cold}
+   
+   {:id 1
+    :role :coordinator
+    :trit 0
+    :seed "0x82BC68B2403D"
+    :skills [triad-interleave glass-bead-game gay-mcp]
+    :mcp-servers [playwright exa]
+    :verifies "GF(3) conservation across streams"
+    :color-band :neutral}
+   
+   {:id 2
+    :role :generator
+    :trit +1
+    :seed "0x588FAF4D9481"
+    :skills [self-evolving-agent gflownet epistemic-arbitrage]
+    :mcp-servers [aptos signal]
+    :verifies "World generation via sampling"
+    :color-band :warm}]
+  
+  :mutual-exclusivity
+  {:skills-overlap false
+   :mcp-overlap false
+   :derangement-constraint "σ(x) ≠ x for all x, σ³ = id"}
+  
+  :receiving-side-verification
+  {:command "derive_color(0x7D7AB988BA9AD7B9, 0)[:trit]"
+   :expected-result 1
+   :on-match :teleportation-successful
+   :on-mismatch :chain-corrupted}}
+
+ :world-generating-event
+ {:polarization
+  {:minus-pole {:agent 0 :role :validator :direction :perception}
+   :plus-pole {:agent 2 :role :generator :direction :action}
+   :ergodic-axis {:agent 1 :role :coordinator :direction :simulation}}
+  
+  :light-up-sequence
+  ["Load VALIDATOR with spi-parallel-verify to verify derivation"
+   "Load COORDINATOR with gay-mcp to generate triadic palette"
+   "Load GENERATOR with gflownet to sample world states P(x) ∝ R(x)"
+   "Verify Σ trits = 0 across all three"
+   "Commit world state if conserved"]
+  
+  :investment-directions
+  {:validator "Invests in PAST (verifies what was derived)"
+   :coordinator "Invests in PRESENT (balances current state)"
+   :generator "Invests in FUTURE (samples possible worlds)"}}}

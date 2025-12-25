@@ -1,0 +1,29 @@
+#!/bin/bash
+# newies - Codex with remote OpenAI model
+# Usage: newies [codex args...]
+#
+# This is the standard remote mode (requires OPENAI_API_KEY)
+
+# Unset local overrides to ensure remote
+unset OPENAI_BASE_URL
+
+if [ -z "$OPENAI_API_KEY" ]; then
+    # Try to get from codex auth
+    if [ -f ~/.codex/auth.json ]; then
+        echo "🔑 Using codex auth..."
+    else
+        echo "⚠ OPENAI_API_KEY not set and no ~/.codex/auth.json"
+        echo ""
+        echo "Set your API key:"
+        echo "  export OPENAI_API_KEY=sk-..."
+        echo ""
+        echo "Or use mlxies (local) instead:"
+        echo "  mlxies $*"
+        exit 1
+    fi
+fi
+
+echo "☁️  newies: Remote OpenAI model"
+echo ""
+
+exec codex --dangerously-bypass-approvals-and-sandbox "$@"
