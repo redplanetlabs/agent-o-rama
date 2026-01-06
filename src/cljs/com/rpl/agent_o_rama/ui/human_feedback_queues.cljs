@@ -769,10 +769,27 @@
   ;; TODO: implement cookie storage
   nil)
 
+(defn metric-type
+  "Determine the metric type from the metric data.
+   Handles both dummy data format (__typename) and backend format (_aor-type or field presence)."
+  [metric]
+  (cond
+    ;; Dummy data format
+    (= (:__typename metric) "HumanCategoryMetric") :category
+    (= (:__typename metric) "HumanNumericMetric") :numeric
+    ;; Backend format with type annotation
+    (str/includes? (str (get metric "_aor-type" "")) "HumanCategoryMetric") :category
+    (str/includes? (str (get metric "_aor-type" "")) "HumanNumericMetric") :numeric
+    ;; Infer from fields present
+    (contains? metric :categories) :category
+    (and (contains? metric :min) (contains? metric :max)) :numeric
+    :else nil))
+
 (defui metric-field [{:keys [rubric value on-change error]}]
   (let [metric (:metric rubric)
-        is-category? (= (:__typename metric) "HumanCategoryMetric")
-        is-numeric? (= (:__typename metric) "HumanNumericMetric")]
+        mtype (metric-type metric)
+        is-category? (= mtype :category)
+        is-numeric? (= mtype :numeric)]
     ($ :div.mb-4
        ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
           (:name rubric)
@@ -809,16 +826,41 @@
 
 (defui item-detail []
   (let [{:keys [module-id queue-id item-id]} (state/use-sub [:route :path-params])
+        decoded-module-id (common/url-decode module-id)
+        decoded-queue-id (common/url-decode queue-id)
 
-        ;; Dummy data
-        queue-info dummy-queue-info
-        items (:items dummy-queue-items)
-        current-idx (.indexOf (clj->js (map :id items)) item-id)
-        current-item (nth items current-idx nil)
-        has-prev? (> current-idx 0)
-        has-next? (< current-idx (dec (count items)))
-        prev-item-id (when has-prev? (:id (nth items (dec current-idx))))
-        next-item-id (when has-next? (:id (nth items (inc current-idx))))
+        ;; Fetch queue info for rubrics
+        {:keys [data queue-info-loading?]}
+        (queries/use-sente-query
+         {:query-key [:human-feedback-queue-info module-id queue-id]
+          :sente-event [:human-feedback/get-queue-info
+                        {:module-id decoded-module-id
+                         :queue-name decoded-queue-id}]
+          :enabled? (boolean (and decoded-module-id decoded-queue-id))})
+        queue-info data
+
+        ;; Fetch all queue items (we need the list for prev/next navigation)
+        {:keys [data isLoading]}
+        (queries/use-paginated-query
+         {:query-key [:human-feedback-queue-items module-id queue-id]
+          :sente-event [:human-feedback/get-queue-items
+                        {:module-id decoded-module-id
+                         :queue-name decoded-queue-id}]
+          :page-size 100  ;; Load more items for navigation
+          :enabled? (boolean (and decoded-module-id decoded-queue-id))})
+        items-loading? isLoading
+        items (or data [])  ;; data IS the items array from use-paginated-query
+
+        ;; Find current item and navigation indices
+        ;; Compare as strings since item-id from route may be UUID or string
+        item-id-str (str item-id)
+        current-idx (some (fn [[idx item]] (when (= (str (:id item)) item-id-str) idx))
+                          (map-indexed vector items))
+        current-item (when current-idx (nth items current-idx nil))
+        has-prev? (and current-idx (> current-idx 0))
+        has-next? (and current-idx (< current-idx (dec (count items))))
+        prev-item-id (when has-prev? (str (:id (nth items (dec current-idx)))))
+        next-item-id (when has-next? (str (:id (nth items (inc current-idx)))))
 
         ;; Form state
         [scores set-scores] (uix/use-state {})
@@ -831,12 +873,13 @@
                         (let [errs (reduce (fn [acc rubric]
                                              (let [metric-name (:name rubric)
                                                    value (get scores metric-name)
-                                                   metric (:metric rubric)]
+                                                   metric (:metric rubric)
+                                                   mtype (metric-type metric)]
                                                (cond
                                                  (and (:required rubric) (or (nil? value) (= value "")))
                                                  (assoc acc metric-name "This field is required")
 
-                                                 (and (= (:__typename metric) "HumanNumericMetric")
+                                                 (and (= mtype :numeric)
                                                       value
                                                       (not= value ""))
                                                  (let [num-val (js/parseFloat value)]
@@ -854,8 +897,8 @@
 
                                                  :else acc)))
                                            {}
-                                           (:rubrics queue-info))]
-                          (if (clojure.string/blank? reviewer-name)
+                                           (or (:rubrics queue-info) []))]
+                          (if (str/blank? reviewer-name)
                             (assoc errs :reviewer-name "Reviewer name is required")
                             errs)))
 
@@ -889,9 +932,18 @@
                                            {:module-id module-id
                                             :queue-id queue-id})))]
 
-    (if-not current-item
+    (cond
+      ;; Loading state
+      (or queue-info-loading? items-loading?)
+      ($ :div.p-6
+         ($ :div.text-center.text-gray-500 "Loading..."))
+
+      ;; Item not found
+      (not current-item)
       ($ :div.p-6
          ($ :div.text-center.text-gray-500 "Item not found"))
+
+      :else
 
       ($ :div.p-6.max-w-5xl.mx-auto
          ;; Header with navigation

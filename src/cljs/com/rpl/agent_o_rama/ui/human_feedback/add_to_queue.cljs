@@ -14,10 +14,9 @@
                         [:human-feedback/get-queues
                          {:module-id module-id
                           :filters {:search-string (or search-string "")}}])
-      :items-key :results
+      :items-key :items
       :item-id-fn :name
       :item-label-fn :name
-      :item-sublabel-fn :description
       :placeholder "Type to search queues..."
       :label "Human Feedback Queue"
       :required? required?
