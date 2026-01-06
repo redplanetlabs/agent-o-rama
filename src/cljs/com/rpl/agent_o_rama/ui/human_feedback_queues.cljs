@@ -907,30 +907,52 @@
                           (if (empty? validation-errors)
                             (do
                               (save-reviewer-name-to-cookie! reviewer-name)
-                              (js/alert (str "Submitted! Scores: " (pr-str scores)))
-                              ;; Auto-advance to next item
+                              ;; Submit to backend
+                              (sente/request!
+                               [:human-feedback/resolve-queue-item
+                                {:module-id decoded-module-id
+                                 :queue-name decoded-queue-id
+                                 :item-id item-id-str
+                                 :target (:target current-item)
+                                 :reviewer-name reviewer-name
+                                 :scores scores
+                                 :comment comment}]
+                               10000
+                               (fn [reply]
+                                 (if (:success reply)
+                                   ;; Auto-advance to next item
+                                   (if has-next?
+                                     (rfe/push-state :module/human-feedback-queue-item
+                                                     {:module-id module-id
+                                                      :queue-id queue-id
+                                                      :item-id next-item-id})
+                                     (rfe/push-state :module/human-feedback-queue-end
+                                                     {:module-id module-id
+                                                      :queue-id queue-id}))
+                                   (js/alert (str "Error submitting: " (:error reply)))))))
+                            (set-errors validation-errors))))
+
+        handle-dismiss (fn []
+                         (set-show-dismiss-confirm false)
+                         ;; Dismiss via backend
+                         (sente/request!
+                          [:human-feedback/dismiss-queue-item
+                           {:module-id decoded-module-id
+                            :queue-name decoded-queue-id
+                            :item-id item-id-str}]
+                          10000
+                          (fn [reply]
+                            (if (:success reply)
+                              ;; Navigate to next item or back to queue
                               (if has-next?
                                 (rfe/push-state :module/human-feedback-queue-item
                                                 {:module-id module-id
                                                  :queue-id queue-id
                                                  :item-id next-item-id})
-                                (rfe/push-state :module/human-feedback-queue-end
+                                (rfe/push-state :module/human-feedback-queue-detail
                                                 {:module-id module-id
-                                                 :queue-id queue-id})))
-                            (set-errors validation-errors))))
-
-        handle-dismiss (fn []
-                         (set-show-dismiss-confirm false)
-                         (js/alert "Item dismissed!")
-                         ;; Navigate to next item or back to queue
-                         (if has-next?
-                           (rfe/push-state :module/human-feedback-queue-item
-                                           {:module-id module-id
-                                            :queue-id queue-id
-                                            :item-id next-item-id})
-                           (rfe/push-state :module/human-feedback-queue-detail
-                                           {:module-id module-id
-                                            :queue-id queue-id})))]
+                                                 :queue-id queue-id}))
+                              (js/alert (str "Error dismissing: " (:error reply)))))))]
 
     (cond
       ;; Loading state

@@ -119,3 +119,38 @@
     (evals/add-human-feedback-request! global-actions-depot queue-name feedback-target (or comment ""))
     {:status :ok}))
 
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/resolve-queue-item
+  [{:keys [manager queue-name item-id target reviewer-name scores comment]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        global-actions-depot (:global-actions-depot underlying-objects)
+        ;; Parse item-id
+        item-uuid (if (uuid? item-id) item-id (UUID/fromString (str item-id)))
+        ;; Build feedback target from the target data
+        {:keys [agent-name agent-invoke node-invoke]} target
+        agent-invoke-impl (aor-types/->AgentInvokeImpl 
+                           (:task-id agent-invoke)
+                           (:agent-invoke-id agent-invoke))
+        node-invoke-impl (when node-invoke
+                           (aor-types/->NodeInvokeImpl
+                            (:task-id node-invoke)
+                            (:node-invoke-id node-invoke)))
+        feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke-impl node-invoke-impl)]
+    (evals/resolve-human-feedback-queue-item! 
+     global-actions-depot 
+     queue-name 
+     item-uuid 
+     feedback-target
+     reviewer-name
+     scores
+     (or comment ""))
+    {:status :ok}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/dismiss-queue-item
+  [{:keys [manager queue-name item-id]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        global-actions-depot (:global-actions-depot underlying-objects)
+        ;; Parse item-id
+        item-uuid (if (uuid? item-id) item-id (UUID/fromString (str item-id)))]
+    (evals/remove-human-feedback-queue-item! global-actions-depot queue-name item-uuid)
+    {:status :ok}))
+
