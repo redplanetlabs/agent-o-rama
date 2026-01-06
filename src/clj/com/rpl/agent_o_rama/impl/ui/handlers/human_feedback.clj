@@ -102,3 +102,20 @@
         query-limit 20]
     (foreign-invoke-query queue-page-query queue-name query-limit pagination)))
 
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/add-to-queue
+  [{:keys [manager queue-name agent-name invoke-id node-task-id node-invoke-id comment]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        global-actions-depot (:global-actions-depot underlying-objects)
+        ;; Parse invoke-id which is "taskId-agentInvokeId" format
+        [agent-task-id agent-invoke-id] (common/parse-url-pair invoke-id)
+        ;; Build agent invoke
+        agent-invoke (aor-types/->AgentInvokeImpl agent-task-id agent-invoke-id)
+        ;; Build node invoke if provided
+        node-invoke (when (and node-task-id node-invoke-id)
+                      (aor-types/->NodeInvokeImpl (parse-long node-task-id)
+                                                   (UUID/fromString node-invoke-id)))
+        ;; Build feedback target
+        feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke node-invoke)]
+    (evals/add-human-feedback-request! global-actions-depot queue-name feedback-target (or comment ""))
+    {:status :ok}))
+

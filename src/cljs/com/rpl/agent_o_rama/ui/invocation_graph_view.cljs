@@ -14,6 +14,7 @@
    [com.rpl.agent-o-rama.ui.feedback :as feedback]
    [com.rpl.agent-o-rama.ui.components.conversation :as conversation]
    [com.rpl.agent-o-rama.ui.streaming :as streaming]
+   [com.rpl.agent-o-rama.ui.human-feedback.add-to-queue :as add-to-queue]
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
@@ -285,30 +286,46 @@
                                   (state/dispatch [:db/set-value [:ui :hitl :responses hr-invoke-id] ""]))}
              (if submitting? "Submitting..." "Submit Response"))))))
 
-(defui node-info-panel [{:keys [node-id node-name graph-data module-id]}]
-  ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
-     ($ :div {:className "flex justify-between items-center"}
-        ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
-        ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
-     ($ :div {:className "flex justify-between items-center mt-1"}
-        ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
-        ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id)))
-     ;; Add to Dataset button for individual node
-     ($ :div {:className "mt-3"}
-        ($ :button
-           {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-white text-black hover:bg-indigo-200 cursor-pointer"
-            :onClick (fn [e]
-                       (.stopPropagation e)
-                       (let [raw-node-data (get graph-data node-id)
-                             input-data (transform-node-input-for-dataset raw-node-data node-name)
-                             output-data (transform-node-data-for-dataset raw-node-data node-name)]
-                         (state/dispatch [:modal/show-form :add-from-trace
-                                          {:module-id module-id
-                                           :title (str "Add Node '" node-name "' to Dataset")
-                                           :source-type :node
-                                           :source-args input-data
-                                           :source-emits output-data}])))}
-           "Add node to Dataset"))))
+(defui node-info-panel [{:keys [node-id node-name graph-data module-id agent-name invoke-id]}]
+  (let [raw-node-data (get graph-data node-id)
+        node-task-id (:node-task-id raw-node-data)]
+    ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
+       ($ :div {:className "flex justify-between items-center"}
+          ($ :span {:className "text-sm font-medium text-indigo-700"} "Node")
+          ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
+       ($ :div {:className "flex justify-between items-center mt-1"}
+          ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
+          ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id)))
+       ;; Buttons row
+       ($ :div {:className "mt-3 flex gap-2"}
+          ;; Add to Dataset button
+          ($ :button
+             {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-white text-black hover:bg-indigo-200 cursor-pointer"
+              :onClick (fn [e]
+                         (.stopPropagation e)
+                         (let [input-data (transform-node-input-for-dataset raw-node-data node-name)
+                               output-data (transform-node-data-for-dataset raw-node-data node-name)]
+                           (state/dispatch [:modal/show-form :add-from-trace
+                                            {:module-id module-id
+                                             :title (str "Add Node '" node-name "' to Dataset")
+                                             :source-type :node
+                                             :source-args input-data
+                                             :source-emits output-data}])))}
+             "Add to Dataset")
+          ;; Add to Queue button
+          ($ :button
+             {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-white text-purple-700 hover:bg-purple-100 cursor-pointer"
+              :onClick (fn [e]
+                         (.stopPropagation e)
+                         (add-to-queue/show-add-to-queue-modal
+                          {:module-id module-id
+                           :title (str "Add Node '" node-name "' to Queue")
+                           :source-type :node
+                           :agent-name agent-name
+                           :invoke-id invoke-id
+                           :node-task-id node-task-id
+                           :node-invoke-id (str node-id)}))}
+             "Add to Queue")))))
 
 (defui node-result-panel [{:keys [result]}]
   (when result
@@ -520,7 +537,9 @@
        ($ node-info-panel {:node-id node-id
                            :node-name node-name
                            :graph-data graph-data
-                           :module-id module-id})
+                           :module-id module-id
+                           :agent-name agent-name
+                           :invoke-id invoke-id})
 
        ;; Streaming panel - shown for nodes that are in progress or have streaming data
        ;; Uses node-id (specific node invocation UUID) to stream from the correct node instance
@@ -907,7 +926,7 @@
                                :is-live? is-live?})))
          ($ :p.text-sm.text-gray-500.italic "No metadata exists")))))
 
-(defui result-panel [{:keys [result summary-data module-id]}]
+(defui result-panel [{:keys [result summary-data module-id agent-name invoke-id]}]
   (when result
     (let [failure? (:failure? result)
           result-val (:val result)]
@@ -927,9 +946,10 @@
                                                       (state/dispatch [:modal/show :content-detail
                                                                        {:title title
                                                                         :component ($ common/ContentDetailModal {:title title :content content})}]))}))
-         ($ :div {:className "mt-4"}
+         ($ :div {:className "mt-4 flex gap-2"}
+            ;; Add to Dataset button
             ($ :button
-               {:className "w-full text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
+               {:className "flex-1 text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
                 :onClick (fn []
                            (let [input-data (:invoke-args summary-data)
                                  output-data (:val (:result summary-data))]
@@ -939,7 +959,18 @@
                                                :source-type :agent
                                                :source-args input-data
                                                :source-result output-data}])))}
-               "Add to Dataset"))))))
+               "Add to Dataset")
+            ;; Add to Queue button
+            ($ :button
+               {:className "flex-1 text-sm font-medium py-2 px-4 rounded-md transition-colors bg-purple-100 text-purple-800 hover:bg-purple-200"
+                :onClick (fn []
+                           (add-to-queue/show-add-to-queue-modal
+                            {:module-id module-id
+                             :title "Add Agent Invocation to Queue"
+                             :source-type :agent
+                             :agent-name agent-name
+                             :invoke-id invoke-id}))}
+               "Add to Queue"))))))
 
 (defui info-panel [{:keys [graph-data summary-data on-select-node module-id agent-name task-id forks fork-of invoke-id]}]
   (let [result (:result summary-data)
@@ -955,7 +986,9 @@
 
        ($ result-panel {:result result
                         :summary-data summary-data
-                        :module-id module-id})
+                        :module-id module-id
+                        :agent-name agent-name
+                        :invoke-id invoke-id})
 
        ($ exceptions-panel {:summary-data summary-data
                             :graph-data graph-data
