@@ -1170,7 +1170,7 @@
 (deframaop handle-human-analytics
   [%mb]
   (%mb :> {:keys [*target *scores *scores-millis]})
-  (identity *target :> {:keys [*agent-name *agent-invoke *node-invoke]})
+  (identity *target :> {:keys [*agent-name *node-invoke]})
   (filter> (contains? (po/agent-names-set) *agent-name))
   (evals/target-location-info *target :> *pstate-name *task-id *root-id)
   (|direct *task-id)
