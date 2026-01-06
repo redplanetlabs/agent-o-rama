@@ -58,7 +58,7 @@
                                  {:pkey agent-task-id})}
                         (->> summary-info-raw
                              (transform
-                              [:feedback :results ALL :source :source]
+                              [:feedback :results ALL :source]
                               aor-types/source-string)
                              (transform [:feedback :actions MAP-KEYS] name))
                         (when-let [stats (:stats summary-info-raw)]
@@ -87,7 +87,7 @@
                           (->> m
                                common/remove-implicit-nodes
                                (transform
-                                [MAP-VALS :feedback :results ALL :source :source]
+                                [MAP-VALS :feedback :results ALL :source]
                                 aor-types/source-string)
                                (transform
                                 [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
