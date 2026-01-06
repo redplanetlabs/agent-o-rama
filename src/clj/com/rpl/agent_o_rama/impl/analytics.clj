@@ -1284,3 +1284,12 @@
       (transformed [(putval metrics-set) MAP-VALS end-path] metrics-extract)]
      telemetry-pstate
      {:pkey [agent-name granularity metric-id]})))
+
+(defn human-metric-ids
+  [human-feedback-pstate]
+  (mapv
+   #(vector :human %)
+   (foreign-select
+    [:metrics MAP-KEYS]
+    human-feedback-pstate
+   )))

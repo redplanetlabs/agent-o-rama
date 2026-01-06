@@ -1559,6 +1559,8 @@
        (bind agent-manager (aor/agent-manager ipc module-name))
        (bind global-actions-depot
          (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind human-feedback-pstate
+         (:human-feedback-pstate (aor-types/underlying-objects agent-manager)))
        (bind foo (aor/agent-client agent-manager "foo"))
        (bind foo-root (:root-pstate (aor-types/underlying-objects foo)))
        (bind foo-traces (:tracing-query (aor-types/underlying-objects foo)))
@@ -1908,10 +1910,5 @@
                                     [:count]
                                     nil)))
 
-
-       ;; TODO: <<<<>>>>
-       ;;  - need query topology or helper function to get human metrics to chart
-       ;;   - just get all of them, and have a simple helper function to return human metric ids
-       ;;     - it could just be at most 100 or something
-
+       (is (= [[:human "c1"] [:human "n1"]] (ana/human-metric-ids human-feedback-pstate)))
       ))))

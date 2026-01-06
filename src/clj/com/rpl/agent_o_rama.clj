@@ -1184,6 +1184,9 @@ Example:\n
                                       cluster
                                       module-name
                                       (po/datasets-task-global-name))
+        human-feedback-pstate        (foreign-pstate cluster
+                                                     module-name
+                                                     (po/human-feedback-task-global-name))
         datasets-page-query          (foreign-query
                                       cluster
                                       module-name
@@ -1810,6 +1813,7 @@ Example:\n
      (underlying-objects [this]
        {:datasets-depot             datasets-depot
         :datasets-pstate            datasets-pstate
+        :human-feedback-pstate      human-feedback-pstate
         :evals-pstate               evals-pstate
         :global-actions-depot       global-actions-depot
         :datasets-page-query        datasets-page-query
