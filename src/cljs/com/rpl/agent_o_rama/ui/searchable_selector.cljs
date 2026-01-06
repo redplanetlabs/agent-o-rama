@@ -112,8 +112,8 @@
 
         handle-input-focus (fn []
                              (set-open! true)
-                             (when (str/blank? search-term)
-                               (set-search-term! "")))
+                             ;; Clear search term so user can type fresh
+                             (set-search-term! ""))
 
         handle-input-blur (fn []
                            ;; Delay to allow click on dropdown item
@@ -135,7 +135,7 @@
                                           (set-open! false))
                              nil)))]
 
-    ;; Update search term when value changes (single-select only)
+    ;; Update search term when value changes externally (single-select only)
     (uix/use-effect
      (fn []
        (when (and (not multi-select?) value (seq selected-items))
@@ -143,7 +143,7 @@
            (when (not= search-term label)
              (set-search-term! label))))
        js/undefined)
-     [value selected-items multi-select? search-term])
+     [value selected-items multi-select?])
 
     ;; Refetch when dropdown opens
     (uix/use-effect
