@@ -1,32 +1,28 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback.add-to-queue
   (:require
-   [uix.core :as uix :refer [defui $]]
+   [uix.core :refer [defui $]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.searchable-selector :refer [SearchableSelector]]
-   [clojure.string :as str]))
+   [com.rpl.agent-o-rama.ui.searchable-selector :refer [SearchableSelector]]))
 
 (defui QueueCombobox [{:keys [module-id value on-change error required?]}]
-  (let [{:keys [data loading?]} (queries/use-sente-query
-                                 {:query-key [:human-feedback-queues module-id]
-                                  :sente-event [:human-feedback/get-queues
-                                                {:module-id module-id
-                                                 :filters {:search-string ""}}]
-                                  :enabled? (some? module-id)})
-        queues (or (:results data) [])
-        queue-names (mapv :name queues)]
-    ($ SearchableSelector
-       {:label "Human Feedback Queue"
-        :value value
-        :on-change on-change
-        :options queue-names
-        :loading? loading?
-        :placeholder "Select a queue..."
-        :error error
-        :required? required?
-        :data-testid "queue-selector"})))
+  ($ SearchableSelector
+     {:module-id module-id
+      :value value
+      :on-change on-change
+      :sente-event-fn (fn [module-id search-string]
+                        [:human-feedback/get-queues
+                         {:module-id module-id
+                          :filters {:search-string (or search-string "")}}])
+      :items-key :results
+      :item-id-fn :name
+      :item-label-fn :name
+      :item-sublabel-fn :description
+      :placeholder "Type to search queues..."
+      :label "Human Feedback Queue"
+      :required? required?
+      :error error
+      :data-testid "queue-selector"}))
 
 (defui AddToQueueForm [{:keys [form-id]}]
   (let [;; Form fields
