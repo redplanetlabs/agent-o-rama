@@ -55,8 +55,9 @@
               serializable-result (common/->ui-serializable result)]
           (when ?reply-fn
             (?reply-fn {:success true :data serializable-result})))
-        (catch Exception e
-          (cljlogging/error e "Error executing handler")
+        (catch Throwable e
+          ;; Catch Throwable (not just Exception) to also handle Errors like NoSuchFieldError
+          (cljlogging/error e "Error executing handler for" id)
           (when ?reply-fn
             (let [error-msg (or (.getMessage e) (str e) "Unknown error occurred")]
               (?reply-fn {:success false :error error-msg}))))))))
