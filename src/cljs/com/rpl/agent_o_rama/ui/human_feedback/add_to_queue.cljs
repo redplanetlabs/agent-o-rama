@@ -60,7 +60,8 @@
                  :value (:value comment-field)
                  :on-change (:on-change comment-field)
                  :error (:error comment-field)
-                 :help-text "Add a note for the reviewer"}))))))
+                 :help-text "Add a note for the reviewer"
+                 :data-testid "comment-input"}))))))
 
 (forms/reg-form
  :add-to-feedback-queue

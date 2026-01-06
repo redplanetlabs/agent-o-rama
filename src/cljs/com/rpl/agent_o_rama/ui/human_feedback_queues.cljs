@@ -999,10 +999,12 @@
          ;; Input/Output Display
          ($ :div.grid.grid-cols-2.gap-4.mb-6
             ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
+               {:data-id "item-input"}
                ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Input")
                ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64
                   (common/to-json (:input current-item))))
             ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
+               {:data-id "item-output"}
                ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Output")
                ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64
                   (common/to-json (:output current-item)))))
