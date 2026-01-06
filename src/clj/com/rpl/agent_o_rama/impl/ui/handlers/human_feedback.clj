@@ -33,7 +33,7 @@
     (let [min-val (if min (long min) 1)
           max-val (if max (long max) 10)]
       (aor/create-numeric-human-metric! manager name "" min-val max-val))
-    
+
     ;; Categorical metric
     (= type :categorical)
     (let [cat-list (if (string? categories)
@@ -41,7 +41,7 @@
                      categories)
           cat-set (set cat-list)]
       (aor/create-categorical-human-metric! manager name "" cat-set))
-    
+
     :else
     (throw (ex-info "Invalid metric type" {:type type})))
   {:status :ok})
@@ -88,4 +88,17 @@
         global-actions-depot (:global-actions-depot underlying-objects)]
     (evals/remove-human-feedback-queue! global-actions-depot name)
     {:status :ok}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-info
+  [{:keys [manager queue-name]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        queue-info-query (:human-feedback-queue-info-query underlying-objects)]
+    (foreign-invoke-query queue-info-query queue-name)))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items
+  [{:keys [manager queue-name pagination]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        queue-page-query (:human-feedback-queue-page-query underlying-objects)
+        query-limit 20]
+    (foreign-invoke-query queue-page-query queue-name query-limit pagination)))
 
