@@ -284,7 +284,7 @@
                     {:value (name (:value type-field))
                      :onChange #((:on-change type-field) (keyword (.. % -target -value)))}
                     ($ :option {:value "numeric"} "Numeric Range")
-                    ($ :option {:value "categorical"} "Categorical (Options)")))
+                    ($ :option {:value "categorical"} "Categorical")))
 
               ;; Conditional fields based on type
               (if (= (:value type-field) :numeric)
