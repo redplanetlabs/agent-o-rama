@@ -55,12 +55,10 @@
 
 (defn retrieve-pstate
   [pstate-name]
-  (let [declared-objects-tg (declared-objects)
-        retriever (.getClusterRetriever declared-objects-tg)]
-    (foreign-pstate
-     retriever
-     (.getThisModuleName declared-objects-tg)
-     pstate-name)))
+  (let [declared-objects-tg (declared-objects)]
+    (.getForeignPState declared-objects-tg
+                       (.getThisModuleName declared-objects-tg)
+                       pstate-name)))
 
 (defn pstate-write!
   [pstate-name path k]
