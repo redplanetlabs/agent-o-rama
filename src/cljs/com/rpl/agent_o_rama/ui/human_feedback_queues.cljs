@@ -822,7 +822,10 @@
                 :max (:max metric)
                 :step 1
                 :value (or value "")
-                :onChange #(on-change (.. % -target -value))
+                :onChange #(let [raw (.. % -target -value)
+                                 ;; Only allow integers - strip decimal portion
+                                 int-val (js/parseInt raw 10)]
+                             (on-change (if (js/isNaN int-val) "" (str int-val))))
                 :placeholder (str (:min metric) " - " (:max metric))
                 :className (if error "border-red-500" "")})
             ($ :div.text-xs.text-gray-500.mt-1
