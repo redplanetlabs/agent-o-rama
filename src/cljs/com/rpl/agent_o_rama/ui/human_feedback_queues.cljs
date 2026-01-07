@@ -768,21 +768,19 @@
 ;; EVALUATION FORM
 ;; =============================================================================
 
-(defn get-reviewer-name-from-cookie []
-  "reviewer-from-cookie")
+(def ^:private reviewer-name-storage-key "aor-reviewer-name")
 
-(defn save-reviewer-name-to-cookie! [name]
-  ;; TODO: implement cookie storage
-  nil)
+(defn get-reviewer-name []
+  (or (.getItem js/localStorage reviewer-name-storage-key) ""))
+
+(defn save-reviewer-name! [name]
+  (.setItem js/localStorage reviewer-name-storage-key name))
 
 (defn metric-type
   "Determine the metric type from the metric data.
    Handles both dummy data format (__typename) and backend format (_aor-type or field presence)."
   [metric]
   (cond
-    ;; Dummy data format
-    (= (:__typename metric) "HumanCategoryMetric") :category
-    (= (:__typename metric) "HumanNumericMetric") :numeric
     ;; Backend format with type annotation
     (str/includes? (str (get metric "_aor-type" "")) "HumanCategoryMetric") :category
     (str/includes? (str (get metric "_aor-type" "")) "HumanNumericMetric") :numeric
@@ -875,7 +873,7 @@
         ;; Form state
         [scores set-scores] (uix/use-state {})
         [comment set-comment] (uix/use-state "")
-        [reviewer-name set-reviewer-name] (uix/use-state (get-reviewer-name-from-cookie))
+        [reviewer-name set-reviewer-name] (uix/use-state (get-reviewer-name))
         [errors set-errors] (uix/use-state {})
         [show-dismiss-confirm? set-show-dismiss-confirm] (uix/use-state false)
 
@@ -938,7 +936,7 @@
                         (let [validation-errors (validate-form)]
                           (if (empty? validation-errors)
                             (do
-                              (save-reviewer-name-to-cookie! reviewer-name)
+                              (save-reviewer-name! reviewer-name)
                               ;; Submit to backend
                               (sente/request!
                                [:human-feedback/resolve-queue-item
