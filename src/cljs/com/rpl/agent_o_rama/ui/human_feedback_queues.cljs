@@ -820,6 +820,7 @@
                {:type "number"
                 :min (:min metric)
                 :max (:max metric)
+                :step 1
                 :value (or value "")
                 :onChange #(on-change (.. % -target -value))
                 :placeholder (str (:min metric) " - " (:max metric))
@@ -888,15 +889,19 @@
                                                  (and (= mtype :numeric)
                                                       value
                                                       (not= value ""))
-                                                 (let [num-val (js/parseFloat value)]
+                                                 (let [int-val (js/parseInt value 10)
+                                                       float-val (js/parseFloat value)]
                                                    (cond
-                                                     (js/isNaN num-val)
-                                                     (assoc acc metric-name "Must be a number")
+                                                     (js/isNaN int-val)
+                                                     (assoc acc metric-name "Must be an integer")
 
-                                                     (< num-val (:min metric))
+                                                     (not= int-val float-val)
+                                                     (assoc acc metric-name "Must be an integer (no decimals)")
+
+                                                     (< int-val (:min metric))
                                                      (assoc acc metric-name (str "Must be at least " (:min metric)))
 
-                                                     (> num-val (:max metric))
+                                                     (> int-val (:max metric))
                                                      (assoc acc metric-name (str "Must be at most " (:max metric)))
 
                                                      :else acc))
