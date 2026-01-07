@@ -776,24 +776,16 @@
 (defn save-reviewer-name! [name]
   (.setItem js/localStorage reviewer-name-storage-key name))
 
-(defn metric-type
-  "Determine the metric type from the metric data.
-   Handles both dummy data format (__typename) and backend format (_aor-type or field presence)."
-  [metric]
-  (cond
-    ;; Backend format with type annotation
-    (str/includes? (str (get metric "_aor-type" "")) "HumanCategoryMetric") :category
-    (str/includes? (str (get metric "_aor-type" "")) "HumanNumericMetric") :numeric
-    ;; Infer from fields present
-    (contains? metric :categories) :category
-    (and (contains? metric :min) (contains? metric :max)) :numeric
-    :else nil))
+(defn- numeric-metric? [metric]
+  (str/ends-with? (get metric "_aor-type" "") "HumanNumericMetric"))
+
+(defn- category-metric? [metric]
+  (str/ends-with? (get metric "_aor-type" "") "HumanCategoryMetric"))
 
 (defui metric-field [{:keys [rubric value on-change error]}]
   (let [metric (:metric rubric)
-        mtype (metric-type metric)
-        is-category? (= mtype :category)
-        is-numeric? (= mtype :numeric)]
+        is-category? (category-metric? metric)
+        is-numeric? (numeric-metric? metric)]
     ($ :div.mb-4
        ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
           (:name rubric)
@@ -879,13 +871,12 @@
 
         ;; Validate a single metric value and return error or nil
         validate-metric (fn [rubric value]
-                          (let [metric (:metric rubric)
-                                mtype (metric-type metric)]
+                          (let [metric (:metric rubric)]
                             (cond
                               (or (nil? value) (= value ""))
                               nil  ;; Don't show error for empty (will catch on submit if required)
 
-                              (= mtype :numeric)
+                              (numeric-metric? metric)
                               (let [int-val (js/parseInt value 10)]
                                 (cond
                                   (js/isNaN int-val) "Must be an integer"
@@ -899,13 +890,12 @@
                         (let [errs (reduce (fn [acc rubric]
                                              (let [metric-name (:name rubric)
                                                    value (get scores metric-name)
-                                                   metric (:metric rubric)
-                                                   mtype (metric-type metric)]
+                                                   metric (:metric rubric)]
                                                (cond
                                                  (and (:required rubric) (or (nil? value) (= value "")))
                                                  (assoc acc metric-name "This field is required")
 
-                                                 (and (= mtype :numeric)
+                                                 (and (numeric-metric? metric)
                                                       value
                                                       (not= value ""))
                                                  (let [int-val (js/parseInt value 10)
