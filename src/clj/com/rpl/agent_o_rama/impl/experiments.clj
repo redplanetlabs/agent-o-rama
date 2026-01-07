@@ -27,13 +27,29 @@
     RegularExperiment
     StartExperiment
     UpdateExperimentName]
+   [com.rpl.rama.cluster
+    ClusterManagerBase]
    [java.util.concurrent
     CompletableFuture]
   ))
 
 (defn get-cluster-retriever
   [agent-node]
-  (.getClusterRetriever ^AgentDeclaredObjectsTaskGlobal (anode/get-declared-objects agent-node)))
+  (let [^AgentDeclaredObjectsTaskGlobal declared-objects-tg (anode/get-declared-objects agent-node)
+        delegate (.getClusterRetriever declared-objects-tg)]
+    (reify
+     ClusterManagerBase
+     (clusterDepot [this module-name name]
+       (.getForeignDepot declared-objects-tg module-name name))
+     (clusterPState [this module-name name]
+       (.getForeignPState declared-objects-tg module-name name))
+     (clusterQuery [this module-name name]
+       (.getForeignQuery declared-objects-tg module-name name))
+     (getDeployedModuleNames [this]
+       (.getDeployedModuleNames delegate))
+     (getMicrobatchDepotInfo [this module-name topology-name]
+       (.getMicrobatchDepotInfo delegate module-name topology-name))
+    )))
 
 (defn get-this-module-name
   [agent-node]
