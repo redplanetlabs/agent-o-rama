@@ -97,7 +97,8 @@
                                     (->ui-serializable v)])
                        item))
 
-        (or (boolean? item)
+        (or (string? item)
+            (boolean? item)
             (number? item)
             (char? item)
             (keyword? item)
