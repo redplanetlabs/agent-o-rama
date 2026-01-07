@@ -408,3 +408,50 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   
   console.log(`Successfully added evaluator: ${evaluatorName}`);
 }
+
+/**
+ * Creates a human metric via the UI.
+ * @param {import('@playwright/test').Page} page - The Playwright page object.
+ * @param {Object} options - The metric creation options.
+ * @param {string} options.name - The unique name for the metric.
+ * @param {'numeric'|'categorical'} options.type - The type of metric.
+ * @param {number} [options.min] - For numeric metrics, the minimum value.
+ * @param {number} [options.max] - For numeric metrics, the maximum value.
+ * @param {string[]} [options.categories] - For categorical metrics, array of category names.
+ * @returns {Promise<void>}
+ */
+export async function createHumanMetric(page, { name, type, min, max, categories }) {
+  console.log(`Creating human metric: ${name} (${type})`);
+  
+  await page.getByRole('button', { name: '+ Create Metric' }).click();
+  const modal = page.locator('[role="dialog"]');
+  await expect(modal).toBeVisible();
+  
+  await modal.getByLabel('Metric Name').fill(name);
+  
+  // Select metric type
+  await modal.getByRole('combobox').selectOption(type);
+  
+  if (type === 'numeric') {
+    if (min !== undefined) {
+      await modal.getByLabel('Min').fill(String(min));
+    }
+    if (max !== undefined) {
+      await modal.getByLabel('Max').fill(String(max));
+    }
+  } else if (type === 'categorical') {
+    if (categories && categories.length > 0) {
+      await modal.getByLabel('Options (comma separated)').fill(categories.join(', '));
+    }
+  }
+  
+  const createButton = modal.getByRole('button', { name: 'Create' });
+  await createButton.click();
+  await expect(modal).not.toBeVisible({ timeout: 10000 });
+  
+  // Verify metric was created
+  await page.waitForTimeout(500);
+  await expect(page.locator('table tbody tr').filter({ hasText: name })).toBeVisible({ timeout: 5000 });
+  
+  console.log(`Successfully created metric: ${name}`);
+}
