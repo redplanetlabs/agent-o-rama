@@ -879,6 +879,24 @@
         [errors set-errors] (uix/use-state {})
         [show-dismiss-confirm? set-show-dismiss-confirm] (uix/use-state false)
 
+        ;; Validate a single metric value and return error or nil
+        validate-metric (fn [rubric value]
+                          (let [metric (:metric rubric)
+                                mtype (metric-type metric)]
+                            (cond
+                              (or (nil? value) (= value ""))
+                              nil  ;; Don't show error for empty (will catch on submit if required)
+
+                              (= mtype :numeric)
+                              (let [int-val (js/parseInt value 10)]
+                                (cond
+                                  (js/isNaN int-val) "Must be an integer"
+                                  (< int-val (:min metric)) (str "Must be at least " (:min metric))
+                                  (> int-val (:max metric)) (str "Must be at most " (:max metric))
+                                  :else nil))
+
+                              :else nil)))
+
         validate-form (fn []
                         (let [errs (reduce (fn [acc rubric]
                                              (let [metric-name (:name rubric)
@@ -1029,11 +1047,18 @@
 
             ;; Metric fields
             (for [rubric (:rubrics queue-info)]
-              ($ metric-field {:key (:name rubric)
-                               :rubric rubric
-                               :value (get scores (:name rubric))
-                               :on-change #(set-scores (assoc scores (:name rubric) %))
-                               :error (get errors (:name rubric))}))
+              (let [metric-name (:name rubric)]
+                ($ metric-field {:key metric-name
+                                 :rubric rubric
+                                 :value (get scores metric-name)
+                                 :on-change (fn [v]
+                                              (set-scores (assoc scores metric-name v))
+                                              ;; Real-time validation
+                                              (let [err (validate-metric rubric v)]
+                                                (set-errors (if err
+                                                              (assoc errors metric-name err)
+                                                              (dissoc errors metric-name)))))
+                                 :error (get errors metric-name)})))
 
             ;; Comment field
             ($ :div.mb-4
