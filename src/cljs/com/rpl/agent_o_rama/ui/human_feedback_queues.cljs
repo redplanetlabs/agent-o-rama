@@ -454,10 +454,10 @@
                                           :placeholder "e.g., support-quality"}
                                          name-field))
 
-              ;; Description field
-              ($ forms/form-field (merge {:label "Description"
+              ;; Guidelines field
+              ($ forms/form-field (merge {:label "Guidelines"
                                           :data-testid "queue-description-input"
-                                          :placeholder "What is this queue for?"}
+                                          :placeholder "What guidelines should reviewers follow when providing feedback?"}
                                          desc-field))
 
               ;; Rubrics section
