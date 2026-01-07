@@ -777,10 +777,10 @@
   (.setItem js/localStorage reviewer-name-storage-key name))
 
 (defn- numeric-metric? [metric]
-  (str/ends-with? (get metric "_aor-type" "") "HumanNumericMetric"))
+  (contains? metric :min))
 
 (defn- category-metric? [metric]
-  (str/ends-with? (get metric "_aor-type" "") "HumanCategoryMetric"))
+  (contains? metric :categories))
 
 (defui metric-field [{:keys [rubric value on-change error]}]
   (let [metric (:metric rubric)
