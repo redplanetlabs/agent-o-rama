@@ -180,7 +180,7 @@
                   ;; Convert metrics to scores map
                   ;; metric-data has :name, :metric, :value, :required
                   scores (into {} (map (fn [{:keys [name value]}]
-                                         [(keyword name) value])
+                                         [name value])
                                        (filter #(not (str/blank? (:value %))) metrics)))]
               (if editing?
                 [:human-feedback/edit-feedback

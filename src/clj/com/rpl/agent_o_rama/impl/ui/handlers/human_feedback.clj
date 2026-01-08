@@ -154,3 +154,62 @@
     (evals/remove-human-feedback-queue-item! global-actions-depot queue-name item-uuid)
     {:status :ok}))
 
+
+;; =============================================================================
+;; MANUAL HUMAN FEEDBACK HANDLERS (Add/Edit/Delete feedback directly)
+;; =============================================================================
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/add-feedback
+  [{:keys [manager agent-name invoke-id node-task-id node-invoke-id reviewer-name scores comment]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        global-actions-depot (:global-actions-depot underlying-objects)
+        ;; Parse invoke-id which is "taskId-agentInvokeId" format
+        [agent-task-id agent-invoke-id] (common/parse-url-pair invoke-id)
+        ;; Build agent invoke
+        agent-invoke (aor-types/->AgentInvokeImpl agent-task-id agent-invoke-id)
+        ;; Build node invoke if provided
+        node-invoke (when (and node-task-id node-invoke-id)
+                      (aor-types/->NodeInvokeImpl (parse-long node-task-id)
+                                                   (UUID/fromString node-invoke-id)))
+        ;; Build feedback target
+        feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke node-invoke)]
+    (evals/add-human-feedback! global-actions-depot feedback-target reviewer-name scores (or comment ""))
+    {:status :ok}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/edit-feedback
+  [{:keys [manager agent-name invoke-id node-task-id node-invoke-id feedback-id reviewer-name scores comment]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        global-actions-depot (:global-actions-depot underlying-objects)
+        ;; Parse invoke-id which is "taskId-agentInvokeId" format
+        [agent-task-id agent-invoke-id] (common/parse-url-pair invoke-id)
+        ;; Build agent invoke
+        agent-invoke (aor-types/->AgentInvokeImpl agent-task-id agent-invoke-id)
+        ;; Build node invoke if provided
+        node-invoke (when (and node-task-id node-invoke-id)
+                      (aor-types/->NodeInvokeImpl (parse-long node-task-id)
+                                                   (UUID/fromString node-invoke-id)))
+        ;; Build feedback target
+        feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke node-invoke)
+        ;; Parse feedback-id
+        feedback-uuid (if (uuid? feedback-id) feedback-id (UUID/fromString (str feedback-id)))]
+    (evals/edit-human-feedback! global-actions-depot feedback-target feedback-uuid reviewer-name scores (or comment ""))
+    {:status :ok}))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/delete-feedback
+  [{:keys [manager agent-name invoke-id node-task-id node-invoke-id feedback-id]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        global-actions-depot (:global-actions-depot underlying-objects)
+        ;; Parse invoke-id which is "taskId-agentInvokeId" format
+        [agent-task-id agent-invoke-id] (common/parse-url-pair invoke-id)
+        ;; Build agent invoke
+        agent-invoke (aor-types/->AgentInvokeImpl agent-task-id agent-invoke-id)
+        ;; Build node invoke if provided
+        node-invoke (when (and node-task-id node-invoke-id)
+                      (aor-types/->NodeInvokeImpl (parse-long node-task-id)
+                                                   (UUID/fromString node-invoke-id)))
+        ;; Build feedback target
+        feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke node-invoke)
+        ;; Parse feedback-id
+        feedback-uuid (if (uuid? feedback-id) feedback-id (UUID/fromString (str feedback-id)))]
+    (evals/delete-human-feedback! global-actions-depot feedback-target feedback-uuid)
+    {:status :ok}))
