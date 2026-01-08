@@ -33,7 +33,6 @@
    [com.rpl.agent-o-rama.ui.datasets.add-from-trace]
    [com.rpl.agent-o-rama.ui.rules :as rules]
    [com.rpl.agent-o-rama.ui.action-log :as action-log]
-   [com.rpl.agent-o-rama.ui.human-metrics :as human-metrics]
    [com.rpl.agent-o-rama.ui.human-feedback-queues :as human-feedback-queues]))
 
 (def routes
