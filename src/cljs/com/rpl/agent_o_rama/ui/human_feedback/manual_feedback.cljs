@@ -3,7 +3,7 @@
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.components.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [clojure.string :as str]))
 
 (defui ManualFeedbackForm [{:keys [form-id]}]
