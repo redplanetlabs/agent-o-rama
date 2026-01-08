@@ -11,6 +11,7 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -776,53 +777,20 @@
 (defn save-reviewer-name! [name]
   (.setItem js/localStorage reviewer-name-storage-key name))
 
+;; Helper for validation (used in item-detail)
 (defn- numeric-metric? [metric]
   (contains? metric :min))
 
-(defn- category-metric? [metric]
-  (contains? metric :categories))
-
+;; Use the shared metric input component for queue item review
 (defui metric-field [{:keys [rubric value on-change error]}]
-  (let [metric (:metric rubric)
-        is-category? (category-metric? metric)
-        is-numeric? (numeric-metric? metric)]
-    ($ :div.mb-4
-       ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
-          (:name rubric)
-          (when (:required rubric)
-            ($ :span.text-red-500.ml-1 "*"))
-          ($ :div.text-xs.text-gray-500.font-normal.mt-1
-             (:description rubric)))
-
-       (cond
-         is-category?
-         ($ :select.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-            {:value (or value "")
-             :onChange #(on-change (.. % -target -value))
-             :className (if error "border-red-500" "")}
-            ($ :option {:value ""} "-- Select --")
-            (for [category (sort (:categories metric))]
-              ($ :option {:key category :value category} category)))
-
-         is-numeric?
-         ($ :div
-            ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-               {:type "number"
-                :min (:min metric)
-                :max (:max metric)
-                :step 1
-                :value (or value "")
-                :onChange #(let [raw (.. % -target -value)
-                                 ;; Only allow integers - strip decimal portion
-                                 int-val (js/parseInt raw 10)]
-                             (on-change (if (js/isNaN int-val) "" (str int-val))))
-                :placeholder (str (:min metric) " - " (:max metric))
-                :className (if error "border-red-500" "")})
-            ($ :div.text-xs.text-gray-500.mt-1
-               (str "Valid range: " (:min metric) " - " (:max metric)))))
-
-       (when error
-         ($ :div.text-sm.text-red-600.mt-1 error)))))
+  ($ metric-input/MetricInput
+     {:metric (:metric rubric)
+      :label (:name rubric)
+      :description (:description rubric)
+      :required? (:required rubric)
+      :value value
+      :on-change on-change
+      :error error}))
 
 (defui item-detail []
   (let [{:keys [module-id queue-id item-id]} (state/use-sub [:route :path-params])

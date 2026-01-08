@@ -4,19 +4,20 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [clojure.string :as str]))
 
-;; Separate component for each metric input field
+;; Separate component for each metric input field in the manual feedback form
 ;; This is necessary because React hooks can't be called inside loops
 (defui MetricInputField [{:keys [form-id idx metric-data editing? on-remove]}]
   (let [metric (:metric metric-data)
-        metric-name (:name metric)
         value-field (forms/use-form-field form-id [:metrics idx :value])]
     ($ :div.p-3.bg-gray-50.rounded-md.border.border-gray-200
        {:data-testid (str "metric-field-" idx)}
+       ;; Header with name and remove button
        ($ :div.flex.items-center.justify-between.mb-2
           ($ :span.text-sm.font-medium.text-gray-700
-             metric-name
+             (:name metric)
              (when (:required metric-data)
                ($ :span.text-red-500.ml-1 "*")))
           (when-not editing?
@@ -26,37 +27,14 @@
                 :onClick on-remove}
                "Remove")))
 
-       ;; Categorical dropdown
-       (when (contains? metric :categories)
-         ($ :select.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-            {:value (or (:value value-field) "")
-             :onChange #((:on-change value-field) (.. % -target -value))
-             :className (if (:error value-field) "border-red-500" "")
-             :data-testid (str "metric-value-" idx)}
-            ($ :option {:value ""} "Select...")
-            (for [category (:categories metric)]
-              ($ :option {:key category :value category} category))))
-
-       ;; Numeric input
-       (when (contains? metric :min)
-         ($ :div
-            ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-               {:type "number"
-                :min (:min metric)
-                :max (:max metric)
-                :step 1
-                :value (or (:value value-field) "")
-                :onChange #(let [raw (.. % -target -value)
-                                 int-val (js/parseInt raw 10)]
-                             ((:on-change value-field) (if (js/isNaN int-val) "" (str int-val))))
-                :placeholder (str (:min metric) " - " (:max metric))
-                :className (if (:error value-field) "border-red-500" "")
-                :data-testid (str "metric-value-" idx)})
-            ($ :div.text-xs.text-gray-500.mt-1
-               (str "Valid range: " (:min metric) " - " (:max metric)))))
-
-       (when (:error value-field)
-         ($ :p.text-sm.text-red-600.mt-1 (:error value-field))))))
+       ;; Use shared metric input component (without its own label since we show it above)
+       ($ metric-input/MetricInput
+          {:metric metric
+           :label false  ;; Don't show label, we have our own header
+           :value (:value value-field)
+           :on-change (:on-change value-field)
+           :error (:error value-field)
+           :data-testid (str "metric-value-" idx)}))))
 
 (defui ManualFeedbackForm [{:keys [form-id]}]
   (let [props (state/use-sub [:forms form-id])
