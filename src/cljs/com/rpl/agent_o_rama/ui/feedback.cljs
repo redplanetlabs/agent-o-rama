@@ -87,20 +87,18 @@
                     {:type "button"
                      :title "Edit feedback"
                      :data-testid "edit-feedback-button"
-                     :onClick #(state/dispatch [:modal/show
-                                                {:form-id :edit-manual-feedback
-                                                 :form-spec manual-feedback/add-manual-feedback-form-spec
-                                                 :props {:module-id module-id
-                                                         :agent-name agent-name
-                                                         :invoke-id invoke-id
-                                                         :node-task-id node-task-id
-                                                         :node-invoke-id node-invoke-id
-                                                         :feedback-id (str source-feedback-id)
-                                                         :editing? true
-                                                         :reviewer-name human-name
-                                                         :comment (or comment "")
-                                                         ;; Pre-populate metrics from scores
-                                                         :metrics []}}])}
+                     :onClick #(state/dispatch [:modal/show-form :add-manual-feedback
+                                                {:module-id module-id
+                                                 :agent-name agent-name
+                                                 :invoke-id invoke-id
+                                                 :node-task-id node-task-id
+                                                 :node-invoke-id node-invoke-id
+                                                 :feedback-id (str source-feedback-id)
+                                                 :editing? true
+                                                 :reviewer-name human-name
+                                                 :comment (or comment "")
+                                                 ;; Pre-populate metrics from scores
+                                                 :metrics []}])}
                     ($ PencilIcon {:className "h-4 w-4"}))
                  
                  ($ :button.p-1.text-red-600.hover:text-red-800.hover:bg-red-100.rounded.transition-colors
@@ -164,15 +162,13 @@
          ($ :div.mb-4
             ($ :button.inline-flex.items-center.px-3.py-2.bg-purple-600.text-white.text-sm.font-medium.rounded-md.hover:bg-purple-700.transition-colors
                {:data-testid "add-feedback-button"
-                :onClick #(state/dispatch [:modal/show
-                                           {:form-id :add-manual-feedback
-                                            :form-spec manual-feedback/add-manual-feedback-form-spec
-                                            :props {:module-id module-id
-                                                    :agent-name agent-name
-                                                    :invoke-id invoke-id
-                                                    :node-task-id node-task-id
-                                                    :node-invoke-id node-invoke-id
-                                                    :editing? false}}])}
+                :onClick #(state/dispatch [:modal/show-form :add-manual-feedback
+                                           {:module-id module-id
+                                            :agent-name agent-name
+                                            :invoke-id invoke-id
+                                            :node-task-id node-task-id
+                                            :node-invoke-id node-invoke-id
+                                            :editing? false}])}
                ($ PlusIcon {:className "h-4 w-4 mr-1"})
                "Add Feedback")))
        

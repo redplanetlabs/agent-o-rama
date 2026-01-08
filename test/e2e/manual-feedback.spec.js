@@ -77,10 +77,10 @@ test.describe('Manual Human Feedback', () => {
     await page.getByRole('link', { name: 'Invocations' }).click();
     await expect(page).toHaveURL(/invocations/);
     
-    // Click on first invocation
-    const firstInvocation = page.locator('tbody tr').first();
-    await firstInvocation.waitFor({ timeout: 10000 });
-    await firstInvocation.click();
+    // Click on first invocation trace button
+    const firstInvocationButton = page.locator('tbody tr').first().getByRole('button', { name: 'View trace' });
+    await firstInvocationButton.waitFor({ timeout: 10000 });
+    await firstInvocationButton.click();
     
     // Wait for invocation graph to load
     await page.waitForURL(/\/invocations\/\d+-/, { timeout: 10000 });

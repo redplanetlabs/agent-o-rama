@@ -138,92 +138,95 @@
            :placeholder "Optional comment about this feedback..."
            :data-testid "feedback-comment-input"}))))
 
-;; Form spec for adding manual feedback
-(def add-manual-feedback-form-spec
-  {:main
-   {:initial-fields (fn [props]
-                      (merge {:reviewer-name ""
-                              :metrics []
-                              :comment ""}
-                             props))
-    :validators {:reviewer-name [forms/required]
-                 :metrics [(fn [metrics]
-                             (when (or (nil? metrics) (empty? metrics))
-                               "At least one metric is required"))
-                           (fn [metrics]
-                             ;; Validate each metric value
-                             (let [errors (keep-indexed
-                                           (fn [idx {:keys [metric value required]}]
-                                             (let [metric-name (:name metric)]
-                                               (cond
-                                                 ;; Required metrics must have value
-                                                 (and required (str/blank? value))
-                                                 (str metric-name " is required")
+;; Register form for adding/editing manual feedback
+(forms/reg-form
+ :add-manual-feedback
+ {:steps [:main]
+  :main
+  {:initial-fields (fn [props]
+                     (merge {:reviewer-name ""
+                             :metrics []
+                             :comment ""}
+                            props))
+   :validators {:reviewer-name [forms/required]
+                :metrics [(fn [metrics]
+                            (when (or (nil? metrics) (empty? metrics))
+                              "At least one metric is required"))
+                          (fn [metrics]
+                            ;; Validate each metric value
+                            (let [errors (keep-indexed
+                                          (fn [idx {:keys [metric value required]}]
+                                            (let [metric-name (:name metric)]
+                                              (cond
+                                                ;; Required metrics must have value
+                                                (and required (str/blank? value))
+                                                (str metric-name " is required")
 
-                                                 ;; Categorical: must be one of the categories
-                                                 (and (contains? metric :categories)
-                                                      (not (str/blank? value))
-                                                      (not (contains? (:categories metric) value)))
-                                                 (str metric-name " must be one of: " (str/join ", " (:categories metric)))
+                                                ;; Categorical: must be one of the categories
+                                                (and (contains? metric :categories)
+                                                     (not (str/blank? value))
+                                                     (not (contains? (:categories metric) value)))
+                                                (str metric-name " must be one of: " (str/join ", " (:categories metric)))
 
-                                                 ;; Numeric: must be in range
-                                                 (and (contains? metric :min)
-                                                      (not (str/blank? value)))
-                                                 (let [num-val (js/parseInt value 10)]
-                                                   (cond
-                                                     (js/isNaN num-val)
-                                                     (str metric-name " must be a number")
+                                                ;; Numeric: must be in range
+                                                (and (contains? metric :min)
+                                                     (not (str/blank? value)))
+                                                (let [num-val (js/parseInt value 10)]
+                                                  (cond
+                                                    (js/isNaN num-val)
+                                                    (str metric-name " must be a number")
 
-                                                     (< num-val (:min metric))
-                                                     (str metric-name " must be at least " (:min metric))
+                                                    (< num-val (:min metric))
+                                                    (str metric-name " must be at least " (:min metric))
 
-                                                     (> num-val (:max metric))
-                                                     (str metric-name " must be at most " (:max metric))
+                                                    (> num-val (:max metric))
+                                                    (str metric-name " must be at most " (:max metric))
 
-                                                     :else nil))
+                                                    :else nil))
 
-                                                 :else nil)))
-                                           metrics)]
-                               (when (seq errors)
-                                 (first errors))))]}
-    :ui (fn [{:keys [form-id]}] ($ ManualFeedbackForm {:form-id form-id}))}
+                                                :else nil)))
+                                          metrics)]
+                              (when (seq errors)
+                                (first errors))))]}
+   :ui (fn [{:keys [form-id]}] ($ ManualFeedbackForm {:form-id form-id}))
+   :modal-props (fn [props]
+                  {:title (if (:editing? props) "Edit Feedback" "Add Feedback")
+                   :submit-text (if (:editing? props) "Save" "Submit")})}
 
-   :on-submit
-   (fn [db form-state]
-     (let [{:keys [form-id module-id agent-name invoke-id node-task-id node-invoke-id
-                   reviewer-name metrics comment feedback-id editing?]} form-state
-           ;; Convert metrics to scores map
-           scores (into {} (map (fn [{:keys [metric value]}]
-                                  [(keyword (:name metric)) value])
-                                (filter #(not (str/blank? (:value %))) metrics)))
-           event (if editing?
-                   [:human-feedback/edit-feedback
-                    {:module-id module-id
-                     :agent-name agent-name
-                     :invoke-id invoke-id
-                     :node-task-id node-task-id
-                     :node-invoke-id node-invoke-id
-                     :feedback-id feedback-id
-                     :reviewer-name reviewer-name
-                     :scores scores
-                     :comment comment}]
-                   [:human-feedback/add-feedback
-                    {:module-id module-id
-                     :agent-name agent-name
-                     :invoke-id invoke-id
-                     :node-task-id node-task-id
-                     :node-invoke-id node-invoke-id
-                     :reviewer-name reviewer-name
-                     :scores scores
-                     :comment comment}])]
-       [[:sente/request event 10000
-         (fn [reply form-state]
-           (if (:success reply)
-             [[:modal/hide]
-              [:form/clear form-id]
-              ;; Reload the invocation to show updated feedback
-              [:invocation/start-graph-loading
-               {:invoke-id invoke-id
-                :module-id module-id
-                :agent-name agent-name}]]
-             [[:form/set-error form-id (or (:error reply) "Failed to save feedback")]]))]]))})
+  :on-submit
+  {:event (fn [db form-state]
+            (let [{:keys [form-id module-id agent-name invoke-id node-task-id node-invoke-id
+                          reviewer-name metrics comment feedback-id editing?]} form-state
+                  ;; Convert metrics to scores map
+                  scores (into {} (map (fn [{:keys [metric value]}]
+                                         [(keyword (:name metric)) value])
+                                       (filter #(not (str/blank? (:value %))) metrics)))]
+              (if editing?
+                [:human-feedback/edit-feedback
+                 {:module-id module-id
+                  :agent-name agent-name
+                  :invoke-id invoke-id
+                  :node-task-id node-task-id
+                  :node-invoke-id node-invoke-id
+                  :feedback-id feedback-id
+                  :reviewer-name reviewer-name
+                  :scores scores
+                  :comment comment}]
+                [:human-feedback/add-feedback
+                 {:module-id module-id
+                  :agent-name agent-name
+                  :invoke-id invoke-id
+                  :node-task-id node-task-id
+                  :node-invoke-id node-invoke-id
+                  :reviewer-name reviewer-name
+                  :scores scores
+                  :comment comment}])))
+   :on-success (fn [db form-state reply]
+                 (let [{:keys [form-id invoke-id module-id agent-name]} form-state]
+                   [[:modal/hide]
+                    [:form/clear form-id]
+                    ;; Reload the invocation to show updated feedback
+                    [:invocation/start-graph-loading
+                     {:invoke-id invoke-id
+                      :module-id module-id
+                      :agent-name agent-name}]]))}})
