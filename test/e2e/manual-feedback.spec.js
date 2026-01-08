@@ -22,10 +22,19 @@ test.describe('Manual Human Feedback', () => {
     await expect(page).toHaveURL(/BasicAgentModule/);
     
     // Create a categorical metric
-    await createHumanMetric(page, metricName1, 'categorical', { categories: ['Good', 'Bad', 'Neutral'] });
+    await createHumanMetric(page, {
+      name: metricName1,
+      type: 'categorical',
+      categories: ['Good', 'Bad', 'Neutral']
+    });
     
     // Create a numeric metric
-    await createHumanMetric(page, metricName2, 'numeric', { min: 1, max: 10 });
+    await createHumanMetric(page, {
+      name: metricName2,
+      type: 'numeric',
+      min: 1,
+      max: 10
+    });
     
     await page.close();
     console.log('✓ Test metrics created');
