@@ -9,7 +9,7 @@
 (defui ManualFeedbackForm [{:keys [form-id]}]
   (let [props (state/use-sub [:forms form-id])
         {:keys [module-id editing?]} props
-        
+
         ;; Form fields
         metrics-field (forms/use-form-field form-id :metrics)
         reviewer-name-field (forms/use-form-field form-id :reviewer-name)
@@ -31,7 +31,7 @@
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
              "Metrics"
              ($ :span.text-red-500.ml-1 "*"))
-          
+
           ;; Display selected metrics with their input fields
           (if (and (:value metrics-field) (seq (:value metrics-field)))
             ($ :div.space-y-3
@@ -53,10 +53,10 @@
                                :data-testid (str "remove-metric-" idx)
                                :onClick #(let [current-metrics (:value metrics-field)
                                                updated-metrics (vec (concat (subvec current-metrics 0 idx)
-                                                                           (subvec current-metrics (inc idx))))]
+                                                                            (subvec current-metrics (inc idx))))]
                                            ((:on-change metrics-field) updated-metrics))}
                               "Remove")))
-                      
+
                       ;; Categorical dropdown
                       (when (contains? metric :categories)
                         ($ :select.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
@@ -67,7 +67,7 @@
                            ($ :option {:value ""} "Select...")
                            (for [category (:categories metric)]
                              ($ :option {:key category :value category} category))))
-                      
+
                       ;; Numeric input
                       (when (contains? metric :min)
                         ($ :div
@@ -85,13 +85,13 @@
                                :data-testid (str "metric-value-" idx)})
                            ($ :div.text-xs.text-gray-500.mt-1
                               (str "Valid range: " (:min metric) " - " (:max metric)))))
-                      
+
                       (when (:error value-field)
                         ($ :p.text-sm.text-red-600.mt-1 (:error value-field)))))))
-            
+
             ($ :div.text-sm.text-gray-500.italic.py-2
                "No metrics selected")))
-       
+
        ;; Add metric button (only if not editing)
        (when-not editing?
          ($ :div
@@ -159,13 +159,13 @@
                                                  ;; Required metrics must have value
                                                  (and required (str/blank? value))
                                                  (str metric-name " is required")
-                                                 
+
                                                  ;; Categorical: must be one of the categories
                                                  (and (contains? metric :categories)
                                                       (not (str/blank? value))
                                                       (not (contains? (:categories metric) value)))
                                                  (str metric-name " must be one of: " (str/join ", " (:categories metric)))
-                                                 
+
                                                  ;; Numeric: must be in range
                                                  (and (contains? metric :min)
                                                       (not (str/blank? value)))
@@ -173,20 +173,21 @@
                                                    (cond
                                                      (js/isNaN num-val)
                                                      (str metric-name " must be a number")
-                                                     
+
                                                      (< num-val (:min metric))
                                                      (str metric-name " must be at least " (:min metric))
-                                                     
+
                                                      (> num-val (:max metric))
                                                      (str metric-name " must be at most " (:max metric))
-                                                     
+
                                                      :else nil))
-                                                 
+
                                                  :else nil)))
                                            metrics)]
                                (when (seq errors)
-                                 (first errors))))]}\n    :ui (fn [{:keys [form-id]}] ($ ManualFeedbackForm {:form-id form-id}))}
-   
+                                 (first errors))))]}
+    :ui (fn [{:keys [form-id]}] ($ ManualFeedbackForm {:form-id form-id}))}
+
    :on-submit
    (fn [db form-state]
      (let [{:keys [form-id module-id agent-name invoke-id node-task-id node-invoke-id
@@ -225,4 +226,4 @@
                {:invoke-id invoke-id
                 :module-id module-id
                 :agent-name agent-name}]]
-             [[:form/set-error form-id (or (:error reply) "Failed to save feedback")]]))]])})
+             [[:form/set-error form-id (or (:error reply) "Failed to save feedback")]]))]]))})
