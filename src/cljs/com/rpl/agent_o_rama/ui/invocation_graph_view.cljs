@@ -655,9 +655,15 @@
               :feedback
               ($ :div {:data-id "node-feedback-container"}
                  (when feedback
-                   ($ feedback/feedback-list
-                      {:feedback-data feedback
-                       :module-id module-id})))
+                   (let [[node-task-id node-invoke-id] (when node-id
+                                                         (clojure.string/split node-id #"-" 2))]
+                     ($ feedback/feedback-list
+                        {:feedback-data feedback
+                         :module-id module-id
+                         :agent-name agent-name
+                         :invoke-id invoke-id
+                         :node-task-id node-task-id
+                         :node-invoke-id node-invoke-id}))))
 
               ;; Default case
               nil))))))
@@ -994,7 +1000,10 @@
                             :graph-data graph-data
                             :on-select-node on-select-node})
 
-       ($ feedback/feedback-panel {:feedback feedback})
+       ($ feedback/feedback-list {:feedback-data feedback
+                                   :module-id module-id
+                                   :agent-name agent-name
+                                   :invoke-id invoke-id})
 
        ($ trace-analytics/info {:invoke-id invoke-id})
        ($ metadata-panel {:summary-data summary-data
@@ -1172,7 +1181,9 @@
                                  :invoke-id invoke-id})
 
             :feedback ($ feedback/feedback-list {:feedback-data (:feedback summary-data)
-                                                 :module-id module-id})
+                                                 :module-id module-id
+                                                 :agent-name agent-name
+                                                 :invoke-id invoke-id})
 
             :fork ($ fork-panel {:changed-nodes changed-nodes
                                  :graph-data graph-data

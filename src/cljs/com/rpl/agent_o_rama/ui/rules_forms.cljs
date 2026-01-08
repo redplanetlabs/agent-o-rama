@@ -125,8 +125,9 @@
         show-description-below? (and (= action-name "aor/eval") description)
         input-classes "w-full p-2 border rounded-md text-sm transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"]
 
-    ;; Dataset selector for datasetId parameter
-    (if (= param-name "datasetId")
+    (cond
+      ;; Dataset selector for datasetId parameter
+      (= param-name "datasetId")
       ($ ss/SearchableSelector
          {:module-id module-id
           :value (:value param-field)
@@ -145,7 +146,28 @@
           :error (:error param-field)
           :data-testid "dataset-selector"})
 
+      ;; Queue selector for queueName parameter
+      (= param-name "queueName")
+      ($ ss/SearchableSelector
+         {:module-id module-id
+          :value (:value param-field)
+          :on-change (:on-change param-field)
+          :sente-event-fn (fn [module-id search-string]
+                            [:human-feedback/get-queues
+                             {:module-id module-id
+                              :filters {:search-string search-string}}])
+          :items-key :queues
+          :item-id-fn :name
+          :item-label-fn :name
+          :item-sublabel-fn :description
+          :placeholder "Type to search queues..."
+          :label "Queue Name"
+          :required? required?
+          :error (:error param-field)
+          :data-testid "queue-name-selector"})
+
       ;; Default text input for all other parameters
+      :else
       ($ :div.space-y-1
          ($ :div.flex.items-center.gap-2
             ($ :label.text-sm.font-medium.text-gray-700
