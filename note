@@ -1,8 +1,0 @@
-categorical (options) -> categorical
-restrict numerical range to integers
-description -> "guidlines" -> "what guidelines should reviewrs follow when providign feedback"
-edit -> same form as create. different event 
-
-pretty print input/output. no scroll. click for dialog. 
-visual of numerical input.
-
