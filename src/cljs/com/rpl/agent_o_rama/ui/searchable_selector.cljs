@@ -91,11 +91,11 @@
                           (if multi-select?
                            ;; Multi-select: toggle item in set
                             (if (selected-values item-id)
-                              (on-change (vec (disj selected-values item-id)))
-                              (on-change (vec (conj selected-values item-id))))
+                              (on-change (vec (disj selected-values item-id)) {:item item})
+                              (on-change (vec (conj selected-values item-id)) {:item item}))
                            ;; Single-select: set value and close
                             (do
-                              (on-change item-id)
+                              (on-change item-id {:item item})
                               (set-search-term! (item-label-fn item))
                               (set-open! false)))))
 

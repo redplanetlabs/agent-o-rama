@@ -10,14 +10,16 @@
 ;; Separate component for each metric input field in the manual feedback form
 ;; This is necessary because React hooks can't be called inside loops
 (defui MetricInputField [{:keys [form-id idx metric-data editing? on-remove]}]
-  (let [metric (:metric metric-data)
+  ;; metric-data has :name, :metric (the definition), :value, :required
+  (let [metric-def (:metric metric-data)
+        metric-name (:name metric-data)
         value-field (forms/use-form-field form-id [:metrics idx :value])]
     ($ :div.p-3.bg-gray-50.rounded-md.border.border-gray-200
        {:data-testid (str "metric-field-" idx)}
        ;; Header with name and remove button
        ($ :div.flex.items-center.justify-between.mb-2
           ($ :span.text-sm.font-medium.text-gray-700
-             (:name metric)
+             metric-name
              (when (:required metric-data)
                ($ :span.text-red-500.ml-1 "*")))
           (when-not editing?
@@ -29,7 +31,7 @@
 
        ;; Use shared metric input component (without its own label since we show it above)
        ($ metric-input/MetricInput
-          {:metric metric
+          {:metric metric-def
            :label false  ;; Don't show label, we have our own header
            :value (:value value-field)
            :on-change (:on-change value-field)
@@ -90,10 +92,14 @@
                              (when metric-name
                                (let [current-metrics (or (:value metrics-field) [])
                                      ;; Check if already added
-                                     already-added? (some #(= (:name (:metric %)) metric-name) current-metrics)]
+                                     already-added? (some #(= (:name %) metric-name) current-metrics)]
                                  (when-not already-added?
-                                   (let [metric (:item opts)
-                                         new-metric {:metric metric
+                                   ;; item has :name, :description, :metric
+                                   ;; We store :name and the actual metric definition from :metric
+                                   (let [item (:item opts)
+                                         metric-def (:metric item)
+                                         new-metric {:name (:name item)
+                                                     :metric metric-def
                                                      :value ""
                                                      :required false}
                                          updated-metrics (conj current-metrics new-metric)]
@@ -142,37 +148,37 @@
                               "At least one metric is required"))
                           (fn [metrics]
                             ;; Validate each metric value
+                            ;; metric-data has :name, :metric (definition), :value, :required
                             (let [errors (keep-indexed
-                                          (fn [idx {:keys [metric value required]}]
-                                            (let [metric-name (:name metric)]
-                                              (cond
-                                                ;; Required metrics must have value
-                                                (and required (str/blank? value))
-                                                (str metric-name " is required")
+                                          (fn [idx {:keys [name metric value required]}]
+                                            (cond
+                                              ;; Required metrics must have value
+                                              (and required (str/blank? value))
+                                              (str name " is required")
 
-                                                ;; Categorical: must be one of the categories
-                                                (and (contains? metric :categories)
-                                                     (not (str/blank? value))
-                                                     (not (contains? (:categories metric) value)))
-                                                (str metric-name " must be one of: " (str/join ", " (:categories metric)))
+                                              ;; Categorical: must be one of the categories
+                                              (and (contains? metric :categories)
+                                                   (not (str/blank? value))
+                                                   (not (contains? (:categories metric) value)))
+                                              (str name " must be one of: " (str/join ", " (:categories metric)))
 
-                                                ;; Numeric: must be in range
-                                                (and (contains? metric :min)
-                                                     (not (str/blank? value)))
-                                                (let [num-val (js/parseInt value 10)]
-                                                  (cond
-                                                    (js/isNaN num-val)
-                                                    (str metric-name " must be a number")
+                                              ;; Numeric: must be in range
+                                              (and (contains? metric :min)
+                                                   (not (str/blank? value)))
+                                              (let [num-val (js/parseInt value 10)]
+                                                (cond
+                                                  (js/isNaN num-val)
+                                                  (str name " must be a number")
 
-                                                    (< num-val (:min metric))
-                                                    (str metric-name " must be at least " (:min metric))
+                                                  (< num-val (:min metric))
+                                                  (str name " must be at least " (:min metric))
 
-                                                    (> num-val (:max metric))
-                                                    (str metric-name " must be at most " (:max metric))
+                                                  (> num-val (:max metric))
+                                                  (str name " must be at most " (:max metric))
 
-                                                    :else nil))
+                                                  :else nil))
 
-                                                :else nil)))
+                                              :else nil))
                                           metrics)]
                               (when (seq errors)
                                 (first errors))))]}
@@ -186,8 +192,9 @@
             (let [{:keys [form-id module-id agent-name invoke-id node-task-id node-invoke-id
                           reviewer-name metrics comment feedback-id editing?]} form-state
                   ;; Convert metrics to scores map
-                  scores (into {} (map (fn [{:keys [metric value]}]
-                                         [(keyword (:name metric)) value])
+                  ;; metric-data has :name, :metric, :value, :required
+                  scores (into {} (map (fn [{:keys [name value]}]
+                                         [(keyword name) value])
                                        (filter #(not (str/blank? (:value %))) metrics)))]
               (if editing?
                 [:human-feedback/edit-feedback
