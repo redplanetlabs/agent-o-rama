@@ -4,7 +4,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.rules-forms :refer [DatasetCombobox]]
+   [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]))
 
@@ -60,9 +60,6 @@
         :empty-msg (if (not dataset-id) "Select a dataset to preview" "No match found")
         :data-testid data-testid})))
 
-;; Note: Now using DatasetCombobox from rules-forms
-;; Circular dependency resolved by moving evaluator helper functions to common.cljs
-
 (defui EvaluatorPreviewSection [{:keys [module-id input-path output-path ref-path show-input? show-output? show-ref?]}]
   (let [[selected-dataset set-selected-dataset] (uix/use-state nil)]
     ($ :div.mt-6.p-4.bg-gray-50.rounded-lg.border.border-gray-200
@@ -70,9 +67,23 @@
 
        ($ :div.mb-4
           ($ :label.block.text-xs.font-medium.text-gray-500.mb-1 "Select Dataset for Preview")
-          ($ SimpleDatasetSelector {:module-id module-id
-                                    :value selected-dataset
-                                    :on-change set-selected-dataset}))
+          ($ ss/SearchableSelector
+             {:module-id module-id
+              :value selected-dataset
+              :on-change set-selected-dataset
+              :sente-event-fn (fn [module-id search-string]
+                                [:datasets/get-all
+                                 {:module-id module-id
+                                  :filters {:search-string search-string}}])
+              :items-key :datasets
+              :item-id-fn #(str (:dataset-id %))
+              :item-label-fn :name
+              :item-sublabel-fn #(str (:dataset-id %))
+              :placeholder "Type to search datasets..."
+              :label "Dataset ID"
+              :hide-label? true
+              :error nil
+              :data-testid "dataset-selector"}))
 
        (when selected-dataset
          ($ :div.space-y-4

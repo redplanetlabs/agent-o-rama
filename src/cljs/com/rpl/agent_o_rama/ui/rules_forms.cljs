@@ -116,30 +116,6 @@
 
        ($ :div.mt-1.h-5))))
 
-(defui DatasetCombobox
-  "Autocomplete combobox for selecting a dataset by ID.
-   
-   Wrapper around SearchableSelector for backwards compatibility."
-  [{:keys [module-id value on-change error required? hide-label?]}]
-  ($ ss/SearchableSelector
-     {:module-id module-id
-      :value value
-      :on-change on-change
-      :sente-event-fn (fn [module-id search-string]
-                       [:datasets/get-all
-                        {:module-id module-id
-                         :filters {:search-string search-string}}])
-      :items-key :datasets
-      :item-id-fn #(str (:dataset-id %))
-      :item-label-fn :name
-      :item-sublabel-fn #(str (:dataset-id %))
-      :placeholder "Type to search datasets..."
-      :label "Dataset ID"
-      :required? required?
-      :hide-label? hide-label?
-      :error error
-      :data-testid "dataset-selector"}))
-
 (defui ParamField
   [{:keys [form-id param-name param-info action-name module-id data-id]}]
   (let [field-path [:action-params param-name]
@@ -149,13 +125,25 @@
         show-description-below? (and (= action-name "aor/eval") description)
         input-classes "w-full p-2 border rounded-md text-sm transition-colors border-gray-300 focus:ring-blue-500 focus:border-blue-500"]
 
-    ;; Use DatasetCombobox for datasetId parameter
+    ;; Dataset selector for datasetId parameter
     (if (= param-name "datasetId")
-      ($ DatasetCombobox {:module-id module-id
-                          :value (:value param-field)
-                          :on-change (:on-change param-field)
-                          :error (:error param-field)
-                          :required? required?})
+      ($ ss/SearchableSelector
+         {:module-id module-id
+          :value (:value param-field)
+          :on-change (:on-change param-field)
+          :sente-event-fn (fn [module-id search-string]
+                            [:datasets/get-all
+                             {:module-id module-id
+                              :filters {:search-string search-string}}])
+          :items-key :datasets
+          :item-id-fn #(str (:dataset-id %))
+          :item-label-fn :name
+          :item-sublabel-fn #(str (:dataset-id %))
+          :placeholder "Type to search datasets..."
+          :label "Dataset ID"
+          :required? required?
+          :error (:error param-field)
+          :data-testid "dataset-selector"})
 
       ;; Default text input for all other parameters
       ($ :div.space-y-1
@@ -399,17 +387,17 @@
                                 (forms/required v)))]
                 :status-filter [forms/required]
                 :sampling-rate [forms/required
-                                (fn [v]
+                                (fn [v _form-state]
                                   (when (or (js/isNaN v) (nil? v))
                                     "Must be a valid number"))
-                                (fn [v]
+                                (fn [v _form-state]
                                   (when (or (< v 0.0) (> v 1.0))
                                     "Must be between 0.0 and 1.0"))]
                 :action-name [forms/required]
                 [:action-params "name"] [(fn [v form-state]
                                            (when (= (:action-name form-state) "aor/eval")
                                              (forms/required v)))]
-                :filter [(fn [filter-val]
+                :filter [(fn [filter-val _form-state]
                            (letfn [(validate-filter [f]
                                      (case (:type f)
                                        :feedback

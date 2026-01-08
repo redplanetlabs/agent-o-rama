@@ -6,7 +6,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
-   [com.rpl.agent-o-rama.ui.rules-forms :refer [DatasetCombobox]]
+   [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [clojure.string :as str]
    ["react" :refer [useEffect]]
    ["use-debounce" :refer [useDebounce]]))
@@ -79,11 +79,23 @@
        ($ forms/form
           ($ :div {:className "space-y-6"}
              ;; Dataset Selection
-             ($ DatasetCombobox {:module-id module-id
-                                 :value (:value dataset-id-field)
-                                 :on-change (:on-change dataset-id-field)
-                                 :error (:error dataset-id-field)
-                                 :required? true})
+             ($ ss/SearchableSelector
+                {:module-id module-id
+                 :value (:value dataset-id-field)
+                 :on-change (:on-change dataset-id-field)
+                 :sente-event-fn (fn [module-id search-string]
+                                   [:datasets/get-all
+                                    {:module-id module-id
+                                     :filters {:search-string search-string}}])
+                 :items-key :datasets
+                 :item-id-fn #(str (:dataset-id %))
+                 :item-label-fn :name
+                 :item-sublabel-fn #(str (:dataset-id %))
+                 :placeholder "Type to search datasets..."
+                 :label "Dataset ID"
+                 :required? true
+                 :error (:error dataset-id-field)
+                 :data-testid "dataset-selector"})
 
              ;; Schema display (place right after the dataset dropdown block)
              (let [selected-ds (some->> (:datasets data)

@@ -246,34 +246,51 @@
                   (:component data)))))
        (.-body js/document)))))
 
-(defn required 
-  "Validator for required fields. Accepts optional field-data for consistency."
-  [value & _field-data] 
-  (when (str/blank? value) "This field is required"))
+(defn required
+  "Validator for required fields."
+  ([value]
+   (when (str/blank? value) "This field is required"))
+  ([value _field-data]
+   (when (str/blank? value) "This field is required")))
 
 (defn min-length
   "Validator for minimum string length"
   [n]
-  (fn [value & _field-data]
-    (when (and (string? value) (< (count value) n))
-      (str "Must be at least " n " characters long"))))
+  (fn
+    ([value]
+     (when (and (string? value) (< (count value) n))
+       (str "Must be at least " n " characters long")))
+    ([value _field-data]
+     (when (and (string? value) (< (count value) n))
+       (str "Must be at least " n " characters long")))))
 
 (defn max-length
   "Validator for maximum string length"
   [n]
-  (fn [value & _field-data]
-    (when (and (string? value) (> (count value) n))
-      (str "Must be no more than " n " characters long"))))
+  (fn
+    ([value]
+     (when (and (string? value) (> (count value) n))
+       (str "Must be no more than " n " characters long")))
+    ([value _field-data]
+     (when (and (string? value) (> (count value) n))
+       (str "Must be no more than " n " characters long")))))
 
 (defn valid-json
-  "Validator for JSON strings. Accepts optional field-data for consistency."
-  [value & _field-data]
-  (when-not (str/blank? value)
-    (try
-      (js/JSON.parse value)
-      nil ; Valid JSON
-      (catch js/Error e
-        (str "Invalid JSON: " (.-message e))))))
+  "Validator for JSON strings."
+  ([value]
+   (when-not (str/blank? value)
+     (try
+       (js/JSON.parse value)
+       nil ; Valid JSON
+       (catch js/Error e
+         (str "Invalid JSON: " (.-message e))))))
+  ([value _field-data]
+   (when-not (str/blank? value)
+     (try
+       (js/JSON.parse value)
+       nil ; Valid JSON
+       (catch js/Error e
+         (str "Invalid JSON: " (.-message e)))))))
 
 (defn- validate-form-fields
   "Validate fields against validators keyed by Specter paths.

@@ -10,7 +10,7 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
-   [com.rpl.agent-o-rama.ui.rules-forms :refer [DatasetCombobox]]
+   [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -188,10 +188,23 @@
             ;; Shared dataset selector for all previews
             ($ :div.mb-4.p-3.bg-gray-50.rounded-lg
                ($ :label.block.text-xs.font-medium.text-gray-700.mb-2 "Preview on example from dataset")
-               ($ DatasetCombobox {:module-id module-id
-                                   :value preview-dataset
-                                   :on-change set-preview-dataset
-                                   :hide-label? true}))
+               ($ ss/SearchableSelector
+                  {:module-id module-id
+                   :value preview-dataset
+                   :on-change set-preview-dataset
+                   :sente-event-fn (fn [module-id search-string]
+                                     [:datasets/get-all
+                                      {:module-id module-id
+                                       :filters {:search-string search-string}}])
+                   :items-key :datasets
+                   :item-id-fn #(str (:dataset-id %))
+                   :item-label-fn :name
+                   :item-sublabel-fn #(str (:dataset-id %))
+                   :placeholder "Type to search datasets..."
+                   :label "Dataset ID"
+                   :hide-label? true
+                   :error nil
+                   :data-testid "dataset-selector"}))
 
             ($ :div.space-y-6
                (when show-input-path?

@@ -516,8 +516,8 @@
        (assoc merged :spec merged-spec)))
    :validators
    {:name [forms/required]
-    :evaluators [(fn [v] (when (empty? v) "At least one evaluator is required"))]
-    [:spec :targets] [(fn [targets]
+    :evaluators [(fn [v _form-state] (when (empty? v) "At least one evaluator is required"))]
+    [:spec :targets] [(fn [targets _form-state]
                         (let [missing-agents (filter #(nil? (get-in % [:target-spec :agent-name])) targets)
                               missing-nodes (filter #(and (= :node (get-in % [:target-spec :type]))
                                                           (str/blank? (get-in % [:target-spec :node])))
