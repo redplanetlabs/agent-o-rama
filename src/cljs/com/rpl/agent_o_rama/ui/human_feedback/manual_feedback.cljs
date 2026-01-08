@@ -110,11 +110,11 @@
                                                      :required false}
                                          updated-metrics (conj current-metrics new-metric)]
                                      ((:on-change metrics-field) updated-metrics))))))
-                :sente-event-fn (fn [mid search-string]
-                                  [:human-feedback/get-metrics
-                                   {:module-id mid
-                                    :filters {:search-string search-string}}])
-                :items-key :metrics
+               :sente-event-fn (fn [mid search-string]
+                                 [:human-feedback/get-metrics
+                                  {:module-id mid
+                                   :filters {:search-string search-string}}])
+               :items-key :items
                 :item-id-fn :name
                 :item-label-fn :name
                 :item-sublabel-fn (fn [m]
