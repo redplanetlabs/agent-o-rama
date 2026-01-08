@@ -20,6 +20,8 @@ test.describe('Manual Human Feedback', () => {
     const agentRow = await getBasicAgentRow(page);
     await agentRow.click();
     await expect(page).toHaveURL(/BasicAgentModule/);
+    await page.getByRole('link', { name: 'Human Metrics' }).click();
+    await expect(page).toHaveURL(/human-metrics/);
     
     // Create a categorical metric
     await createHumanMetric(page, {
@@ -51,6 +53,8 @@ test.describe('Manual Human Feedback', () => {
     
     const agentRow = await getBasicAgentRow(page);
     await agentRow.click();
+    await page.getByRole('link', { name: 'Human Metrics' }).click();
+    await expect(page).toHaveURL(/human-metrics/);
     
     // Delete test metrics
     await deleteHumanMetric(page, metricName1);
@@ -70,7 +74,7 @@ test.describe('Manual Human Feedback', () => {
     await expect(page).toHaveURL(/BasicAgentModule/);
     
     // Navigate to agent page and get first invocation
-    await page.getByText('Invocations').click();
+    await page.getByRole('link', { name: 'Invocations' }).click();
     await expect(page).toHaveURL(/invocations/);
     
     // Click on first invocation
