@@ -6,6 +6,58 @@
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [clojure.string :as str]))
 
+;; Separate component for each metric input field
+;; This is necessary because React hooks can't be called inside loops
+(defui MetricInputField [{:keys [form-id idx metric-data editing? on-remove]}]
+  (let [metric (:metric metric-data)
+        metric-name (:name metric)
+        value-field (forms/use-form-field form-id [:metrics idx :value])]
+    ($ :div.p-3.bg-gray-50.rounded-md.border.border-gray-200
+       {:data-testid (str "metric-field-" idx)}
+       ($ :div.flex.items-center.justify-between.mb-2
+          ($ :span.text-sm.font-medium.text-gray-700
+             metric-name
+             (when (:required metric-data)
+               ($ :span.text-red-500.ml-1 "*")))
+          (when-not editing?
+            ($ :button.text-red-600.hover:text-red-800.text-sm
+               {:type "button"
+                :data-testid (str "remove-metric-" idx)
+                :onClick on-remove}
+               "Remove")))
+
+       ;; Categorical dropdown
+       (when (contains? metric :categories)
+         ($ :select.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+            {:value (or (:value value-field) "")
+             :onChange #((:on-change value-field) (.. % -target -value))
+             :className (if (:error value-field) "border-red-500" "")
+             :data-testid (str "metric-value-" idx)}
+            ($ :option {:value ""} "Select...")
+            (for [category (:categories metric)]
+              ($ :option {:key category :value category} category))))
+
+       ;; Numeric input
+       (when (contains? metric :min)
+         ($ :div
+            ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+               {:type "number"
+                :min (:min metric)
+                :max (:max metric)
+                :step 1
+                :value (or (:value value-field) "")
+                :onChange #(let [raw (.. % -target -value)
+                                 int-val (js/parseInt raw 10)]
+                             ((:on-change value-field) (if (js/isNaN int-val) "" (str int-val))))
+                :placeholder (str (:min metric) " - " (:max metric))
+                :className (if (:error value-field) "border-red-500" "")
+                :data-testid (str "metric-value-" idx)})
+            ($ :div.text-xs.text-gray-500.mt-1
+               (str "Valid range: " (:min metric) " - " (:max metric)))))
+
+       (when (:error value-field)
+         ($ :p.text-sm.text-red-600.mt-1 (:error value-field))))))
+
 (defui ManualFeedbackForm [{:keys [form-id]}]
   (let [props (state/use-sub [:forms form-id])
         {:keys [module-id editing?]} props
@@ -36,58 +88,16 @@
           (if (and (:value metrics-field) (seq (:value metrics-field)))
             ($ :div.space-y-3
                (for [[idx metric-data] (map-indexed vector (:value metrics-field))]
-                 (let [metric (:metric metric-data)
-                       metric-name (:name metric)
-                       value-field (forms/use-form-field form-id [:metrics idx :value])]
-                   ($ :div.p-3.bg-gray-50.rounded-md.border.border-gray-200
-                      {:key idx
-                       :data-testid (str "metric-field-" idx)}
-                      ($ :div.flex.items-center.justify-between.mb-2
-                         ($ :span.text-sm.font-medium.text-gray-700
-                            metric-name
-                            (when (:required metric-data)
-                              ($ :span.text-red-500.ml-1 "*")))
-                         (when-not editing?
-                           ($ :button.text-red-600.hover:text-red-800.text-sm
-                              {:type "button"
-                               :data-testid (str "remove-metric-" idx)
-                               :onClick #(let [current-metrics (:value metrics-field)
-                                               updated-metrics (vec (concat (subvec current-metrics 0 idx)
-                                                                            (subvec current-metrics (inc idx))))]
-                                           ((:on-change metrics-field) updated-metrics))}
-                              "Remove")))
-
-                      ;; Categorical dropdown
-                      (when (contains? metric :categories)
-                        ($ :select.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-                           {:value (or (:value value-field) "")
-                            :onChange #((:on-change value-field) (.. % -target -value))
-                            :className (if (:error value-field) "border-red-500" "")
-                            :data-testid (str "metric-value-" idx)}
-                           ($ :option {:value ""} "Select...")
-                           (for [category (:categories metric)]
-                             ($ :option {:key category :value category} category))))
-
-                      ;; Numeric input
-                      (when (contains? metric :min)
-                        ($ :div
-                           ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-                              {:type "number"
-                               :min (:min metric)
-                               :max (:max metric)
-                               :step 1
-                               :value (or (:value value-field) "")
-                               :onChange #(let [raw (.. % -target -value)
-                                                int-val (js/parseInt raw 10)]
-                                            ((:on-change value-field) (if (js/isNaN int-val) "" (str int-val))))
-                               :placeholder (str (:min metric) " - " (:max metric))
-                               :className (if (:error value-field) "border-red-500" "")
-                               :data-testid (str "metric-value-" idx)})
-                           ($ :div.text-xs.text-gray-500.mt-1
-                              (str "Valid range: " (:min metric) " - " (:max metric)))))
-
-                      (when (:error value-field)
-                        ($ :p.text-sm.text-red-600.mt-1 (:error value-field)))))))
+                 ($ MetricInputField
+                    {:key idx
+                     :form-id form-id
+                     :idx idx
+                     :metric-data metric-data
+                     :editing? editing?
+                     :on-remove #(let [current-metrics (:value metrics-field)
+                                       updated-metrics (vec (concat (subvec current-metrics 0 idx)
+                                                                    (subvec current-metrics (inc idx))))]
+                                   ((:on-change metrics-field) updated-metrics))})))
 
             ($ :div.text-sm.text-gray-500.italic.py-2
                "No metrics selected")))
