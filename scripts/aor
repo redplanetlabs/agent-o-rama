@@ -30,11 +30,14 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: $0 --rama <path-to-rama-release> [--port <port>] [--jvm-opts \"<options>\"]"
       echo ""
       echo "Options:"
-      echo "  --rama <path>       Path to Rama release root (required)"
+      echo "  --rama <path>       Path to Rama release root (or set RAMA_HOME env variable)"
       echo "  --port <port>       Port for the UI (default: 1974)"
       echo "  --jvm-opts <opts>   JVM options to pass to the Java process"
       echo "                      Example: --jvm-opts \"-Xmx2g -XX:+UseG1GC\""
       echo "  -h, --help          Show this help message"
+      echo ""
+      echo "Environment variables:"
+      echo "  RAMA_HOME           Default path to Rama release root (used if --rama not provided)"
       exit 0
       ;;
     *)
@@ -45,11 +48,16 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Check if --rama flag was provided
+# Check if --rama flag was provided, fall back to RAMA_HOME env variable
 if [[ -z "$RAMA_ROOT" ]]; then
-  echo "Error: --rama flag is required"
-  echo "Usage: $0 --rama <path-to-rama-release> [--port <port>]"
-  exit 1
+  if [[ -n "$RAMA_HOME" ]]; then
+    echo "Warning: --rama flag not provided, defaulting to RAMA_HOME=$RAMA_HOME"
+    RAMA_ROOT="$RAMA_HOME"
+  else
+    echo "Error: --rama flag is required or RAMA_HOME environment variable must be set"
+    echo "Usage: $0 --rama <path-to-rama-release> [--port <port>]"
+    exit 1
+  fi
 fi
 
 # Check if Rama root directory exists

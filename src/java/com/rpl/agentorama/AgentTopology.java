@@ -19,9 +19,8 @@ import java.util.*;
  * <li>Declaring agent objects: {@link #declareAgentObject(String, Object)}, {@link #declareAgentObjectBuilder(String, com.rpl.rama.ops.RamaFunction1)}</li>
  * <li>Declaring evaluators: {@link #declareEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}, {@link #declareComparativeEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}, {@link #declareSummaryEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}</li>
  * <li>Declaring actions: {@link #declareActionBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}</li>
- * <li>Declaring cluster agents: {@link #declareClusterAgent(String, String, String)}</li>
  * </ul>
- * 
+ *
  * Example:
  * <pre>{@code
  * public class MyAgentModule extends AgentModule {
@@ -310,15 +309,6 @@ public interface AgentTopology {
       RamaFunction1<Map<String, String>,
                     RamaFunction4<AgentObjectFetcher, List<Input>, Output, RunInfo, Map>> builder,
       ActionBuilderOptions options);
-
-  /**
-   * Declares a cluster agent that references an agent in another module. This enables agents to invoke agents in other modules.
-   *
-   * @param localName the local name for the agent
-   * @param moduleName the name of the module containing the agent
-   * @param agentName the name of the agent in the remote module
-   */
-  void declareClusterAgent(String localName, String moduleName, String agentName);
 
   /**
    * Gets the underlying Rama stream topology.

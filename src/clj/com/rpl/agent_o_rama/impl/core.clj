@@ -275,7 +275,8 @@
      {:key-partitioner apart/task-id-key-partitioner})
 
     (doseq [depot-sym [pstate-write-depot-sym datasets-depot-sym
-                       global-actions-depot-sym agent-edit-depot-sym]]
+                       global-actions-depot-sym agent-edit-depot-sym
+                       human-analytics-depot-sym]]
       (set-launch-depot-dynamic-option!* setup
                                          depot-sym
                                          "depot.max.entries.per.partition"

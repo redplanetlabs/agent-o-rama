@@ -18,7 +18,6 @@ import com.rpl.rama.*;
  * <li>Declaring agent objects: {@link AgentTopology#declareAgentObject(String, Object)}, {@link AgentTopology#declareAgentObjectBuilder(String, com.rpl.rama.ops.RamaFunction1)}</li>
  * <li>Declaring evaluators: {@link AgentTopology#declareEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}, {@link AgentTopology#declareComparativeEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}, {@link AgentTopology#declareSummaryEvaluatorBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}</li>
  * <li>Declaring actions: {@link AgentTopology#declareActionBuilder(String, String, com.rpl.rama.ops.RamaFunction1)}</li>
- * <li>Declaring cluster agents: {@link AgentTopology#declareClusterAgent(String, String, String)}</li>
  * </ul>
  *
  * Example:

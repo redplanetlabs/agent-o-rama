@@ -3,14 +3,14 @@
 
   Features demonstrated:
   - rama/module: Define a Rama module directly
-  - agents-topology: Create agent topology manually
+  - agent-topology: Create agent topology manually
   - underlying-stream-topology: Access the underlying StreamTopology
   - declare-depot: Declare a Rama depot alongside agents
   - <<sources: Process depot streams with Rama's stream processing
   - new-agent: Create an agent within the topology
   - node: Define agent node
   - define-agents!: Explicitly finalize agent definitions
-  
+
   This example shows how to integrate agent-o-rama with full Rama features
   when you need access to depots, stream processing, or other Rama primitives."
   (:require
@@ -21,37 +21,37 @@
 ;;; Rama module with agents and depot
 (def RamaModuleAgent
   (rama/module
-   {:module-name "RamaModuleAgent"}
-   [setup topologies]
-   ;; Declare a depot to demonstrate Rama feature integration
-   (rama/declare-depot setup *example-depot (rama/hash-by identity))
+    {:module-name "RamaModuleAgent"}
+    [setup topologies]
+    ;; Declare a depot to demonstrate Rama feature integration
+    (rama/declare-depot setup *example-depot (rama/hash-by identity))
 
-   ;; Create agents topology
-   (let [topology (aor/agents-topology setup topologies)
-         ;; Access underlying stream topology for Rama features
-         s-topology (aor/underlying-stream-topology topology)]
+    ;; Create agents topology
+    (let [topology   (aor/agent-topology setup topologies)
+          ;; Access underlying stream topology for Rama features
+          s-topology (aor/underlying-stream-topology topology)]
 
-     ;; Use Rama's stream processing alongside agents
-     (rama/<<sources
-      s-topology
-      (rama/source> *example-depot :> *value)
-      (println "Depot received:" *value))
+      ;; Use Rama's stream processing alongside agents
+      (rama/<<sources
+        s-topology
+       (rama/source> *example-depot :> *value)
+        (println "Depot received:" *value))
 
-     ;; Define a simple feedback agent
-     (-> topology
-         (aor/new-agent "FeedbackAgent")
-         (aor/node
-          "process-feedback"
-          nil
-          (fn [agent-node feedback-text]
-            ;; Process feedback and return success response
-            (let [response {:status :success
-                            :message (str "Processed: " feedback-text)
-                            :length (count feedback-text)}]
-              (aor/result! agent-node response)))))
+      ;; Define a simple feedback agent
+      (-> topology
+          (aor/new-agent "FeedbackAgent")
+          (aor/node
+           "process-feedback"
+           nil
+           (fn [agent-node feedback-text]
+             ;; Process feedback and return success response
+             (let [response {:status  :success
+                             :message (str "Processed: " feedback-text)
+                             :length  (count feedback-text)}]
+               (aor/result! agent-node response)))))
 
-     ;; Finalize agent definitions
-     (aor/define-agents! topology))))
+      ;; Finalize agent definitions
+      (aor/define-agents! topology))))
 
 (defn -main
   "Run the rama module agent example"
@@ -72,7 +72,7 @@
 
       ;; Get agent manager and client
       (let [manager (aor/agent-manager ipc module-name)
-            agent (aor/agent-client manager "FeedbackAgent")]
+            agent   (aor/agent-client manager "FeedbackAgent")]
 
         (println "\n=== Agent Results ===")
         (println "Available agents:" (aor/agent-names manager))

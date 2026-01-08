@@ -29,10 +29,9 @@ public class MirrorAgentTest {
       // Deploy GreeterModule first
       MirrorAgent.GreeterModule greeterModule = new MirrorAgent.GreeterModule();
       ipc.launchModule(greeterModule, new LaunchConfig(1, 1));
-      String greeterModuleName = greeterModule.getModuleName();
 
       // Deploy MirrorModule with reference to GreeterModule
-      MirrorAgent.MirrorModule mirrorModule = new MirrorAgent.MirrorModule(greeterModuleName);
+      MirrorAgent.MirrorModule mirrorModule = new MirrorAgent.MirrorModule();
       ipc.launchModule(mirrorModule, new LaunchConfig(1, 1));
 
       // Get agent manager and client for MirrorModule

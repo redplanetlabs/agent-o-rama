@@ -423,16 +423,16 @@
                 (fetch-day [:agent :node-latencies] nil))))
 
        (testing "node latencies at hour granularity"
-         (let [fetch-hour (fn [metric-id]
-                            (ana/select-telemetry telemetry
-                                                  "foo"
-                                                  po/HOUR-GRANULARITY
-                                                  metric-id
-                                                  0
-                                                  (day-millis 1)
-                                                  [:count :rest-sum :mean]
-                                                  nil))
-               hour-node-data (fetch-hour [:agent :node-latencies])
+         (let [fetch-hour        (fn [metric-id]
+                                   (ana/select-telemetry telemetry
+                                                         "foo"
+                                                         po/HOUR-GRANULARITY
+                                                         metric-id
+                                                         0
+                                                         (day-millis 1)
+                                                         [:count :rest-sum :mean]
+                                                         nil))
+               hour-node-data    (fetch-hour [:agent :node-latencies])
                hour-success-data (fetch-hour [:agent :success-rate])]
            (is (seq hour-success-data)
                "Success rate should have data at hour granularity (control)")
@@ -848,6 +848,18 @@
          trace)]
     (aor-types/->valid-NodeInvokeImpl task-id id)))
 
+(defn rubric
+  [human-metric required?]
+  (aor-types/->valid-HumanFeedbackQueueRubric human-metric required?))
+
+(defn agent-target
+  [agent-name agent-invoke]
+  (aor-types/->valid-FeedbackTarget agent-name agent-invoke nil))
+
+(defn node-target
+  [agent-name agent-invoke node-invoke]
+  (aor-types/->valid-FeedbackTarget agent-name agent-invoke node-invoke))
+
 (deftest human-metrics-test
   (with-open [ipc (rtest/create-ipc)]
     (letlocals
@@ -1020,10 +1032,6 @@
               :metric      (aor-types/->HumanNumericMetric 0 5)}
             ]))
 
-     (bind rubric
-       (fn [human-metric required?]
-         (aor-types/->valid-HumanFeedbackQueueRubric human-metric required?)))
-
      (evals/create-human-feedback-queue! global-actions-depot
                                          "q1"
                                          "q1 q"
@@ -1134,13 +1142,6 @@
                             :name        "n2"
                             :metric      (aor-types/->HumanNumericMetric 0 5)
                             :required    true}]}))
-
-     (bind agent-target
-       (fn [agent-name agent-invoke]
-         (aor-types/->valid-FeedbackTarget agent-name agent-invoke nil)))
-     (bind node-target
-       (fn [agent-name agent-invoke node-invoke]
-         (aor-types/->valid-FeedbackTarget agent-name agent-invoke node-invoke)))
 
      (bind target0 (agent-target "foo" foo-inv1))
      (evals/add-human-feedback-request!
@@ -1512,4 +1513,402 @@
               :created-at  0
               :modified-at 0}
             ]))
-    )))
+   )))
+
+
+(deftest human-metric-telemetry-test
+  (with-redefs [TICKS (atom 0)
+                i/SUBSTITUTE-TICK-DEPOTS true
+
+                i/hook:analytics-tick
+                (fn [& args] (swap! TICKS inc))
+
+                anode/gen-node-id
+                (fn [& args]
+                  (h/random-uuid7-at-timestamp (h/current-time-millis)))
+
+                ana/max-node-scan-time (fn [] (+ (h/current-time-millis) 60000))
+
+                ana/node-stall-time (fn [] (+ (h/current-time-millis) 60000))
+
+                at/gen-new-agent-id
+                (fn [agent-name]
+                  (h/random-uuid7-at-timestamp (h/current-time-millis)))]
+    (with-open [ipc (rtest/create-ipc)
+                _ (TopologyUtils/startSimTime)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (-> topology
+              (aor/new-agent "foo")
+              (aor/node
+               "start"
+               "a"
+               (fn [agent-node input]
+                 (aor/emit! agent-node "a" (str input "!"))))
+              (aor/node
+               "a"
+               nil
+               (fn [agent-node input]
+                 (aor/result! agent-node (str input "?"))
+               )))
+         ))
+       (rtest/launch-module! ipc module {:tasks 2 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind global-actions-depot
+         (:global-actions-depot (aor-types/underlying-objects agent-manager)))
+       (bind human-feedback-pstate
+         (:human-feedback-pstate (aor-types/underlying-objects agent-manager)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+       (bind foo-root (:root-pstate (aor-types/underlying-objects foo)))
+       (bind foo-traces (:tracing-query (aor-types/underlying-objects foo)))
+       (bind ana-depot (foreign-depot ipc module-name (po/agent-analytics-tick-depot-name)))
+       (bind telemetry (:telemetry-pstate (aor-types/underlying-objects foo)))
+       (bind queue-page
+         (:human-feedback-queue-page-query (aor-types/underlying-objects agent-manager)))
+
+
+       (bind get-trace
+         (fn [{:keys [task-id agent-invoke-id]}]
+           (let [root-invoke-id
+                 (foreign-select-one [(keypath agent-invoke-id) :root-invoke-id]
+                                     foo-root
+                                     {:pkey task-id})]
+             (:invokes-map (foreign-invoke-query foo-traces
+                                                 task-id
+                                                 [[task-id root-invoke-id]]
+                                                 10000)))))
+
+       (bind cycle!
+         (fn []
+           (reset! TICKS 0)
+           (foreign-append! ana-depot nil)
+           (is (condition-attained? (> @TICKS 0)))
+           (rtest/pause-microbatch-topology! ipc
+                                             module-name
+                                             aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)
+           (rtest/resume-microbatch-topology! ipc
+                                              module-name
+                                              aor-types/AGENT-ANALYTICS-MB-TOPOLOGY-NAME)))
+
+       (bind inv1
+         (aor/agent-initiate-with-context foo
+                                          {:metadata {"m1" "a" "m2" 0}}
+                                          "a"))
+       (is (= "a!?" (aor/agent-result foo inv1)))
+       (bind inv2
+         (aor/agent-initiate-with-context foo
+                                          {:metadata {"m1" "b" "m3" 10}}
+                                          "b"))
+       (is (= "b!?" (aor/agent-result foo inv2)))
+
+       (bind trace1 (get-trace inv1))
+       (bind trace2 (get-trace inv2))
+
+       (aor/create-categorical-human-metric! agent-manager
+                                             "c1"
+                                             "c1 metric"
+                                             #{"option1" "option2" "option3"})
+       (aor/create-numeric-human-metric! agent-manager
+                                         "n1"
+                                         "n1 metric"
+                                         1
+                                         10)
+
+       (evals/create-human-feedback-queue! global-actions-depot
+                                           "q1"
+                                           "q1 q"
+                                           [(rubric "c1" true)
+                                            (rubric "n1" false)])
+
+
+       (bind all-ids-fn
+         (fn []
+           (select
+            [:items ALL :id]
+            (foreign-invoke-query queue-page "q1" 1000 nil))))
+
+
+       (bind target0 (agent-target "foo" inv1))
+       (evals/add-human-feedback-request!
+        global-actions-depot
+        "q1"
+        target0
+        "")
+       (bind target1 (node-target "foo" inv2 (node-invoke-by-name trace2 "a")))
+       (evals/add-human-feedback-request!
+        global-actions-depot
+        "q1"
+        target1
+        "")
+       (evals/add-human-feedback-request!
+        global-actions-depot
+        "q1"
+        target0
+        "")
+       (evals/add-human-feedback-request!
+        global-actions-depot
+        "q1"
+        target1
+        "")
+
+       (bind all-ids (all-ids-fn))
+
+       (bind fid0
+         (evals/resolve-human-feedback-queue-item!
+          global-actions-depot
+          "q1"
+          (nth all-ids 0)
+          target0
+          "alice"
+          {"c1" "option2"
+           "n1" 4}
+          ""))
+       (bind fid1
+         (evals/resolve-human-feedback-queue-item!
+          global-actions-depot
+          "q1"
+          (nth all-ids 1)
+          target1
+          "alice"
+          {"n1" 10}
+          ""))
+       (bind fid2
+         (evals/add-human-feedback! global-actions-depot
+                                    target0
+                                    "charlie"
+                                    {"c1" "option1"}
+                                    ""))
+       (bind fid3
+         (evals/add-human-feedback! global-actions-depot
+                                    target1
+                                    "charlie"
+                                    {"c1" "option1"
+                                     "n1" 2}
+                                    ""))
+
+       (cycle!)
+       (cycle!)
+
+       (is (= {0 {po/DEFAULT-CATEGORY {:count 3 :rest-sum 16}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "n1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count :rest-sum]
+                                    nil)))
+
+       (is (= {0 {"option1" {:count 2}
+                  "option2" {:count 1}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "c1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count]
+                                    nil)))
+
+       ;; verify indexed by metadata as well
+       (is (= {0 {"a" {po/DEFAULT-CATEGORY {:rest-sum 4 :count 1}}
+                  "b" {po/DEFAULT-CATEGORY {:rest-sum 12 :count 2}}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "n1"]
+                                    0
+                                    (day-millis 1)
+                                    [:rest-sum :count]
+                                    "m1")))
+       (is (= {0 {0 {po/DEFAULT-CATEGORY {:rest-sum 4 :count 1}}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "n1"]
+                                    0
+                                    (day-millis 1)
+                                    [:rest-sum :count]
+                                    "m2")))
+       (is (= {0 {10 {po/DEFAULT-CATEGORY {:rest-sum 12 :count 2}}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "n1"]
+                                    0
+                                    (day-millis 1)
+                                    [:rest-sum :count]
+                                    "m3")))
+
+       (is (= {0 {"a" {"option1" {:count 1} "option2" {:count 1}}
+                  "b" {"option1" {:count 1}}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "c1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count]
+                                    "m1")))
+       (is (= {0 {0 {"option1" {:count 1} "option2" {:count 1}}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "c1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count]
+                                    "m2")))
+       (is (= {0 {10 {"option1" {:count 1}}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "c1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count]
+                                    "m3")))
+
+
+
+       ;; verify editing/deleting don't affect telemetry
+       (evals/edit-human-feedback!
+        global-actions-depot
+        target0
+        fid0
+        "alice"
+        {"c1" "option3"
+         "n1" 10}
+        "")
+
+       (evals/delete-human-feedback!
+        global-actions-depot
+        target1
+        fid1)
+
+       (cycle!)
+       (cycle!)
+
+
+       (is (= {0 {po/DEFAULT-CATEGORY {:count 3 :rest-sum 16}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "n1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count :rest-sum]
+                                    nil)))
+
+       (is (= {0 {"option1" {:count 2}
+                  "option2" {:count 1}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "c1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count]
+                                    nil)))
+
+
+       (TopologyUtils/advanceSimTime (inc (day-millis 1)))
+
+
+       (bind fid4
+         (evals/resolve-human-feedback-queue-item!
+          global-actions-depot
+          "q1"
+          (nth all-ids 0)
+          target0
+          "alice"
+          {"c1" "option1"
+           "n1" 9}
+          ""))
+       (bind fid5
+         (evals/resolve-human-feedback-queue-item!
+          global-actions-depot
+          "q1"
+          (nth all-ids 1)
+          target1
+          "alice"
+          {"n1" 5}
+          ""))
+       (bind fid6
+         (evals/add-human-feedback! global-actions-depot
+                                    target0
+                                    "charlie"
+                                    {"c1" "option3"}
+                                    ""))
+       (bind fid7
+         (evals/add-human-feedback! global-actions-depot
+                                    target1
+                                    "charlie"
+                                    {"c1" "option3"
+                                     "n1" 9}
+                                    ""))
+
+
+       (cycle!)
+       (cycle!)
+
+       (is (= {0 {po/DEFAULT-CATEGORY {:count 3 :rest-sum 16}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "n1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count :rest-sum]
+                                    nil)))
+
+       (is (= {0 {"option1" {:count 2}
+                  "option2" {:count 1}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "c1"]
+                                    0
+                                    (day-millis 1)
+                                    [:count]
+                                    nil)))
+
+
+       (is (= {1440 {po/DEFAULT-CATEGORY {:count 3 :rest-sum 23}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "n1"]
+                                    (day-millis 1)
+                                    (day-millis 2)
+                                    [:count :rest-sum]
+                                    nil)))
+
+       (is (= {1440 {"option1" {:count 1}
+                     "option3" {:count 2}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/MINUTE-GRANULARITY
+                                    [:human "c1"]
+                                    (day-millis 1)
+                                    (day-millis 2)
+                                    [:count]
+                                    nil)))
+
+       ;; verify it indexes at multiple granularities
+       (is (= {1 {"option1" {:count 1}
+                  "option3" {:count 2}}}
+              (ana/select-telemetry telemetry
+                                    "foo"
+                                    po/DAY-GRANULARITY
+                                    [:human "c1"]
+                                    (day-millis 1)
+                                    (day-millis 2)
+                                    [:count]
+                                    nil)))
+
+      (is (= [[:human "c1"] [:human "n1"]] (ana/human-metric-ids human-feedback-pstate)))
+     ))))

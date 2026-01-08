@@ -360,19 +360,24 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
          :id
          (pred= feedback-id))))
 
+(deframafn target-location-info
+  [{:keys [*agent-name *agent-invoke *node-invoke]}]
+  (<<if (nil? *node-invoke)
+    (po/agent-root-task-global-name *agent-name :> *pstate-name)
+    (get *agent-invoke :task-id :> *task-id)
+    (get *agent-invoke :agent-invoke-id :> *root-id)
+   (else>)
+    (po/agent-node-task-global-name *agent-name :> *pstate-name)
+    (get *node-invoke :task-id :> *task-id)
+    (get *node-invoke :node-invoke-id :> *root-id))
+  (:> *pstate-name *task-id *root-id))
+
 (deframaop update-feedback!>
-  [{:keys [*agent-name *agent-invoke *node-invoke]} *feedback-id *path]
+  [{:keys [*agent-name] :as *target} *feedback-id *path]
   (<<if (not (contains? (po/agent-names-set) *agent-name))
     (:no-agent>)
    (else>)
-    (<<if (nil? *node-invoke)
-      (po/agent-root-task-global-name *agent-name :> *pstate-name)
-      (get *agent-invoke :task-id :> *task-id)
-      (get *agent-invoke :agent-invoke-id :> *root-id)
-     (else>)
-      (po/agent-node-task-global-name *agent-name :> *pstate-name)
-      (get *node-invoke :task-id :> *task-id)
-      (get *node-invoke :node-invoke-id :> *root-id))
+    (target-location-info *target :> *pstate-name *task-id *root-id)
     (|direct *task-id)
     (this-module-pobject-task-global *pstate-name :> $$p)
     (local-select> [(keypath *root-id)
@@ -406,7 +411,9 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
    (<<if (nil? *existing)
      (depot-partition-append!
       *human-analytics-depot
-      (aor-types/->valid-HumanAnalyticsEvent nil nil *scores *current-time-millis)
+      (aor-types/->valid-HumanAnalyticsEvent *target
+                                             *scores
+                                             *current-time-millis)
       :append-ack))
    (:>)))
 
@@ -489,16 +496,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                           [:modified-at (termval *modified-at)]
                           [:source :name (termval *human-name)]
                           [:source :id (termval *new-feedback-id)]
-                         ))
-                        :> *existing)
-     (filter> (some? *existing))
-     (depot-partition-append!
-      *human-analytics-depot
-      (aor-types/->valid-HumanAnalyticsEvent (get *existing :scores)
-                                             (get *existing :modified-at)
-                                             *scores
-                                             *modified-at)
-      :append-ack)
+                         )))
 
     (case> DeleteHumanFeedback :> {:keys [*target *feedback-id]})
      (update-feedback!> *target
@@ -507,16 +505,7 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
                          :feedback
                          :results
                          (matching-human-feedback *feedback-id)
-                         NONE>)
-                        :> *existing)
-     (filter> (some? *existing))
-     (depot-partition-append!
-      *human-analytics-depot
-      (aor-types/->valid-HumanAnalyticsEvent (get *existing :scores)
-                                             (get *existing :modified-at)
-                                             nil
-                                             nil)
-      :append-ack)
+                         NONE>))
    )))
 
 ;; for use by AgentManager

@@ -713,6 +713,10 @@
       :fail (not success?)
       (throw (h/ex-info "Unexpected status filter" {:status-filter status-filter})))))
 
+(deframafn expand-data-map
+  [*m *root?]
+  (:> (assoc (into {} *m) :run-type (ifexpr *root? :agent :node))))
+
 (deframafn fetch-data
   [*agent-name *target *offset *dep-end-offset]
   (<<if (AnaRootTarget? *target)
@@ -728,7 +732,7 @@
                             :> *scan-amt)
   (<<ramafn %add-run-type
     [*m]
-    (:> (assoc (into {} *m) :run-type (ifexpr (AnaRootTarget? *target) :agent :node))))
+    (:> (expand-data-map *m (AnaRootTarget? *target))))
   (po/agent-node-executor-task-global :> *node-exec)
   (<<if (>= (compare *offset *end-offset) 0)
     (sorted-map :> *m)
@@ -958,6 +962,28 @@
       {}
     )))
 
+(defn enriched-metadata
+  [{:keys [metadata] :as data-map}]
+  (assoc metadata
+   "aor/status"
+   (if (metrics/run-success? data-map) "run-success" "run-failure")))
+
+(deframaop update-telemetry!
+  [*agent-name *metric-id *metric-point *start-time-millis *metadata]
+  (metric-point->category-values *metric-point :> *category-values)
+  (filter> (not (empty? *category-values)))
+
+  (ops/explode po/GRANULARITIES :> *granularity)
+  (to-bucket *granularity *start-time-millis :> *bucket)
+
+  (|hash [*agent-name *granularity *metric-id])
+  (po/agent-telemetry-task-global *agent-name :> $$telemetry)
+  (local-transform>
+   [(keypath *granularity *metric-id *bucket)
+    (term (stats-updater *metadata *category-values))]
+   $$telemetry)
+  (:>))
+
 (deframaop compute-metrics!
   [*agent->rule->info]
   (ops/explode (po/agent-names-set) :> *agent-name)
@@ -990,33 +1016,15 @@
    :> *m *end-scan-offset)
   (local-transform> [(keypath *query-id) (termval *end-scan-offset)]
                     $$metric-cursors)
-  ;; TODO: factor from here to share with human analytics
-  ;;    - where to get metadata from?
-  ;;      - should be part of analytics event?
-  ;;    - also needs to know aor/status
-  (ops/explode-map *m :> *k {:keys [*start-time-millis *metadata] :as *data-map})
+  (ops/explode-map *m :> *k {:keys [*start-time-millis] :as *data-map})
   (filter> (some? *start-time-millis)) ; defensive
   (filter> (not (experiment-source? *data-map)))
-  (assoc *metadata
-   "aor/status"
-   (ifexpr (metrics/run-success? *data-map) "run-success" "run-failure")
-   :> *metadata)
+  (enriched-metadata *data-map :> *metadata)
   (ops/explode *metrics :> {:keys [*metrics-fn]})
   (invoke-metrics-fn *metrics-fn *data-map :> *metrics-map)
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
   (ops/explode *metric-points :> *metric-point)
-  (metric-point->category-values *metric-point :> *category-values)
-  (filter> (not (empty? *category-values)))
-
-  (ops/explode po/GRANULARITIES :> *granularity)
-  (to-bucket *granularity *start-time-millis :> *bucket)
-
-  (|hash [*agent-name *granularity *metric-id])
-  (po/agent-telemetry-task-global *agent-name :> $$telemetry)
-  (local-transform>
-   [(keypath *granularity *metric-id *bucket)
-    (term (stats-updater *metadata *category-values))]
-   $$telemetry)
+  (update-telemetry! *agent-name *metric-id *metric-point *start-time-millis *metadata)
 )
 
 (defn to-action-queue
@@ -1155,13 +1163,36 @@
      [update-rule-offsets! '*new-cursors]
     ]))
 
+(defn log-unexpected-human-metric
+  [msg data]
+  (tl/error ::unexpected-human-metric msg data))
+
 (deframaop handle-human-analytics
   [%mb]
-  (%mb :> {:keys [*old-scores *old-scores-millis *new-scores *new-scores-millis]})
-  ;; TODO:
-  ;;    - subtract old-scores from that bucket
-  ;;    - add new-scores to that bucket
-)
+  (%mb :> {:keys [*target *scores *scores-millis]})
+  (identity *target :> {:keys [*agent-name *node-invoke]})
+  (filter> (contains? (po/agent-names-set) *agent-name))
+  (evals/target-location-info *target :> *pstate-name *task-id *root-id)
+  (|direct *task-id)
+  (this-module-pobject-task-global *pstate-name :> $$p)
+  (local-select> (keypath *root-id) $$p :> *data-map)
+  (<<if (nil? *data-map)
+    (identity nil :> *metadata)
+   (else>)
+    (enriched-metadata (expand-data-map *data-map (nil? *node-invoke))
+                       :> *metadata))
+  (ops/explode-map *scores :> *name *value)
+  (<<cond
+   (case> (string? *value))
+    (hash-map :type :categorical :values {*value 1} :> *metric-point)
+
+   (case> (number? *value))
+    (hash-map :type :numeric :values [*value] :> *metric-point)
+
+   (default> :unify false)
+    (log-unexpected-human-metric "Unexpected human metric for analytics"
+                                 {:name *name :value *value :value-class (class *value)}))
+  (update-telemetry! *agent-name [:human *name] *metric-point *scores-millis *metadata))
 
 (defn add-rule!
   [global-actions-depot name agent-name
@@ -1253,3 +1284,12 @@
       (transformed [(putval metrics-set) MAP-VALS end-path] metrics-extract)]
      telemetry-pstate
      {:pkey [agent-name granularity metric-id]})))
+
+(defn human-metric-ids
+  [human-feedback-pstate]
+  (mapv
+   #(vector :human %)
+   (foreign-select
+    [:metrics MAP-KEYS]
+    human-feedback-pstate
+   )))

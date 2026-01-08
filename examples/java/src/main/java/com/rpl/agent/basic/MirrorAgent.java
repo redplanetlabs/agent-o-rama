@@ -47,11 +47,12 @@ public class MirrorAgent {
    * cross-module agent invocation.
    */
   public static class MirrorModule extends AgentModule {
-    private final String GREETER_MODULE_NAME = new GreeterModule().getModuleName();
+    private static final String GREETER_MODULE_NAME = new GreeterModule().getModuleName();
 
     @Override
     protected void defineAgents(AgentTopology topology) {
-      topology.newAgent("MirrorAgent").node("process", null, (AgentNode agentNode, String name) -> {
+      topology.newAgent("MirrorAgent")
+              .node("process", null, (AgentNode agentNode, String name) -> {
         // Get client for the mirror agent
         AgentClient greeterClient = agentNode.getMirrorAgentClient(GREETER_MODULE_NAME, "Greeter");
 
@@ -76,7 +77,7 @@ public class MirrorAgent {
       String greeterModuleName = greeterModule.getModuleName();
 
       // Launch MirrorModule with reference to GreeterModule
-      MirrorModule mirrorModule = new MirrorModule(greeterModuleName);
+      MirrorModule mirrorModule = new MirrorModule();
       ipc.launchModule(mirrorModule, new LaunchConfig(1, 1));
 
       // Get agent manager for MirrorModule

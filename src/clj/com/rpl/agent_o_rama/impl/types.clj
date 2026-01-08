@@ -595,10 +595,9 @@
   HumanFeedbackEvent)
 
 (defaorrecord HumanAnalyticsEvent
-  [old-scores :- (s/maybe {String (s/maybe Object)})
-   old-scores-millis :- (s/maybe Long)
-   new-scores :- (s/maybe {String (s/maybe Object)})
-   new-scores-millis :- (s/maybe Long)])
+  [target :- FeedbackTarget
+   scores :- (s/maybe {String (s/maybe Object)})
+   scores-millis :- (s/maybe Long)])
 
 ;; Experiments
 
