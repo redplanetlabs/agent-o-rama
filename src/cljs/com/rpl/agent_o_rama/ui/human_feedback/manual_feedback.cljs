@@ -23,7 +23,8 @@
            :on-change (:on-change reviewer-name-field)
            :error (:error reviewer-name-field)
            :required? true
-           :placeholder "Your name"})
+           :placeholder "Your name"
+           :data-testid "reviewer-name-input"})
 
        ;; Selected metrics
        ($ :div
@@ -39,7 +40,8 @@
                        metric-name (:name metric)
                        value-field (forms/use-form-field form-id [:metrics idx :value])]
                    ($ :div.p-3.bg-gray-50.rounded-md.border.border-gray-200
-                      {:key idx}
+                      {:key idx
+                       :data-testid (str "metric-field-" idx)}
                       ($ :div.flex.items-center.justify-between.mb-2
                          ($ :span.text-sm.font-medium.text-gray-700
                             metric-name
@@ -48,6 +50,7 @@
                          (when-not editing?
                            ($ :button.text-red-600.hover:text-red-800.text-sm
                               {:type "button"
+                               :data-testid (str "remove-metric-" idx)
                                :onClick #(let [current-metrics (:value metrics-field)
                                                updated-metrics (vec (concat (subvec current-metrics 0 idx)
                                                                            (subvec current-metrics (inc idx))))]
@@ -59,7 +62,8 @@
                         ($ :select.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
                            {:value (or (:value value-field) "")
                             :onChange #((:on-change value-field) (.. % -target -value))
-                            :className (if (:error value-field) "border-red-500" "")}
+                            :className (if (:error value-field) "border-red-500" "")
+                            :data-testid (str "metric-value-" idx)}
                            ($ :option {:value ""} "Select...")
                            (for [category (:categories metric)]
                              ($ :option {:key category :value category} category))))
@@ -77,7 +81,8 @@
                                                 int-val (js/parseInt raw 10)]
                                             ((:on-change value-field) (if (js/isNaN int-val) "" (str int-val))))
                                :placeholder (str (:min metric) " - " (:max metric))
-                               :className (if (:error value-field) "border-red-500" "")})
+                               :className (if (:error value-field) "border-red-500" "")
+                               :data-testid (str "metric-value-" idx)})
                            ($ :div.text-xs.text-gray-500.mt-1
                               (str "Valid range: " (:min metric) " - " (:max metric)))))
                       
@@ -130,7 +135,8 @@
            :rows 3
            :value (:value comment-field)
            :on-change (:on-change comment-field)
-           :placeholder "Optional comment about this feedback..."}))))
+           :placeholder "Optional comment about this feedback..."
+           :data-testid "feedback-comment-input"}))))
 
 ;; Form spec for adding manual feedback
 (def add-manual-feedback-form-spec

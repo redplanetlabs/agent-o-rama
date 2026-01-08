@@ -86,6 +86,7 @@
                  ($ :button.p-1.text-purple-600.hover:text-purple-800.hover:bg-purple-200.rounded.transition-colors
                     {:type "button"
                      :title "Edit feedback"
+                     :data-testid "edit-feedback-button"
                      :onClick #(state/dispatch [:modal/show
                                                 {:form-id :edit-manual-feedback
                                                  :form-spec manual-feedback/add-manual-feedback-form-spec
@@ -105,6 +106,7 @@
                  ($ :button.p-1.text-red-600.hover:text-red-800.hover:bg-red-100.rounded.transition-colors
                     {:type "button"
                      :title "Delete feedback"
+                     :data-testid "delete-feedback-button"
                      :onClick #(when (js/confirm "Are you sure you want to delete this feedback?")
                                  (state/dispatch [:sente/request
                                                   [:human-feedback/delete-feedback
@@ -161,7 +163,8 @@
        (when (and module-id agent-name invoke-id)
          ($ :div.mb-4
             ($ :button.inline-flex.items-center.px-3.py-2.bg-purple-600.text-white.text-sm.font-medium.rounded-md.hover:bg-purple-700.transition-colors
-               {:onClick #(state/dispatch [:modal/show
+               {:data-testid "add-feedback-button"
+                :onClick #(state/dispatch [:modal/show
                                            {:form-id :add-manual-feedback
                                             :form-spec manual-feedback/add-manual-feedback-form-spec
                                             :props {:module-id module-id
