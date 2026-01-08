@@ -11,32 +11,15 @@
 ;; This is necessary because React hooks can't be called inside loops
 (defui MetricInputField [{:keys [form-id idx metric-data editing? on-remove]}]
   ;; metric-data has :name, :metric (the definition), :value, :required
-  (let [metric-def (:metric metric-data)
-        metric-name (:name metric-data)
-        value-field (forms/use-form-field form-id [:metrics idx :value])]
-    ($ :div.p-3.bg-gray-50.rounded-md.border.border-gray-200
-       {:data-testid (str "metric-field-" idx)}
-       ;; Header with name and remove button
-       ($ :div.flex.items-center.justify-between.mb-2
-          ($ :span.text-sm.font-medium.text-gray-700
-             metric-name
-             (when (:required metric-data)
-               ($ :span.text-red-500.ml-1 "*")))
-          (when-not editing?
-            ($ :button.text-red-600.hover:text-red-800.text-sm
-               {:type "button"
-                :data-testid (str "remove-metric-" idx)
-                :onClick on-remove}
-               "Remove")))
-
-       ;; Use shared metric input component (without its own label since we show it above)
-       ($ metric-input/MetricInput
-          {:metric metric-def
-           :label false  ;; Don't show label, we have our own header
-           :value (:value value-field)
-           :on-change (:on-change value-field)
-           :error (:error value-field)
-           :data-testid (str "metric-value-" idx)}))))
+  (let [value-field (forms/use-form-field form-id [:metrics idx :value])]
+    ($ metric-input/MetricInput
+       {:metric (:metric metric-data)
+        :label (:name metric-data)
+        :required? (:required metric-data)
+        :value (:value value-field)
+        :on-change (:on-change value-field)
+        :on-remove (when-not editing? on-remove)
+        :data-testid (str "metric-value-" idx)})))
 
 (defui ManualFeedbackForm [{:keys [form-id]}]
   (let [props (state/use-sub [:forms form-id])
@@ -111,11 +94,14 @@
                :items-key :items
                 :item-id-fn :name
                 :item-label-fn :name
-                :item-sublabel-fn (fn [m]
-                                    (cond
-                                      (contains? m :categories) (str "Categorical: " (str/join ", " (:categories m)))
-                                      (contains? m :min) (str "Numeric: " (:min m) " - " (:max m))
-                                      :else ""))
+                :item-sublabel-fn (fn [item]
+                                    ;; item has :name, :description, :metric
+                                    ;; :metric contains :categories or :min/:max
+                                    (let [m (:metric item)]
+                                      (cond
+                                        (contains? m :categories) (str "Categorical: " (str/join ", " (:categories m)))
+                                        (contains? m :min) (str "Numeric: " (:min m) " - " (:max m))
+                                        :else "")))
                 :placeholder "Add a metric..."
                 :label "Add Metric"
                 :hide-label? false
