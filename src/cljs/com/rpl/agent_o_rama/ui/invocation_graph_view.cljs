@@ -313,21 +313,7 @@
                                              :source-type :node
                                              :source-args input-data
                                              :source-emits output-data}])))}
-             "Add to Dataset")
-          ;; Add to Queue button
-          ($ :button
-             {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-white text-purple-700 hover:bg-purple-100 cursor-pointer"
-              :onClick (fn [e]
-                         (.stopPropagation e)
-                         (add-to-queue/show-add-to-queue-modal
-                          {:module-id module-id
-                           :title (str "Add Node '" node-name "' to Queue")
-                           :source-type :node
-                           :agent-name agent-name
-                           :invoke-id invoke-id
-                           :node-task-id node-task-id
-                           :node-invoke-id (str node-id)}))}
-             "Add to Queue")))))
+             "Add to Dataset")))))
 
 (defui node-result-panel [{:keys [result]}]
   (when result
@@ -663,7 +649,8 @@
                        :agent-name agent-name
                        :invoke-id invoke-id
                        :node-task-id node-task-id
-                       :node-invoke-id node-id})))
+                       :node-invoke-id node-id
+                       :node-name node-name})))
 
               ;; Default case
               nil))))))

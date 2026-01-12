@@ -5,7 +5,8 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.human-feedback.manual-feedback :as manual-feedback]
-   ["@heroicons/react/24/outline" :refer [ArrowTopRightOnSquareIcon PlusIcon PencilIcon TrashIcon]]))
+   [com.rpl.agent-o-rama.ui.human-feedback.add-to-queue :as add-to-queue]
+   ["@heroicons/react/24/outline" :refer [ArrowTopRightOnSquareIcon PlusIcon PencilIcon TrashIcon QueueListIcon]]))
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -162,13 +163,14 @@
    - :invoke-id - Invoke ID for add/edit/delete operations
    - :node-task-id - Node task ID (optional, for node feedback)
    - :node-invoke-id - Node invoke ID (optional, for node feedback)"
-  [{:keys [feedback-data module-id agent-name invoke-id node-task-id node-invoke-id]}]
+  [{:keys [feedback-data module-id agent-name invoke-id node-task-id node-invoke-id node-name]}]
   (let [results (:results feedback-data)]
     ($ :div
-       ;; Add feedback button
+       ;; Action buttons - Add Feedback and Add to Queue side by side
        (when (and module-id agent-name invoke-id)
-         ($ :div.mb-4
-            ($ :button.inline-flex.items-center.px-3.py-2.bg-purple-600.text-white.text-sm.font-medium.rounded-md.hover:bg-purple-700.transition-colors.cursor-pointer.w-full
+         ($ :div.mb-4.flex.gap-2
+            ;; Add Feedback button (left half)
+            ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-blue-600.text-white.text-sm.font-medium.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer.flex-1
                {:data-testid "add-feedback-button"
                 :onClick #(state/dispatch [:modal/show-form :add-manual-feedback
                                            {:module-id module-id
@@ -178,7 +180,21 @@
                                             :node-invoke-id node-invoke-id
                                             :editing? false}])}
                ($ PlusIcon {:className "h-4 w-4 mr-1"})
-               "Add Feedback")))
+               "Add Feedback")
+            ;; Add to Queue button (right half) - only show for node feedback
+            (when node-task-id
+              ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.flex-1
+                 {:data-testid "add-to-queue-button"
+                  :onClick #(add-to-queue/show-add-to-queue-modal
+                             {:module-id module-id
+                              :title (str "Add " (or node-name "Node") " to Queue")
+                              :source-type :node
+                              :agent-name agent-name
+                              :invoke-id invoke-id
+                              :node-task-id node-task-id
+                              :node-invoke-id (str node-invoke-id)})}
+                 ($ QueueListIcon {:className "h-4 w-4 mr-1"})
+                 "Add to Queue"))))
        ;; Feedback list
        (if (and results (seq results))
          ($ :div {:className "space-y-2"
