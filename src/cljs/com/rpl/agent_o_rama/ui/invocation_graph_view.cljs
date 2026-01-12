@@ -297,23 +297,7 @@
           ($ :span {:className "text-sm text-indigo-600 font-mono"} node-name))
        ($ :div {:className "flex justify-between items-center mt-1"}
           ($ :span {:className "text-sm font-medium text-indigo-700"} "ID")
-          ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id)))
-       ;; Buttons row
-       ($ :div {:className "mt-3 flex gap-2"}
-          ;; Add to Dataset button
-          ($ :button
-             {:className "text-sm font-medium py-1 px-3 rounded-md transition-colors bg-white text-black hover:bg-indigo-200 cursor-pointer"
-              :onClick (fn [e]
-                         (.stopPropagation e)
-                         (let [input-data (transform-node-input-for-dataset raw-node-data node-name)
-                               output-data (transform-node-data-for-dataset raw-node-data node-name)]
-                           (state/dispatch [:modal/show-form :add-from-trace
-                                            {:module-id module-id
-                                             :title (str "Add Node '" node-name "' to Dataset")
-                                             :source-type :node
-                                             :source-args input-data
-                                             :source-emits output-data}])))}
-             "Add to Dataset")))))
+          ($ :span {:className "text-xs text-indigo-500 font-mono"} (str node-id))))))
 
 (defui node-result-panel [{:keys [result]}]
   (when result
@@ -512,8 +496,23 @@
                                         emits graph-data flow-nodes on-select-node on-paginate-node
                                         agent-invoke-id]}]
   (let [;; Determine if node is in progress (started but not finished)
-        is-node-in-progress? (and start-time (not finish-time))]
+        is-node-in-progress? (and start-time (not finish-time))
+        raw-node-data (get graph-data node-id)]
     ($ :<>
+       ;; Add to Dataset button (first, at top)
+       ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.w-full.mb-4
+          {:onClick (fn [e]
+                      (.stopPropagation e)
+                      (let [input-data (transform-node-input-for-dataset raw-node-data node-name)
+                            output-data (transform-node-data-for-dataset raw-node-data node-name)]
+                        (state/dispatch [:modal/show-form :add-from-trace
+                                         {:module-id module-id
+                                          :title (str "Add Node '" node-name "' to Dataset")
+                                          :source-type :node
+                                          :source-args input-data
+                                          :source-emits output-data}])))}
+          "Add to Dataset")
+
        ($ hitl-request-panel {:hr hr
                               :hr-invoke-id hr-invoke-id
                               :hitl-response hitl-response
@@ -938,26 +937,25 @@
                                          :on-expand (fn [{:keys [title content]}]
                                                       (state/dispatch [:modal/show :content-detail
                                                                        {:title title
-                                                                        :component ($ common/ContentDetailModal {:title title :content content})}]))}))
-         ($ :div {:className "mt-4 flex gap-2"}
-            ;; Add to Dataset button
-            ($ :button
-               {:className "flex-1 text-sm font-medium py-2 px-4 rounded-md transition-colors bg-green-100 text-green-800 hover:bg-green-200"
-                :onClick (fn []
-                           (let [input-data (:invoke-args summary-data)
-                                 output-data (:val (:result summary-data))]
-                             (state/dispatch [:modal/show-form :add-from-trace
-                                              {:module-id module-id
-                                               :title "Add Agent Invocation to Dataset"
-                                               :source-type :agent
-                                               :source-args input-data
-                                               :source-result output-data}])))}
-               "Add to Dataset"))))))
+                                                                        :component ($ common/ContentDetailModal {:title title :content content})}]))}))))))
 
 (defui info-panel [{:keys [graph-data summary-data on-select-node module-id agent-name task-id forks fork-of invoke-id]}]
   (let [result (:result summary-data)]
 
     ($ :div {:className "space-y-4"}
+
+       ;; Add to Dataset button (first, at top)
+       ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.w-full
+          {:onClick (fn []
+                      (let [input-data (:invoke-args summary-data)
+                            output-data (:val (:result summary-data))]
+                        (state/dispatch [:modal/show-form :add-from-trace
+                                         {:module-id module-id
+                                          :title "Add Agent Invocation to Dataset"
+                                          :source-type :agent
+                                          :source-args input-data
+                                          :source-result output-data}])))}
+          "Add to Dataset")
 
        ($ lineage-panel {:module-id module-id
                          :agent-name agent-name
