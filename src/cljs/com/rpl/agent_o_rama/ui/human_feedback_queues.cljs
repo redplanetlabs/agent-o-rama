@@ -1023,12 +1023,13 @@
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
                   "Reviewer Name"
                   ($ :span.text-red-500.ml-1 "*"))
-               ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-                  {:type "text"
-                   :value reviewer-name
-                   :onChange #(set-reviewer-name (.. % -target -value))
-                   :placeholder "Your name"
-                   :className (if (:reviewer-name errors) "border-red-500" "")})
+               ($ :input {:type "text"
+                         :value reviewer-name
+                         :onChange #(set-reviewer-name (.. % -target -value))
+                         :placeholder "Your name"
+                         :className (common/cn
+                                      "w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                      {"border-red-500" (:reviewer-name errors)})})
                (when (:reviewer-name errors)
                  ($ :div.text-sm.text-red-600.mt-1 (:reviewer-name errors)))))
 
