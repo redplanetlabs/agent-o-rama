@@ -1134,12 +1134,6 @@
              (on-toggle-forking-mode)))))
      [active-tab forking-mode? on-toggle-forking-mode])
 
-    ;; Switch away from fork tab if changes are cleared
-    (uix/use-effect
-     (fn []
-       (when (and (= active-tab :fork) (empty? changed-nodes))
-         (set-tab! "info")))
-     [changed-nodes active-tab])
 
     ($ :div {:className "fixed right-0 top-16 h-[calc(100vh-4rem)] bg-white shadow-lg border-l border-gray-200 flex flex-col z-40"
              :style {:width (str sidebar-width "px")}
