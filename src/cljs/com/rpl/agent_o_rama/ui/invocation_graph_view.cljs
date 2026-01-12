@@ -952,18 +952,7 @@
                                                :source-type :agent
                                                :source-args input-data
                                                :source-result output-data}])))}
-               "Add to Dataset")
-            ;; Add to Queue button
-            ($ :button
-               {:className "flex-1 text-sm font-medium py-2 px-4 rounded-md transition-colors bg-purple-100 text-purple-800 hover:bg-purple-200"
-                :onClick (fn []
-                           (add-to-queue/show-add-to-queue-modal
-                            {:module-id module-id
-                             :title "Add Agent Invocation to Queue"
-                             :source-type :agent
-                             :agent-name agent-name
-                             :invoke-id invoke-id}))}
-               "Add to Queue"))))))
+               "Add to Dataset"))))))
 
 (defui info-panel [{:keys [graph-data summary-data on-select-node module-id agent-name task-id forks fork-of invoke-id]}]
   (let [result (:result summary-data)]

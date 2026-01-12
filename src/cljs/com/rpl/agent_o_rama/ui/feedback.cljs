@@ -181,21 +181,28 @@
                                             :editing? false}])}
                ($ PlusIcon {:className "h-4 w-4 mr-1"})
                "Add Feedback")
-            ;; Add to Queue button (right half) - only show for node feedback
-            (when node-task-id
-              ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.flex-1
-                 {:data-testid "add-to-queue-button"
-                  :onClick #(add-to-queue/show-add-to-queue-modal
+            ;; Add to Queue button (right half) - show for both agent and node feedback
+            ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.flex-1
+               {:data-testid "add-to-queue-button"
+                :onClick #(add-to-queue/show-add-to-queue-modal
+                           (if node-task-id
+                             ;; Node feedback
                              {:module-id module-id
-                              :title (str "Add " (or node-name "Node") " to Queue")
+                              :title (str "Add Node '" node-name "' to Queue")
                               :source-type :node
                               :agent-name agent-name
                               :node-name node-name
                               :invoke-id invoke-id
                               :node-task-id node-task-id
-                              :node-invoke-id node-invoke-id})}
-                 ($ QueueListIcon {:className "h-4 w-4 mr-1"})
-                 "Add to Queue"))))
+                              :node-invoke-id node-invoke-id}
+                             ;; Agent feedback
+                             {:module-id module-id
+                              :title "Add Agent Invocation to Queue"
+                              :source-type :agent
+                              :agent-name agent-name
+                              :invoke-id invoke-id}))}
+               ($ QueueListIcon {:className "h-4 w-4 mr-1"})
+               "Add to Queue")))
        ;; Feedback list
        (if (and results (seq results))
          ($ :div {:className "space-y-2"
