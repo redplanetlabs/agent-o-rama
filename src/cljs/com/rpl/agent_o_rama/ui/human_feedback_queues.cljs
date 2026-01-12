@@ -465,7 +465,7 @@
               ;; Rubrics section
               ($ :div.space-y-2
                  ($ :label.block.text-sm.font-medium.text-gray-700
-                    "Rubrics"
+                    "Rubric"
                     ($ :span.text-red-500.ml-1 "*"))
 
                  ($ :div.text-sm.text-gray-500.mb-2
@@ -490,7 +490,7 @@
                     {:data-testid "add-rubric-button"
                      :type "button"
                      :onClick add-rubric}
-                    "+ Add Rubric")
+                    "+ Add Metric")
 
                  ;; Error message
                  (when (:error rubrics-field)
