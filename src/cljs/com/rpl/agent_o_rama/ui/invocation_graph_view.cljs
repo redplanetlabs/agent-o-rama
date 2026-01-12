@@ -1075,8 +1075,8 @@
                       :onClick on-clear-fork}
              "Clear All Changes")))))
 
-(defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live]
-                     module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change}]
+(defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
+                            module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change]}]
   (let [;; Read tab from URL query params, default to :info
         query-params (state/use-sub [:route :query-params])
         tab-param (get query-params :tab)
