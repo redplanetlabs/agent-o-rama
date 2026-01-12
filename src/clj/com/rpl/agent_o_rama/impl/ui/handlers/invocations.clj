@@ -57,9 +57,7 @@
                                  root-pstate
                                  {:pkey agent-task-id})}
                         (->> summary-info-raw
-                             (transform
-                              [:feedback :results ALL :source]
-                              aor-types/source-string)
+                             ;; Don't transform :source - keep as record, serialization handles it
                              (transform [:feedback :actions MAP-KEYS] name))
                         (when-let [stats (:stats summary-info-raw)]
                           {:stats (merge {:aggregated-stats
@@ -86,9 +84,7 @@
           cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
                           (->> m
                                common/remove-implicit-nodes
-                               (transform
-                                [MAP-VALS :feedback :results ALL :source]
-                                aor-types/source-string)
+                               ;; Don't transform :source - keep as record, serialization handles it
                                (transform
                                 [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
                                 name)

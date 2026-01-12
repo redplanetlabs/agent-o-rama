@@ -31,44 +31,19 @@
    - :node-task-id - Node task ID (optional, for node feedback)
    - :node-invoke-id - Node invoke ID (optional, for node feedback)"
   [{:keys [feedback module-id agent-name invoke-id node-task-id node-invoke-id]}]
-  ;; DEBUG: Print the feedback object to see its shape
-  (println "=== FEEDBACK DATA ===" (pr-str feedback))
-  (when (and feedback (seq (:scores feedback)))
+  (when (and feedback (or (seq (:scores feedback)) (not (clojure.string/blank? (:comment feedback)))))
     (let [scores (:scores feedback)
           source (:source feedback)
           created-at (:created-at feedback)
-          modified-at (:modified-at feedback)
-          feedback-id (:id feedback)
           comment (:comment feedback)
-          raw-source-str (if (string? source) source (:source source "Unknown"))
-          ;; Check if this is human feedback (HumanSourceImpl)
-          ;; Case 1: Source is an object (when backend fix is applied)
-          ;; Case 2: Source is a string "human[Name]" (default backend behavior)
-          is-human-feedback? (or (= "HumanSourceImpl" (get source "_aor-type"))
-                                 (contains? source :name)
-                                 (and (string? source) (clojure.string/starts-with? source "human[")))
-          
-          human-name (cond
-                       (:name source) (:name source)
-                       (get source "name") (get source "name")
-                       (and (string? source) (clojure.string/starts-with? source "human["))
-                       (second (re-find #"human\[(.*)\]" source))
-                       :else "Unknown")
-          
-          ;; Use feedback-id from the feedback object itself (more reliable than from source)
-          the-feedback-id (or feedback-id (:id source) (get source "id"))
-          ;; Remove agent name prefix before "/" if present
-          ;; e.g., "action[FeedbackTestAgent/agent-dual-eval]" -> "action[agent-dual-eval]"
-          source-str (if-let [slash-idx (clojure.string/index-of raw-source-str "/")]
-                       (let [before-slash (subs raw-source-str 0 slash-idx)
-                             after-slash (subs raw-source-str (inc slash-idx))
-                         ;; Find the opening bracket before the slash
-                             bracket-idx (clojure.string/last-index-of before-slash "[")]
-                         (if bracket-idx
-                           (str (subs before-slash 0 (inc bracket-idx)) after-slash)
-                           raw-source-str))
-                       raw-source-str)
-          ;; Extract agent-invoke data from source to build invocation link
+          ;; Source is always a map: {:name "..." :id #uuid"..."} for human, or other structure for automated
+          is-human-feedback? (contains? source :name)
+          human-name (:name source)
+          feedback-id (:id source)
+          ;; For non-human feedback, get source string and build link
+          source-str (when-not is-human-feedback?
+                       (or (:source-string source) (str source)))
+          ;; Extract agent-invoke data from source to build invocation link (for automated evaluators)
           agent-invoke (:agent-invoke source)
           task-id (:task-id agent-invoke)
           agent-invoke-id (:agent-invoke-id agent-invoke)
@@ -94,7 +69,7 @@
                       source-str))))
             
             ;; Edit/Delete buttons for human feedback
-            (when (and is-human-feedback? the-feedback-id agent-name invoke-id)
+            (when (and is-human-feedback? feedback-id agent-name invoke-id)
               ($ :div.flex.items-center.gap-1
                  ($ :button.p-1.text-purple-600.hover:text-purple-800.hover:bg-purple-200.rounded.transition-colors
                     {:type "button"
@@ -114,7 +89,7 @@
                                                    :invoke-id invoke-id
                                                    :node-task-id node-task-id
                                                    :node-invoke-id node-invoke-id
-                                                   :feedback-id (str the-feedback-id)
+                                                   :feedback-id (str feedback-id)
                                                    :editing? true
                                                    :reviewer-name human-name
                                                    :comment (or comment "")
@@ -134,7 +109,7 @@
                                                     :invoke-id invoke-id
                                                     :node-task-id node-task-id
                                                     :node-invoke-id node-invoke-id
-                                                    :feedback-id (str the-feedback-id)}]
+                                                    :feedback-id (str feedback-id)}]
                                                   10000
                                                   (fn [reply]
                                                     (when (:success reply)
