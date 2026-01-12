@@ -111,8 +111,15 @@
             ($ :div.text-xs.text-gray-500.mt-1
                (str "Valid range: " (:min metric) " - " (:max metric))))
 
+         ;; No metric definition (editing legacy feedback) - show simple text input
          :else
-         ($ :div.text-gray-500.italic "Unknown metric type"))
+         ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+            {:type "text"
+             :value (or value "")
+             :onChange #(on-change (.. % -target -value))
+             :placeholder "Enter value..."
+             :className (if display-error "border-red-500" "")
+             :data-testid data-testid}))
 
        ;; Error message
        (when display-error

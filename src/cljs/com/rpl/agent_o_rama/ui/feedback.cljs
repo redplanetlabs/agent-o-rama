@@ -31,6 +31,8 @@
    - :node-task-id - Node task ID (optional, for node feedback)
    - :node-invoke-id - Node invoke ID (optional, for node feedback)"
   [{:keys [feedback module-id agent-name invoke-id node-task-id node-invoke-id]}]
+  ;; DEBUG: Print the feedback object to see its shape
+  (println "=== FEEDBACK DATA ===" (pr-str feedback))
   (when (and feedback (seq (:scores feedback)))
     (let [scores (:scores feedback)
           source (:source feedback)
@@ -53,7 +55,8 @@
                        (second (re-find #"human\[(.*)\]" source))
                        :else "Unknown")
           
-          source-feedback-id (or (:id source) (get source "id"))
+          ;; Use feedback-id from the feedback object itself (more reliable than from source)
+          the-feedback-id (or feedback-id (:id source) (get source "id"))
           ;; Remove agent name prefix before "/" if present
           ;; e.g., "action[FeedbackTestAgent/agent-dual-eval]" -> "action[agent-dual-eval]"
           source-str (if-let [slash-idx (clojure.string/index-of raw-source-str "/")]
@@ -91,24 +94,32 @@
                       source-str))))
             
             ;; Edit/Delete buttons for human feedback
-            (when (and is-human-feedback? source-feedback-id agent-name invoke-id)
+            (when (and is-human-feedback? the-feedback-id agent-name invoke-id)
               ($ :div.flex.items-center.gap-1
                  ($ :button.p-1.text-purple-600.hover:text-purple-800.hover:bg-purple-200.rounded.transition-colors
                     {:type "button"
                      :title "Edit feedback"
                      :data-testid "edit-feedback-button"
-                     :onClick #(state/dispatch [:modal/show-form :add-manual-feedback
-                                                {:module-id module-id
-                                                 :agent-name agent-name
-                                                 :invoke-id invoke-id
-                                                 :node-task-id node-task-id
-                                                 :node-invoke-id node-invoke-id
-                                                 :feedback-id (str source-feedback-id)
-                                                 :editing? true
-                                                 :reviewer-name human-name
-                                                 :comment (or comment "")
-                                                 ;; Pre-populate metrics from scores
-                                                 :metrics []}])}
+                     :onClick #(let [;; Convert scores to metrics format for the form
+                                     ;; We don't have metric definitions, so we'll create simple entries
+                                     metrics-from-scores (mapv (fn [[k v]]
+                                                                 {:name (name k)
+                                                                  :metric nil  ;; No definition available
+                                                                  :value (str v)
+                                                                  :required false})
+                                                               scores)]
+                                 (state/dispatch [:modal/show-form :add-manual-feedback
+                                                  {:module-id module-id
+                                                   :agent-name agent-name
+                                                   :invoke-id invoke-id
+                                                   :node-task-id node-task-id
+                                                   :node-invoke-id node-invoke-id
+                                                   :feedback-id (str the-feedback-id)
+                                                   :editing? true
+                                                   :reviewer-name human-name
+                                                   :comment (or comment "")
+                                                   ;; Pre-populate metrics from existing scores
+                                                   :metrics metrics-from-scores}]))}
                     ($ PencilIcon {:className "h-4 w-4"}))
                  
                  ($ :button.p-1.text-red-600.hover:text-red-800.hover:bg-red-100.rounded.transition-colors
@@ -123,7 +134,7 @@
                                                     :invoke-id invoke-id
                                                     :node-task-id node-task-id
                                                     :node-invoke-id node-invoke-id
-                                                    :feedback-id (str source-feedback-id)}]
+                                                    :feedback-id (str the-feedback-id)}]
                                                   10000
                                                   (fn [reply]
                                                     (when (:success reply)

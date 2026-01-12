@@ -23,7 +23,7 @@
           :required? (:required metric-data)
           :value (:value value-field)
           :on-change (:on-change value-field)
-          :on-remove (when-not editing? on-remove)
+          :on-remove on-remove  ;; Allow removal in both add and edit modes
           :data-testid (str "metric-value-" idx)})
       
       ;; Show selector when no metric chosen
@@ -54,11 +54,10 @@
                 :data-testid (str "metric-selector-" idx)}))
          
          ;; Remove button
-         (when-not editing?
-           ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
-              {:type "button"
-               :onClick on-remove}
-              "Remove"))))))
+         ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
+            {:type "button"
+             :onClick on-remove}
+            "Remove")))))
 
 (defui ManualFeedbackForm [{:keys [form-id]}]
   (let [props (state/use-sub [:forms form-id])
@@ -118,19 +117,18 @@
                                                                       :required false})]
                                        ((:on-change metrics-field) updated-metrics)))))}))))
 
-          ;; Add metric button (only if not editing)
-          (when-not editing?
-            ($ :button.w-full.px-3.py-2.border-2.border-dashed.border-gray-300.rounded-md.text-gray-600.hover:border-gray-400.hover:text-gray-700.transition-colors
-               {:data-testid "add-metric-button"
-                :type "button"
-                :onClick #(let [current-metrics (or (:value metrics-field) [])
-                                new-metric {:name nil
-                                           :metric nil
-                                           :value ""
-                                           :required false}
-                                updated-metrics (conj current-metrics new-metric)]
-                            ((:on-change metrics-field) updated-metrics))}
-               "+ Add Metric"))
+          ;; Add metric button
+          ($ :button.w-full.px-3.py-2.border-2.border-dashed.border-gray-300.rounded-md.text-gray-600.hover:border-gray-400.hover:text-gray-700.transition-colors
+             {:data-testid "add-metric-button"
+              :type "button"
+              :onClick #(let [current-metrics (or (:value metrics-field) [])
+                              new-metric {:name nil
+                                         :metric nil
+                                         :value ""
+                                         :required false}
+                              updated-metrics (conj current-metrics new-metric)]
+                          ((:on-change metrics-field) updated-metrics))}
+             "+ Add Metric")
 
           ;; Error message
           (when (:error metrics-field)
