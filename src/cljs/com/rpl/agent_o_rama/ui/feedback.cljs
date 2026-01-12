@@ -137,9 +137,9 @@
              (for [[score-name score-value] (sort-by key scores)]
                (let [score-name (name score-name)]
                  ($ :div {:key       score-name
-                          :className "flex justify-between items-center"}
+                          :className "flex items-center gap-2"}
                     ($ :span {:className "text-xs font-medium text-purple-600"}
-                       score-name)
+                       (str score-name ":"))
                     ($ :span {:className "text-sm font-semibold text-purple-800"}
                        (if (number? score-value)
                          (str score-value)
