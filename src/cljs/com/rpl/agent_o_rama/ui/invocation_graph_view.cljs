@@ -1117,13 +1117,20 @@
              (on-toggle-forking-mode)))))
      [active-tab forking-mode? on-toggle-forking-mode])
 
-    ;; Ensure we switch back to Info tab when a new invocation starts (live)
-    ;; or when fork changes are cleared
+    ;; Ensure we switch back to Info tab when navigating to a different invocation
+    ;; or when fork changes are cleared (but only if currently on fork tab)
     (uix/use-effect
      (fn []
-       (when (or is-live (empty? changed-nodes))
+       ;; Reset to info tab on invocation change
+       (state/dispatch [:db/set-value [:ui :active-tab] :info]))
+     [invoke-id])
+    
+    ;; Switch away from fork tab if changes are cleared
+    (uix/use-effect
+     (fn []
+       (when (and (= active-tab :fork) (empty? changed-nodes))
          (state/dispatch [:db/set-value [:ui :active-tab] :info])))
-     [is-live changed-nodes])
+     [changed-nodes active-tab])
 
     ($ :div {:className "fixed right-0 top-16 h-[calc(100vh-4rem)] bg-white shadow-lg border-l border-gray-200 flex flex-col z-40"
              :style {:width (str sidebar-width "px")}
