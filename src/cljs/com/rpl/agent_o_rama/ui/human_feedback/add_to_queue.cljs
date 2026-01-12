@@ -30,7 +30,7 @@
         comment-field (forms/use-form-field form-id :comment)
 
         props (state/use-sub [:forms form-id])
-        {:keys [module-id source-type agent-name]} props]
+        {:keys [module-id source-type agent-name node-name]} props]
 
     ($ forms/form
        ($ :div.space-y-4.p-4
@@ -39,6 +39,10 @@
              ($ :div.flex.gap-2
                 ($ :span.text-gray-500 "Type:")
                 ($ :span.font-medium (name source-type)))
+             (when node-name
+               ($ :div.flex.gap-2
+                  ($ :span.text-gray-500 "Node:")
+                  ($ :span.font-medium.font-mono node-name)))
              ($ :div.flex.gap-2
                 ($ :span.text-gray-500 "Agent:")
                 ($ :span.font-medium.font-mono agent-name)))
@@ -90,8 +94,8 @@
          :queue-name queue-name
          :agent-name agent-name
          :invoke-id invoke-id
-         :node-task-id (when node-task-id (str node-task-id))
-         :node-invoke-id (when node-invoke-id (str node-invoke-id))
+         :node-task-id node-task-id
+         :node-invoke-id node-invoke-id
          :comment comment}]))
    :on-success-invalidate (fn [_db {:keys [module-id queue-name]} _reply]
                             {:query-key-pattern [:human-feedback-queue-items module-id queue-name]})}})

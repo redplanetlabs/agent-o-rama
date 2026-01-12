@@ -190,9 +190,10 @@
                               :title (str "Add " (or node-name "Node") " to Queue")
                               :source-type :node
                               :agent-name agent-name
+                              :node-name node-name
                               :invoke-id invoke-id
                               :node-task-id node-task-id
-                              :node-invoke-id (str node-invoke-id)})}
+                              :node-invoke-id node-invoke-id})}
                  ($ QueueListIcon {:className "h-4 w-4 mr-1"})
                  "Add to Queue"))))
        ;; Feedback list
