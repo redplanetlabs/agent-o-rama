@@ -253,11 +253,10 @@
                   :scores scores
                   :comment comment}])))
    :on-success (fn [db form-state reply]
-                 (let [{:keys [form-id invoke-id module-id agent-name]} form-state]
-                   [[:modal/hide]
-                    [:form/clear form-id]
-                    ;; Reload the invocation to show updated feedback
-                    [:invocation/start-graph-loading
-                     {:invoke-id invoke-id
-                      :module-id module-id
-                      :agent-name agent-name}]]))}})
+                 (let [{:keys [invoke-id module-id agent-name]} form-state]
+                   ;; Reload the invocation to show updated feedback
+                   ;; Note: modal/hide and form/clear are already handled by the form framework
+                   (state/dispatch [:invocation/start-graph-loading
+                                    {:invoke-id invoke-id
+                                     :module-id module-id
+                                     :agent-name agent-name}])))}})
