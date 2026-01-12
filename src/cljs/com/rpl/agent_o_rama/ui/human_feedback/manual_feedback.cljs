@@ -14,7 +14,7 @@
   ;; metric-data has :name, :metric (the definition), :value, :required
   (let [value-field (forms/use-form-field form-id [:metrics idx :value])
         has-metric? (some? (:name metric-data))]
-    
+
     (if has-metric?
       ;; Show input field when metric is selected
       ($ metric-input/MetricInput
@@ -25,7 +25,7 @@
           :on-change (:on-change value-field)
           :on-remove on-remove  ;; Allow removal in both add and edit modes
           :data-testid (str "metric-value-" idx)})
-      
+
       ;; Show selector when no metric chosen
       ($ :div.flex.items-start.gap-2
          ($ :div.flex-1
@@ -52,7 +52,7 @@
                 :label "Metric"
                 :hide-label? true
                 :data-testid (str "metric-selector-" idx)}))
-         
+
          ;; Remove button
          ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
             {:type "button"
@@ -123,9 +123,9 @@
               :type "button"
               :onClick #(let [current-metrics (or (:value metrics-field) [])
                               new-metric {:name nil
-                                         :metric nil
-                                         :value ""
-                                         :required false}
+                                          :metric nil
+                                          :value ""
+                                          :required false}
                               updated-metrics (conj current-metrics new-metric)]
                           ((:on-change metrics-field) updated-metrics))}
              "+ Add Metric")
