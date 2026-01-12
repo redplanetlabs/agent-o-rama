@@ -82,8 +82,7 @@
        ;; Metrics section
        ($ :div.space-y-2
           ($ :label.block.text-sm.font-medium.text-gray-700
-             "Metrics"
-             ($ :span.text-red-500.ml-1 "*"))
+             "Metrics")
 
           ($ :div.text-sm.text-gray-500.mb-2
              "Add metrics to evaluate this invocation")
