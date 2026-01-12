@@ -3,7 +3,8 @@
    [uix.core :refer [defui $]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.searchable-selector :refer [SearchableSelector]]))
+   [com.rpl.agent-o-rama.ui.searchable-selector :refer [SearchableSelector]]
+   ["@heroicons/react/24/outline" :refer [ArrowDownIcon]]))
 
 (defui QueueCombobox [{:keys [module-id value on-change error required?]}]
   ($ SearchableSelector
@@ -31,37 +32,38 @@
         props (state/use-sub [:forms form-id])
         {:keys [module-id source-type agent-name]} props]
 
-    ($ :div {:className "max-w-4xl mx-auto p-6"}
-       ($ forms/form
-          ($ :div {:className "space-y-6"}
-             ;; Queue Selection
-             ($ QueueCombobox {:module-id module-id
-                              :value (:value queue-name-field)
-                              :on-change (:on-change queue-name-field)
-                              :error (:error queue-name-field)
-                              :required? true})
+    ($ forms/form
+       ($ :div.space-y-4.p-4
+          ;; Source info display (at top, clean styling)
+          ($ :div.space-y-1.text-sm.text-gray-600
+             ($ :div.flex.gap-2
+                ($ :span.text-gray-500 "Type:")
+                ($ :span.font-medium (name source-type)))
+             ($ :div.flex.gap-2
+                ($ :span.text-gray-500 "Agent:")
+                ($ :span.font-medium.font-mono agent-name)))
 
-             ;; Source info display
-             ($ :div {:className "p-4 bg-gray-50 border rounded-md"}
-                ($ :h4 {:className "font-semibold text-gray-700 mb-2"} "Adding to Queue")
-                ($ :div {:className "space-y-1 text-sm"}
-                   ($ :div {:className "flex gap-2"}
-                      ($ :span {:className "text-gray-500"} "Type:")
-                      ($ :span {:className "font-medium"} (name source-type)))
-                   ($ :div {:className "flex gap-2"}
-                      ($ :span {:className "text-gray-500"} "Agent:")
-                      ($ :span {:className "font-medium font-mono"} agent-name))))
+          ;; Down arrow indicator
+          ($ :div.flex.justify-center.text-gray-400
+             ($ ArrowDownIcon {:className "h-5 w-5"}))
 
-             ;; Optional comment
-             ($ forms/form-field
-                {:label "Comment (optional)"
-                 :type :textarea
-                 :rows 3
-                 :value (:value comment-field)
-                 :on-change (:on-change comment-field)
-                 :error (:error comment-field)
-                 :help-text "Add a note for the reviewer"
-                 :data-testid "comment-input"}))))))
+          ;; Queue Selection
+          ($ QueueCombobox {:module-id module-id
+                           :value (:value queue-name-field)
+                           :on-change (:on-change queue-name-field)
+                           :error (:error queue-name-field)
+                           :required? true})
+
+          ;; Optional comment
+          ($ forms/form-field
+             {:label "Comment (optional)"
+              :type :textarea
+              :rows 3
+              :value (:value comment-field)
+              :on-change (:on-change comment-field)
+              :error (:error comment-field)
+              :help-text "Add a note for the reviewer"
+              :data-testid "comment-input"})))))
 
 (forms/reg-form
  :add-to-feedback-queue
