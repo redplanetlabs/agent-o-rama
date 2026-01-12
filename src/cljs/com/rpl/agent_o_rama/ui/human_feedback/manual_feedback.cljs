@@ -30,7 +30,7 @@
         reviewer-name-field (forms/use-form-field form-id :reviewer-name)
         comment-field (forms/use-form-field form-id :comment)]
 
-    ($ :div.space-y-4
+    ($ :div.space-y-4.p-4
        ;; Reviewer name
        ($ forms/form-field
           {:label "Reviewer Name"
