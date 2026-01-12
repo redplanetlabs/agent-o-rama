@@ -1125,7 +1125,7 @@
          (state/dispatch [:db/set-value [:ui :active-tab] :info])))
      [is-live changed-nodes])
 
-    ($ :div {:className "fixed right-0 top-32 h-[calc(100vh-8rem)] bg-white shadow-lg border-l border-gray-200 flex flex-col z-40"
+    ($ :div {:className "fixed right-0 top-16 h-[calc(100vh-4rem)] bg-white shadow-lg border-l border-gray-200 flex flex-col z-40"
              :style {:width (str sidebar-width "px")}
              :data-id "agent-info-panel"}
 
