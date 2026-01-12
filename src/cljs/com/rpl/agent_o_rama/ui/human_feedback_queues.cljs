@@ -12,6 +12,7 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
+   [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -769,14 +770,6 @@
 ;; EVALUATION FORM
 ;; =============================================================================
 
-(def ^:private reviewer-name-storage-key "aor-reviewer-name")
-
-(defn get-reviewer-name []
-  (or (.getItem js/localStorage reviewer-name-storage-key) ""))
-
-(defn save-reviewer-name! [name]
-  (.setItem js/localStorage reviewer-name-storage-key name))
-
 ;; Helper for validation (used in item-detail)
 (defn- numeric-metric? [metric]
   (contains? metric :min))
@@ -833,7 +826,7 @@
         ;; Form state
         [scores set-scores] (uix/use-state {})
         [comment set-comment] (uix/use-state "")
-        [reviewer-name set-reviewer-name] (uix/use-state (get-reviewer-name))
+        [reviewer-name set-reviewer-name] (uix/use-state (hf-common/get-reviewer-name))
         [errors set-errors] (uix/use-state {})
         [show-dismiss-confirm? set-show-dismiss-confirm] (uix/use-state false)
 
@@ -894,7 +887,7 @@
                         (let [validation-errors (validate-form)]
                           (if (empty? validation-errors)
                             (do
-                              (save-reviewer-name! reviewer-name)
+                              (hf-common/save-reviewer-name! reviewer-name)
                               ;; Submit to backend
                               (sente/request!
                                [:human-feedback/resolve-queue-item

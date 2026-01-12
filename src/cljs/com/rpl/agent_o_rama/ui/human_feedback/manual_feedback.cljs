@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
+   [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
    [clojure.string :as str]))
 
 ;; Separate component for each metric row in the manual feedback form
@@ -151,7 +152,7 @@
  {:steps [:main]
   :main
   {:initial-fields (fn [props]
-                     (merge {:reviewer-name ""
+                     (merge {:reviewer-name (hf-common/get-reviewer-name)
                              :metrics []
                              :comment ""}
                             props))
@@ -204,6 +205,9 @@
   {:event (fn [db form-state]
             (let [{:keys [form-id module-id agent-name invoke-id node-task-id node-invoke-id
                           reviewer-name metrics comment feedback-id editing?]} form-state
+                  ;; Save reviewer name to localStorage
+                  _ (when-not (str/blank? reviewer-name)
+                      (hf-common/save-reviewer-name! reviewer-name))
                   ;; Convert metrics to scores map
                   ;; metric-data has :name, :metric, :value, :required
                   scores (into {} (map (fn [{:keys [name value]}]
