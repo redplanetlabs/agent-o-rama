@@ -314,18 +314,18 @@
 
     ($ :div {:className (cn "relative inline-block text-left" (when full-width? "w-full"))}
        ($ :button {:className (cn "inline-flex items-center justify-between px-3 py-2 text-xs bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:bg-gray-100 cursor-pointer"
-                                  (when full-width? "w-full"))}
-          {:type "button"
-           :disabled disabled?
-           :data-testid data-testid
-           :onClick handle-toggle}
+                                  (when full-width? "w-full"))
+                   :type "button"
+                   :disabled disabled?
+                   :data-testid data-testid
+                   :onClick handle-toggle}
           ($ :span.truncate (or display-text label))
           ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
 
        (when (and open? (not disabled?))
          ($ :div {:className (cn "origin-top-right absolute right-0 mt-1 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
-                                 (if full-width? "w-full" "min-w-full"))}
-            {:onClick #(.stopPropagation %)}
+                                 (if full-width? "w-full" "min-w-full"))
+                  :onClick #(.stopPropagation %)}
             ($ :div.py-1.max-h-60.overflow-y-auto
                (cond
                  loading? ($ :div.px-4.py-2.text-xs.text-gray-500 "Loading...")

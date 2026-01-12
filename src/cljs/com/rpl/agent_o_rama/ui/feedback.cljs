@@ -170,7 +170,7 @@
        ;; Add feedback button
        (when (and module-id agent-name invoke-id)
          ($ :div.mb-4
-            ($ :button.inline-flex.items-center.px-3.py-2.bg-purple-600.text-white.text-sm.font-medium.rounded-md.hover:bg-purple-700.transition-colors.cursor-pointer
+            ($ :button.inline-flex.items-center.px-3.py-2.bg-purple-600.text-white.text-sm.font-medium.rounded-md.hover:bg-purple-700.transition-colors.cursor-pointer.w-full
                {:data-testid "add-feedback-button"
                 :onClick #(state/dispatch [:modal/show-form :add-manual-feedback
                                            {:module-id module-id
@@ -181,7 +181,6 @@
                                             :editing? false}])}
                ($ PlusIcon {:className "h-4 w-4 mr-1"})
                "Add Feedback")))
-       
        ;; Feedback list
        (if (and results (seq results))
          ($ :div {:className "space-y-2"
