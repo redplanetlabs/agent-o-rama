@@ -72,7 +72,7 @@
             ;; Edit/Delete buttons for human feedback
             (when (and is-human-feedback? feedback-id agent-name invoke-id)
               ($ :div.flex.items-center.gap-1
-                 ($ :button.p-1.text-purple-600.hover:text-purple-800.hover:bg-purple-200.rounded.transition-colors
+                 ($ :button.p-1.text-purple-600.hover:text-purple-800.hover:bg-purple-200.rounded.transition-colors.cursor-pointer
                     {:type "button"
                      :title "Edit feedback"
                      :data-testid "edit-feedback-button"
@@ -109,7 +109,7 @@
                                                        :metrics metrics-from-scores}])))))}
                     ($ PencilIcon {:className "h-4 w-4"}))
                  
-                 ($ :button.p-1.text-red-600.hover:text-red-800.hover:bg-red-100.rounded.transition-colors
+                 ($ :button.p-1.text-red-600.hover:text-red-800.hover:bg-red-100.rounded.transition-colors.cursor-pointer
                     {:type "button"
                      :title "Delete feedback"
                      :data-testid "delete-feedback-button"
