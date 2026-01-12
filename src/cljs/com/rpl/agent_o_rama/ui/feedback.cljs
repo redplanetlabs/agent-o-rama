@@ -3,6 +3,7 @@
    [uix.core :as uix :refer [$ defui]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
+   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.human-feedback.manual-feedback :as manual-feedback]
    ["@heroicons/react/24/outline" :refer [ArrowTopRightOnSquareIcon PlusIcon PencilIcon TrashIcon]]))
 
@@ -102,21 +103,21 @@
                      :title "Delete feedback"
                      :data-testid "delete-feedback-button"
                      :onClick #(when (js/confirm "Are you sure you want to delete this feedback?")
-                                 (state/dispatch [:sente/request
-                                                  [:human-feedback/delete-feedback
-                                                   {:module-id module-id
-                                                    :agent-name agent-name
-                                                    :invoke-id invoke-id
-                                                    :node-task-id node-task-id
-                                                    :node-invoke-id node-invoke-id
-                                                    :feedback-id (str feedback-id)}]
-                                                  10000
-                                                  (fn [reply]
-                                                    (when (:success reply)
-                                                      (state/dispatch [:invocation/start-graph-loading
-                                                                       {:invoke-id invoke-id
-                                                                        :module-id module-id
-                                                                        :agent-name agent-name}])))]))}
+                                 (sente/request!
+                                  [:human-feedback/delete-feedback
+                                   {:module-id module-id
+                                    :agent-name agent-name
+                                    :invoke-id invoke-id
+                                    :node-task-id node-task-id
+                                    :node-invoke-id node-invoke-id
+                                    :feedback-id (str feedback-id)}]
+                                  10000
+                                  (fn [reply]
+                                    (when (:success reply)
+                                      (state/dispatch [:invocation/start-graph-loading
+                                                       {:invoke-id invoke-id
+                                                        :module-id module-id
+                                                        :agent-name agent-name}])))))}
                     ($ TrashIcon {:className "h-4 w-4"})))))
          ($ :div {:className "space-y-1"}
             ;; Display scores
