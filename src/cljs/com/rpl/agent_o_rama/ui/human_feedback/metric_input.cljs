@@ -56,7 +56,10 @@
         is-numeric? (numeric-metric? metric)
         ;; Inline validation
         inline-error (validate-metric-value metric value)
-        display-error (or error inline-error)]
+        ;; Required validation
+        required-error (when (and required? (or (nil? value) (= value "")))
+                         "This field is required")
+        display-error (or error inline-error required-error)]
     ($ :div.p-3.bg-gray-50.rounded-md.border.border-gray-200
        ;; Header with label and optional remove button
        ($ :div.flex.items-center.justify-between.mb-2

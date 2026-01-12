@@ -1046,12 +1046,12 @@
                                                      (or (nil? v) (= v "")))))
                                             (or (:rubrics queue-info) []))
                   is-invalid? (or has-errors? has-required-empty?)]
-              ($ :button.px-6.py-2.rounded-md.transition-colors
+              ($ :button
                  {:onClick handle-submit
                   :disabled is-invalid?
-                  :className (if is-invalid?
-                               "bg-gray-300 text-gray-500 cursor-not-allowed"
-                               "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer")}
+                  :className (common/cn "px-6 py-2 rounded-md transition-colors"
+                                       {"bg-gray-300 text-gray-500 cursor-not-allowed" is-invalid?
+                                        "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer" (not is-invalid?)})}
                  "Submit & Continue")))))))
 
 ;; End of queue page
