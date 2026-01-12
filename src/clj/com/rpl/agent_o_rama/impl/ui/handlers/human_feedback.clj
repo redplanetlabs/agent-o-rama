@@ -112,8 +112,7 @@
         agent-invoke (aor-types/->AgentInvokeImpl agent-task-id agent-invoke-id)
         ;; Build node invoke if provided
         node-invoke (when (and node-task-id node-invoke-id)
-                      (aor-types/->NodeInvokeImpl (parse-long node-task-id)
-                                                   (UUID/fromString node-invoke-id)))
+                      (aor-types/->NodeInvokeImpl node-task-id node-invoke-id))
         ;; Build feedback target
         feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke node-invoke)]
     (evals/add-human-feedback-request! global-actions-depot queue-name feedback-target (or comment ""))
@@ -171,9 +170,9 @@
         ;; Build agent invoke
         agent-invoke (aor-types/->AgentInvokeImpl agent-task-id agent-invoke-id)
         ;; Build node invoke if provided
+        ;; Transit sends numbers and UUIDs directly, no parsing needed
         node-invoke (when (and node-task-id node-invoke-id)
-                      (aor-types/->NodeInvokeImpl (parse-long node-task-id)
-                                                   (UUID/fromString node-invoke-id)))
+                      (aor-types/->NodeInvokeImpl node-task-id node-invoke-id))
         ;; Build feedback target
         feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke node-invoke)]
     (evals/add-human-feedback! global-actions-depot feedback-target reviewer-name scores (or comment ""))
@@ -192,8 +191,7 @@
         agent-invoke (aor-types/->AgentInvokeImpl agent-task-id agent-invoke-id)
         ;; Build node invoke if provided
         node-invoke (when (and node-task-id node-invoke-id)
-                      (aor-types/->NodeInvokeImpl (parse-long node-task-id)
-                                                   (UUID/fromString node-invoke-id)))
+                      (aor-types/->NodeInvokeImpl node-task-id node-invoke-id))
         ;; Build feedback target
         feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke node-invoke)
         ;; Parse feedback-id
@@ -211,8 +209,7 @@
         agent-invoke (aor-types/->AgentInvokeImpl agent-task-id agent-invoke-id)
         ;; Build node invoke if provided
         node-invoke (when (and node-task-id node-invoke-id)
-                      (aor-types/->NodeInvokeImpl (parse-long node-task-id)
-                                                   (UUID/fromString node-invoke-id)))
+                      (aor-types/->NodeInvokeImpl node-task-id node-invoke-id))
         ;; Build feedback target
         feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke node-invoke)
         ;; Parse feedback-id
