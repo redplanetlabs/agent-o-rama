@@ -580,11 +580,6 @@
   (let [{:keys [module-id agent-name invoke-id]} (state/use-sub [:route :path-params])]
 
     ($ :div
-       ;; Sticky header with all controls
-       ($ :div.sticky.top-0.z-50.bg-white.border-b.border-gray-200.shadow-sm.p-6
-          ($ :div.flex.justify-between.items-center
-             ($ :h2.text-2xl.font-semibold.text-gray-700 "Agent Invocation Graph")))
-
        ;; Graph content
        ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
           ($ invocation-page/invocation-page)))))
