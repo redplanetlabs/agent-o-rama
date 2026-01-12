@@ -160,9 +160,9 @@
                           (for [metric data
                                 :let [metric-name (:name metric)
                                       metric-def (:metric metric)
-                                      metric-type (:__typename metric-def)
-                                      is-numeric? (= metric-type "HumanNumericMetric")
-                                      is-category? (= metric-type "HumanCategoryMetric")]]
+                                      ;; Determine type by checking which fields exist
+                                      is-numeric? (and (:min metric-def) (:max metric-def))
+                                      is-category? (contains? metric-def :categories)]]
                             ($ :tr {:key metric-name
                                     :className "hover:bg-gray-50"}
                                ($ :td {:className (:td common/table-classes)}
