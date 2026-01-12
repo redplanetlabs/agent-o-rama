@@ -991,25 +991,25 @@
 
          ;; Evaluation Form
          ($ :div.bg-white.border.border-gray-200.rounded-md.p-6.mb-6
-            ($ :h3.text-lg.font-semibold.text-gray-900.mb-4 "Evaluation")
-
-            ;; Metric fields
-            (for [rubric (:rubrics queue-info)]
-              (let [metric-name (:name rubric)]
-                ($ metric-field {:key metric-name
-                                 :rubric rubric
-                                 :value (get scores metric-name)
-                                 :on-change (fn [v]
-                                              (set-scores (assoc scores metric-name v))
-                                              ;; Real-time validation
-                                              (let [err (validate-metric rubric v)]
-                                                (set-errors (if err
-                                                              (assoc errors metric-name err)
-                                                              (dissoc errors metric-name)))))
-                                 :error (get errors metric-name)})))
+            ;; Metric field              
+            ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Metrics")
+            ($ :div.space-y-2
+               (for [rubric (:rubrics queue-info)]
+                 (let [metric-name (:name rubric)]
+                   ($ metric-field {:key metric-name
+                                    :rubric rubric
+                                    :value (get scores metric-name)
+                                    :on-change (fn [v]
+                                                 (set-scores (assoc scores metric-name v))
+                                                 ;; Real-time validation
+                                                 (let [err (validate-metric rubric v)]
+                                                   (set-errors (if err
+                                                                 (assoc errors metric-name err)
+                                                                 (dissoc errors metric-name)))))
+                                    :error (get errors metric-name)}))))
 
             ;; Comment field
-            ($ :div.mb-4
+            ($ :div.mb-4.mt-4
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
                   "Comment (optional)")
                ($ :textarea.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
