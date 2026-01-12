@@ -336,10 +336,10 @@
        ($ generic-data-viewer {:data result
                                :color "indigo"
                                :truncate-length 100
-                               :depth 0})))
+                               :depth 0}))))
 
-  (defui node-exceptions-panel [{:keys [exceptions]}]
-    (when (seq exceptions))
+(defui node-exceptions-panel [{:keys [exceptions]}]
+  (when (seq exceptions)
     ($ :div {:className "bg-red-50 p-3 rounded-md mt-4 border border-red-200"}
        ($ :div {:className (common/cn "text-sm font-medium text-red-700 mb-2 flex items-center gap-2")}
           ($ ExclamationTriangleIcon {:className (common/cn "w-5 h-5")})
