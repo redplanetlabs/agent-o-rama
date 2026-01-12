@@ -1039,9 +1039,21 @@
                {:onClick #(set-show-dismiss-confirm true)}
                ($ XMarkIcon {:className "h-5 w-5 mr-2"})
                "Dismiss")
-            ($ :button.px-6.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-               {:onClick handle-submit}
-               "Submit & Continue"))
+            (let [has-errors? (or (seq errors) 
+                                  (str/blank? reviewer-name))
+                  has-required-empty? (some (fn [rubric]
+                                              (and (:required rubric)
+                                                   (let [v (get scores (:name rubric))]
+                                                     (or (nil? v) (= v "")))))
+                                            (or (:rubrics queue-info) []))
+                  is-invalid? (or has-errors? has-required-empty?)]
+              ($ :button.px-6.py-2.rounded-md.transition-colors
+                 {:onClick handle-submit
+                  :disabled is-invalid?
+                  :className (if is-invalid?
+                              "bg-gray-300 text-gray-500 cursor-not-allowed"
+                              "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer")}
+                 "Submit & Continue")))
 
          ;; Dismiss confirmation dialog
          (when show-dismiss-confirm?
