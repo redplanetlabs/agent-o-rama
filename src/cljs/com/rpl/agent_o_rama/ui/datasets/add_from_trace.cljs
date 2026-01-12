@@ -75,105 +75,104 @@
        js/undefined)
      (clj->js [debounced-dataset-id debounced-input-data debounced-output-data]))
 
-    ($ :div {:className "max-w-4xl mx-auto p-6"}
-       ($ forms/form
-          ($ :div {:className "space-y-6"}
+    ($ forms/form
+       ($ :div.space-y-4.p-4
              ;; Dataset Selection
-             ($ ss/SearchableSelector
-                {:module-id module-id
-                 :value (:value dataset-id-field)
-                 :on-change (:on-change dataset-id-field)
-                 :sente-event-fn (fn [module-id search-string]
-                                   [:datasets/get-all
-                                    {:module-id module-id
-                                     :filters {:search-string search-string}}])
-                 :items-key :datasets
-                 :item-id-fn #(str (:dataset-id %))
-                 :item-label-fn :name
-                 :item-sublabel-fn #(str (:dataset-id %))
-                 :placeholder "Type to search datasets..."
-                 :label "Dataset ID"
-                 :required? true
-                 :error (:error dataset-id-field)
-                 :data-testid "dataset-selector"})
+          ($ ss/SearchableSelector
+             {:module-id module-id
+              :value (:value dataset-id-field)
+              :on-change (:on-change dataset-id-field)
+              :sente-event-fn (fn [module-id search-string]
+                                [:datasets/get-all
+                                 {:module-id module-id
+                                  :filters {:search-string search-string}}])
+              :items-key :datasets
+              :item-id-fn #(str (:dataset-id %))
+              :item-label-fn :name
+              :item-sublabel-fn #(str (:dataset-id %))
+              :placeholder "Type to search datasets..."
+              :label "Dataset ID"
+              :required? true
+              :error (:error dataset-id-field)
+              :data-testid "dataset-selector"})
 
              ;; Schema display (place right after the dataset dropdown block)
-             (let [selected-ds (some->> (:datasets data)
-                                        (filter #(= (:dataset-id %) (:value dataset-id-field)))
-                                        first)]
-               (when (and selected-ds
-                          (or (:input-json-schema selected-ds)
-                              (:output-json-schema selected-ds)))
-                 ($ :div {:className "space-y-4 p-4 bg-gray-50 border rounded-md"}
-                    ($ :h4 {:className "font-semibold text-gray-700"} "Dataset Schema")
+          (let [selected-ds (some->> (:datasets data)
+                                     (filter #(= (:dataset-id %) (:value dataset-id-field)))
+                                     first)]
+            (when (and selected-ds
+                       (or (:input-json-schema selected-ds)
+                           (:output-json-schema selected-ds)))
+              ($ :div {:className "space-y-4 p-4 bg-gray-50 border rounded-md"}
+                 ($ :h4 {:className "font-semibold text-gray-700"} "Dataset Schema")
 
                     ;; Input schema
-                    (when-let [in-schema (:input-json-schema selected-ds)]
-                      ($ :div {:className "space-y-2"}
-                         ($ :label {:className "block text-sm font-medium text-gray-600"} "Expected Input Format")
-                         ($ :pre {:className "text-xs bg-white p-3 rounded border overflow-auto max-h-48"}
-                            (common/pp-json in-schema))))
+                 (when-let [in-schema (:input-json-schema selected-ds)]
+                   ($ :div {:className "space-y-2"}
+                      ($ :label {:className "block text-sm font-medium text-gray-600"} "Expected Input Format")
+                      ($ :pre {:className "text-xs bg-white p-3 rounded border overflow-auto max-h-48"}
+                         (common/pp-json in-schema))))
 
                     ;; Output schema
-                    (when-let [out-schema (:output-json-schema selected-ds)]
-                      ($ :div {:className "space-y-2"}
-                         ($ :label {:className "block text-sm font-medium text-gray-600"} "Expected Output Format")
-                         ($ :pre {:className "text-xs bg-white p-3 rounded border overflow-auto max-h-48"}
-                            (common/pp-json out-schema)))))))
+                 (when-let [out-schema (:output-json-schema selected-ds)]
+                   ($ :div {:className "space-y-2"}
+                      ($ :label {:className "block text-sm font-medium text-gray-600"} "Expected Output Format")
+                      ($ :pre {:className "text-xs bg-white p-3 rounded border overflow-auto max-h-48"}
+                         (common/pp-json out-schema)))))))
 
                                         ;
                                         ; Input Data
-             ($ :div
-                ($ forms/form-field
-                   {:label "Input Data"
-                    :type :textarea
-                    :rows 8
-                    :value (:value input-data-field)
-                    :on-change (:on-change input-data-field)
-                    :error (:error input-data-field)
-                    :help-text "Edit the input data for this dataset example"})
-                (when validation-state
-                  (let [input-validation (:input validation-state)]
-                    ($ :div {:className "mt-1 text-sm"}
-                       (cond
-                         (:parse-error input-validation)
-                         ($ :p {:className "text-red-600"} (:parse-error input-validation))
+          ($ :div
+             ($ forms/form-field
+                {:label "Input Data"
+                 :type :textarea
+                 :rows 8
+                 :value (:value input-data-field)
+                 :on-change (:on-change input-data-field)
+                 :error (:error input-data-field)
+                 :help-text "Edit the input data for this dataset example"})
+             (when validation-state
+               (let [input-validation (:input validation-state)]
+                 ($ :div {:className "mt-1 text-sm"}
+                    (cond
+                      (:parse-error input-validation)
+                      ($ :p {:className "text-red-600"} (:parse-error input-validation))
 
-                         (:validation-error input-validation)
-                         ($ :p {:className "text-red-600"} (str "Schema error: " (:validation-error input-validation)))
+                      (:validation-error input-validation)
+                      ($ :p {:className "text-red-600"} (str "Schema error: " (:validation-error input-validation)))
 
-                         (:is-valid? input-validation)
-                         ($ :p {:className "text-green-600"} "✓ Valid input data")
+                      (:is-valid? input-validation)
+                      ($ :p {:className "text-green-600"} "✓ Valid input data")
 
-                         :else nil)))))
+                      :else nil)))))
 
              ;; Output Data  
-             ($ :div
-                ($ forms/form-field
-                   {:label "Reference Output Data"
-                    :type :textarea
-                    :rows 8
-                    :value (:value output-data-field)
-                    :on-change (:on-change output-data-field)
-                    :error (:error output-data-field)
-                    :help-text "Edit the expected output data for this dataset example"})
-                (when validation-state
-                  (let [output-validation (:output validation-state)]
-                    ($ :div {:className "mt-1 text-sm"}
-                       (cond
-                         (:parse-error output-validation)
-                         ($ :p {:className "text-red-600"} (:parse-error output-validation))
+          ($ :div
+             ($ forms/form-field
+                {:label "Reference Output Data"
+                 :type :textarea
+                 :rows 8
+                 :value (:value output-data-field)
+                 :on-change (:on-change output-data-field)
+                 :error (:error output-data-field)
+                 :help-text "Edit the expected output data for this dataset example"})
+             (when validation-state
+               (let [output-validation (:output validation-state)]
+                 ($ :div {:className "mt-1 text-sm"}
+                    (cond
+                      (:parse-error output-validation)
+                      ($ :p {:className "text-red-600"} (:parse-error output-validation))
 
-                         (:validation-error output-validation)
-                         ($ :p {:className "text-red-600"} (str "Schema error: " (:validation-error output-validation)))
+                      (:validation-error output-validation)
+                      ($ :p {:className "text-red-600"} (str "Schema error: " (:validation-error output-validation)))
 
-                         (:is-valid? output-validation)
-                         ($ :p {:className "text-green-600"} "✓ Valid output data")
+                      (:is-valid? output-validation)
+                      ($ :p {:className "text-green-600"} "✓ Valid output data")
 
-                         :else nil)))))
+                      :else nil)))))
 
              ;; Display backend validation errors
-             ($ forms/form-error {:error error}))))))
+          ($ forms/form-error {:error error})))))
 
 (forms/reg-form
  :add-from-trace
