@@ -16,6 +16,8 @@
    [com.rpl.agent-o-rama.ui.streaming :as streaming]
    [com.rpl.agent-o-rama.ui.human-feedback.add-to-queue :as add-to-queue]
 
+   [reitit.frontend.easy :as rfe]
+
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
    ["@dagrejs/dagre" :as Dagre]
@@ -1076,8 +1078,23 @@
              "Clear All Changes")))))
 
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
-                            module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change]}]
-  (let [active-tab (state/use-sub [:ui :active-tab])
+                           module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change]}]
+  (let [;; Read tab from URL query params, default to :info
+        query-params (state/use-sub [:route :query-params])
+        tab-param (get query-params :tab)
+        active-tab (case tab-param
+                     "feedback" :feedback
+                     "fork" :fork
+                     :info)  ; default
+        
+        ;; Helper to update tab via URL
+        set-tab! (fn [tab-name]
+                   (rfe/replace-state :agent/invocation-detail
+                                      {:module-id module-id
+                                       :agent-name agent-name
+                                       :invoke-id invoke-id}
+                                      {:tab tab-name}))
+        
         [is-dragging set-is-dragging] (uix/use-state false)
 
         handle-mouse-down (fn [e]
@@ -1117,19 +1134,11 @@
              (on-toggle-forking-mode)))))
      [active-tab forking-mode? on-toggle-forking-mode])
 
-    ;; Ensure we switch back to Info tab when navigating to a different invocation
-    ;; or when fork changes are cleared (but only if currently on fork tab)
-    (uix/use-effect
-     (fn []
-       ;; Reset to info tab on invocation change
-       (state/dispatch [:db/set-value [:ui :active-tab] :info]))
-     [invoke-id])
-    
     ;; Switch away from fork tab if changes are cleared
     (uix/use-effect
      (fn []
        (when (and (= active-tab :fork) (empty? changed-nodes))
-         (state/dispatch [:db/set-value [:ui :active-tab] :info])))
+         (set-tab! "info")))
      [changed-nodes active-tab])
 
     ($ :div {:className "fixed right-0 top-16 h-[calc(100vh-4rem)] bg-white shadow-lg border-l border-gray-200 flex flex-col z-40"
@@ -1151,13 +1160,13 @@
                                                {"bg-white text-gray-900 shadow-sm" (= active-tab :info)
                                                 "text-gray-600 hover:text-gray-900" (not= active-tab :info)})
                          :data-id "info-tab"
-                         :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :info])}
+                         :onClick #(set-tab! "info")}
                 "Info")
              ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
                                                {"bg-white text-gray-900 shadow-sm" (= active-tab :feedback)
                                                 "text-gray-600 hover:text-gray-900" (not= active-tab :feedback)})
                          :data-id "feedback-tab"
-                         :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :feedback])}
+                         :onClick #(set-tab! "feedback")}
                 "Feedback")
              ;; Only show Fork tab when not in live mode
              (when-not is-live
@@ -1165,7 +1174,7 @@
                                                  {"bg-white text-gray-900 shadow-sm" (= active-tab :fork)
                                                   "text-gray-600 hover:text-gray-900" (not= active-tab :fork)})
                            :data-id "fork-tab"
-                           :onClick #(state/dispatch [:db/set-value [:ui :active-tab] :fork])}
+                           :onClick #(set-tab! "fork")}
                   (str "Fork" (when (> (count changed-nodes) 0) (str " (" (count changed-nodes) ")")))))))
 
        ;; Tab content
