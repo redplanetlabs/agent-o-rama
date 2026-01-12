@@ -828,7 +828,6 @@
         [comment set-comment] (uix/use-state "")
         [reviewer-name set-reviewer-name] (uix/use-state (hf-common/get-reviewer-name))
         [errors set-errors] (uix/use-state {})
-        [show-dismiss-confirm? set-show-dismiss-confirm] (uix/use-state false)
 
         ;; Validate a single metric value and return error or nil
         validate-metric (fn [rubric value]
@@ -914,26 +913,26 @@
                             (set-errors validation-errors))))
 
         handle-dismiss (fn []
-                         (set-show-dismiss-confirm false)
-                         ;; Dismiss via backend
-                         (sente/request!
-                          [:human-feedback/dismiss-queue-item
-                           {:module-id decoded-module-id
-                            :queue-name decoded-queue-id
-                            :item-id item-id-str}]
-                          10000
-                          (fn [reply]
-                            (if (:success reply)
-                              ;; Navigate to next item or back to queue
-                              (if has-next?
-                                (rfe/push-state :module/human-feedback-queue-item
-                                                {:module-id module-id
-                                                 :queue-id queue-id
-                                                 :item-id next-item-id})
-                                (rfe/push-state :module/human-feedback-queue-detail
-                                                {:module-id module-id
-                                                 :queue-id queue-id}))
-                              (js/alert (str "Error dismissing: " (:error reply)))))))]
+                         (when (js/confirm "Dismiss this item? This will remove it from the queue without adding feedback. This action cannot be undone.")
+                           ;; Dismiss via backend
+                           (sente/request!
+                            [:human-feedback/dismiss-queue-item
+                             {:module-id decoded-module-id
+                              :queue-name decoded-queue-id
+                              :item-id item-id-str}]
+                            10000
+                            (fn [reply]
+                              (if (:success reply)
+                                ;; Navigate to next item or back to queue
+                                (if has-next?
+                                  (rfe/push-state :module/human-feedback-queue-item
+                                                  {:module-id module-id
+                                                   :queue-id queue-id
+                                                   :item-id next-item-id})
+                                  (rfe/push-state :module/human-feedback-queue-detail
+                                                  {:module-id module-id
+                                                   :queue-id queue-id}))
+                                (js/alert (str "Error dismissing: " (:error reply))))))))]
 
     (cond
       ;; Loading state
@@ -1035,8 +1034,8 @@
 
          ;; Action buttons
          ($ :div.flex.justify-between
-            ($ :button.px-4.py-2.border.border-red-300.text-red-700.rounded-md.hover:bg-red-50.transition-colors.inline-flex.items-center
-               {:onClick #(set-show-dismiss-confirm true)}
+            ($ :button.px-4.py-2.border.border-red-300.text-red-700.rounded-md.hover:bg-red-50.transition-colors.inline-flex.items-center.cursor-pointer
+               {:onClick handle-dismiss}
                ($ XMarkIcon {:className "h-5 w-5 mr-2"})
                "Dismiss")
             (let [has-errors? (or (seq errors) 
@@ -1051,27 +1050,9 @@
                  {:onClick handle-submit
                   :disabled is-invalid?
                   :className (if is-invalid?
-                              "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer")}
-                 "Submit & Continue")))
-
-         ;; Dismiss confirmation dialog
-         (when show-dismiss-confirm?
-           ($ :div.fixed.inset-0.bg-black.bg-opacity-50.flex.items-center.justify-center.z-50
-              {:onClick #(set-show-dismiss-confirm false)}
-              ($ :div.bg-white.rounded-lg.p-6.max-w-md.mx-4
-                 {:onClick #(. % stopPropagation)}
-                 ($ :h3.text-lg.font-semibold.text-gray-900.mb-2
-                    "Dismiss Item?")
-                 ($ :p.text-gray-600.mb-4
-                    "This will remove the item from the queue without adding feedback. This action cannot be undone.")
-                 ($ :div.flex.justify-end.gap-2
-                    ($ :button.px-4.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors
-                       {:onClick #(set-show-dismiss-confirm false)}
-                       "Cancel")
-                    ($ :button.px-4.py-2.bg-red-600.text-white.rounded-md.hover:bg-red-700.transition-colors
-                       {:onClick handle-dismiss}
-                       "Dismiss Item")))))))))
+                               "bg-gray-300 text-gray-500 cursor-not-allowed"
+                               "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer")}
+                 "Submit & Continue")))))))
 
 ;; End of queue page
 (defui queue-end []
