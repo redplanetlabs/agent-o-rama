@@ -38,11 +38,21 @@
           modified-at (:modified-at feedback)
           feedback-id (:id feedback)
           comment (:comment feedback)
-          raw-source-str (:source source "Unknown")
+          raw-source-str (if (string? source) source (:source source "Unknown"))
           ;; Check if this is human feedback (HumanSourceImpl)
+          ;; Case 1: Source is an object (when backend fix is applied)
+          ;; Case 2: Source is a string "human[Name]" (default backend behavior)
           is-human-feedback? (or (= "HumanSourceImpl" (get source "_aor-type"))
-                                 (contains? source :name))  ;; HumanSource has :name field
-          human-name (or (:name source) (get source "name"))
+                                 (contains? source :name)
+                                 (and (string? source) (clojure.string/starts-with? source "human[")))
+          
+          human-name (cond
+                       (:name source) (:name source)
+                       (get source "name") (get source "name")
+                       (and (string? source) (clojure.string/starts-with? source "human["))
+                       (second (re-find #"human\[(.*)\]" source))
+                       :else "Unknown")
+          
           source-feedback-id (or (:id source) (get source "id"))
           ;; Remove agent name prefix before "/" if present
           ;; e.g., "action[FeedbackTestAgent/agent-dual-eval]" -> "action[agent-dual-eval]"
@@ -160,7 +170,7 @@
        ;; Add feedback button
        (when (and module-id agent-name invoke-id)
          ($ :div.mb-4
-            ($ :button.inline-flex.items-center.px-3.py-2.bg-purple-600.text-white.text-sm.font-medium.rounded-md.hover:bg-purple-700.transition-colors
+            ($ :button.inline-flex.items-center.px-3.py-2.bg-purple-600.text-white.text-sm.font-medium.rounded-md.hover:bg-purple-700.transition-colors.cursor-pointer
                {:data-testid "add-feedback-button"
                 :onClick #(state/dispatch [:modal/show-form :add-manual-feedback
                                            {:module-id module-id

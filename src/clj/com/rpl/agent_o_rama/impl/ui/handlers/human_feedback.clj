@@ -161,6 +161,9 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/add-feedback
   [{:keys [manager agent-name invoke-id node-task-id node-invoke-id reviewer-name scores comment]} uid]
+  ;; Validation: must have either scores OR comment (or both)
+  (when (and (empty? scores) (clojure.string/blank? comment))
+    (throw (ex-info "Feedback must include either metrics or a comment" {:scores scores :comment comment})))
   (let [underlying-objects (aor-types/underlying-objects manager)
         global-actions-depot (:global-actions-depot underlying-objects)
         ;; Parse invoke-id which is "taskId-agentInvokeId" format
@@ -178,6 +181,9 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/edit-feedback
   [{:keys [manager agent-name invoke-id node-task-id node-invoke-id feedback-id reviewer-name scores comment]} uid]
+  ;; Validation: must have either scores OR comment (or both)
+  (when (and (empty? scores) (clojure.string/blank? comment))
+    (throw (ex-info "Feedback must include either metrics or a comment" {:scores scores :comment comment})))
   (let [underlying-objects (aor-types/underlying-objects manager)
         global-actions-depot (:global-actions-depot underlying-objects)
         ;; Parse invoke-id which is "taskId-agentInvokeId" format

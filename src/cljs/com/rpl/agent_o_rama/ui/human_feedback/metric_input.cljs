@@ -91,6 +91,7 @@
               {:display-text display-text
                :items dropdown-items
                :disabled? false
+               :full-width? false
                :data-testid data-testid}))
 
          is-numeric?

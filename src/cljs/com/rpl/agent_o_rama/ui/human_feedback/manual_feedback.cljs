@@ -157,45 +157,64 @@
                              :comment ""}
                             props))
    :validators {:reviewer-name [forms/required]
-                :metrics [(fn [metrics]
-                            (when (or (nil? metrics) (empty? metrics))
-                              "At least one metric is required"))
-                          (fn [metrics]
-                            ;; Validate each metric value
-                            ;; metric-data has :name, :metric (definition), :value, :required
-                            (let [errors (keep-indexed
-                                          (fn [idx {:keys [name metric value required]}]
-                                            (cond
-                                              ;; Required metrics must have value
-                                              (and required (str/blank? value))
-                                              (str name " is required")
-
-                                              ;; Categorical: must be one of the categories
-                                              (and (contains? metric :categories)
-                                                   (not (str/blank? value))
-                                                   (not (contains? (:categories metric) value)))
-                                              (str name " must be one of: " (str/join ", " (:categories metric)))
-
-                                              ;; Numeric: must be in range
-                                              (and (contains? metric :min)
-                                                   (not (str/blank? value)))
-                                              (let [num-val (js/parseInt value 10)]
+                :metrics [(fn [metrics form-state]
+                            ;; New validation rules:
+                            ;; 1. If metrics added with empty values → FAIL
+                            ;; 2. If no metrics but has comment → PASS
+                            ;; 3. If no metrics and no comment → FAIL
+                            (let [has-metrics? (and metrics (seq metrics))
+                                  has-comment? (not (str/blank? (:comment form-state)))]
+                              (cond
+                                ;; If metrics exist, validate each one
+                                has-metrics?
+                                (let [errors (keep-indexed
+                                              (fn [idx {:keys [name metric value required]}]
                                                 (cond
-                                                  (js/isNaN num-val)
-                                                  (str name " must be a number")
+                                                  ;; Metric added but not selected yet (no name)
+                                                  (nil? name)
+                                                  "Please select a metric or remove the empty row"
 
-                                                  (< num-val (:min metric))
-                                                  (str name " must be at least " (:min metric))
+                                                  ;; Metric selected but no value provided
+                                                  (str/blank? value)
+                                                  (str name " requires a value")
 
-                                                  (> num-val (:max metric))
-                                                  (str name " must be at most " (:max metric))
+                                                  ;; Required metrics must have value (redundant but explicit)
+                                                  (and required (str/blank? value))
+                                                  (str name " is required")
+
+                                                  ;; Categorical: must be one of the categories
+                                                  (and (contains? metric :categories)
+                                                       (not (str/blank? value))
+                                                       (not (contains? (:categories metric) value)))
+                                                  (str name " must be one of: " (str/join ", " (:categories metric)))
+
+                                                  ;; Numeric: must be in range
+                                                  (and (contains? metric :min)
+                                                       (not (str/blank? value)))
+                                                  (let [num-val (js/parseInt value 10)]
+                                                    (cond
+                                                      (js/isNaN num-val)
+                                                      (str name " must be a number")
+
+                                                      (< num-val (:min metric))
+                                                      (str name " must be at least " (:min metric))
+
+                                                      (> num-val (:max metric))
+                                                      (str name " must be at most " (:max metric))
+
+                                                      :else nil))
 
                                                   :else nil))
+                                              metrics)]
+                                  (when (seq errors)
+                                    (first errors)))
 
-                                              :else nil))
-                                          metrics)]
-                              (when (seq errors)
-                                (first errors))))]}
+                                ;; No metrics and no comment → FAIL
+                                (and (not has-metrics?) (not has-comment?))
+                                "Please provide either metrics or a comment"
+
+                                ;; No metrics but has comment → PASS (return nil)
+                                :else nil)))]}
    :ui (fn [{:keys [form-id]}] ($ ManualFeedbackForm {:form-id form-id}))
    :modal-props (fn [props]
                   {:title (if (:editing? props) "Edit Feedback" "Add Feedback")
