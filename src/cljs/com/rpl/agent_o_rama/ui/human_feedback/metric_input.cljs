@@ -5,7 +5,8 @@
    - Manual feedback form (add/edit feedback on invocations)
    - Queue item review form (reviewing items in a feedback queue)"
   (:require
-   [uix.core :refer [defui $]]))
+   [uix.core :refer [defui $]]
+   [com.rpl.agent-o-rama.ui.common :as common]))
 
 (defn- numeric-metric? [metric]
   (contains? metric :min))
@@ -76,14 +77,21 @@
        ;; Input control based on metric type
        (cond
          is-category?
-         ($ :select.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-            {:value (or value "")
-             :onChange #(on-change (.. % -target -value))
-             :className (if display-error "border-red-500" "")
-             :data-testid data-testid}
-            ($ :option {:value ""} "-- Select --")
-            (for [category (sort (:categories metric))]
-              ($ :option {:key category :value category} category)))
+         (let [sorted-categories (sort (:categories metric))
+               dropdown-items (mapv (fn [category]
+                                      {:key category
+                                       :label category
+                                       :selected? (= value category)
+                                       :on-select #(on-change category)})
+                                    sorted-categories)
+               display-text (if (and value (not= value ""))
+                              value
+                              "-- Select --")]
+           ($ common/Dropdown
+              {:display-text display-text
+               :items dropdown-items
+               :disabled? false
+               :data-testid data-testid}))
 
          is-numeric?
          ($ :div
