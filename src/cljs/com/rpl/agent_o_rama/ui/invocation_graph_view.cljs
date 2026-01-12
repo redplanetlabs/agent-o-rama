@@ -979,8 +979,7 @@
                "Add to Queue"))))))
 
 (defui info-panel [{:keys [graph-data summary-data on-select-node module-id agent-name task-id forks fork-of invoke-id]}]
-  (let [result (:result summary-data)
-        feedback (:feedback summary-data)]
+  (let [result (:result summary-data)]
 
     ($ :div {:className "space-y-4"}
 
@@ -999,11 +998,6 @@
        ($ exceptions-panel {:summary-data summary-data
                             :graph-data graph-data
                             :on-select-node on-select-node})
-
-       ($ feedback/feedback-list {:feedback-data feedback
-                                   :module-id module-id
-                                   :agent-name agent-name
-                                   :invoke-id invoke-id})
 
        ($ trace-analytics/info {:invoke-id invoke-id})
        ($ metadata-panel {:summary-data summary-data
