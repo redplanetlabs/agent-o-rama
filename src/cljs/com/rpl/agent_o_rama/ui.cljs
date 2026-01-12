@@ -277,7 +277,7 @@
 
 (defui breadcrumb []
   (let [match (state/use-sub [:route])
-        {:keys [module-id agent-name dataset-id invoke-id rule-name queue-id]} (or (:path-params match) {})
+        {:keys [module-id agent-name dataset-id invoke-id rule-name queue-id item-id]} (or (:path-params match) {})
         route-name (get-in match [:data :name])
 
         ;; Build breadcrumb items based on current route
@@ -319,6 +319,17 @@
                                            :agent/config "Config"
                                            :agent/stats "Stats"
                                            "Agent")
+                                  :path nil}] ; Current page
+
+                                ;; Queue item detail
+                                (and module-id queue-id item-id)
+                                [{:label (common/url-decode module-id)
+                                  :path (rfe/href :module/detail {:module-id module-id})}
+                                 {:label "Human Feedback Queues"
+                                  :path (rfe/href :module/human-feedback-queues {:module-id module-id})}
+                                 {:label (common/url-decode queue-id)
+                                  :path (rfe/href :module/human-feedback-queue-detail {:module-id module-id :queue-id queue-id})}
+                                 {:label (str "Item " (subs (str item-id) 0 8) "...")
                                   :path nil}] ; Current page
 
                                 ;; Queue detail
