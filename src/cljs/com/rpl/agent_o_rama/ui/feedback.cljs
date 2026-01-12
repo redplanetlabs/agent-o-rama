@@ -170,7 +170,7 @@
        (when (and module-id agent-name invoke-id)
          ($ :div.mb-4.flex.gap-2
             ;; Add Feedback button (left half)
-            ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-blue-600.text-white.text-sm.font-medium.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer.flex-1
+            ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.flex-1
                {:data-testid "add-feedback-button"
                 :onClick #(state/dispatch [:modal/show-form :add-manual-feedback
                                            {:module-id module-id
