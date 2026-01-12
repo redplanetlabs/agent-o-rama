@@ -7,19 +7,57 @@
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [clojure.string :as str]))
 
-;; Separate component for each metric input field in the manual feedback form
-;; This is necessary because React hooks can't be called inside loops
-(defui MetricInputField [{:keys [form-id idx metric-data editing? on-remove]}]
+;; Separate component for each metric row in the manual feedback form
+;; Shows selector if no metric chosen, or input field if metric is selected
+(defui MetricRow [{:keys [form-id idx metric-data editing? on-remove on-select module-id]}]
   ;; metric-data has :name, :metric (the definition), :value, :required
-  (let [value-field (forms/use-form-field form-id [:metrics idx :value])]
-    ($ metric-input/MetricInput
-       {:metric (:metric metric-data)
-        :label (:name metric-data)
-        :required? (:required metric-data)
-        :value (:value value-field)
-        :on-change (:on-change value-field)
-        :on-remove (when-not editing? on-remove)
-        :data-testid (str "metric-value-" idx)})))
+  (let [value-field (forms/use-form-field form-id [:metrics idx :value])
+        has-metric? (some? (:name metric-data))]
+    
+    (if has-metric?
+      ;; Show input field when metric is selected
+      ($ metric-input/MetricInput
+         {:metric (:metric metric-data)
+          :label (:name metric-data)
+          :required? (:required metric-data)
+          :value (:value value-field)
+          :on-change (:on-change value-field)
+          :on-remove (when-not editing? on-remove)
+          :data-testid (str "metric-value-" idx)})
+      
+      ;; Show selector when no metric chosen
+      ($ :div.flex.items-start.gap-2
+         ($ :div.flex-1
+            ($ ss/SearchableSelector
+               {:module-id module-id
+                :value nil
+                :on-change (fn [metric-name opts]
+                             (when metric-name
+                               (on-select metric-name opts)))
+                :sente-event-fn (fn [mid search-string]
+                                  [:human-feedback/get-metrics
+                                   {:module-id mid
+                                    :filters {:search-string search-string}}])
+                :items-key :items
+                :item-id-fn :name
+                :item-label-fn :name
+                :item-sublabel-fn (fn [item]
+                                    (let [m (:metric item)]
+                                      (cond
+                                        (contains? m :categories) (str "Categorical: " (str/join ", " (:categories m)))
+                                        (contains? m :min) (str "Numeric: " (:min m) " - " (:max m))
+                                        :else "")))
+                :placeholder "Select metric..."
+                :label "Metric"
+                :hide-label? true
+                :data-testid (str "metric-selector-" idx)}))
+         
+         ;; Remove button
+         (when-not editing?
+           ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
+              {:type "button"
+               :onClick on-remove}
+              "Remove"))))))
 
 (defui ManualFeedbackForm [{:keys [form-id]}]
   (let [props (state/use-sub [:forms form-id])
@@ -41,72 +79,61 @@
            :placeholder "Your name"
            :data-testid "reviewer-name-input"})
 
-       ;; Selected metrics
-       ($ :div
-          ($ :label.block.text-sm.font-medium.text-gray-700.mb-2
+       ;; Metrics section
+       ($ :div.space-y-2
+          ($ :label.block.text-sm.font-medium.text-gray-700
              "Metrics"
              ($ :span.text-red-500.ml-1 "*"))
 
-          ;; Display selected metrics with their input fields
-          (if (and (:value metrics-field) (seq (:value metrics-field)))
-            ($ :div.space-y-3
-               (for [[idx metric-data] (map-indexed vector (:value metrics-field))]
-                 ($ MetricInputField
-                    {:key idx
-                     :form-id form-id
-                     :idx idx
-                     :metric-data metric-data
-                     :editing? editing?
-                     :on-remove #(let [current-metrics (:value metrics-field)
-                                       updated-metrics (vec (concat (subvec current-metrics 0 idx)
-                                                                    (subvec current-metrics (inc idx))))]
-                                   ((:on-change metrics-field) updated-metrics))})))
+          ($ :div.text-sm.text-gray-500.mb-2
+             "Add metrics to evaluate this invocation")
 
-            ($ :div.text-sm.text-gray-500.italic.py-2
-               "No metrics selected")))
+          ;; Metric list
+          ($ :div.space-y-2
+             (vec
+              (for [[idx metric-data] (map-indexed vector (or (:value metrics-field) []))]
+                ($ MetricRow
+                   {:key idx
+                    :form-id form-id
+                    :idx idx
+                    :module-id module-id
+                    :metric-data metric-data
+                    :editing? editing?
+                    :on-remove #(let [current-metrics (:value metrics-field)
+                                      updated-metrics (vec (concat (subvec current-metrics 0 idx)
+                                                                   (subvec current-metrics (inc idx))))]
+                                  ((:on-change metrics-field) updated-metrics))
+                    :on-select (fn [metric-name opts]
+                                 (let [item (:item opts)
+                                       metric-def (:metric item)
+                                       current-metrics (:value metrics-field)
+                                       ;; Check if already added in another row
+                                       already-added? (some #(= (:name %) metric-name) current-metrics)]
+                                   (when-not already-added?
+                                     (let [updated-metrics (assoc-in current-metrics [idx]
+                                                                     {:name (:name item)
+                                                                      :metric metric-def
+                                                                      :value ""
+                                                                      :required false})]
+                                       ((:on-change metrics-field) updated-metrics)))))}))))
 
-       ;; Add metric button (only if not editing)
-       (when-not editing?
-         ($ :div
-            ($ ss/SearchableSelector
-               {:module-id module-id
-                :value nil  ;; Always empty for adding
-                :on-change (fn [metric-name opts]
-                             (when metric-name
-                               (let [current-metrics (or (:value metrics-field) [])
-                                     ;; Check if already added
-                                     already-added? (some #(= (:name %) metric-name) current-metrics)]
-                                 (when-not already-added?
-                                   ;; item has :name, :description, :metric
-                                   ;; We store :name and the actual metric definition from :metric
-                                   (let [item (:item opts)
-                                         metric-def (:metric item)
-                                         new-metric {:name (:name item)
-                                                     :metric metric-def
-                                                     :value ""
-                                                     :required false}
-                                         updated-metrics (conj current-metrics new-metric)]
-                                     ((:on-change metrics-field) updated-metrics))))))
-               :sente-event-fn (fn [mid search-string]
-                                 [:human-feedback/get-metrics
-                                  {:module-id mid
-                                   :filters {:search-string search-string}}])
-               :items-key :items
-                :item-id-fn :name
-                :item-label-fn :name
-                :item-sublabel-fn (fn [item]
-                                    ;; item has :name, :description, :metric
-                                    ;; :metric contains :categories or :min/:max
-                                    (let [m (:metric item)]
-                                      (cond
-                                        (contains? m :categories) (str "Categorical: " (str/join ", " (:categories m)))
-                                        (contains? m :min) (str "Numeric: " (:min m) " - " (:max m))
-                                        :else "")))
-                :placeholder "Add a metric..."
-                :label "Add Metric"
-                :hide-label? false
-                :allow-clear? true
-                :data-testid "add-metric-selector"})))
+          ;; Add metric button (only if not editing)
+          (when-not editing?
+            ($ :button.w-full.px-3.py-2.border-2.border-dashed.border-gray-300.rounded-md.text-gray-600.hover:border-gray-400.hover:text-gray-700.transition-colors
+               {:data-testid "add-metric-button"
+                :type "button"
+                :onClick #(let [current-metrics (or (:value metrics-field) [])
+                                new-metric {:name nil
+                                           :metric nil
+                                           :value ""
+                                           :required false}
+                                updated-metrics (conj current-metrics new-metric)]
+                            ((:on-change metrics-field) updated-metrics))}
+               "+ Add Metric"))
+
+          ;; Error message
+          (when (:error metrics-field)
+            ($ :p.text-sm.text-red-600.mt-1 (:error metrics-field))))
 
        ;; Comment
        ($ forms/form-field
