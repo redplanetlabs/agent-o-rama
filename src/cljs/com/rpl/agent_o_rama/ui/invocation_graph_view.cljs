@@ -336,10 +336,10 @@
        ($ generic-data-viewer {:data result
                                :color "indigo"
                                :truncate-length 100
-                               :depth 0}))))
+                               :depth 0})))
 
-(defui node-exceptions-panel [{:keys [exceptions]}]
-  (when (seq exceptions)
+  (defui node-exceptions-panel [{:keys [exceptions]}]
+    (when (seq exceptions))
     ($ :div {:className "bg-red-50 p-3 rounded-md mt-4 border border-red-200"}
        ($ :div {:className (common/cn "text-sm font-medium text-red-700 mb-2 flex items-center gap-2")}
           ($ ExclamationTriangleIcon {:className (common/cn "w-5 h-5")})
@@ -353,7 +353,7 @@
                                   (.stopPropagation e)
                                   (state/dispatch [:modal/show :exception-detail
                                                    {:title (str "Exception " (inc idx))
-                                                    :component ($ ExceptionDetailModal {:title (str "Exception " (inc idx)) :content exc-str})}]))
+                                                    :component ($ ExceptionDetailModal {:title (str "Exception " (inc idx)) :content exc-text})}]))
                        :title "Click to view full exception"}
                  ($ :div {:className "text-xs font-mono text-red-800"}
                     first-line))))))))
@@ -446,17 +446,17 @@
   [{:keys [module-id agent-name invoke-id node-name node-invoke-id is-streaming?]}]
   (let [{:keys [text streaming? chunks reset-count]}
         (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id)
-        
+
         ;; Ref for auto-scrolling
         scroll-ref (uix/use-ref nil)]
-    
+
     ;; Auto-scroll to bottom when text changes
     (uix/use-effect
      (fn []
        (when-let [el @scroll-ref]
          (set! (.-scrollTop el) (.-scrollHeight el))))
      [text])
-    
+
     ;; Only show the panel if we have chunks to display
     (when (seq chunks)
       ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4 border border-blue-200"}
@@ -470,7 +470,7 @@
             (when (pos? reset-count)
               ($ :span {:className "text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded"}
                  (str "↻ Reset " reset-count "x"))))
-         
+
          ;; Streaming content with auto-scroll
          ($ :div {:ref scroll-ref
                   :className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
@@ -478,7 +478,7 @@
                text
                (when streaming?
                  ($ :span {:className "inline-block w-2 h-4 bg-blue-500 animate-pulse ml-0.5"}))))
-         
+
          ;; Chunk count
          (when (seq chunks)
            ($ :div {:className "mt-2 text-xs text-blue-500"}
@@ -553,7 +553,6 @@
                                   :node-invoke-id node-id  ;; Specific node invocation ID
                                   :is-streaming? is-node-in-progress?}))
 
-
        ($ node-exceptions-panel {:exceptions exceptions})
 
        ($ node-input-panel {:input input})
@@ -576,6 +575,7 @@
   (let [data (when selected-node
                (js->clj (aget selected-node "data") :keywordize-keys true))
         node-id (:node-id data)
+        node-task-id (:agent-task-id data)
         node-name (:node data)
         input (:input data)
         exceptions (:exceptions data)
@@ -657,15 +657,13 @@
               :feedback
               ($ :div {:data-id "node-feedback-container"}
                  (when feedback
-                   (let [[node-task-id node-invoke-id] (when node-id
-                                                         (clojure.string/split node-id #"-" 2))]
-                     ($ feedback/feedback-list
-                        {:feedback-data feedback
-                         :module-id module-id
-                         :agent-name agent-name
-                         :invoke-id invoke-id
-                         :node-task-id node-task-id
-                         :node-invoke-id node-invoke-id}))))
+                   ($ feedback/feedback-list
+                      {:feedback-data feedback
+                       :module-id module-id
+                       :agent-name agent-name
+                       :invoke-id invoke-id
+                       :node-task-id node-task-id
+                       :node-invoke-id node-id})))
 
               ;; Default case
               nil))))))
@@ -1077,8 +1075,8 @@
                       :onClick on-clear-fork}
              "Clear All Changes")))))
 
-(defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
-                           module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change]}]
+(defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live]
+                     module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change}]
   (let [;; Read tab from URL query params, default to :info
         query-params (state/use-sub [:route :query-params])
         tab-param (get query-params :tab)
@@ -1086,7 +1084,7 @@
                      "feedback" :feedback
                      "fork" :fork
                      :info)  ; default
-        
+
         ;; Helper to update tab via URL
         set-tab! (fn [tab-name]
                    (rfe/replace-state :agent/invocation-detail
@@ -1094,7 +1092,7 @@
                                        :agent-name agent-name
                                        :invoke-id invoke-id}
                                       {:tab tab-name}))
-        
+
         [is-dragging set-is-dragging] (uix/use-state false)
 
         handle-mouse-down (fn [e]
@@ -1133,7 +1131,6 @@
            (when (not= forking-mode? should-be-forking)
              (on-toggle-forking-mode)))))
      [active-tab forking-mode? on-toggle-forking-mode])
-
 
     ($ :div {:className "fixed right-0 top-16 h-[calc(100vh-4rem)] bg-white shadow-lg border-l border-gray-200 flex flex-col z-40"
              :style {:width (str sidebar-width "px")}
