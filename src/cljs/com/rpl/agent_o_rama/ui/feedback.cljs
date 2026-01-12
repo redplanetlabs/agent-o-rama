@@ -151,8 +151,9 @@
                  comment))
             ;; Display timestamp if available
             (when created-at
-              ($ :div {:className "text-xs text-purple-500 mt-1 pt-1 border-t border-purple-200"}
-                 (str "Created: " (format-ms created-at)))))))))
+              ($ :div {:className "text-xs text-purple-600 mt-1 pt-1 border-t border-purple-200"}
+                ($ :span.font-medium "Created: ")
+                (format-ms created-at))))))))
 
 (defui feedback-list
   "Displays a list of feedback items from the summary data.
