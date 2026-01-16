@@ -97,8 +97,8 @@ test.describe('Manual Human Feedback', () => {
     // Wait for invocation graph to load
     await page.waitForURL(/\/invocations\/\d+-/, { timeout: 10000 });
     
-    // Click on Feedback tab
-    await page.getByRole('button', { name: 'Feedback' }).click();
+    // Click on Feedback tab (agent-level, not node-level)
+    await page.locator('[data-id="feedback-tab"]').click();
     await page.waitForTimeout(1000);
     
     agentInvokeUrl = page.url();
@@ -132,7 +132,7 @@ test.describe('Manual Human Feedback', () => {
     console.log('Test 3: Validating at least one metric required');
     await modal.getByTestId('reviewer-name-input').fill('Test Reviewer');
     await expect(submitButton).toBeDisabled();
-    await expect(modal.getByText(/at least one metric/i)).toBeVisible();
+    await expect(modal.getByText(/either metrics or a comment/i)).toBeVisible();
     console.log('✓ Metric validation works');
     
     // =============================================================================
@@ -140,14 +140,16 @@ test.describe('Manual Human Feedback', () => {
     // =============================================================================
     console.log('Test 4: Adding categorical metric');
     
-    // Click on metric selector
-    await modal.getByTestId('add-metric-selector').getByRole('combobox').click();
+    // Click "Add Metric" button to create a new metric row
+    await modal.getByTestId('add-metric-button').click();
+    await page.waitForTimeout(500);
     
-    // Wait for dropdown
-    await page.waitForTimeout(1000);
+    // Click on the selector in the new row
+    await modal.getByTestId('metric-selector-0').getByRole('combobox').click();
+    await page.waitForTimeout(500);
     
     // Type to search for our metric
-    await modal.getByTestId('add-metric-selector').getByRole('combobox').fill(metricName1);
+    await modal.getByTestId('metric-selector-0').getByRole('combobox').fill(metricName1);
     await page.waitForTimeout(500);
     
     // Click first option (our categorical metric)
@@ -155,8 +157,8 @@ test.describe('Manual Human Feedback', () => {
     await firstOption.waitFor({ timeout: 5000 });
     await firstOption.click();
     
-    // Verify metric field appeared
-    await expect(modal.getByTestId('metric-field-0')).toBeVisible();
+    // Verify metric value input appeared
+    await expect(modal.getByTestId('metric-value-0')).toBeVisible();
     console.log('✓ Metric field added');
     
     // =============================================================================
@@ -178,12 +180,16 @@ test.describe('Manual Human Feedback', () => {
     // =============================================================================
     console.log('Test 6: Adding numeric metric');
     
-    // Click on metric selector again
-    await modal.getByTestId('add-metric-selector').getByRole('combobox').click();
+    // Click "Add Metric" button again to create another row
+    await modal.getByTestId('add-metric-button').click();
+    await page.waitForTimeout(500);
+    
+    // Click on the second selector
+    await modal.getByTestId('metric-selector-1').getByRole('combobox').click();
     await page.waitForTimeout(500);
     
     // Type to search for numeric metric
-    await modal.getByTestId('add-metric-selector').getByRole('combobox').fill(metricName2);
+    await modal.getByTestId('metric-selector-1').getByRole('combobox').fill(metricName2);
     await page.waitForTimeout(500);
     
     // Click the numeric metric
@@ -191,8 +197,8 @@ test.describe('Manual Human Feedback', () => {
     await numericOption.waitFor({ timeout: 5000 });
     await numericOption.click();
     
-    // Verify second metric field appeared
-    await expect(modal.getByTestId('metric-field-1')).toBeVisible();
+    // Verify second metric value input appeared
+    await expect(modal.getByTestId('metric-value-1')).toBeVisible();
     
     // Enter a numeric value
     await modal.getByTestId('metric-value-1').fill('7');
@@ -263,9 +269,11 @@ test.describe('Manual Human Feedback', () => {
     await modal.getByTestId('reviewer-name-input').fill('Original Reviewer');
     
     // Add a metric
-    await modal.getByTestId('add-metric-selector').getByRole('combobox').click();
+    await modal.getByTestId('add-metric-button').click();
     await page.waitForTimeout(500);
-    await modal.getByTestId('add-metric-selector').getByRole('combobox').fill(metricName1);
+    await modal.getByTestId('metric-selector-0').getByRole('combobox').click();
+    await page.waitForTimeout(500);
+    await modal.getByTestId('metric-selector-0').getByRole('combobox').fill(metricName1);
     await page.waitForTimeout(500);
     await modal.locator('[role="option"]').first().click();
     
@@ -322,9 +330,11 @@ test.describe('Manual Human Feedback', () => {
     await modal.getByTestId('reviewer-name-input').fill('Test Reviewer');
     
     // Add numeric metric
-    await modal.getByTestId('add-metric-selector').getByRole('combobox').click();
+    await modal.getByTestId('add-metric-button').click();
     await page.waitForTimeout(500);
-    await modal.getByTestId('add-metric-selector').getByRole('combobox').fill(metricName2);
+    await modal.getByTestId('metric-selector-0').getByRole('combobox').click();
+    await page.waitForTimeout(500);
+    await modal.getByTestId('metric-selector-0').getByRole('combobox').fill(metricName2);
     await page.waitForTimeout(500);
     await modal.locator('[role="option"]').first().click();
     
