@@ -84,7 +84,16 @@
           cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
                           (->> m
                                common/remove-implicit-nodes
-                               ;; Don't transform :source - keep as record, serialization handles it
+                               ;; Convert feedback results to maps and add source-string
+                               (transform
+                                [MAP-VALS :feedback :results ALL]
+                                (fn [feedback-result]
+                                  (let [feedback-map (into {} feedback-result)
+                                        source (:source feedback-map)]
+                                    (if source
+                                      (assoc feedback-map :source-string (aor-types/source-string source))
+                                      feedback-map))))
+                               ;; Convert score keys to strings for JSON
                                (transform
                                 [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
                                 name)

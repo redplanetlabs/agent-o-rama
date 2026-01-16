@@ -38,13 +38,13 @@
           source (:source feedback)
           created-at (:created-at feedback)
           comment (:comment feedback)
+          source-string (:source-string feedback)
           ;; Source is always a map: {:name "..." :id #uuid"..."} for human, or other structure for automated
           is-human-feedback? (contains? source :name)
           human-name (:name source)
           feedback-id (:id source)
-          ;; For non-human feedback, get source string and build link
-          source-str (when-not is-human-feedback?
-                       (or (:source-string source) (str source)))
+          ;; Use the backend-provided source-string for all feedback types
+          source-str source-string
           ;; Extract agent-invoke data from source to build invocation link (for automated evaluators)
           agent-invoke (:agent-invoke source)
           task-id (:task-id agent-invoke)
@@ -66,9 +66,7 @@
                        source-str)
                     ($ ArrowTopRightOnSquareIcon {:className "h-3 w-3 text-purple-400 group-hover:text-purple-600"}))
                  ($ :span {:className "text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full"}
-                    (if is-human-feedback?
-                      (str "Human: " human-name)
-                      source-str))))
+                    source-str)))
             
             ;; Edit/Delete buttons for human feedback
             (when (and is-human-feedback? feedback-id agent-name invoke-id)
