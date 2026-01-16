@@ -170,6 +170,60 @@ test.describe('Queue Review Pagination', () => {
     console.log('✓ Previous button works across page boundaries');
     
     // =============================================================================
+    // STEP 4: Test URL refresh on a deep item (cursor-based loading)
+    // =============================================================================
+    console.log('Step 4: Testing URL refresh with cursor-based pagination');
+    
+    // Navigate to queue list
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    const queueRow = page.getByTestId(`queue-row-${queueName}`);
+    await queueRow.getByTestId('queue-name-link').click();
+    
+    // Load all items on the queue page
+    let loadMoreCell = page.getByRole('cell', { name: 'Load More' });
+    while (await loadMoreCell.isVisible()) {
+      await loadMoreCell.click();
+      await page.waitForTimeout(1000);
+      loadMoreCell = page.getByRole('cell', { name: 'Load More' });
+    }
+    
+    // Get a deep item (should have at least initialCount + numToReview items remaining)
+    // Use item #15 (should be safe - we added 25 and reviewed ~15)
+    const deepItemRow = page.locator('tbody').getByRole('row').nth(14); // 0-indexed
+    await expect(deepItemRow).toBeVisible();
+    await deepItemRow.click();
+    
+    // Get current URL to use for refresh test
+    const currentUrl = page.url();
+    const itemIdMatch = currentUrl.match(/item\/([^/?]+)/);
+    expect(itemIdMatch).toBeTruthy(); // Fail test if URL format unexpected
+    
+    const deepItemId = itemIdMatch[1];
+    console.log(`✓ Navigated to deep item #15: ${deepItemId}`);
+    
+    // Refresh the page
+    await page.reload();
+    await page.waitForTimeout(1500);
+    
+    // Verify page loaded correctly with cursor-based pagination
+    await expect(page.getByText('Target Information')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(metricName)).toBeVisible();
+    
+    // Previous button should be disabled (loaded from cursor, no earlier items)
+    await expect(page.getByTestId('previous-item-button')).toBeDisabled();
+    
+    // Next button should be enabled (more items available)
+    const nextBtn = page.getByTestId('next-item-button');
+    await expect(nextBtn).toBeEnabled();
+    
+    // Can navigate forward
+    await nextBtn.click();
+    await page.waitForTimeout(500);
+    await expect(page.getByText('Target Information')).toBeVisible();
+    
+    console.log('✓ URL refresh works - loaded from cursor, Previous disabled, Next enabled');
+    
+    // =============================================================================
     // CLEANUP: Delete queue and metric
     // =============================================================================
     if (!shouldSkipCleanup()) {
