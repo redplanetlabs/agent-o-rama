@@ -57,7 +57,17 @@
                                  root-pstate
                                  {:pkey agent-task-id})}
                         (->> summary-info-raw
-                             ;; Don't transform :source - keep as record, serialization handles it
+                             ;; Add source-string to feedback results
+                             (transform [:feedback :results ALL]
+                                        (fn [feedback-result]
+                                          (let [feedback-map (into {} feedback-result)
+                                                source (:source feedback-map)]
+                                            (if source
+                                              (assoc feedback-map :source-string (aor-types/source-string source))
+                                              feedback-map))))
+                             ;; Convert feedback score keys to strings
+                             (transform [:feedback :results ALL :scores MAP-KEYS] name)
+                             ;; Convert feedback action keys to strings
                              (transform [:feedback :actions MAP-KEYS] name))
                         (when-let [stats (:stats summary-info-raw)]
                           {:stats (merge {:aggregated-stats
