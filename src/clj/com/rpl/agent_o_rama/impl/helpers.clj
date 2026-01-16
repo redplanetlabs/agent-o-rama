@@ -232,6 +232,14 @@
       (UUID. msb (inc lsb))
       (UUID. (inc msb) 0))))
 
+(defn uuid-dec
+  [^UUID u]
+  (let [msb (.getMostSignificantBits u)
+        lsb (.getLeastSignificantBits u)]
+    (if (not= lsb 0)
+      (UUID. msb (dec lsb))
+      (UUID. (dec msb) -1))))
+
 (defn half-uuid
   [^UUID uuid]
   (.getLeastSignificantBits uuid))

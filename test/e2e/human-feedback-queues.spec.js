@@ -550,7 +550,7 @@ test.describe('Human Feedback Queues', () => {
     // Fill out the review form
     const metricDropdown = page.getByTestId('metric-value-0');
     await metricDropdown.click();
-    await page.getByText('Good').click();
+    await page.locator('[role="option"]').filter({ hasText: 'Good' }).click();
     
     // Add optional comment
     await page.getByPlaceholder(/Add any additional notes/).fill('Test review for agent invocation');

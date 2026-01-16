@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
    [clojure.string :as str]
    [jsonista.core :as j])
   (:import [java.util UUID])
@@ -112,8 +113,13 @@
   [{:keys [manager queue-name pagination]} uid]
   (let [underlying-objects (aor-types/underlying-objects manager)
         queue-page-query (:human-feedback-queue-page-query underlying-objects)
-        query-limit 20]
-    (foreign-invoke-query queue-page-query queue-name query-limit pagination)))
+        query-limit 20
+        ;; If pagination is a UUID string (initial cursor from item-id),
+        ;; decrement it by 1 so search-loop with inclusive?=false includes the target item
+        adjusted-pagination (if (string? pagination)
+                              (h/uuid-dec (java.util.UUID/fromString pagination))
+                              pagination)]
+    (foreign-invoke-query queue-page-query queue-name query-limit adjusted-pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/add-to-queue
   [{:keys [manager queue-name agent-name invoke-id node-task-id node-invoke-id comment]} uid]

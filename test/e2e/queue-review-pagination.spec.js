@@ -247,7 +247,7 @@ test.describe('Queue Review Pagination', () => {
     await lastVisibleRow.click();
     
     const firstItemUrl = page.url();
-    const firstItemIdMatch = firstItemUrl.match(/item\/([^/?]+)/);
+    const firstItemIdMatch = firstItemUrl.match(/items\/([^/?]+)/); // Note: "items" plural
     expect(firstItemIdMatch).toBeTruthy();
     const deepItemId = firstItemIdMatch[1];
     
@@ -264,7 +264,7 @@ test.describe('Queue Review Pagination', () => {
       if (i === 4) {
         // This is item #25
         const targetUrl = page.url();
-        const targetMatch = targetUrl.match(/item\/([^/?]+)/);
+        const targetMatch = targetUrl.match(/items\/([^/?]+)/); // Note: "items" plural
         targetItemId = targetMatch[1];
       }
     }
