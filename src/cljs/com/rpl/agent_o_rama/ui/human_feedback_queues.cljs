@@ -641,14 +641,14 @@
 
        ;; Rubrics
        ($ :div.mt-4
-          ($ :h4.text-sm.font-medium.text-gray-700.mb-2 "Rubrics:")
+          ($ :h4.text-sm.font-medium.text-gray-700.mb-2 "Metrics:")
           (if (empty? rubrics)
-            ($ :p.text-sm.text-gray-500.italic "No rubrics configured")
+            ($ :p.text-sm.text-gray-500.italic "No metrics configured")
             ($ :div.space-y-2
                (for [rubric rubrics]
                  (let [metric (:metric rubric)
-                       is-category? (= (:__typename metric) "HumanCategoryMetric")
-                       is-numeric? (= (:__typename metric) "HumanNumericMetric")]
+                       is-category? (metric-input/category-metric? metric)
+                       is-numeric? (metric-input/numeric-metric? metric)]
                    ($ :div.flex.items-start.gap-2 {:key (:name rubric)}
                       ($ :span.inline-flex.px-2.py-1.rounded.text-xs.font-medium
                          {:className (if (:required rubric)
