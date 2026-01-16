@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getBasicAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric } from './helpers.js';
+import { getBasicAgentRow, getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE: Human Feedback Queues
@@ -411,12 +411,13 @@ test.describe('Human Feedback Queues', () => {
     const metricName = `e2e-trace-metric-${uniqueId}`;
     
     // =============================================================================
-    // STEP 0: Create a test metric first
+    // STEP 0: Create a test metric using E2ETestAgent module
     // =============================================================================
     console.log('Step 0: Creating test metric');
     await page.goto('/');
-    const agentRow = await getBasicAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
+    await expect(page).toHaveURL(/E2ETestAgentModule/);
     
     // Navigate to Human Metrics
     await page.getByText('Human Metrics').click();
@@ -429,14 +430,13 @@ test.describe('Human Feedback Queues', () => {
     });
     console.log(`✓ Created metric: ${metricName}`);
     
-    // Navigate to Human Feedback Queues
-    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
-    await expect(page).toHaveURL(/human-feedback-queues/);
-    
     // =============================================================================
     // STEP 1: Create a queue
     // =============================================================================
     console.log('Step 1: Creating queue for trace test');
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await expect(page).toHaveURL(/human-feedback-queues/);
+    
     await page.getByTestId('create-queue-button').click();
     const modal = page.locator('[role="dialog"]');
     await expect(modal).toBeVisible();
@@ -447,42 +447,106 @@ test.describe('Human Feedback Queues', () => {
     // Add a rubric with our newly created metric
     await modal.getByTestId('add-rubric-button').click();
     const rubric = modal.getByTestId('rubric-0');
-    await expect(rubric).toBeVisible();
-    
-    // Click on the metric selector input to open dropdown
     await rubric.getByTestId('metric-selector-input').click();
-    
-    // Wait for dropdown to appear (it's rendered in a portal outside the modal)
-    await expect(page.getByTestId('metric-selector-dropdown')).toBeVisible({ timeout: 10000 });
-    
-    // Wait for options to load
-    await page.waitForTimeout(2000);
-    
-    // Find and select our specific metric
-    const metricOption = page.getByTestId('metric-selector-dropdown').locator('[role="option"]').filter({ hasText: metricName });
-    await metricOption.waitFor({ timeout: 15000 });
-    await metricOption.click();
+    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName }).click();
     
     await modal.getByRole('button', { name: 'Create' }).click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
-    
-    const queueRow = page.getByTestId(`queue-row-${queueName}`);
-    await expect(queueRow).toBeVisible({ timeout: 5000 });
     console.log(`✓ Created queue: ${queueName}`);
     
     // =============================================================================
-    // STEP 2: Verify queue detail page loads
+    // STEP 2: Invoke E2ETestAgent to create a trace
     // =============================================================================
-    console.log('Step 2: Verifying queue detail page');
-    await queueRow.getByTestId('queue-name-link').click();
-    await expect(page).toHaveURL(new RegExp(`human-feedback-queues/${encodeURIComponent(queueName)}`));
-    await expect(page.getByRole('heading', { name: queueName })).toBeVisible();
-    console.log('✓ Queue detail page loads successfully');
-    console.log('✓ Test complete - Core queue functionality verified');
+    console.log('Step 2: Invoking E2ETestAgent');
+    await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+    await expect(page).toHaveURL(/agent\/E2ETestAgent$/);
     
-    // Note: Testing the "Add to Queue" button from trace view and item detail page
-    // requires having actual invocations, which is best tested manually or with
-    // backend test helpers. The core UI components are now in place and working.
+    await invokeAgentManually(page, [{ query: 'test query for queue' }]);
+    
+    // invokeAgentManually already navigates to the trace page
+    await expect(page).toHaveURL(/invocations/);
+    console.log('✓ Invoked agent and navigated to trace page');
+    
+    // =============================================================================
+    // STEP 3: Add agent invocation to queue
+    // =============================================================================
+    console.log('Step 3: Adding agent invocation to queue');
+    
+    // Click the Feedback tab in the agent panel
+    await page.locator('[data-id="feedback-tab"]').click();
+    
+    // Click "Add to Queue" button in agent feedback panel
+    const agentFeedbackPanel = page.locator('[data-id="agent-feedback-container"]');
+    await agentFeedbackPanel.getByRole('button', { name: 'Add to Queue' }).click();
+    
+    // Select queue from modal using searchable selector
+    await expect(modal).toBeVisible();
+    await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+    await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+    
+    // Click "Add to Queue" submit button
+    await modal.getByRole('button', { name: 'Add to Queue' }).click();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
+    console.log('✓ Added agent invocation to queue');
+    
+    // =============================================================================
+    // STEP 4: Add node invocation to queue
+    // =============================================================================
+    console.log('Step 4: Adding node invocation to queue');
+    
+    // Select a node (processing_node)
+    await page.locator('[data-id]').filter({ hasText: 'processing_node' }).first().click();
+    
+    // Click the Feedback tab in the node panel
+    await page.locator('[data-id="node-feedback-tab"]').click();
+    
+    // Click "Add to Queue" button in node feedback panel
+    const nodeFeedbackPanel = page.locator('[data-id="node-feedback-container"]');
+    await nodeFeedbackPanel.getByRole('button', { name: 'Add to Queue' }).click();
+    
+    // Select queue from modal using searchable selector
+    await expect(modal).toBeVisible();
+    await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+    await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+    
+    // Click "Add to Queue" submit button
+    await modal.getByRole('button', { name: 'Add to Queue' }).click();
+    await expect(modal).not.toBeVisible({ timeout: 5000 });
+    console.log('✓ Added node invocation to queue');
+    
+    // =============================================================================
+    // STEP 5: Navigate to queue and verify items
+    // =============================================================================
+    console.log('Step 5: Verifying queue items');
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    
+    const queueRow = page.getByTestId(`queue-row-${queueName}`);
+    await expect(queueRow).toBeVisible({ timeout: 5000 });
+    await queueRow.getByTestId('queue-name-link').click();
+    
+    // Verify 2 items are in the queue (check table body rows)
+    const itemRows = page.locator('tbody').getByRole('row');
+    await expect(itemRows).toHaveCount(2, { timeout: 5000 });
+    console.log('✓ Queue shows 2 items');
+    
+    // =============================================================================
+    // STEP 6: View item detail page
+    // =============================================================================
+    console.log('Step 6: Viewing item detail');
+    
+    // Click on first item row to view detail
+    await itemRows.first().click();
+    
+    // Verify item detail page elements
+    await expect(page.getByText('Target Information')).toBeVisible();
+    await expect(page.getByText('Input')).toBeVisible();
+    await expect(page.getByText('Output')).toBeVisible();
+    await expect(page.getByText(metricName)).toBeVisible(); // Metric name should be visible
+    
+    console.log('✓ Item detail page displays correctly');
     
     // =============================================================================
     // CLEANUP: Delete queue and metric
@@ -496,11 +560,8 @@ test.describe('Human Feedback Queues', () => {
       await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
       const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
       await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
+      page.once('dialog', dialog => dialog.accept());
       await queueRowForDelete.getByTestId('delete-queue-button').click();
-      const confirmModal = page.locator('[role="dialog"]').filter({ hasText: 'Delete Queue' });
-      await expect(confirmModal).toBeVisible();
-      await confirmModal.getByRole('button', { name: 'Delete' }).click();
-      await expect(confirmModal).not.toBeVisible({ timeout: 5000 });
       await expect(queueRowForDelete).not.toBeVisible({ timeout: 5000 });
       console.log('✓ Deleted queue');
       
