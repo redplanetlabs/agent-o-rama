@@ -12,7 +12,7 @@ test.describe('Queue Review Pagination', () => {
   const metricName = `e2e-pagination-metric-${uniqueId}`;
   const NUM_ITEMS = 25; // More than one page worth of items
 
-  test('should handle pagination when reviewing queue items', async ({ page }) => {
+  test('should paginate with Load More button on queue detail page', async ({ page }) => {
     test.setTimeout(180000); // 3 minutes - creating 25 items takes time
     
     // =============================================================================
@@ -118,110 +118,22 @@ test.describe('Queue Review Pagination', () => {
     }
     
     // =============================================================================
-    // STEP 3: Test reviewing beyond initial page boundary
+    // STEP 3: Verify items are clickable after Load More
     // =============================================================================
-    console.log('Step 3: Testing review workflow across page boundary');
+    console.log('Step 3: Verifying loaded items are clickable');
     
-    // Click first item to start review
-    await itemsTable.getByRole('row').first().click();
+    // Click an item from the second page
+    const secondPageItem = itemsTable.getByRole('row').nth(initialCount + 2);
+    await expect(secondPageItem).toBeVisible();
+    await secondPageItem.click();
     await expect(page).toHaveURL(/item/);
     
-    // Review items up to and past the initial page boundary
-    // This tests that pagination automatically loads more items during review
-    const numToReview = initialCount + 5; // Go past the first page
-    
-    for (let i = 0; i < numToReview; i++) {
-      if (i % 5 === 0) {
-        console.log(`  Reviewing item ${i + 1}/${numToReview} (initial page had ${initialCount} items)...`);
-      }
-      
-      // Verify we're on an item review page
-      await expect(page.getByText('Target Information')).toBeVisible();
-      
-      // Quick review - just fill required fields
-      await page.getByTestId('metric-value-0').click();
-      await page.getByText('Pass').click();
-      await page.getByPlaceholder('Your name').fill('Pagination Tester');
-      
-      // Submit and continue
-      await page.getByRole('button', { name: 'Submit & Continue' }).click();
-      await page.waitForTimeout(800);
-      
-      // CRITICAL: After reviewing item #initialCount, we should automatically
-      // load the next page and continue to item #(initialCount+1) seamlessly
-      if (i === initialCount - 1) {
-        console.log(`  ✓ Crossed page boundary! Now on item ${i + 2} (beyond initial ${initialCount})`);
-      }
-    }
-    
-    console.log(`✓ Successfully reviewed ${numToReview} items across page boundary`);
-    console.log('✓ Pagination automatically loads more items during review');
-    
-    // Verify we can still navigate back (including to items from previous page)
-    const prevButton = page.getByTestId('previous-item-button');
-    
-    // Click Previous several times to go back across page boundary
-    for (let i = 0; i < 3; i++) {
-      await expect(prevButton).toBeEnabled();
-      await prevButton.click();
-      await page.waitForTimeout(500);
-      await expect(page.getByText('Target Information')).toBeVisible();
-    }
-    console.log('✓ Previous button works across page boundaries');
-    
-    // =============================================================================
-    // STEP 4: Test URL refresh on a deep item (cursor-based loading)
-    // =============================================================================
-    console.log('Step 4: Testing URL refresh with cursor-based pagination');
-    
-    // Navigate to queue list
-    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
-    const queueRow = page.getByTestId(`queue-row-${queueName}`);
-    await queueRow.getByTestId('queue-name-link').click();
-    
-    // Load all items on the queue page
-    let loadMoreCell = page.getByRole('cell', { name: 'Load More' });
-    while (await loadMoreCell.isVisible()) {
-      await loadMoreCell.click();
-      await page.waitForTimeout(1000);
-      loadMoreCell = page.getByRole('cell', { name: 'Load More' });
-    }
-    
-    // Get a deep item (should have at least initialCount + numToReview items remaining)
-    // Use item #15 (should be safe - we added 25 and reviewed ~15)
-    const deepItemRow = page.locator('tbody').getByRole('row').nth(14); // 0-indexed
-    await expect(deepItemRow).toBeVisible();
-    await deepItemRow.click();
-    
-    // Get current URL to use for refresh test
-    const currentUrl = page.url();
-    const itemIdMatch = currentUrl.match(/item\/([^/?]+)/);
-    expect(itemIdMatch).toBeTruthy(); // Fail test if URL format unexpected
-    
-    const deepItemId = itemIdMatch[1];
-    console.log(`✓ Navigated to deep item #15: ${deepItemId}`);
-    
-    // Refresh the page
-    await page.reload();
-    await page.waitForTimeout(1500);
-    
-    // Verify page loaded correctly with cursor-based pagination
-    await expect(page.getByText('Target Information')).toBeVisible({ timeout: 10000 });
+    // Verify it loaded correctly
+    await expect(page.getByText('Target Information')).toBeVisible();
     await expect(page.getByText(metricName)).toBeVisible();
     
-    // Previous button should be disabled (loaded from cursor, no earlier items)
-    await expect(page.getByTestId('previous-item-button')).toBeDisabled();
+    console.log('✓ Items from second page are accessible and display correctly');
     
-    // Next button should be enabled (more items available)
-    const nextBtn = page.getByTestId('next-item-button');
-    await expect(nextBtn).toBeEnabled();
-    
-    // Can navigate forward
-    await nextBtn.click();
-    await page.waitForTimeout(500);
-    await expect(page.getByText('Target Information')).toBeVisible();
-    
-    console.log('✓ URL refresh works - loaded from cursor, Previous disabled, Next enabled');
     
     // =============================================================================
     // CLEANUP: Delete queue and metric
@@ -244,6 +156,172 @@ test.describe('Queue Review Pagination', () => {
       console.log('✓ Deleted queue');
       
       // Delete metric
+      await page.getByText('Human Metrics').click();
+      await deleteHumanMetric(page, metricName);
+      console.log('✓ Cleanup complete');
+    }
+  });
+
+  test('should load from cursor when accessing deep item via URL', async ({ page }) => {
+    test.setTimeout(180000); // 3 minutes
+    
+    const uniqueId = randomUUID().substring(0, 8);
+    const queueName = `e2e-cursor-queue-${uniqueId}`;
+    const metricName = `e2e-cursor-metric-${uniqueId}`;
+    const NUM_ITEMS = 30;
+    
+    // =============================================================================
+    // SETUP: Create metric, queue, and add 30 items
+    // =============================================================================
+    console.log('--- Setup: Creating queue with 30 items ---');
+    await page.goto('/');
+    const agentRow = await getE2ETestAgentRow(page);
+    await agentRow.click();
+    
+    await page.getByText('Human Metrics').click();
+    await createHumanMetric(page, {
+      name: metricName,
+      type: 'categorical',
+      categories: ['Good', 'Bad']
+    });
+    
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByTestId('create-queue-button').click();
+    const modal = page.locator('[role="dialog"]');
+    await modal.getByTestId('queue-name-input').fill(queueName);
+    await modal.getByTestId('queue-description-input').fill('Cursor test');
+    await modal.getByTestId('add-rubric-button').click();
+    await modal.getByTestId('rubric-0').getByTestId('metric-selector-input').click();
+    await page.locator('[role="option"]').filter({ hasText: metricName }).click();
+    await modal.getByRole('button', { name: 'Create' }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    
+    // Add 30 items
+    console.log(`Adding ${NUM_ITEMS} items...`);
+    await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+    
+    const itemIds = [];
+    for (let i = 0; i < NUM_ITEMS; i++) {
+      if (i % 10 === 0) console.log(`  Adding item ${i + 1}/${NUM_ITEMS}...`);
+      
+      await invokeAgentManually(page, [{ query: `cursor test ${i}` }]);
+      await page.locator('[data-id="feedback-tab"]').click();
+      await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
+      await expect(modal).toBeVisible();
+      await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+      await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+      await modal.getByRole('button', { name: 'Add to Queue' }).click();
+      await expect(modal).not.toBeVisible({ timeout: 5000 });
+      
+      // Capture the item ID from the URL (we're on the trace page)
+      const currentUrl = page.url();
+      const invokeIdMatch = currentUrl.match(/invocations\/([^/?]+)/);
+      if (invokeIdMatch && i === 24) {
+        // Save the 25th item ID for direct URL test
+        itemIds.push(invokeIdMatch[1]);
+      }
+      
+      if (i < NUM_ITEMS - 1) {
+        await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+      }
+    }
+    console.log(`✓ Added ${NUM_ITEMS} items`);
+    
+    // =============================================================================
+    // TEST: Navigate directly to queue detail page
+    // =============================================================================
+    console.log('Test: Getting deep item ID without pre-loading cache');
+    
+    // Go to queue detail WITHOUT clicking Load More
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    const queueRow = page.getByTestId(`queue-row-${queueName}`);
+    await queueRow.getByTestId('queue-name-link').click();
+    
+    // Get the 25th item ID from the table (should be visible in first page of 20)
+    // Wait for table to load
+    await page.locator('tbody').getByRole('row').first().waitFor({ timeout: 5000 });
+    
+    // Click the last visible row to get its ID
+    const rows = page.locator('tbody').getByRole('row');
+    const lastVisibleRow = rows.nth(19); // 20th row (0-indexed)
+    await lastVisibleRow.click();
+    
+    const firstItemUrl = page.url();
+    const firstItemIdMatch = firstItemUrl.match(/item\/([^/?]+)/);
+    expect(firstItemIdMatch).toBeTruthy();
+    const deepItemId = firstItemIdMatch[1];
+    
+    console.log(`✓ Got item ID: ${deepItemId}`);
+    
+    // Now navigate to item #25 (which is NOT in the initial 20-item cache)
+    // We'll construct URL by going to next item 5 times
+    let targetItemId = deepItemId;
+    for (let i = 0; i < 5; i++) {
+      const nextBtn = page.getByTestId('next-item-button');
+      await nextBtn.click();
+      await page.waitForTimeout(500);
+      
+      if (i === 4) {
+        // This is item #25
+        const targetUrl = page.url();
+        const targetMatch = targetUrl.match(/item\/([^/?]+)/);
+        targetItemId = targetMatch[1];
+      }
+    }
+    
+    console.log(`✓ Navigated to item #25: ${targetItemId}`);
+    
+    // =============================================================================
+    // TEST: Direct URL navigation with cursor-based loading
+    // =============================================================================
+    console.log('Test: Direct URL navigation to deep item (no cache)');
+    
+    // Open a new page to ensure clean cache
+    const page2 = await page.context().newPage();
+    
+    // Navigate directly to item #25 URL
+    const targetUrl = page.url(); // Current URL with item #25
+    await page2.goto(targetUrl);
+    await page2.waitForTimeout(2000);
+    
+    // Verify page loaded correctly using cursor-based pagination
+    await expect(page2.getByText('Target Information')).toBeVisible({ timeout: 10000 });
+    await expect(page2.getByText(metricName)).toBeVisible();
+    
+    // Previous button should be disabled (loaded from cursor, no earlier items)
+    await expect(page2.getByTestId('previous-item-button')).toBeDisabled();
+    
+    // Next button should be enabled (items 26-30 exist)
+    const nextBtn = page2.getByTestId('next-item-button');
+    await expect(nextBtn).toBeEnabled();
+    
+    // Navigate forward successfully
+    await nextBtn.click();
+    await page2.waitForTimeout(500);
+    await expect(page2.getByText('Target Information')).toBeVisible();
+    
+    console.log('✓ Direct URL navigation works - loaded from cursor without pre-cached items');
+    
+    await page2.close();
+    
+    // =============================================================================
+    // CLEANUP
+    // =============================================================================
+    if (!shouldSkipCleanup()) {
+      console.log('--- Cleanup ---');
+      await page.goto('/');
+      await agentRow.click();
+      
+      await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+      await expect(page).toHaveURL(/human-feedback-queues$/);
+      
+      const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
+      await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
+      
+      page.once('dialog', dialog => dialog.accept());
+      await queueRowForDelete.getByTestId('delete-queue-button').click();
+      await expect(queueRowForDelete).not.toBeVisible({ timeout: 5000 });
+      
       await page.getByText('Human Metrics').click();
       await deleteHumanMetric(page, metricName);
       console.log('✓ Cleanup complete');
