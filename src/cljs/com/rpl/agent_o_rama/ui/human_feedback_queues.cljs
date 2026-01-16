@@ -2,7 +2,7 @@
   (:require
    [uix.core :as uix :refer [defui $]]
    [reitit.frontend.easy :as rfe]
-   ["@heroicons/react/24/outline" :refer [PencilIcon ChevronLeftIcon ChevronRightIcon XMarkIcon TrashIcon]]
+   ["@heroicons/react/24/outline" :refer [PencilIcon ChevronLeftIcon ChevronRightIcon XMarkIcon TrashIcon ArrowTopRightOnSquareIcon]]
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
@@ -1000,6 +1000,54 @@
                                                 :queue-id queue-id
                                                 :item-id next-item-id}))}
                   ($ ChevronRightIcon {:className "h-5 w-5"}))))
+
+         ;; Target Info Panel (Agent/Node with trace link)
+         (let [target (:target current-item)
+               agent-name (:agent-name target)
+               agent-invoke (:agent-invoke target)
+               node-invoke (:node-invoke target)
+               agent-task-id (:task-id agent-invoke)
+               agent-invoke-id (:agent-invoke-id agent-invoke)
+               ;; Build URL to agent invocation
+               agent-url (str "/agents/" module-id
+                              "/agent/" (common/url-encode agent-name)
+                              "/invocations/" agent-task-id "-" agent-invoke-id)
+               ;; Build URL to node invocation if node-invoke exists
+               node-url (when node-invoke
+                          (let [node-task-id (:task-id node-invoke)
+                                node-invoke-id (:node-invoke-id node-invoke)]
+                            (str agent-url "#node-" node-task-id "-" node-invoke-id)))]
+           ($ :div.bg-gray-50.border.border-gray-200.rounded-md.p-4.mb-6
+              {:data-testid "target-info-panel"}
+              ($ :div.space-y-3
+                 ($ :div.text-sm.font-semibold.text-gray-900 "Target Information")
+                 ($ :div.flex.flex-col.gap-2
+                    ;; Agent info with link
+                    ($ :div.flex.items-start.gap-2
+                       ($ :span.text-xs.text-gray-500.w-16 "Agent:")
+                       ($ :div.flex.items-center.gap-1.flex-1
+                          ($ :a.text-sm.font-mono.text-blue-600.hover:text-blue-800.hover:underline.font-medium
+                             {:href agent-url
+                              :target "_blank"
+                              :data-testid "agent-trace-link"}
+                             agent-name)
+                          ($ ArrowTopRightOnSquareIcon {:className "h-3.5 w-3.5 text-blue-500"})))
+                    ;; Invocation ID
+                    ($ :div.flex.items-start.gap-2
+                       ($ :span.text-xs.text-gray-500.w-16 "Invocation:")
+                       ($ :span.text-xs.font-mono.text-gray-700
+                          (str agent-task-id "-" agent-invoke-id)))
+                    ;; Node info (if exists)
+                    (when node-invoke
+                      ($ :div.flex.items-start.gap-2
+                         ($ :span.text-xs.text-gray-500.w-16 "Node:")
+                         ($ :div.flex.items-center.gap-1.flex-1
+                            ($ :a.text-xs.font-mono.text-blue-600.hover:text-blue-800.hover:underline
+                               {:href node-url
+                                :target "_blank"
+                                :data-testid "node-trace-link"}
+                               (str (:task-id node-invoke) "-" (:node-invoke-id node-invoke)))
+                            ($ ArrowTopRightOnSquareIcon {:className "h-3 w-3 text-blue-500"}))))))))
 
          ;; Comment
          (when (not (str/blank? (:comment current-item)))
