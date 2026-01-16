@@ -931,15 +931,20 @@
                                10000
                                (fn [reply]
                                  (if (:success reply)
-                                   ;; Auto-advance to next item
-                                   (if has-next?
-                                     (rfe/push-state :module/human-feedback-queue-item
-                                                     {:module-id module-id
-                                                      :queue-id queue-id
-                                                      :item-id next-item-id})
-                                     (rfe/push-state :module/human-feedback-queue-end
-                                                     {:module-id module-id
-                                                      :queue-id queue-id}))
+                                   (do
+                                     ;; Clear form state before navigating
+                                     (set-scores {})
+                                     (set-comment "")
+                                     (set-errors {})
+                                     ;; Auto-advance to next item
+                                     (if has-next?
+                                       (rfe/push-state :module/human-feedback-queue-item
+                                                       {:module-id module-id
+                                                        :queue-id queue-id
+                                                        :item-id next-item-id})
+                                       (rfe/push-state :module/human-feedback-queue-end
+                                                       {:module-id module-id
+                                                        :queue-id queue-id})))
                                    (js/alert (str "Error submitting: " (:error reply)))))))
                             (set-errors validation-errors))))
 
