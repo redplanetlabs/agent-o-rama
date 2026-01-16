@@ -521,7 +521,7 @@
                   :rubrics clean-rubrics}])))
    :on-success-invalidate (fn [db {:keys [module-id name]} _reply]
                             {:query-key-pattern [:human-feedback-queues module-id]
-                             :additional-keys [[:human-feedback-queue-info module-id (common/url-encode name)]]})}})
+                             :additional-keys [[:human-feedback-queue-info module-id (common/url-encode name)]]})})
 
 
 ;; =============================================================================
