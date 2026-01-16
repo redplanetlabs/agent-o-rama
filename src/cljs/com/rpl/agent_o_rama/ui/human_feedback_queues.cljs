@@ -237,39 +237,39 @@
                                        (not= (count categories) (count (set categories)))
                                        "Duplicate categories are not allowed"
 
-                                       :else nil)))))]}
-   :min [(fn [v form-state]
-           (when (= (:type form-state) :numeric)
-             (cond
-               (or (str/blank? (str v))
-                   (js/isNaN (js/parseInt v 10)))
-               "Min must be an integer"
+                                       :else nil)))))]
+                :min [(fn [v form-state]
+                        (when (= (:type form-state) :numeric)
+                          (cond
+                            (or (str/blank? (str v))
+                                (js/isNaN (js/parseInt v 10)))
+                            "Min must be an integer"
 
-               (not= (js/parseInt v 10) (js/parseFloat v))
-               "Min must be an integer (no decimals)"
+                            (not= (js/parseInt v 10) (js/parseFloat v))
+                            "Min must be an integer (no decimals)"
 
-               :else
-               (let [min-val (js/parseInt v 10)
-                     max-val (js/parseInt (:max form-state) 10)]
-                 (when (and (not (js/isNaN max-val))
-                            (>= min-val max-val))
-                   "Min must be less than Max")))))]
-   :max [(fn [v form-state]
-           (when (= (:type form-state) :numeric)
-             (cond
-               (or (str/blank? (str v))
-                   (js/isNaN (js/parseInt v 10)))
-               "Max must be an integer"
+                            :else
+                            (let [min-val (js/parseInt v 10)
+                                  max-val (js/parseInt (:max form-state) 10)]
+                              (when (and (not (js/isNaN max-val))
+                                         (>= min-val max-val))
+                                "Min must be less than Max")))))]
+                :max [(fn [v form-state]
+                        (when (= (:type form-state) :numeric)
+                          (cond
+                            (or (str/blank? (str v))
+                                (js/isNaN (js/parseInt v 10)))
+                            "Max must be an integer"
 
-               (not= (js/parseInt v 10) (js/parseFloat v))
-               "Max must be an integer (no decimals)"
+                            (not= (js/parseInt v 10) (js/parseFloat v))
+                            "Max must be an integer (no decimals)"
 
-               :else
-               (let [min-val (js/parseInt (:min form-state) 10)
-                     max-val (js/parseInt v 10)]
-                 (when (and (not (js/isNaN min-val))
-                            (<= max-val min-val))
-                   "Max must be greater than Min")))))]
+                            :else
+                            (let [min-val (js/parseInt (:min form-state) 10)
+                                  max-val (js/parseInt v 10)]
+                              (when (and (not (js/isNaN min-val))
+                                         (<= max-val min-val))
+                                "Max must be greater than Min")))))]}
    :ui (fn [{:keys [form-id]}]
          (let [type-field (forms/use-form-field form-id :type)
                name-field (forms/use-form-field form-id :name)
