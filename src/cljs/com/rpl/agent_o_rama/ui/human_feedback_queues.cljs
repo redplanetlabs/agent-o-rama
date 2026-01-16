@@ -13,7 +13,9 @@
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
-   [clojure.string :as str]))
+   [clojure.string :as str]
+   [cljs.pprint]
+   [cljs.reader]))
 
 ;; =============================================================================
 ;; DUMMY DATA
@@ -810,6 +812,48 @@
 (defn- numeric-metric? [metric]
   (contains? metric :min))
 
+;; Helper to truncate text to first N lines
+(defn- truncate-to-lines [text max-lines]
+  (let [lines (str/split-lines text)
+        line-count (count lines)]
+    (if (<= line-count max-lines)
+      {:text text
+       :truncated? false
+       :line-count line-count}
+      {:text (str/join "\n" (take max-lines lines))
+       :truncated? true
+       :line-count line-count})))
+
+;; Component for showing truncated JSON with expandable modal
+(defui ExpandableJsonContent [{:keys [content title max-lines]
+                               :or {max-lines 30}}]
+  (let [;; If content is a string, try to parse it first, otherwise use as-is
+        parsed-content (if (string? content)
+                         (try
+                           (cljs.reader/read-string content)
+                           (catch js/Error _e content))
+                         content)
+        ;; Use with-out-str and pprint to ensure proper formatting
+        pretty-str (if (string? parsed-content)
+                     parsed-content  ; Already a string, use as-is
+                     (with-out-str (cljs.pprint/pprint parsed-content)))
+        {:keys [text truncated? line-count]} (truncate-to-lines pretty-str max-lines)
+        handle-expand (fn [e]
+                        (.stopPropagation e)
+                        (state/dispatch [:modal/show :content-detail
+                                        {:title title
+                                         :component ($ common/ContentDetailModal 
+                                                      {:title title 
+                                                       :content pretty-str})}]))]
+    ($ :div
+       ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64.font-mono.whitespace-pre
+          text)
+       (when truncated?
+         ($ :div.mt-2.text-center
+            ($ :button.text-xs.text-blue-600.hover:text-blue-800.font-medium.cursor-pointer
+               {:onClick handle-expand}
+               (str "Show all " line-count " lines ↗")))))))
+
 ;; Use the shared metric input component for queue item review
 (defui metric-field [{:keys [rubric value on-change error data-testid]}]
   ($ metric-input/MetricInput
@@ -1079,13 +1123,15 @@
             ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
                {:data-id "item-input"}
                ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Input")
-               ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64
-                  (common/to-json (:input current-item))))
+               ($ ExpandableJsonContent {:content (:input current-item)
+                                        :title "Input"
+                                        :max-lines 30}))
             ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
                {:data-id "item-output"}
                ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Output")
-               ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64
-                  (common/to-json (:output current-item)))))
+               ($ ExpandableJsonContent {:content (:output current-item)
+                                        :title "Output"
+                                        :max-lines 30})))
 
          ;; Evaluation Form
          ($ :div.bg-white.border.border-gray-200.rounded-md.p-6.mb-6
