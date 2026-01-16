@@ -341,8 +341,7 @@
 
 ;; A simple modal component to display pre-formatted text content.
 (defui ContentDetailModal [{:keys [title content]}]
-  ($ :div.p-6
-     ($ :h3.text-lg.font-bold.mb-4 title)
+  ($ :div.p-3
      ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-screen.font-mono.whitespace-pre-wrap.break-words
         content)))
 
