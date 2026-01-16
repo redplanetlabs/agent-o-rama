@@ -113,6 +113,7 @@
    - :query-key - A unique vector key to identify this query's state.
    - :sente-event - The base Sente event vector. Pagination params will be merged into it.
    - :page-size - The number of items to fetch per page.
+   - :initial-cursor - Optional starting cursor (e.g., item-id to start from).
    - :enabled? - Boolean to control if the query should run.
 
    Returns a map with:
@@ -123,7 +124,7 @@
    - :error - Error message if a fetch fails.
    - :loadMore - A function to call to fetch the next page.
    - :refetch - A function to clear all data and start from page 1."
-  [{:keys [query-key sente-event page-size enabled?]
+  [{:keys [query-key sente-event page-size initial-cursor enabled?]
     :or {page-size 20 enabled? true}}]
   (let [state-path (into [:queries] query-key)
         query-state (state/use-sub state-path)
@@ -225,10 +226,10 @@
      (fn []
        ;; Only fetch if connected, enabled, and we don't have data yet
        (when (and connected? enabled? (empty? data))
-         (fetch-page nil false))
+         (fetch-page initial-cursor false))
        js/undefined)
      ;; Re-run when connection status or enabled changes, or when fetch-page changes
-     [connected? enabled? data fetch-page])
+     [connected? enabled? data fetch-page initial-cursor])
 
     ;; Effect to watch for invalidation flag and auto-refetch
     (uix/use-effect

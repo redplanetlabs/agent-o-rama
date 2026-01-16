@@ -881,24 +881,39 @@
           :enabled? (boolean (and decoded-module-id decoded-queue-id))})
         queue-info data
 
-        ;; Fetch all queue items (we need the list for prev/next navigation)
-        {:keys [data isLoading]}
+        ;; Fetch queue items starting from current item-id (for efficient URL navigation)
+        ;; Use item-id in query key so each item gets its own cache
+        {:keys [data isLoading hasMore loadMore]}
         (queries/use-paginated-query
-         {:query-key [:human-feedback-queue-items module-id queue-id]
+         {:query-key [:human-feedback-queue-items-from module-id queue-id item-id]
           :sente-event [:human-feedback/get-queue-items
                         {:module-id decoded-module-id
                          :queue-name decoded-queue-id}]
-          :page-size 100  ;; Load more items for navigation
-          :enabled? (boolean (and decoded-module-id decoded-queue-id))})
+          :page-size 50
+          :initial-cursor item-id  ;; Start from current item on page load
+          :enabled? (boolean (and decoded-module-id decoded-queue-id item-id))})
         items-loading? isLoading
-        items (or data [])  ;; data IS the items array from use-paginated-query
+        items (or data [])
+        
+        ;; Auto-load more if current item not found yet and more pages available
+        _ (uix/use-effect
+           (fn []
+             (let [item-id-str (str item-id)
+                   found? (some #(= (str (:id %)) item-id-str) items)]
+               (when (and (not found?) hasMore (not isLoading))
+                 (loadMore))))
+           [item-id items hasMore isLoading loadMore])
 
         ;; Find current item and navigation indices
-        ;; Compare as strings since item-id from route may be UUID or string
         item-id-str (str item-id)
         current-idx (some (fn [[idx item]] (when (= (str (:id item)) item-id-str) idx))
                           (map-indexed vector items))
         current-item (when current-idx (nth items current-idx nil))
+        
+        ;; Navigation: 
+        ;; - Previous disabled if we're at index 0 (no earlier items loaded)
+        ;; - Next enabled if there are more items in array
+        ;; - When approaching end and hasMore, we auto-load more above
         has-prev? (and current-idx (> current-idx 0))
         has-next? (and current-idx (< current-idx (dec (count items))))
         prev-item-id (when has-prev? (str (:id (nth items (dec current-idx)))))
