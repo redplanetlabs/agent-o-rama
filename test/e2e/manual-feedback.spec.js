@@ -232,8 +232,8 @@ test.describe('Manual Human Feedback', () => {
     // Verify feedback appears in the list
     await expect(page.locator('[data-id="feedback-list"]')).toBeVisible({ timeout: 10000 });
     
-    // Look for "Human:" prefix in feedback (indicates human feedback)
-    const humanFeedback = page.locator('text=/Human:/').first();
+    // Look for "human[" prefix in feedback (indicates human feedback)
+    const humanFeedback = page.locator('text=/human\\[/').first();
     await expect(humanFeedback).toBeVisible({ timeout: 5000 });
     console.log('✓ Feedback submitted and visible');
     
@@ -320,7 +320,7 @@ test.describe('Manual Human Feedback', () => {
     await page.waitForTimeout(2000);
     
     // Verify the updated feedback shows "Updated Reviewer"
-    await expect(page.locator('text=/Human:.*Updated Reviewer/')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=/human\\[Updated Reviewer\\]/')).toBeVisible({ timeout: 5000 });
     
     console.log('✓ Feedback edited successfully');
     
