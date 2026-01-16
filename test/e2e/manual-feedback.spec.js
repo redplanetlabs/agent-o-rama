@@ -144,16 +144,18 @@ test.describe('Manual Human Feedback', () => {
     await modal.getByTestId('add-metric-button').click();
     await page.waitForTimeout(500);
     
-    // Click on the selector in the new row
-    await modal.getByTestId('metric-selector-0').getByRole('combobox').click();
+    // Click on the input in the new row to open dropdown
+    const metricInput = modal.getByTestId('metric-selector-0-input');
+    await metricInput.click();
     await page.waitForTimeout(500);
     
     // Type to search for our metric
-    await modal.getByTestId('metric-selector-0').getByRole('combobox').fill(metricName1);
+    await metricInput.fill(metricName1);
     await page.waitForTimeout(500);
     
     // Click first option (our categorical metric)
-    const firstOption = modal.locator('[role="option"]').first();
+    // Note: Options are rendered in a portal outside the modal
+    const firstOption = page.locator('[role="option"]').first();
     await firstOption.waitFor({ timeout: 5000 });
     await firstOption.click();
     
@@ -168,8 +170,10 @@ test.describe('Manual Human Feedback', () => {
     // Button should still be disabled without value
     await expect(submitButton).toBeDisabled();
     
-    // Select a category
-    await modal.getByTestId('metric-value-0').selectOption('Good');
+    // Select a category by clicking the dropdown button then the item
+    await modal.getByTestId('metric-value-0').click();
+    await page.waitForTimeout(300);
+    await page.getByText('Good').click();
     
     // Now button should be enabled
     await expect(submitButton).not.toBeDisabled();
@@ -184,16 +188,18 @@ test.describe('Manual Human Feedback', () => {
     await modal.getByTestId('add-metric-button').click();
     await page.waitForTimeout(500);
     
-    // Click on the second selector
-    await modal.getByTestId('metric-selector-1').getByRole('combobox').click();
+    // Click on the second selector input
+    const numericMetricInput = modal.getByTestId('metric-selector-1-input');
+    await numericMetricInput.click();
     await page.waitForTimeout(500);
     
     // Type to search for numeric metric
-    await modal.getByTestId('metric-selector-1').getByRole('combobox').fill(metricName2);
+    await numericMetricInput.fill(metricName2);
     await page.waitForTimeout(500);
     
     // Click the numeric metric
-    const numericOption = modal.locator('[role="option"]').first();
+    // Note: Options are rendered in a portal outside the modal
+    const numericOption = page.locator('[role="option"]').first();
     await numericOption.waitFor({ timeout: 5000 });
     await numericOption.click();
     
@@ -271,13 +277,18 @@ test.describe('Manual Human Feedback', () => {
     // Add a metric
     await modal.getByTestId('add-metric-button').click();
     await page.waitForTimeout(500);
-    await modal.getByTestId('metric-selector-0').getByRole('combobox').click();
+    const metricInput = modal.getByTestId('metric-selector-0-input');
+    await metricInput.click();
     await page.waitForTimeout(500);
-    await modal.getByTestId('metric-selector-0').getByRole('combobox').fill(metricName1);
+    await metricInput.fill(metricName1);
     await page.waitForTimeout(500);
-    await modal.locator('[role="option"]').first().click();
+    await page.locator('[role="option"]').first().click();
     
-    await modal.getByTestId('metric-value-0').selectOption('Good');
+    // Select category from dropdown
+    await modal.getByTestId('metric-value-0').click();
+    await page.waitForTimeout(300);
+    await page.getByText('Good').click();
+    
     await modal.getByTestId('feedback-comment-input').fill('Original comment');
     
     await modal.getByRole('button', { name: /Submit/i }).click();
@@ -332,11 +343,12 @@ test.describe('Manual Human Feedback', () => {
     // Add numeric metric
     await modal.getByTestId('add-metric-button').click();
     await page.waitForTimeout(500);
-    await modal.getByTestId('metric-selector-0').getByRole('combobox').click();
+    const metricInput = modal.getByTestId('metric-selector-0-input');
+    await metricInput.click();
     await page.waitForTimeout(500);
-    await modal.getByTestId('metric-selector-0').getByRole('combobox').fill(metricName2);
+    await metricInput.fill(metricName2);
     await page.waitForTimeout(500);
-    await modal.locator('[role="option"]').first().click();
+    await page.locator('[role="option"]').first().click();
     
     // Try to enter value outside range (metric is 1-10)
     await modal.getByTestId('metric-value-0').fill('15');
