@@ -371,4 +371,79 @@ test.describe('Manual Human Feedback', () => {
     // Close modal
     await modal.getByRole('button', { name: /Cancel|Close/i }).click();
   });
+
+  test('should add manual feedback to a node', async ({ page }) => {
+    const modal = page.locator('[role="dialog"]');
+    
+    console.log('Test: Node-level manual feedback');
+    
+    // =============================================================================
+    // SETUP: Select a node in the graph
+    // =============================================================================
+    console.log('Step 1: Selecting a node in the graph');
+    // Click on the process node (not the root)
+    const processNode = page.locator('[data-id]').filter({ hasText: 'process' }).first();
+    await expect(processNode).toBeVisible({ timeout: 10000 });
+    await processNode.click();
+    console.log('✓ Node selected');
+    
+    // =============================================================================
+    // STEP 2: Click node feedback tab
+    // =============================================================================
+    console.log('Step 2: Clicking node feedback tab');
+    await page.locator('[data-id="node-feedback-tab"]').click();
+    await page.waitForTimeout(1000);
+    console.log('✓ Node feedback tab opened');
+    
+    // =============================================================================
+    // STEP 3: Add feedback to the node
+    // =============================================================================
+    console.log('Step 3: Adding node feedback');
+    await page.getByTestId('add-feedback-button').click();
+    await expect(modal).toBeVisible();
+    
+    // Fill in feedback
+    await modal.getByTestId('reviewer-name-input').fill('Node Reviewer');
+    
+    // Add a metric
+    await modal.getByTestId('add-metric-button').click();
+    await page.waitForTimeout(500);
+    const metricInput = modal.getByTestId('metric-selector-0-input');
+    await metricInput.click();
+    await page.waitForTimeout(500);
+    await metricInput.fill(metricName1);
+    await page.waitForTimeout(500);
+    await page.locator('[role="option"]').first().click();
+    
+    // Select category
+    await modal.getByTestId('metric-value-0').click();
+    await page.waitForTimeout(300);
+    await page.getByText('Good').click();
+    
+    // Add comment
+    await modal.getByTestId('feedback-comment-input').fill('Node feedback comment');
+    
+    // Submit
+    await modal.getByRole('button', { name: /Submit/i }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(2000);
+    
+    // Verify feedback appears
+    const nodeFeedback = page.locator('text=/human\\[Node Reviewer\\]/').first();
+    await expect(nodeFeedback).toBeVisible({ timeout: 5000 });
+    console.log('✓ Node feedback submitted and visible');
+    
+    // =============================================================================
+    // STEP 4: Delete node feedback
+    // =============================================================================
+    console.log('Step 4: Deleting node feedback');
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByTestId('delete-feedback-button').first().click();
+    await page.waitForTimeout(2000);
+    
+    // Verify feedback is gone
+    await expect(page.locator('text=/human\\[Node Reviewer\\]/')).not.toBeVisible();
+    await expect(page.getByText('No feedback available')).toBeVisible();
+    console.log('✓ Node feedback deleted');
+  });
 });
