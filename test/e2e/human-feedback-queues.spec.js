@@ -582,12 +582,15 @@ test.describe('Human Feedback Queues', () => {
     // Fill in reviewer name (should be pre-filled from previous review)
     await page.getByPlaceholder('Your name').fill('Test Reviewer');
     
-    // Submit review
+    // Submit review - should show "Reached end of queue" message
     await page.getByRole('button', { name: 'Submit & Continue' }).click();
-    await page.waitForTimeout(1000); // Wait for navigation
-    console.log('✓ Reviewed node invocation');
+    await page.waitForTimeout(1000);
     
-    // Verify queue is now empty
+    // Verify "Reached end of queue" message appears
+    await expect(page.getByText(/Reached end of.*queue|No more items|All items reviewed/i)).toBeVisible({ timeout: 5000 });
+    console.log('✓ Reviewed node invocation - reached end of queue');
+    
+    // Navigate back and verify queue is empty
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
     const queueRowFinal = page.getByTestId(`queue-row-${queueName}`);
     await queueRowFinal.getByTestId('queue-name-link').click();
@@ -617,5 +620,140 @@ test.describe('Human Feedback Queues', () => {
       console.log('✓ Cleanup complete');
     }
   });
+
+  test('should handle queue item navigation and dismiss', async ({ page }) => {
+    const uniqueId = randomUUID().substring(0, 8);
+    const queueName = `e2e-nav-queue-${uniqueId}`;
+    const metricName = `e2e-nav-metric-${uniqueId}`;
+    
+    // =============================================================================
+    // SETUP: Create metric, queue, and add 3 items to queue
+    // =============================================================================
+    console.log('--- Setup: Creating metric and queue ---');
+    await page.goto('/');
+    const agentRow = await getE2ETestAgentRow(page);
+    await agentRow.click();
+    
+    // Create metric
+    await page.getByText('Human Metrics').click();
+    await createHumanMetric(page, {
+      name: metricName,
+      type: 'categorical',
+      categories: ['Good', 'Bad']
+    });
+    
+    // Create queue
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByTestId('create-queue-button').click();
+    const modal = page.locator('[role="dialog"]');
+    await modal.getByTestId('queue-name-input').fill(queueName);
+    await modal.getByTestId('queue-description-input').fill('Navigation test queue');
+    await modal.getByTestId('add-rubric-button').click();
+    await modal.getByTestId('rubric-0').getByTestId('metric-selector-input').click();
+    await page.locator('[role="option"]').filter({ hasText: metricName }).click();
+    await modal.getByRole('button', { name: 'Create' }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    
+    // Add 3 invocations to queue
+    console.log('Adding 3 items to queue');
+    await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+    
+    for (let i = 0; i < 3; i++) {
+      await invokeAgentManually(page, [{ query: `test query ${i}` }]);
+      await page.locator('[data-id="feedback-tab"]').click();
+      await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
+      await expect(modal).toBeVisible();
+      await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+      await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+      await modal.getByRole('button', { name: 'Add to Queue' }).click();
+      await expect(modal).not.toBeVisible({ timeout: 5000 });
+      
+      if (i < 2) {
+        await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+      }
+    }
+    console.log('✓ Added 3 items to queue');
+    
+    // =============================================================================
+    // TEST 1: Navigate to queue and test Previous/Next buttons
+    // =============================================================================
+    console.log('Test 1: Testing Previous/Next navigation');
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    const queueRow = page.getByTestId(`queue-row-${queueName}`);
+    await queueRow.getByTestId('queue-name-link').click();
+    
+    // Click first item
+    const firstItem = page.locator('tbody').getByRole('row').first();
+    await firstItem.click();
+    await expect(page).toHaveURL(/item/);
+    
+    // Previous button should be disabled (we're on first item)
+    const prevButton = page.getByTestId('previous-item-button');
+    await expect(prevButton).toBeDisabled();
+    
+    // Next button should be enabled
+    const nextButton = page.getByTestId('next-item-button');
+    await expect(nextButton).toBeEnabled();
+    
+    // Click Next to go to second item
+    await nextButton.click();
+    await page.waitForTimeout(500);
+    
+    // Now both buttons should be enabled (we're in the middle)
+    await expect(prevButton).toBeEnabled();
+    await expect(nextButton).toBeEnabled();
+    console.log('✓ Previous/Next buttons work correctly');
+    
+    // Go back to first item
+    await prevButton.click();
+    await page.waitForTimeout(500);
+    await expect(prevButton).toBeDisabled();
+    console.log('✓ Previous button navigation works');
+    
+    // =============================================================================
+    // TEST 2: Test Dismiss button
+    // =============================================================================
+    console.log('Test 2: Testing Dismiss button');
+    
+    // Click Dismiss
+    page.once('dialog', dialog => {
+      expect(dialog.message()).toMatch(/dismiss|remove/i);
+      dialog.accept();
+    });
+    await page.getByRole('button', { name: 'Dismiss' }).click();
+    
+    // Should navigate to next item or back to queue
+    await page.waitForTimeout(1000);
+    
+    // Verify we moved to next item (2 items should remain)
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await queueRow.getByTestId('queue-name-link').click();
+    const remainingItems = page.locator('tbody').getByRole('row');
+    await expect(remainingItems).toHaveCount(2);
+    console.log('✓ Dismiss button removes item from queue');
+    
+    // =============================================================================
+    // CLEANUP
+    // =============================================================================
+    if (!shouldSkipCleanup()) {
+      console.log('--- Cleanup ---');
+      
+      // Navigate back to queue list page first
+      await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+      await expect(page).toHaveURL(/human-feedback-queues$/);
+      
+      const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
+      await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
+      
+      page.once('dialog', dialog => dialog.accept());
+      await queueRowForDelete.getByTestId('delete-queue-button').click();
+      await expect(queueRowForDelete).not.toBeVisible({ timeout: 5000 });
+      
+      await page.getByText('Human Metrics').click();
+      await deleteHumanMetric(page, metricName);
+      console.log('✓ Cleanup complete');
+    }
+  });
+
 });
 

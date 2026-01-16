@@ -450,4 +450,72 @@ test.describe('Manual Human Feedback', () => {
     await expect(nodeFeedbackPanel.getByText('No feedback available')).toBeVisible();
     console.log('✓ Node feedback deleted');
   });
+
+  test('should edit feedback and change metric values', async ({ page }) => {
+    const modal = page.locator('[role="dialog"]');
+    const agentFeedbackPanel = page.locator('[data-id="agent-feedback-container"]');
+    
+    // =============================================================================
+    // SETUP: Add feedback with a categorical metric
+    // =============================================================================
+    console.log('Setup: Adding initial feedback with metric');
+    
+    await agentFeedbackPanel.getByTestId('add-feedback-button').click();
+    await expect(modal).toBeVisible();
+    
+    await modal.getByTestId('reviewer-name-input').fill('Original Reviewer');
+    
+    // Add categorical metric
+    await modal.getByTestId('add-metric-button').click();
+    await page.waitForTimeout(500);
+    const metricInput = modal.getByTestId('metric-selector-0-input');
+    await metricInput.click();
+    await metricInput.fill(metricName1);
+    await page.waitForTimeout(500);
+    await page.locator('[role="option"]').first().click();
+    
+    // Select initial category value
+    await modal.getByTestId('metric-value-0').click();
+    await page.getByText('Good').click();
+    
+    await modal.getByTestId('feedback-comment-input').fill('Initial comment');
+    await modal.getByRole('button', { name: /Submit/i }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1000);
+    console.log('✓ Initial feedback added with "Good" rating');
+    
+    // =============================================================================
+    // TEST: Edit feedback and change metric value
+    // =============================================================================
+    console.log('Test: Editing feedback and changing metric value');
+    
+    await agentFeedbackPanel.getByTestId('edit-feedback-button').first().click();
+    await expect(modal).toBeVisible();
+    
+    // Verify metric value is pre-selected
+    const metricDropdown = modal.getByTestId('metric-value-0');
+    await expect(metricDropdown).toContainText('Good');
+    
+    // Change metric value from "Good" to "Bad"
+    await metricDropdown.click();
+    await page.getByText('Bad').click();
+    
+    // Also update reviewer name and comment
+    await modal.getByTestId('reviewer-name-input').fill('Updated Reviewer');
+    await modal.getByTestId('feedback-comment-input').fill('Updated comment with new rating');
+    
+    await modal.getByRole('button', { name: /Submit|Save/i }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1000);
+    
+    // Verify updates are visible
+    await expect(page.locator('text=/human\\[Updated Reviewer\\]/')).toBeVisible();
+    console.log('✓ Feedback edited with metric value changed to "Bad"');
+    
+    // Cleanup
+    page.once('dialog', dialog => dialog.accept());
+    await agentFeedbackPanel.getByTestId('delete-feedback-button').click();
+    await page.waitForTimeout(1000);
+    console.log('✓ Cleanup complete');
+  });
 });
