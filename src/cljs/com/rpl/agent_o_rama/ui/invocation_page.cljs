@@ -57,9 +57,18 @@
         _ (uix/use-effect
            (fn []
              (when (and graph-data (not selected-node-id))
-               (let [;; Check if the node from query param exists in the graph
-                     node-from-query (when (and node-query-param (get graph-data node-query-param))
-                                       node-query-param)
+               (let [;; Parse node from query param: format is "task-id-node-invoke-id"
+                     ;; We need to extract the node-invoke-id (UUID) part
+                     node-uuid (when node-query-param
+                                 (let [parts (clojure.string/split node-query-param #"-" 2)]
+                                   (when (= 2 (count parts))
+                                     (try
+                                       (uuid (second parts))
+                                       (catch js/Error e
+                                         nil)))))
+                     ;; Check if the parsed node UUID exists in the graph
+                     node-from-query (when (and node-uuid (get graph-data node-uuid))
+                                       node-uuid)
                      ;; Fallback to root node
                      node-to-select (or node-from-query root-invoke-id)]
                  (when node-to-select
