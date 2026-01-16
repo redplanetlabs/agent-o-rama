@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getBasicAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric } from './helpers.js';
+import { getBasicAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE: Manual Human Feedback (Add/Edit/Delete)
@@ -13,13 +13,15 @@ test.describe('Manual Human Feedback', () => {
   let agentInvokeUrl;
   
   test.beforeAll(async ({ browser }) => {
-    // Create test metrics
+    // Create test metrics and an invocation for testing
     const page = await browser.newPage();
     await page.goto('/');
     
     const agentRow = await getBasicAgentRow(page);
     await agentRow.click();
     await expect(page).toHaveURL(/BasicAgentModule/);
+    
+    // Create test metrics
     await page.getByRole('link', { name: 'Human Metrics' }).click();
     await expect(page).toHaveURL(/human-metrics/);
     
@@ -38,8 +40,18 @@ test.describe('Manual Human Feedback', () => {
       max: 10
     });
     
-    await page.close();
     console.log('✓ Test metrics created');
+    
+    // Create a test invocation by invoking BasicAgent
+    // Navigate back to agent detail page
+    await page.goBack();
+    await expect(page).toHaveURL(/BasicAgentModule/);
+    
+    // Invoke the agent with test data
+    await invokeAgentManually(page, ['test-input-for-feedback']);
+    console.log('✓ Test invocation created');
+    
+    await page.close();
   });
   
   test.afterAll(async ({ browser }) => {

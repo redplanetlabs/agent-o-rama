@@ -19,6 +19,30 @@ export async function getBasicAgentRow(page) {
 }
 
 /**
+ * Manually invokes an agent using the UI form.
+ * @param {import('@playwright/test').Page} page - The Playwright page object (must be on agent detail page).
+ * @param {Array} args - The arguments to pass to the agent (will be JSON.stringify'd).
+ * @returns {Promise<string>} The URL of the created invocation.
+ */
+export async function invokeAgentManually(page, args) {
+  console.log('Invoking agent with args:', args);
+  
+  const manualRunForm = page.locator('div').filter({ hasText: /^Manually Run Agent/ });
+  
+  // Fill in the args
+  await manualRunForm.getByPlaceholder(/\[arg1, arg2, arg3, ...\]/).fill(JSON.stringify(args));
+  
+  // Submit
+  await manualRunForm.getByRole('button', { name: 'Submit' }).click();
+  
+  // Wait for navigation to invocation page
+  await expect(page).toHaveURL(/\/invocations\//, { timeout: 30000 });
+  console.log('Navigated to invocation trace page.');
+  
+  return page.url();
+}
+
+/**
  * Gets the agent row for the E2ETestAgent module.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @returns {Promise<import('@playwright/test').Locator>} The agent row locator.
