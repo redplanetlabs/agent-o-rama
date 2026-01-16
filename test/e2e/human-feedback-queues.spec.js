@@ -363,12 +363,21 @@ test.describe('Human Feedback Queues', () => {
     // Update description
     await modal.getByTestId('queue-description-input').fill('Updated description');
     
-    // Add a second rubric
+    // Remove the first rubric (metricName1)
+    const rubric0 = modal.getByTestId('rubric-0');
+    await rubric0.getByTestId('remove-rubric-button').click();
+    await expect(rubric0).not.toBeVisible();
+    console.log('✓ Removed first metric');
+    
+    // Add a new rubric with metricName2 and mark it as required
     await modal.getByTestId('add-rubric-button').click();
-    const rubric1 = modal.getByTestId('rubric-1');
-    await rubric1.getByTestId('metric-selector-input').click();
+    const newRubric = modal.getByTestId('rubric-0');
+    await newRubric.getByTestId('metric-selector-input').click();
     await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName2 }).click();
+    await newRubric.getByTestId('metric-required-checkbox').check();
+    await expect(newRubric.getByTestId('metric-required-checkbox')).toBeChecked();
+    console.log('✓ Added new metric with required status');
     
     // Submit update
     await modal.getByRole('button', { name: 'Update' }).click();
@@ -376,8 +385,10 @@ test.describe('Human Feedback Queues', () => {
     
     // Verify updates
     await expect(page.getByText('Updated description')).toBeVisible();
-    await expect(page.getByText(/2 metrics/)).toBeVisible();
-    console.log('✓ Queue updated successfully');
+    await expect(page.getByText(metricName1)).not.toBeVisible(); // Should be removed
+    await expect(page.getByText(metricName2)).toBeVisible(); // Should be present
+    await expect(page.getByText('Required')).toBeVisible(); // Should show required status
+    console.log('✓ Queue updated successfully - removed old metric, added new required metric');
     
     // Cleanup
     if (!shouldSkipCleanup()) {

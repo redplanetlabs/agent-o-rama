@@ -72,13 +72,15 @@
    - :class-name - Additional CSS classes
    - :rows - For textarea, number of rows"
   [{:keys [label value on-change error required? placeholder class-name
-           type rows data-id data-testid]
+           type rows data-id data-testid disabled]
     :or {type :text rows 3}}]
 
   (let [input-classes (str "w-full p-3 border rounded-md text-sm transition-colors "
-                           (if error
-                             "border-red-300 focus:ring-red-500 focus:border-red-500"
-                             "border-gray-300 focus:ring-blue-500 focus:border-blue-500")
+                           (if disabled
+                             "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
+                             (if error
+                               "border-red-300 focus:ring-red-500 focus:border-red-500"
+                               "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
                            (when class-name (str " " class-name)))
 
         field-id (str "field-" (random-uuid))]
@@ -99,7 +101,8 @@
                      :rows rows
                      :onChange #(on-change (.. % -target -value))}
               data-id (assoc :data-id data-id)
-              data-testid (assoc :data-testid data-testid)))
+              data-testid (assoc :data-testid data-testid)
+              disabled (assoc :disabled true)))
 
          ;; Default to text input for all other types
          ($ :input
@@ -110,7 +113,8 @@
                      :placeholder placeholder
                      :onChange #(on-change (.. % -target -value))}
               data-id (assoc :data-id data-id)
-              data-testid (assoc :data-testid data-testid))))
+              data-testid (assoc :data-testid data-testid)
+              disabled (assoc :disabled true))))
 
        (if error
          ($ :p.text-sm.text-red-600.mt-1 error)

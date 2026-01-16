@@ -425,7 +425,7 @@
                                 (when (seq duplicates)
                                   (str "Duplicate metrics: " (str/join ", " duplicates))))))]}
    :ui (fn [{:keys [form-id props]}]
-         (let [{:keys [module-id]} props
+         (let [{:keys [module-id editing?]} props
                name-field (forms/use-form-field form-id :name)
                desc-field (forms/use-form-field form-id :description)
                rubrics-field (forms/use-form-field form-id :rubrics)
@@ -454,7 +454,7 @@
                                           :required? true
                                           :data-testid "queue-name-input"
                                           :placeholder "e.g., support-quality"
-                                          :disabled (:editing? props)}
+                                          :disabled editing?}
                                          name-field))
 
               ;; Guidelines field
