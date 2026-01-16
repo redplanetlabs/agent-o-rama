@@ -23,7 +23,7 @@ test.describe('Human Feedback Queues', () => {
     await expect(page).toHaveURL(/BasicAgentModule/);
     
     // Navigate to Human Feedback Queues page
-    await page.getByText('Human Feedback').click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
     await expect(page).toHaveURL(/human-feedback-queues/);
     await expect(page.getByRole('heading', { name: 'Human Feedback Queues' })).toBeVisible();
     console.log('Successfully navigated to Human Feedback Queues page');
@@ -53,7 +53,7 @@ test.describe('Human Feedback Queues', () => {
     console.log(`✓ Created metric: ${metricName2}`);
     
     // Navigate back to Human Feedback Queues page
-    await page.getByText('Human Feedback').click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
     await expect(page).toHaveURL(/human-feedback-queues/);
     
     const modal = page.locator('[role="dialog"]');
@@ -244,12 +244,12 @@ test.describe('Human Feedback Queues', () => {
     // =============================================================================
     console.log('Test 8: Navigating to queue detail page');
     await queue1Row.getByTestId('queue-name-link').click();
-    await expect(page).toHaveURL(new RegExp(`human-feedback-queues/queue/${encodeURIComponent(queueName1)}`));
+    await expect(page).toHaveURL(new RegExp(`human-feedback-queues/${encodeURIComponent(queueName1)}`));
     await expect(page.getByRole('heading', { name: queueName1 })).toBeVisible();
     console.log('✓ Queue detail page navigation works');
     
-    // Go back to index
-    await page.goBack();
+    // Navigate back to queue list
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
     await expect(page).toHaveURL(/human-feedback-queues$/);
 
     // =============================================================================
@@ -327,7 +327,7 @@ test.describe('Human Feedback Queues', () => {
     console.log(`✓ Created metric: ${metricName}`);
     
     // Navigate to Human Feedback Queues
-    await page.getByText('Human Feedback').click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
     await expect(page).toHaveURL(/human-feedback-queues/);
     
     // =============================================================================
@@ -390,7 +390,7 @@ test.describe('Human Feedback Queues', () => {
       await agentRow.click();
       
       // Delete queue
-      await page.getByText('Human Feedback').click();
+      await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
       const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
       await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
       await queueRowForDelete.getByTestId('delete-queue-button').click();
