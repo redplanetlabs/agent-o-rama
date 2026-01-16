@@ -617,18 +617,20 @@
 
                          ;; Actions
                          ($ :td {:className (:td common/table-classes)}
-                            ($ :button.text-red-600.hover:text-red-800.p-2.rounded
+                            ($ :button.text-red-600.hover:text-red-800.p-2.rounded.cursor-pointer
                                {:data-testid "delete-queue-button"
                                 :onClick (fn [e]
                                            (.stopPropagation e)
-                                           (state/dispatch [:modal/show-confirmation
-                                                            {:title "Delete Queue"
-                                                             :message (str "Are you sure you want to delete \"" queue-name "\"?")
-                                                             :on-confirm #(do
-                                                                            (sente/send! [:human-feedback/delete-queue
-                                                                                          {:module-id decoded-module-id
-                                                                                           :name queue-name}])
-                                                                            (queries/invalidate-query [:human-feedback-queues module-id]))}]))}
+                                           (when (js/confirm (str "Are you sure you want to delete queue \"" queue-name "\"?"))
+                                             (sente/request!
+                                              [:human-feedback/delete-queue
+                                               {:module-id decoded-module-id
+                                                :name queue-name}]
+                                              10000
+                                              (fn [reply]
+                                                (if (:success reply)
+                                                  (state/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queues module-id]}])
+                                                  (js/alert (str "Error deleting queue: " (:error reply))))))))}
                                ($ TrashIcon {:className "h-5 w-5"})))))))
 
                ;; Load more row

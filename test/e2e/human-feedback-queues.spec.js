@@ -259,19 +259,14 @@ test.describe('Human Feedback Queues', () => {
       console.log('Test 9: Deleting queues');
       
       // Delete first queue
+      page.once('dialog', dialog => dialog.accept());
       await queue1Row.getByTestId('delete-queue-button').click();
-      const confirmModal = page.locator('[role="dialog"]').filter({ hasText: 'Delete Queue' });
-      await expect(confirmModal).toBeVisible();
-      await confirmModal.getByRole('button', { name: 'Delete' }).click();
-      await expect(confirmModal).not.toBeVisible({ timeout: 5000 });
       await expect(queue1Row).not.toBeVisible({ timeout: 5000 });
       console.log(`✓ Deleted queue: ${queueName1}`);
       
       // Delete second queue
+      page.once('dialog', dialog => dialog.accept());
       await queue2Row.getByTestId('delete-queue-button').click();
-      await expect(confirmModal).toBeVisible();
-      await confirmModal.getByRole('button', { name: 'Delete' }).click();
-      await expect(confirmModal).not.toBeVisible({ timeout: 5000 });
       await expect(queue2Row).not.toBeVisible({ timeout: 5000 });
       console.log(`✓ Deleted queue: ${queueName2}`);
       
@@ -300,6 +295,103 @@ test.describe('Human Feedback Queues', () => {
     await expect(emptyState).toContainText('No queues found');
     
     console.log('✓ Empty state works correctly');
+  });
+
+  test('should edit queue', async ({ page }) => {
+    const uniqueId = randomUUID().substring(0, 8);
+    const queueName = `e2e-edit-queue-${uniqueId}`;
+    const metricName1 = `e2e-edit-metric-${uniqueId}-1`;
+    const metricName2 = `e2e-edit-metric-${uniqueId}-2`;
+    
+    // Create test metrics
+    console.log('--- Creating test metrics ---');
+    await page.getByText('Human Metrics').click();
+    await expect(page).toHaveURL(/human-metrics/);
+    
+    await createHumanMetric(page, {
+      name: metricName1,
+      type: 'numeric',
+      min: 1,
+      max: 5
+    });
+    
+    await createHumanMetric(page, {
+      name: metricName2,
+      type: 'categorical',
+      categories: ['Excellent', 'Good', 'Poor']
+    });
+    
+    // Navigate to Human Feedback Queues
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    
+    // Create a queue
+    console.log('Creating queue to edit');
+    await page.getByTestId('create-queue-button').click();
+    const modal = page.locator('[role="dialog"]');
+    await expect(modal).toBeVisible();
+    
+    await modal.getByTestId('queue-name-input').fill(queueName);
+    await modal.getByTestId('queue-description-input').fill('Original description');
+    
+    // Add one rubric
+    await modal.getByTestId('add-rubric-button').click();
+    const rubric = modal.getByTestId('rubric-0');
+    await rubric.getByTestId('metric-selector-input').click();
+    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
+    
+    await modal.getByRole('button', { name: 'Create' }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    
+    // Navigate to queue detail page
+    const queueRow = page.getByTestId(`queue-row-${queueName}`);
+    await expect(queueRow).toBeVisible({ timeout: 5000 });
+    await queueRow.getByTestId('queue-name-link').click();
+    await expect(page).toHaveURL(new RegExp(`human-feedback-queues/${encodeURIComponent(queueName)}`));
+    
+    // Click Edit button
+    console.log('Editing queue');
+    await page.getByTestId('edit-queue-button').click();
+    await expect(modal).toBeVisible();
+    await expect(modal.getByRole('heading', { name: 'Edit Human Feedback Queue' })).toBeVisible();
+    
+    // Verify name field is disabled
+    const nameInput = modal.getByTestId('queue-name-input');
+    await expect(nameInput).toBeDisabled();
+    await expect(nameInput).toHaveValue(queueName);
+    
+    // Update description
+    await modal.getByTestId('queue-description-input').fill('Updated description');
+    
+    // Add a second rubric
+    await modal.getByTestId('add-rubric-button').click();
+    const rubric1 = modal.getByTestId('rubric-1');
+    await rubric1.getByTestId('metric-selector-input').click();
+    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName2 }).click();
+    
+    // Submit update
+    await modal.getByRole('button', { name: 'Update' }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+    
+    // Verify updates
+    await expect(page.getByText('Updated description')).toBeVisible();
+    await expect(page.getByText(/2 metrics/)).toBeVisible();
+    console.log('✓ Queue updated successfully');
+    
+    // Cleanup
+    if (!shouldSkipCleanup()) {
+      console.log('--- Cleanup ---');
+      await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+      page.once('dialog', dialog => dialog.accept());
+      await queueRow.getByTestId('delete-queue-button').click();
+      await expect(queueRow).not.toBeVisible({ timeout: 5000 });
+      
+      await page.getByText('Human Metrics').click();
+      await deleteHumanMetric(page, metricName1);
+      await deleteHumanMetric(page, metricName2);
+      console.log('✓ Cleanup complete');
+    }
   });
 
   test('should add trace to queue and view item detail', async ({ page }) => {
