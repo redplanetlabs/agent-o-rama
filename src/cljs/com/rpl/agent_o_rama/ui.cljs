@@ -253,8 +253,8 @@
                       :className "p-2 rounded-md hover:bg-gray-200 transition-colors"
                       :title (if collapsed? "Expand sidebar" "Collapse sidebar")}
              (if collapsed?
-               ($ ChevronRightIcon {:className "h-5 w-5"})
-               ($ ChevronLeftIcon {:className "h-5 w-5"}))))
+               ($ ChevronRightIcon {:className "h-5 w-5 cursor-pointer"})
+               ($ ChevronLeftIcon {:className "h-5 w-5 cursor-pointer"}))))
 
        ;; Navigation
        ($ :nav.flex-1.p-3.overflow-y-auto

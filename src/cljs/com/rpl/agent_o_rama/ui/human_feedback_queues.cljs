@@ -1039,7 +1039,7 @@
             ($ :h2.text-2xl.font-bold.text-gray-900
                (str "Review Item: " item-id))
             ($ :div.flex.gap-2
-               ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed
+               ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                   {:disabled (not has-prev?)
                    :data-testid "previous-item-button"
                    :onClick #(when has-prev?
@@ -1048,7 +1048,7 @@
                                                 :queue-id queue-id
                                                 :item-id prev-item-id}))}
                   ($ ChevronLeftIcon {:className "h-5 w-5"}))
-               ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed
+               ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                   {:disabled (not has-next?)
                    :data-testid "next-item-button"
                    :onClick #(when has-next?
