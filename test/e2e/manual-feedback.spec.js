@@ -257,10 +257,16 @@ test.describe('Manual Human Feedback', () => {
     
     await page.getByTestId('delete-feedback-button').first().click();
     
-    // Wait for feedback to be removed
+    // Wait for feedback to be removed and verify it's gone
     await page.waitForTimeout(2000);
     
-    console.log('✓ Feedback deleted');
+    // Verify the feedback is no longer visible
+    await expect(page.locator('text=/human\\[Test Reviewer\\]/')).not.toBeVisible();
+    
+    // Verify empty state is shown
+    await expect(page.getByText('No feedback available')).toBeVisible();
+    
+    console.log('✓ Feedback deleted and confirmed removed from UI');
   });
   
   test('should edit existing feedback', async ({ page }) => {
