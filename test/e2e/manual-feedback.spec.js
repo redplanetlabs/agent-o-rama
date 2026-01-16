@@ -108,13 +108,13 @@ test.describe('Manual Human Feedback', () => {
   test('should add manual feedback with validation', async ({ page }) => {
     const modal = page.locator('[role="dialog"]');
     const submitButton = modal.getByRole('button', { name: /Submit|Save/i });
+    const agentFeedbackPanel = page.locator('[data-id="agent-feedback-container"]');
     
     // =============================================================================
     // TEST 1: Open Add Feedback modal
     // =============================================================================
     console.log('Test 1: Opening Add Feedback modal');
-    // Use first() since we're on the agent feedback tab
-    await page.getByTestId('add-feedback-button').first().click();
+    await agentFeedbackPanel.getByTestId('add-feedback-button').click();
     await expect(modal).toBeVisible();
     await expect(modal.getByRole('heading', { name: /Add.*Feedback/i })).toBeVisible();
     console.log('✓ Modal opened');
@@ -256,26 +256,28 @@ test.describe('Manual Human Feedback', () => {
       dialog.accept();
     });
     
-    await page.getByTestId('delete-feedback-button').first().click();
+    await agentFeedbackPanel.getByTestId('delete-feedback-button').click();
     
     // Wait for feedback to be removed and verify it's gone
     await page.waitForTimeout(2000);
     
-    // Verify the feedback is no longer visible
-    await expect(page.locator('text=/human\\[Test Reviewer\\]/')).not.toBeVisible();
+    // Verify the feedback is no longer visible in agent panel
+    await expect(agentFeedbackPanel.locator('text=/human\\[Test Reviewer\\]/')).not.toBeVisible();
     
-    // Verify empty state is shown
-    await expect(page.getByText('No feedback available')).toBeVisible();
+    // Verify empty state is shown in agent panel
+    await expect(agentFeedbackPanel.getByText('No feedback available')).toBeVisible();
     
     console.log('✓ Feedback deleted and confirmed removed from UI');
   });
   
   test('should edit existing feedback', async ({ page }) => {
+    const modal = page.locator('[role="dialog"]');
+    const agentFeedbackPanel = page.locator('[data-id="agent-feedback-container"]');
+    
     // First, add a feedback item to edit
     console.log('Setting up: Adding initial feedback');
     
-    await page.getByTestId('add-feedback-button').first().click();
-    const modal = page.locator('[role="dialog"]');
+    await agentFeedbackPanel.getByTestId('add-feedback-button').click();
     await expect(modal).toBeVisible();
     
     // Fill in initial feedback
@@ -333,7 +335,7 @@ test.describe('Manual Human Feedback', () => {
     
     // Cleanup: Delete the feedback
     page.once('dialog', dialog => dialog.accept());
-    await page.getByTestId('delete-feedback-button').first().click();
+    await agentFeedbackPanel.getByTestId('delete-feedback-button').click();
     await page.waitForTimeout(1000);
   });
   
@@ -375,6 +377,7 @@ test.describe('Manual Human Feedback', () => {
 
   test('should add manual feedback to a node', async ({ page }) => {
     const modal = page.locator('[role="dialog"]');
+    const nodeFeedbackPanel = page.locator('[data-id="node-feedback-container"]');
     
     console.log('Test: Node-level manual feedback');
     
@@ -382,10 +385,10 @@ test.describe('Manual Human Feedback', () => {
     // SETUP: Select a node in the graph
     // =============================================================================
     console.log('Step 1: Selecting a node in the graph');
-    // Click on the process node (not the root)
-    const processNode = page.locator('[data-id]').filter({ hasText: 'process' }).first();
-    await expect(processNode).toBeVisible({ timeout: 10000 });
-    await processNode.click();
+    // Click on a node in the graph
+    const firstNode = page.locator('[data-id]').filter({ hasText: /invoke-node|process-node|node-/ }).first();
+    await expect(firstNode).toBeVisible({ timeout: 10000 });
+    await firstNode.click();
     console.log('✓ Node selected');
     
     // =============================================================================
@@ -400,7 +403,7 @@ test.describe('Manual Human Feedback', () => {
     // STEP 3: Add feedback to the node
     // =============================================================================
     console.log('Step 3: Adding node feedback');
-    await page.getByTestId('add-feedback-button').first().click();
+    await nodeFeedbackPanel.getByTestId('add-feedback-button').click();
     await expect(modal).toBeVisible();
     
     // Fill in feedback
@@ -429,9 +432,8 @@ test.describe('Manual Human Feedback', () => {
     await expect(modal).not.toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(2000);
     
-    // Verify feedback appears
-    const nodeFeedback = page.locator('text=/human\\[Node Reviewer\\]/').first();
-    await expect(nodeFeedback).toBeVisible({ timeout: 5000 });
+    // Verify feedback appears in node panel
+    await expect(nodeFeedbackPanel.locator('text=/human\\[Node Reviewer\\]/')).toBeVisible({ timeout: 5000 });
     console.log('✓ Node feedback submitted and visible');
     
     // =============================================================================
@@ -439,12 +441,13 @@ test.describe('Manual Human Feedback', () => {
     // =============================================================================
     console.log('Step 4: Deleting node feedback');
     page.once('dialog', dialog => dialog.accept());
-    await page.getByTestId('delete-feedback-button').first().click();
+    await nodeFeedbackPanel.getByTestId('delete-feedback-button').click();
     await page.waitForTimeout(2000);
     
-    // Verify feedback is gone
-    await expect(page.locator('text=/human\\[Node Reviewer\\]/')).not.toBeVisible();
-    await expect(page.getByText('No feedback available')).toBeVisible();
+    // Verify feedback is gone from node panel
+    await expect(nodeFeedbackPanel.locator('text=/human\\[Node Reviewer\\]/')).not.toBeVisible();
+    // Verify node panel shows empty state
+    await expect(nodeFeedbackPanel.getByText('No feedback available')).toBeVisible();
     console.log('✓ Node feedback deleted');
   });
 });

@@ -1155,10 +1155,11 @@
                                  :fork-of fork-of
                                  :invoke-id invoke-id})
 
-            :feedback ($ feedback/feedback-list {:feedback-data (:feedback summary-data)
-                                                 :module-id module-id
-                                                 :agent-name agent-name
-                                                 :invoke-id invoke-id})
+            :feedback ($ :div {:data-id "agent-feedback-container"}
+                         ($ feedback/feedback-list {:feedback-data (:feedback summary-data)
+                                                    :module-id module-id
+                                                    :agent-name agent-name
+                                                    :invoke-id invoke-id}))
 
             :fork ($ fork-panel {:changed-nodes changed-nodes
                                  :graph-data graph-data
