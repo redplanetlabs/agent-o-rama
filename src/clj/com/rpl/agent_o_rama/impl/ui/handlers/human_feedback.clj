@@ -82,6 +82,19 @@
     (evals/create-human-feedback-queue! global-actions-depot name description rubric-records)
     {:status :ok}))
 
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/update-queue
+  [{:keys [manager name description rubrics]} uid]
+  (let [underlying-objects (aor-types/underlying-objects manager)
+        global-actions-depot (:global-actions-depot underlying-objects)
+        ;; Convert rubrics from maps to HumanFeedbackQueueRubric records
+        rubric-records (mapv (fn [r]
+                               (aor-types/->valid-HumanFeedbackQueueRubric
+                                (:metric r)
+                                (boolean (:required r))))
+                             rubrics)]
+    (evals/update-human-feedback-queue! global-actions-depot name description rubric-records)
+    {:status :ok}))
+
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/delete-queue
   [{:keys [manager name]} uid]
   (let [underlying-objects (aor-types/underlying-objects manager)

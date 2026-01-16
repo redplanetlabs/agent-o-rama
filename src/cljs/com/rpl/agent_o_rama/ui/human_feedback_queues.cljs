@@ -449,11 +449,12 @@
                                  ((:on-change rubrics-field) updated)))]
 
            ($ :div.space-y-4.p-4
-              ;; Name field
+              ;; Name field (disabled when editing)
               ($ forms/form-field (merge {:label "Queue Name"
                                           :required? true
                                           :data-testid "queue-name-input"
-                                          :placeholder "e.g., support-quality"}
+                                          :placeholder "e.g., support-quality"
+                                          :disabled (:editing? props)}
                                          name-field))
 
               ;; Guidelines field
@@ -495,21 +496,33 @@
                  ;; Error message
                  (when (:error rubrics-field)
                    ($ :p.text-sm.text-red-600.mt-1 (:error rubrics-field)))))))
-   :modal-props {:title "Create Human Feedback Queue"
-                 :submit-text "Create"}}
+   :modal-props (fn [props]
+                  (if (:editing? props)
+                    {:title "Edit Human Feedback Queue"
+                     :submit-text "Update"}
+                    {:title "Create Human Feedback Queue"
+                     :submit-text "Create"}))}}
 
   :on-submit
   {:event (fn [db form-state]
-            (let [{:keys [name description rubrics module-id]} form-state
+            (let [{:keys [name description rubrics module-id editing?]} form-state
                   ;; Strip out :id field used for React keys
                   clean-rubrics (mapv #(dissoc % :id) rubrics)]
-              [:human-feedback/create-queue
-               {:module-id module-id
-                :name name
-                :description description
-                :rubrics clean-rubrics}]))
-   :on-success-invalidate (fn [db {:keys [module-id]} _reply]
-                            {:query-key-pattern [:human-feedback-queues module-id]})}})
+              (if editing?
+                [:human-feedback/update-queue
+                 {:module-id module-id
+                  :name name
+                  :description description
+                  :rubrics clean-rubrics}]
+                [:human-feedback/create-queue
+                 {:module-id module-id
+                  :name name
+                  :description description
+                  :rubrics clean-rubrics}])))
+   :on-success-invalidate (fn [db {:keys [module-id name]} _reply]
+                            {:query-key-pattern [:human-feedback-queues module-id]
+                             :additional-keys [[:human-feedback-queue-info module-id (common/url-encode name)]]})}})
+
 
 ;; =============================================================================
 ;; QUEUE LIST PAGE
@@ -627,7 +640,23 @@
 ;; =============================================================================
 
 (defui queue-info-header [{:keys [queue-info queue-id module-id]}]
-  (let [rubrics (:rubrics queue-info)]
+  (let [rubrics (:rubrics queue-info)
+        decoded-module-id (common/url-decode module-id)
+        
+        handle-edit (fn []
+                      ;; Transform rubrics: queue-info has {:name ... :required ...}
+                      ;; but form expects {:metric ... :required ... :id ...}
+                      (let [rubrics-for-form (mapv (fn [r]
+                                                     {:id (random-uuid)
+                                                      :metric (:name r)
+                                                      :required (:required r)})
+                                                   rubrics)]
+                        (state/dispatch [:modal/show-form :create-human-feedback-queue
+                                         {:module-id decoded-module-id
+                                          :name queue-id
+                                          :description (or (:description queue-info) "")
+                                          :rubrics rubrics-for-form
+                                          :editing? true}])))]
     ($ :div.bg-white.rounded-md.border.border-gray-200.p-6.mb-6
        ($ :div.flex.justify-between.items-start
           ($ :div
@@ -635,7 +664,8 @@
                 (str "Queue: " queue-id))
              ($ :p.text-gray-600 (or (:description queue-info) "")))
           ($ :button.inline-flex.items-center.px-3.py-2.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors
-             {:onClick #(js/alert "Edit queue - not yet implemented")}
+             {:onClick handle-edit
+              :data-testid "edit-queue-button"}
              ($ PencilIcon {:className "h-5 w-5 mr-2"})
              "Edit Queue"))
 
