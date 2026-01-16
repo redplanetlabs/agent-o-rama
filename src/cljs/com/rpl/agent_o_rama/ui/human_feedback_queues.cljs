@@ -1009,7 +1009,8 @@
                agent-task-id (:task-id agent-invoke)
                agent-invoke-id (:agent-invoke-id agent-invoke)
                ;; Build URL to agent invocation trace
-               trace-url (str "/agents/" module-id
+               ;; Note: module-id from route params is decoded, so we need to encode it
+               trace-url (str "/agents/" (common/url-encode decoded-module-id)
                               "/agent/" (common/url-encode agent-name)
                               "/invocations/" agent-task-id "-" agent-invoke-id)
                is-node-target? (some? node-invoke)]
