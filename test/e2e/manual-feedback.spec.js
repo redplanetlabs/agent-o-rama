@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getBasicAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually } from './helpers.js';
+import { getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE: Manual Human Feedback (Add/Edit/Delete)
@@ -17,9 +17,9 @@ test.describe('Manual Human Feedback', () => {
     const page = await browser.newPage();
     await page.goto('/');
     
-    const agentRow = await getBasicAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
-    await expect(page).toHaveURL(/BasicAgentModule/);
+    await expect(page).toHaveURL(/E2ETestAgentModule/);
     
     // Create test metrics
     await page.getByRole('link', { name: 'Human Metrics' }).click();
@@ -45,10 +45,10 @@ test.describe('Manual Human Feedback', () => {
     // Create a test invocation by invoking BasicAgent
     // Navigate back to agent detail page
     await page.goBack();
-    await expect(page).toHaveURL(/BasicAgentModule/);
+    await expect(page).toHaveURL(/E2ETestAgentModule/);
     
     // Invoke the agent with test data
-    await invokeAgentManually(page, ['test-input-for-feedback']);
+    await invokeAgentManually(page, [{ query: 'test query for feedback' }]);
     console.log('✓ Test invocation created');
     
     await page.close();
@@ -63,7 +63,7 @@ test.describe('Manual Human Feedback', () => {
     const page = await browser.newPage();
     await page.goto('/');
     
-    const agentRow = await getBasicAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
     await page.getByRole('link', { name: 'Human Metrics' }).click();
     await expect(page).toHaveURL(/human-metrics/);
@@ -81,9 +81,9 @@ test.describe('Manual Human Feedback', () => {
     await page.goto('/');
     await expect(page).toHaveTitle(/Agent-o-rama/);
     
-    const agentRow = await getBasicAgentRow(page);
+    const agentRow = await getE2ETestAgentRow(page);
     await agentRow.click();
-    await expect(page).toHaveURL(/BasicAgentModule/);
+    await expect(page).toHaveURL(/E2ETestAgentModule/);
     
     // Navigate to agent page and get first invocation
     await page.getByRole('link', { name: 'Invocations' }).click();
@@ -113,7 +113,8 @@ test.describe('Manual Human Feedback', () => {
     // TEST 1: Open Add Feedback modal
     // =============================================================================
     console.log('Test 1: Opening Add Feedback modal');
-    await page.getByTestId('add-feedback-button').click();
+    // Use first() since we're on the agent feedback tab
+    await page.getByTestId('add-feedback-button').first().click();
     await expect(modal).toBeVisible();
     await expect(modal.getByRole('heading', { name: /Add.*Feedback/i })).toBeVisible();
     console.log('✓ Modal opened');
@@ -273,7 +274,7 @@ test.describe('Manual Human Feedback', () => {
     // First, add a feedback item to edit
     console.log('Setting up: Adding initial feedback');
     
-    await page.getByTestId('add-feedback-button').click();
+    await page.getByTestId('add-feedback-button').first().click();
     const modal = page.locator('[role="dialog"]');
     await expect(modal).toBeVisible();
     
@@ -399,7 +400,7 @@ test.describe('Manual Human Feedback', () => {
     // STEP 3: Add feedback to the node
     // =============================================================================
     console.log('Step 3: Adding node feedback');
-    await page.getByTestId('add-feedback-button').click();
+    await page.getByTestId('add-feedback-button').first().click();
     await expect(modal).toBeVisible();
     
     // Fill in feedback
