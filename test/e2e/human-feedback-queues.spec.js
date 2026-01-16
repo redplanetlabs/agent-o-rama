@@ -558,25 +558,19 @@ test.describe('Human Feedback Queues', () => {
     // Fill in reviewer name (required)
     await page.getByPlaceholder('Your name').fill('Test Reviewer');
     
-    // Submit review
+    // Submit review - this navigates to the next item automatically
     await page.getByRole('button', { name: 'Submit & Continue' }).click();
-    await expect(page).toHaveURL(/item/); // Should navigate to next item or back to queue
+    await page.waitForTimeout(1000);
     console.log('✓ Reviewed agent invocation');
     
     // =============================================================================
-    // STEP 7: Review second item (node invocation)
+    // STEP 7: Review second item (node invocation) - auto-navigated here
     // =============================================================================
     console.log('Step 7: Reviewing second item (node invocation)');
     
-    // Navigate back to queue
-    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
-    const queueRowAgain = page.getByTestId(`queue-row-${queueName}`);
-    await queueRowAgain.getByTestId('queue-name-link').click();
-    
-    // Click on second item (should now be first since first was reviewed)
-    const remainingItems = page.locator('tbody').getByRole('row');
-    await remainingItems.first().click();
+    // Should already be on the next item's review page
     await expect(page).toHaveURL(/item/);
+    await expect(page.getByText('Target Information')).toBeVisible();
     
     // Fill out the review form
     const metricDropdown2 = page.getByTestId('metric-value-0');
@@ -595,7 +589,8 @@ test.describe('Human Feedback Queues', () => {
     
     // Verify queue is now empty
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
-    await queueRowAgain.getByTestId('queue-name-link').click();
+    const queueRowFinal = page.getByTestId(`queue-row-${queueName}`);
+    await queueRowFinal.getByTestId('queue-name-link').click();
     await expect(page.getByText('No items in this queue yet')).toBeVisible();
     console.log('✓ Queue is now empty after reviewing all items');
     
