@@ -695,8 +695,6 @@
                          (if (:required rubric) "Required" "Optional"))
                       ($ :div
                          ($ :span.font-medium.text-gray-900 (:name rubric))
-                         (when (:description rubric)
-                           ($ :span.text-gray-600 " - " (:description rubric)))
                          (when is-category?
                            ($ :div.text-xs.text-gray-500.mt-1
                               "Categories: " (str/join ", " (:categories metric))))
