@@ -813,7 +813,7 @@
   (contains? metric :min))
 
 ;; Use the shared metric input component for queue item review
-(defui metric-field [{:keys [rubric value on-change error]}]
+(defui metric-field [{:keys [rubric value on-change error data-testid]}]
   ($ metric-input/MetricInput
      {:metric (:metric rubric)
       :label (:name rubric)
@@ -821,7 +821,8 @@
       :required? (:required rubric)
       :value value
       :on-change on-change
-      :error error}))
+      :error error
+      :data-testid data-testid}))
 
 (defui item-detail []
   (let [{:keys [module-id queue-id item-id]} (state/use-sub [:route :path-params])
@@ -1091,7 +1092,7 @@
             ;; Metric field              
             ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Metrics")
             ($ :div.space-y-2
-               (for [rubric (:rubrics queue-info)]
+               (for [[idx rubric] (map-indexed vector (:rubrics queue-info))]
                  (let [metric-name (:name rubric)]
                    ($ metric-field {:key metric-name
                                     :rubric rubric
@@ -1103,7 +1104,8 @@
                                                    (set-errors (if err
                                                                  (assoc errors metric-name err)
                                                                  (dissoc errors metric-name)))))
-                                    :error (get errors metric-name)}))))
+                                    :error (get errors metric-name)
+                                    :data-testid (str "metric-value-" idx)}))))
 
             ;; Comment field
             ($ :div.mb-4.mt-4

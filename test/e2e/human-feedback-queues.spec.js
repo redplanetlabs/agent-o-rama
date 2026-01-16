@@ -533,20 +533,71 @@ test.describe('Human Feedback Queues', () => {
     console.log('✓ Queue shows 2 items');
     
     // =============================================================================
-    // STEP 6: View item detail page
+    // STEP 6: Review first item (agent invocation)
     // =============================================================================
-    console.log('Step 6: Viewing item detail');
+    console.log('Step 6: Reviewing first item (agent invocation)');
     
     // Click on first item row to view detail
     await itemRows.first().click();
+    await expect(page).toHaveURL(/item/);
     
     // Verify item detail page elements
     await expect(page.getByText('Target Information')).toBeVisible();
     await expect(page.getByText('Input')).toBeVisible();
     await expect(page.getByText('Output')).toBeVisible();
-    await expect(page.getByText(metricName)).toBeVisible(); // Metric name should be visible
+    await expect(page.getByText(metricName)).toBeVisible();
     
-    console.log('✓ Item detail page displays correctly');
+    // Fill out the review form
+    const metricDropdown = page.getByTestId('metric-value-0');
+    await metricDropdown.click();
+    await page.getByText('Good').click();
+    
+    // Add optional comment
+    await page.getByPlaceholder(/Add any additional notes/).fill('Test review for agent invocation');
+    
+    // Fill in reviewer name (required)
+    await page.getByPlaceholder('Your name').fill('Test Reviewer');
+    
+    // Submit review
+    await page.getByRole('button', { name: 'Submit & Continue' }).click();
+    await expect(page).toHaveURL(/item/); // Should navigate to next item or back to queue
+    console.log('✓ Reviewed agent invocation');
+    
+    // =============================================================================
+    // STEP 7: Review second item (node invocation)
+    // =============================================================================
+    console.log('Step 7: Reviewing second item (node invocation)');
+    
+    // Navigate back to queue
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    const queueRowAgain = page.getByTestId(`queue-row-${queueName}`);
+    await queueRowAgain.getByTestId('queue-name-link').click();
+    
+    // Click on second item (should now be first since first was reviewed)
+    const remainingItems = page.locator('tbody').getByRole('row');
+    await remainingItems.first().click();
+    await expect(page).toHaveURL(/item/);
+    
+    // Fill out the review form
+    const metricDropdown2 = page.getByTestId('metric-value-0');
+    await metricDropdown2.click();
+    await page.getByText('Average').click();
+    
+    await page.getByPlaceholder(/Add any additional notes/).fill('Test review for node invocation');
+    
+    // Fill in reviewer name (should be pre-filled from previous review)
+    await page.getByPlaceholder('Your name').fill('Test Reviewer');
+    
+    // Submit review
+    await page.getByRole('button', { name: 'Submit & Continue' }).click();
+    await page.waitForTimeout(1000); // Wait for navigation
+    console.log('✓ Reviewed node invocation');
+    
+    // Verify queue is now empty
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await queueRowAgain.getByTestId('queue-name-link').click();
+    await expect(page.getByText('No items in this queue yet')).toBeVisible();
+    console.log('✓ Queue is now empty after reviewing all items');
     
     // =============================================================================
     // CLEANUP: Delete queue and metric
