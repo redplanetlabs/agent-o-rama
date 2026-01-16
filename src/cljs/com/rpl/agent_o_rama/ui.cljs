@@ -66,7 +66,10 @@
 
       ["/invocations"
        ["" {:name :agent/invocations, :views [agents/invocations]}]
-       ["/:invoke-id" {:name :agent/invocation-detail, :views [agents/invoke]}]]
+       ["/:invoke-id" {:name :agent/invocation-detail
+                       :views [agents/invoke]
+                       :parameters {:query [:map
+                                            [:node {:optional true} :string]]}}]]
       ["/analytics" {:name :agent/analytics
                      :views [analytics/analytics-page]
                      :parameters {:query [:map

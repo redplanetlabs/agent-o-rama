@@ -1008,12 +1008,19 @@
                node-invoke (:node-invoke target)
                agent-task-id (:task-id agent-invoke)
                agent-invoke-id (:agent-invoke-id agent-invoke)
+               is-node-target? (some? node-invoke)
                ;; Build URL to agent invocation trace
                ;; Note: module-id from route params is decoded, so we need to encode it
-               trace-url (str "/agents/" (common/url-encode decoded-module-id)
-                              "/agent/" (common/url-encode agent-name)
-                              "/invocations/" agent-task-id "-" agent-invoke-id)
-               is-node-target? (some? node-invoke)]
+               base-url (str "/agents/" (common/url-encode decoded-module-id)
+                             "/agent/" (common/url-encode agent-name)
+                             "/invocations/" agent-task-id "-" agent-invoke-id)
+               ;; Add node query parameter if this is a node target
+               trace-url (if node-invoke
+                           (let [node-task-id (:task-id node-invoke)
+                                 node-invoke-id (:node-invoke-id node-invoke)
+                                 node-id (str node-task-id "-" node-invoke-id)]
+                             (str base-url "?node=" (common/url-encode node-id)))
+                           base-url)]
            ($ :div.bg-gray-50.border.border-gray-200.rounded-md.p-4.mb-6
               {:data-testid "target-info-panel"}
               ($ :div.space-y-3

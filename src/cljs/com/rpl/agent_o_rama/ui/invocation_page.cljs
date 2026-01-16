@@ -11,6 +11,8 @@
 
 (defui invocation-page []
   (let [{:keys [module-id agent-name invoke-id]} (state/use-sub [:route :path-params])
+        query-params (state/use-sub [:route :query-params])
+        node-query-param (:node query-params)
 
         invocation-state (state/use-sub [:invocations-data invoke-id])
 
@@ -50,15 +52,19 @@
                (state/dispatch [:invocation/cleanup {:invoke-id invoke-id}])))
            [invoke-id module-id agent-name connected?])
 
-        ;; Auto-select the first node when graph data loads
+        ;; Auto-select node when graph data loads
+        ;; Priority: 1) node from query param, 2) root node, 3) any first node
         _ (uix/use-effect
            (fn []
              (when (and graph-data (not selected-node-id))
-               ;; Find the first node - prioritize starter nodes, then fall back to any node
-               (let [first-node-id (or root-invoke-id)]
-                 (when first-node-id
-                   (state/dispatch [:db/set-value [:ui :selected-node-id] first-node-id])))))
-           [graph-data root-invoke-id selected-node-id])
+               (let [;; Check if the node from query param exists in the graph
+                     node-from-query (when (and node-query-param (get graph-data node-query-param))
+                                       node-query-param)
+                     ;; Fallback to root node
+                     node-to-select (or node-from-query root-invoke-id)]
+                 (when node-to-select
+                   (state/dispatch [:db/set-value [:ui :selected-node-id] node-to-select])))))
+           [graph-data root-invoke-id selected-node-id node-query-param])
 
         ;; 3. Polling effect removed in favor of unified streaming loop in events
 
