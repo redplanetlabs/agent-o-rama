@@ -663,7 +663,7 @@
              ($ :h3.text-lg.font-semibold.text-gray-900.mb-2
                 (str "Queue: " queue-id))
              ($ :p.text-gray-600 (or (:description queue-info) "")))
-          ($ :button.inline-flex.items-center.px-3.py-2.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors
+          ($ :button.inline-flex.items-center.px-3.py-2.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.cursor-pointer
              {:onClick handle-edit
               :data-testid "edit-queue-button"}
              ($ PencilIcon {:className "h-5 w-5 mr-2"})
