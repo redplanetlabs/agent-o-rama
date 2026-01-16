@@ -520,9 +520,14 @@
                   :rubrics clean-rubrics}])))
    
    :on-success-invalidate
+   (fn [db {:keys [module-id]} _reply]
+     ;; Invalidate the queue list to show the newly created queue
+     {:query-key-pattern [:human-feedback-queues module-id]})
+   
+   :on-success
    (fn [db {:keys [module-id name]} _reply]
-     (println "INVALIDATE" module-id name)
-     {:query-key-pattern [:human-feedback-queue-info module-id name]})}})
+     ;; Also invalidate the specific queue info (useful for edit mode)
+     (state/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queue-info module-id name]}]))}})
 
 
 ;; =============================================================================

@@ -10,7 +10,8 @@ test.describe('Human Feedback Queues', () => {
   const uniqueId = randomUUID().substring(0, 8);
   const queueName1 = `e2e-queue-${uniqueId}-1`;
   const queueName2 = `e2e-queue-${uniqueId}-2`;
-  const testMetricName = `e2e-queue-metric-${uniqueId}`;
+  const metricName1 = `e2e-queue-metric-${uniqueId}-1`;
+  const metricName2 = `e2e-queue-metric-${uniqueId}-2`;
   
   test.beforeEach(async ({ page }) => {
     console.log('--- Starting Test Setup ---');
@@ -29,6 +30,32 @@ test.describe('Human Feedback Queues', () => {
   });
 
   test('should handle validation and create queues with rubrics', async ({ page }) => {
+    // =============================================================================
+    // SETUP: Create test metrics
+    // =============================================================================
+    console.log('--- Creating test metrics ---');
+    await page.getByText('Human Metrics').click();
+    await expect(page).toHaveURL(/human-metrics/);
+    
+    await createHumanMetric(page, {
+      name: metricName1,
+      type: 'numeric',
+      min: 1,
+      max: 5
+    });
+    console.log(`✓ Created metric: ${metricName1}`);
+    
+    await createHumanMetric(page, {
+      name: metricName2,
+      type: 'categorical',
+      categories: ['Good', 'Bad', 'Average']
+    });
+    console.log(`✓ Created metric: ${metricName2}`);
+    
+    // Navigate back to Human Feedback Queues page
+    await page.getByText('Human Feedback').click();
+    await expect(page).toHaveURL(/human-feedback-queues/);
+    
     const modal = page.locator('[role="dialog"]');
     const createButton = modal.getByRole('button', { name: 'Create' });
 
@@ -72,24 +99,14 @@ test.describe('Human Feedback Queues', () => {
     // Click on the metric selector input to open dropdown
     await firstRubric.getByTestId('metric-selector-input').click();
     
-    // Wait for dropdown to appear
-    await expect(firstRubric.getByTestId('metric-selector-dropdown')).toBeVisible({ timeout: 10000 });
-    
-    // Wait a bit for the query to complete and items to load
-    await page.waitForTimeout(2000);
-    
-    // Check if there's a loading state or if options appeared
-    const hasOptions = await firstRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').count() > 0;
-    const hasLoading = await firstRubric.getByTestId('metric-selector-loading').isVisible().catch(() => false);
-    const hasEmpty = await firstRubric.getByTestId('metric-selector-empty-state').isVisible().catch(() => false);
-    
-    console.log(`Options: ${hasOptions ? 'YES' : 'NO'}, Loading: ${hasLoading ? 'YES' : 'NO'}, Empty: ${hasEmpty ? 'YES' : 'NO'}`);
+    // Wait for dropdown to appear (it's portaled to the page level)
+    await expect(page.locator('[role="listbox"]')).toBeVisible({ timeout: 10000 });
     
     // Wait for options to load
-    await firstRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 15000 });
+    await page.locator('[role="option"]').first().waitFor({ timeout: 15000 });
     
-    // Select first matching metric
-    await firstRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
+    // Select first test metric by name
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     
     // Toggle required checkbox
     await firstRubric.getByTestId('metric-required-checkbox').check();
@@ -103,8 +120,8 @@ test.describe('Human Feedback Queues', () => {
     
     // Select metric for second rubric (not required)
     await secondRubric.getByTestId('metric-selector-input').click();
-    await secondRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 10000 });
-    await secondRubric.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
+    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName2 }).click();
     
     console.log('✓ Added second rubric');
 
@@ -134,8 +151,8 @@ test.describe('Human Feedback Queues', () => {
     await modal.getByTestId('add-rubric-button').click();
     const rubric0 = modal.getByTestId('rubric-0');
     await rubric0.getByTestId('metric-selector-input').click();
-    await rubric0.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 10000 });
-    await rubric0.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
+    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     await rubric0.getByTestId('metric-required-checkbox').check();
     
     // Submit
@@ -150,27 +167,47 @@ test.describe('Human Feedback Queues', () => {
     console.log(`✓ Successfully created queue: ${queueName1}`);
 
     // =============================================================================
-    // TEST 6: Create second queue
+    // TEST 6: Create second queue with duplicate validation
     // =============================================================================
-    console.log('Test 6: Creating second queue');
+    console.log('Test 6: Creating second queue with duplicate validation');
     await page.getByTestId('create-queue-button').click();
     await expect(modal).toBeVisible();
     
     await modal.getByTestId('queue-name-input').fill(queueName2);
     await modal.getByTestId('queue-description-input').fill('Second test queue');
     
-    // Add two rubrics
+    // Add two rubrics with the SAME metric (to trigger duplicate validation)
     await modal.getByTestId('add-rubric-button').click();
     const rubric0_2 = modal.getByTestId('rubric-0');
     await rubric0_2.getByTestId('metric-selector-input').click();
-    await rubric0_2.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 10000 });
-    await rubric0_2.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
+    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     
     await modal.getByTestId('add-rubric-button').click();
-    const rubric1_2 = modal.getByTestId('rubric-1');
+    let rubric1_2 = modal.getByTestId('rubric-1');
     await rubric1_2.getByTestId('metric-selector-input').click();
-    await rubric1_2.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().waitFor({ timeout: 10000 });
-    await rubric1_2.getByTestId('metric-selector-dropdown').locator('[role="option"]').first().click();
+    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
+    
+    // Verify duplicate validation error appears
+    await expect(modal.getByText(/Duplicate metrics/)).toBeVisible();
+    await expect(createButton).toBeDisabled();
+    console.log('✓ Duplicate validation error works');
+    
+    // Fix the error by removing the second rubric
+    await rubric1_2.getByTestId('remove-rubric-button').click();
+    await expect(rubric1_2).not.toBeVisible();
+    
+    // Add second rubric with a DIFFERENT metric
+    await modal.getByTestId('add-rubric-button').click();
+    rubric1_2 = modal.getByTestId('rubric-1');
+    await rubric1_2.getByTestId('metric-selector-input').click();
+    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName2 }).click();
+    
+    // Verify button is now enabled
+    await expect(createButton).toBeEnabled();
+    console.log('✓ Duplicate error resolved with different metric');
     
     await createButton.click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
@@ -237,6 +274,14 @@ test.describe('Human Feedback Queues', () => {
       await expect(confirmModal).not.toBeVisible({ timeout: 5000 });
       await expect(queue2Row).not.toBeVisible({ timeout: 5000 });
       console.log(`✓ Deleted queue: ${queueName2}`);
+      
+      // Delete test metrics
+      console.log('--- Cleaning up test metrics ---');
+      await page.getByText('Human Metrics').click();
+      await expect(page).toHaveURL(/human-metrics/);
+      await deleteHumanMetric(page, metricName1);
+      await deleteHumanMetric(page, metricName2);
+      console.log('✓ Deleted test metrics');
       
       console.log('✓ Cleanup complete');
     }
