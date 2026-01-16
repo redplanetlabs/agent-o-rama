@@ -501,8 +501,7 @@
                     {:title "Edit Human Feedback Queue"
                      :submit-text "Update"}
                     {:title "Create Human Feedback Queue"
-                     :submit-text "Create"}))}}
-
+                     :submit-text "Create"}))}
   :on-submit
   {:event (fn [db form-state]
             (let [{:keys [name description rubrics module-id editing?]} form-state
@@ -519,9 +518,11 @@
                   :name name
                   :description description
                   :rubrics clean-rubrics}])))
-   :on-success-invalidate (fn [db {:keys [module-id name]} _reply]
-                            {:query-key-pattern [:human-feedback-queues module-id]
-                             :additional-keys [[:human-feedback-queue-info module-id (common/url-encode name)]]})})
+   
+   :on-success-invalidate
+   (fn [db {:keys [module-id name]} _reply]
+     {:query-key-pattern [:human-feedback-queues module-id]
+      :additional-keys [[:human-feedback-queue-info module-id (common/url-encode name)]]})}})
 
 
 ;; =============================================================================
