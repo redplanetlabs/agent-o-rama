@@ -384,12 +384,12 @@ test.describe('Manual Human Feedback', () => {
     // =============================================================================
     // SETUP: Select a node in the graph
     // =============================================================================
-    console.log('Step 1: Selecting a node in the graph');
-    // Click on a node in the graph
-    const firstNode = page.locator('[data-id]').filter({ hasText: /invoke-node|process-node|node-/ }).first();
-    await expect(firstNode).toBeVisible({ timeout: 10000 });
-    await firstNode.click();
-    console.log('✓ Node selected');
+    console.log('Step 1: Selecting processing_node in the graph');
+    // Click on the processing_node
+    const processingNode = page.locator('[data-id]').filter({ hasText: 'processing_node' }).first();
+    await expect(processingNode).toBeVisible({ timeout: 10000 });
+    await processingNode.click();
+    console.log('✓ processing_node selected');
     
     // =============================================================================
     // STEP 2: Click node feedback tab
