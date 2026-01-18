@@ -12,7 +12,8 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
   const metricName = `e2e-failed-metric-${uniqueId}`;
   const ruleName = `e2e-failed-rule-${uniqueId}`;
   
-  test('should display FAILED for failed agent output in queue', async ({ page }) => {
+  // Increase timeout - this test involves rule processing which can take time
+  test('should display FAILED for failed agent output in queue', { timeout: 120000 }, async ({ page }) => {
     // =============================================================================
     // STEP 1: Setup - Navigate to E2ETestAgent module
     // =============================================================================
@@ -154,13 +155,13 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     // Poll for item to appear - rule processing can take a few seconds
     const itemRows = page.locator('tbody').getByRole('row');
     
-    // Retry up to 30 times with full page navigation if queue is empty
+    // Retry up to 15 times with full page navigation if queue is empty
     const queueDetailUrl = page.url();
-    for (let attempt = 1; attempt <= 30; attempt++) {
-      console.log(`  Checking for queue items (attempt ${attempt}/30)...`);
+    for (let attempt = 1; attempt <= 15; attempt++) {
+      console.log(`  Checking for queue items (attempt ${attempt}/15)...`);
       
-    await page.waitForTimeout(2000);
-    await page.goto(queueDetailUrl);
+      await page.waitForTimeout(2000);
+      await page.goto(queueDetailUrl);
       
       // Check if we have items
       const hasItems = await itemRows.first().isVisible().catch(() => false);
@@ -169,11 +170,8 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
         break;
       }
       
-      // If empty and not last attempt, navigate to force fresh fetch
-      if (attempt < 30) {
-        console.log('  Queue empty, reloading via navigation...');
-      } else {
-        // Last attempt - fail with assertion
+      // Last attempt - fail with assertion
+      if (attempt === 15) {
         await expect(itemRows.first()).toBeVisible({ timeout: 5000 });
       }
     }

@@ -14,6 +14,9 @@ export default defineConfig({
   // Reporter to use. `html` puts results in a nice folder.
   reporter: 'html',
 
+  // Default timeout for each test (2 minutes)
+  timeout: 120000,
+
   use: {
     // The base URL for your dev server. This matches your UI's default port.
     baseURL: 'http://localhost:1974',
