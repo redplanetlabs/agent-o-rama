@@ -148,8 +148,11 @@ export async function addExample(page, { input, output, tags }) {
   const table = page.locator('table tbody');
   await expect(table).toBeVisible({ timeout: 5000 });
   
-  // Find the row containing our input - more reliable than counting rows
-  const newRow = page.locator('table tbody tr').filter({ hasText: inputStr });
+  // Find the row by targeting the Input cell specifically (2nd column)
+  // Using exact match on the cell to avoid substring issues (e.g. "E" matching "Example")
+  const newRow = page.locator('table tbody tr').filter({ 
+    has: page.locator('td').nth(1).filter({ hasText: new RegExp(`^${inputStr}$`) })
+  });
   await expect(newRow.first()).toBeVisible({ timeout: 10000 });
   console.log(`Verified example with input "${inputStr}" appears in table`);
 
@@ -175,8 +178,8 @@ export async function addExample(page, { input, output, tags }) {
       await expect(tagRow).toBeVisible();
     }
 
-    const closeButton = editModal.getByRole('button', { name: '×' })
-    closeButton.click();
+    const closeButton = editModal.getByRole('button', { name: '×' });
+    await closeButton.click();
     await expect(editModal).not.toBeVisible({ timeout: 15000 });
     console.log('Successfully added tags to example.');
   }
