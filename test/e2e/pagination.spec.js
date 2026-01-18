@@ -241,7 +241,8 @@ test.describe('Pagination Tests', () => {
         // Use the regular helper for first 20 examples
         await addExample(page, {
           input: { "id": `pg-ex-${exampleCount}`, "value": `test value ${exampleCount}` },
-          output: { "result": `output ${exampleCount}` }
+          output: { "result": `output ${exampleCount}` },
+          searchText: `pg-ex-${exampleCount}`
         });
       } else {
         // For examples 21+, add without checking row count
