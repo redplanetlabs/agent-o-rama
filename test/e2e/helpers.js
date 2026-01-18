@@ -127,22 +127,10 @@ export async function createEvaluator(page, { name, builderName, description, pa
  * @param {Object} example - An object with `input`, optional `output`, and optional `tags` array.
  */
 export async function addExample(page, { input, output, tags }) {
-  console.log('Adding example with input:', JSON.stringify(input), 'tags:', tags);
+  const inputStr = typeof input === 'string' ? input : JSON.stringify(input);
+  console.log('Adding example with input:', inputStr, 'tags:', tags);
   
-  // Step 1: Check if table exists (may not exist if no examples yet)
-  const table = page.locator('table tbody');
-  
-  let rowsBefore = 0;
-  if (await table.isVisible().catch(() => false)) {
-    // Wait for table to be stable before counting
-    await page.waitForTimeout(300);
-    rowsBefore = await page.locator('table tbody tr').count();
-    console.log(`Rows before adding example: ${rowsBefore}`);
-  } else {
-    console.log('No table yet (empty state)');
-  }
-  
-  // Step 2: Create the example
+  // Step 1: Create the example
   await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
 
   const createModal = page.locator('[role="dialog"]');
@@ -156,28 +144,19 @@ export async function addExample(page, { input, output, tags }) {
   await createModal.getByRole('button', { name: 'Add Example' }).click();
   await expect(createModal).not.toBeVisible({ timeout: 15000 });
 
-  // Wait for paginated query to refetch after invalidation
-  await page.waitForTimeout(500);
-
-  // Step 3: Wait for table to appear (if it didn't exist) and new row to be added
+  // Step 2: Wait for table to show the new example (verify by input value)
+  const table = page.locator('table tbody');
   await expect(table).toBeVisible({ timeout: 5000 });
   
-  await expect(async () => {
-    const rowsAfter = await page.locator('table tbody tr').count();
-    expect(rowsAfter).toBe(rowsBefore + 1);
-  }).toPass({ timeout: 10000 });
-  
-  const rowsAfter = await page.locator('table tbody tr').count();
-  console.log(`Rows after adding example: ${rowsAfter}`);
+  // Find the row containing our input - more reliable than counting rows
+  const newRow = page.locator('table tbody tr').filter({ hasText: inputStr });
+  await expect(newRow.first()).toBeVisible({ timeout: 10000 });
+  console.log(`Verified example with input "${inputStr}" appears in table`);
 
-  // Step 4: Target the newly added row (last row)
-  const newRow = page.locator('table tbody tr').nth(rowsAfter - 1);
-  await expect(newRow).toBeVisible();
-
-  // Step 5: If tags are provided, edit the example to add them
+  // Step 3: If tags are provided, edit the example to add them
   if (tags && tags.length > 0) {
     // Click the newly added row
-    await newRow.click();
+    await newRow.first().click();
 
     const editModal = page.locator('[role="dialog"]');
     await expect(editModal).toBeVisible();
@@ -419,8 +398,10 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   }
 
   // Now wait for the specific evaluator option to appear in the dropdown
+  // The option's accessible name includes both name and description, so use filter
   const evaluatorOption = page
-    .getByRole('option', { name: evaluatorName, exact: true })
+    .getByRole('option')
+    .filter({ hasText: evaluatorName })
     .first();
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
   
