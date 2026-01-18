@@ -135,8 +135,8 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     // STEP 6: Wait for rule to process and add to queue
     // =============================================================================
     console.log('Step 6: Waiting for rule to process...');
-    // Give the system time to process the rule and add to queue
-    await page.waitForTimeout(5000);
+    // Initial wait for rule processing
+    await page.waitForTimeout(3000);
     
     // =============================================================================
     // STEP 7: Navigate to queue and verify item shows FAILED
@@ -151,13 +151,36 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     // Wait for queue detail page
     await expect(page).toHaveURL(new RegExp(`human-feedback-queues/${encodeURIComponent(queueName)}`));
     
-    // Verify at least 1 item is in the queue (might need to wait for processing)
+    // Poll for item to appear - rule processing can take a few seconds
     const itemRows = page.locator('tbody').getByRole('row');
-    await expect(itemRows.first()).toBeVisible({ timeout: 30000 });
-    console.log('✓ Queue has items');
+    
+    // Retry up to 30 times with full page navigation if queue is empty
+    const queueDetailUrl = page.url();
+    for (let attempt = 1; attempt <= 30; attempt++) {
+      console.log(`  Checking for queue items (attempt ${attempt}/30)...`);
+      
+    await page.waitForTimeout(2000);
+    await page.goto(queueDetailUrl);
+      
+      // Check if we have items
+      const hasItems = await itemRows.first().isVisible().catch(() => false);
+      if (hasItems) {
+        console.log('✓ Queue has items');
+        break;
+      }
+      
+      // If empty and not last attempt, navigate to force fresh fetch
+      if (attempt < 30) {
+        console.log('  Queue empty, reloading via navigation...');
+      } else {
+        // Last attempt - fail with assertion
+        await expect(itemRows.first()).toBeVisible({ timeout: 5000 });
+      }
+    }
     
     // Verify the output column shows "FAILED" (not the raw JSON)
-    const failedText = page.locator('td').getByText('FAILED', { exact: true });
+    // Use .first() since there may be multiple items in queue
+    const failedText = page.locator('td').getByText('FAILED', { exact: true }).first();
     await expect(failedText).toBeVisible({ timeout: 5000 });
     console.log('✓ Output shows "FAILED" in queue table');
     
