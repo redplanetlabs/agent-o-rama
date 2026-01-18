@@ -13,7 +13,7 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
   const ruleName = `e2e-failed-rule-${uniqueId}`;
   
   // Increase timeout - this test involves rule processing which can take time
-  test('should display FAILED for failed agent output in queue', { timeout: 120000 }, async ({ page }) => {
+  test('should display failed agent error in red', { timeout: 120000 }, async ({ page }) => {
     // =============================================================================
     // STEP 1: Setup - Navigate to E2ETestAgent module
     // =============================================================================
@@ -176,29 +176,29 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
       }
     }
     
-    // Verify the output column shows "FAILED" (not the raw JSON)
-    // Use .first() since there may be multiple items in queue
-    const failedText = page.locator('td').getByText('FAILED', { exact: true }).first();
-    await expect(failedText).toBeVisible({ timeout: 5000 });
-    console.log('✓ Output shows "FAILED" in queue table');
+    // Verify the output column shows the error message in red (not raw JSON with failure? key)
+    // The error message should be "Max retry limit exceeded"
+    const errorText = page.locator('td.text-red-600').filter({ hasText: /Max retry limit exceeded/ }).first();
+    await expect(errorText).toBeVisible({ timeout: 5000 });
+    console.log('✓ Output shows error message in red in queue table');
     
     // =============================================================================
-    // STEP 8: Click into item detail and verify FAILED display
+    // STEP 8: Click into item detail and verify failed output display
     // =============================================================================
-    console.log('Step 8: Verifying FAILED in item detail view');
+    console.log('Step 8: Verifying failed output in item detail view');
     await itemRows.first().click();
     await expect(page).toHaveURL(/item/);
     
-    // Find the Output section and verify it shows FAILED
+    // Find the Output section - header should show "Output (Failed)" in red
     const outputSection = page.locator('[data-id="item-output"]');
     await expect(outputSection).toBeVisible();
-    await expect(outputSection.getByText('FAILED')).toBeVisible();
-    console.log('✓ Output shows "FAILED" in item detail view');
+    await expect(outputSection.getByText('Output (Failed)')).toBeVisible();
+    console.log('✓ Output header shows "Output (Failed)" in item detail view');
     
-    // Verify it's styled in red
-    const failedElement = outputSection.locator('.text-red-600, .text-red-500').filter({ hasText: 'FAILED' });
-    await expect(failedElement).toBeVisible();
-    console.log('✓ FAILED text is styled in red');
+    // Verify the header is styled in red
+    const failedHeader = outputSection.locator('h3.text-red-600').filter({ hasText: 'Output (Failed)' });
+    await expect(failedHeader).toBeVisible();
+    console.log('✓ Failed output header is styled in red');
     
     // =============================================================================
     // CLEANUP
@@ -235,9 +235,9 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     }
   });
   
-  test('should show successful agent output normally (not FAILED)', async ({ page }) => {
+  test('should show successful agent output normally (not in red)', async ({ page }) => {
     // This test verifies that successful agents still show their output normally
-    // (contrasting with the FAILED display)
+    // (not styled in red like failed outputs)
     
     console.log('Step 1: Navigating to E2ETestAgent module');
     await page.goto('/');
@@ -303,13 +303,13 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     const itemRows = page.locator('tbody').getByRole('row');
     await expect(itemRows.first()).toBeVisible({ timeout: 10000 });
     
-    // Should NOT show FAILED
-    const failedText = page.locator('td').getByText('FAILED', { exact: true });
-    await expect(failedText).not.toBeVisible();
+    // Should NOT have red-styled output (no failures)
+    const redOutput = page.locator('td.text-red-600');
+    await expect(redOutput).not.toBeVisible();
     
     // Should show the actual output value (contains "success")
     await expect(page.locator('td').filter({ hasText: /success/ })).toBeVisible();
-    console.log('✓ Successful output shows value, not FAILED');
+    console.log('✓ Successful output shows value normally (not red)');
     
     // Cleanup
     if (!shouldSkipCleanup()) {

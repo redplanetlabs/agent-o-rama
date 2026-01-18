@@ -741,10 +741,9 @@
             (common/to-json input)))
        ($ :td.px-4.py-3.text-sm.max-w-xs.truncate
           {:className (if failed? "text-red-600 font-semibold" "text-gray-600")}
-          (cond
-            output-unavailable? ($ :span.text-gray-400.italic "Data unavailable")
-            failed? "FAILED"
-            :else (common/to-json value))))))
+          (if output-unavailable?
+            ($ :span.text-gray-400.italic "Data unavailable")
+            (common/to-json value))))))
 
 (defui detail []
   (let [{:keys [module-id queue-id]} (state/use-sub [:route :path-params])
@@ -847,11 +846,7 @@
 (defui ExpandableJsonContent [{:keys [content title max-lines]
                                :or {max-lines 30}}]
   (let [;; If content is a string, try to parse it first, otherwise use as-is
-        parsed-content (if (string? content)
-                         (try
-                           (cljs.reader/read-string content)
-                           (catch js/Error _e content))
-                         content)
+        parsed-content content 
         ;; Use with-out-str and pprint to ensure proper formatting
         pretty-str (if (string? parsed-content)
                      parsed-content  ; Already a string, use as-is
@@ -1156,12 +1151,13 @@
                                           :max-lines 30}))
               ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
                  {:data-id "item-output"}
-                 ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Output")
-                 (if failed?
-                   ($ :div.text-red-600.font-semibold.text-lg "FAILED")
-                   ($ ExpandableJsonContent {:content value
-                                            :title "Output"
-                                            :max-lines 30})))))
+                 ($ :h3.text-sm.font-semibold.mb-2
+                    {:className (if failed? "text-red-600" "text-gray-700")}
+                    (if failed? "Output (Failed)" "Output"))
+                 (println "value" (type value) value)
+                 ($ ExpandableJsonContent {:content value
+                                           :title "Output"
+                                           :max-lines 30}))))
 
          ;; Evaluation Form
          ($ :div.bg-white.border.border-gray-200.rounded-md.p-6.mb-6
