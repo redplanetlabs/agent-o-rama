@@ -99,7 +99,7 @@ test.describe('Comparative Experiment Flow', () => {
     await page.getByRole('link', { name: datasetName }).click();
     await page.getByRole('link', { name: 'Examples' }).click();
     for (const example of examples) {
-      await addExample(page, example);
+      await addExample(page, { ...example, searchText: example.input['run-id'] });
     }
     console.log('Setup complete: All resources created with 3 examples.');
 
@@ -352,7 +352,7 @@ test.describe('Comparative Experiment Flow', () => {
     
     // Add only 2 examples for this test
     for (const example of examples.slice(0, 2)) {
-      await addExample(page, example);
+      await addExample(page, { ...example, searchText: example.input['run-id'] });
     }
     console.log('Setup complete: Dataset created with 2 examples.');
 

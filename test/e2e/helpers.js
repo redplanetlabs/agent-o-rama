@@ -124,11 +124,16 @@ export async function createEvaluator(page, { name, builderName, description, pa
 /**
  * Adds an example to the currently viewed dataset.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
- * @param {Object} example - An object with `input`, optional `output`, and optional `tags` array.
+ * @param {Object} example - An object with `input`, optional `output`, optional `tags`, and optional `searchText`.
+ * @param {*} example.input - The input value (string or object).
+ * @param {*} [example.output] - The reference output value.
+ * @param {string[]} [example.tags] - Tags to add to the example.
+ * @param {string} [example.searchText] - Text to search for in the Input cell to find the row. 
+ *                                         If not provided, uses exact match on stringified input.
  */
-export async function addExample(page, { input, output, tags }) {
+export async function addExample(page, { input, output, tags, searchText }) {
   const inputStr = typeof input === 'string' ? input : JSON.stringify(input);
-  console.log('Adding example with input:', inputStr, 'tags:', tags);
+  console.log('Adding example with input:', inputStr.substring(0, 50), 'tags:', tags);
   
   // Step 1: Create the example
   await page.locator('button').filter({ hasText: 'Add Example' }).filter({ hasNot: page.locator('[disabled]') }).first().click();
@@ -143,18 +148,22 @@ export async function addExample(page, { input, output, tags }) {
   
   await createModal.getByRole('button', { name: 'Add Example' }).click();
   await expect(createModal).not.toBeVisible({ timeout: 15000 });
-
-  // Step 2: Wait for table to show the new example (verify by input value)
+  
+  // Step 2: Wait for table to show the new example
   const table = page.locator('table tbody');
   await expect(table).toBeVisible({ timeout: 5000 });
   
-  // Find the row by targeting the Input cell specifically (2nd column)
-  // Using exact match on the cell to avoid substring issues (e.g. "E" matching "Example")
+  // Find the row by targeting the Input cell (2nd column)
+  // Use provided searchText for substring match, or exact match on simple inputs
+  const matchPattern = searchText 
+    ? searchText  // Substring match
+    : new RegExp(`^${inputStr}$`);  // Exact match for simple inputs
+  
   const newRow = page.locator('table tbody tr').filter({ 
-    has: page.locator('td').nth(1).filter({ hasText: new RegExp(`^${inputStr}$`) })
+    has: page.locator('td').nth(1).filter({ hasText: matchPattern })
   });
   await expect(newRow.first()).toBeVisible({ timeout: 10000 });
-  console.log(`Verified example with input "${inputStr}" appears in table`);
+  console.log(`Verified example appears in table`);
 
   // Step 3: If tags are provided, edit the example to add them
   if (tags && tags.length > 0) {
