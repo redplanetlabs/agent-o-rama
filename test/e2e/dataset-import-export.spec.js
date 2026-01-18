@@ -175,7 +175,7 @@ test.describe('Dataset Import/Export Round-trip', () => {
     ];
 
     for (const example of complexExamples) {
-      await addExample(page, example);
+      await addExample(page, { ...example, searchText: example.input['run-id'] });
     }
     
     console.log('Complex examples added to original dataset.');
@@ -494,7 +494,8 @@ test.describe('Dataset Import/Export Round-trip', () => {
     // Add one example first
     await addExample(page, { 
       input: { "run-id": `readonly-test-${uniqueId}`, "output-value": "test output" }, 
-      output: "test output" 
+      output: "test output",
+      searchText: `readonly-test-${uniqueId}`
     });
     
     // Create a snapshot (this would make it read-only when selected)
