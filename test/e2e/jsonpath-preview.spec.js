@@ -40,7 +40,8 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   console.log('Adding example with nested JSON structure...');
   await addExample(page, {
     input: { question: 'What is 2+2?', nested: { deep: 'value' } },
-    output: { answer: '4', confidence: 0.95 }
+    output: { answer: '4', confidence: 0.95 },
+    searchText: 'What is 2+2?'
   });
 
   console.log('✓ Dataset created with example');
@@ -85,11 +86,14 @@ test('should display JSONPath preview when creating evaluator', async ({ page })
   const comboboxInput = modal.getByPlaceholder('Type to search datasets...');
   await expect(comboboxInput).toBeVisible();
   await comboboxInput.click();
-  await comboboxInput.fill(datasetName);
+  await comboboxInput.clear();
+  await comboboxInput.pressSequentially(datasetName);
   await page.waitForTimeout(500); // Wait for search debounce
   
-  // Click the dataset option
-  await page.getByText(datasetName, { exact: true }).click();
+  // Click the dataset option from the dropdown
+  const datasetOption = page.locator('[role="option"]').filter({ hasText: datasetName });
+  await datasetOption.waitFor({ timeout: 10000 });
+  await datasetOption.click();
 
   // Wait for preview to load (debounce + request)
   await page.waitForTimeout(1500);
@@ -150,7 +154,8 @@ test('should show no result (not fallback) when reference-output is missing', as
   console.log('Adding example with only input (no reference-output)...');
   await addExample(page, {
     input: { testField: 'input-only-value-should-NOT-appear-in-ref-output' },
-    output: null  // Explicitly no reference output
+    output: null,  // Explicitly no reference output
+    searchText: 'input-only-value-should-NOT-appear-in-ref-output'
   });
   
   console.log('✓ Example created with input only');
@@ -181,9 +186,12 @@ test('should show no result (not fallback) when reference-output is missing', as
       
       // Select our test dataset using combobox
       await comboboxInput.click();
-      await comboboxInput.fill(testDatasetName);
+      await comboboxInput.clear();
+      await comboboxInput.pressSequentially(testDatasetName);
       await page.waitForTimeout(500);
-      await page.getByText(testDatasetName, { exact: true }).click();
+      const datasetOption = page.locator('[role="option"]').filter({ hasText: testDatasetName });
+      await datasetOption.waitFor({ timeout: 10000 });
+      await datasetOption.click();
       await page.waitForTimeout(1500);
       
       // CRITICAL TEST: Verify no-fallback behavior with data-testid selectors
