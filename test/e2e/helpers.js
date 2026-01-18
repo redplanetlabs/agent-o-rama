@@ -363,6 +363,10 @@ export async function deleteHumanMetric(page, name) {
   };
   page.once('dialog', dialogHandler);
   
+  // Search for the metric to ensure it's visible
+  await page.getByRole('textbox', { name: /Search metrics/ }).fill(name);
+  await page.waitForTimeout(500);
+  
   const metricRow = page.locator('table tbody tr').filter({ hasText: name });
   await metricRow.getByRole('button', { name: 'Delete' }).click();
   
