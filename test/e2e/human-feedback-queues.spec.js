@@ -703,6 +703,7 @@ test.describe('Human Feedback Queues', () => {
       await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).toBeVisible();
       await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+      await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
       await page.locator('[role="option"]').filter({ hasText: queueName }).click();
       await modal.getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).not.toBeVisible({ timeout: 5000 });
@@ -768,6 +769,8 @@ test.describe('Human Feedback Queues', () => {
     
     // Verify we moved to next item (2 items should remain)
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+    await page.waitForTimeout(500);
     await queueRow.getByTestId('queue-name-link').click();
     const remainingItems = page.locator('tbody').getByRole('row');
     await expect(remainingItems).toHaveCount(2);
