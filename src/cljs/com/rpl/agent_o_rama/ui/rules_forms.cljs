@@ -20,6 +20,7 @@
     "aor/eval" "Online evaluation"
     "aor/add-to-dataset" "Add to dataset"
     "aor/webhook" "Webhook"
+    "aor/add-to-human-feedback-queue" "Add to human feedback queue"
     action-id))
 
 (defn compute-start-time-millis
