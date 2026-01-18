@@ -83,7 +83,7 @@
 (defui metrics-index []
   (let [{:keys [module-id]} (state/use-sub [:route :path-params])
         decoded-module-id (when module-id (common/url-decode module-id))
-         ;; Search state
+        ;; Search state
         [search-term set-search-term] (useState "")
         [debounced-search] (useDebounce search-term 300)
 
@@ -125,7 +125,7 @@
                 :onClick #(state/dispatch [:modal/show-form :create-human-metric {:module-id decoded-module-id}])}
                "+ Create Metric"))
 
-       ;; Search
+         ;; Search
          ($ :div.mb-4
             ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
                {:type "text"
@@ -133,7 +133,7 @@
                 :value search-term
                 :onChange #(set-search-term (.. % -target -value))}))
 
-       ;; Table
+         ;; Table
          (cond
            isLoading
            ($ :div.flex.justify-center.items-center.py-12
@@ -190,7 +190,7 @@
                                      ($ TrashIcon {:className "h-4 w-4 mr-1"})
                                      "Delete")))))))
 
-            ;; Load More button
+              ;; Load More button
               (when hasMore
                 ($ :tfoot.bg-gray-50.border-t.border-gray-200
                    ($ :tr.hover:bg-gray-100.transition-colors.duration-150
@@ -855,10 +855,10 @@
         handle-expand (fn [e]
                         (.stopPropagation e)
                         (state/dispatch [:modal/show :content-detail
-                                        {:title title
-                                         :component ($ common/ContentDetailModal 
-                                                      {:title title 
-                                                       :content pretty-str})}]))]
+                                         {:title title
+                                          :component ($ common/ContentDetailModal 
+                                                        {:title title 
+                                                         :content pretty-str})}]))]
     ($ :div
        ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64.font-mono.whitespace-pre
           text)
@@ -1147,8 +1147,8 @@
                  {:data-id "item-input"}
                  ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Input")
                  ($ ExpandableJsonContent {:content (:input current-item)
-                                          :title "Input"
-                                          :max-lines 30}))
+                                           :title "Input"
+                                           :max-lines 30}))
               ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
                  {:data-id "item-output"}
                  ($ :h3.text-sm.font-semibold.mb-2
