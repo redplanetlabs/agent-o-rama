@@ -69,7 +69,8 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
         "run-id": `disambiguation-test-${uniqueId}`, 
         "output-value": "A test sentence with vowels." 
       }, 
-      output: "A test sentence with vowels."
+      output: "A test sentence with vowels.",
+      searchText: `disambiguation-test-${uniqueId}`
     });
     console.log('Dataset with example created.');
 

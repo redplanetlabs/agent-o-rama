@@ -79,10 +79,10 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   await expect(page.getByRole('heading', { name: datasetName })).toBeVisible();
 
   // Create examples with unique identifiers
-  await addExample(page, { input: { "run-id": `ex1-${uniqueId}`, "output-value": "out", text: "short", id: `ex1-${uniqueId}` }, output: "out" }); // For conciseness test
-  await addExample(page, { input: { "run-id": `ex2-${uniqueId}`, "output-value": "10", value: 5, id: `ex2-${uniqueId}` }, output: "10" });         // For comparative test
-  await addExample(page, { input: { "run-id": `ex3-${uniqueId}`, "output-value": "+", symbol: "+", id: `ex3-${uniqueId}` }, output: "+" });      // For summary F1 test
-  await addExample(page, { input: { "run-id": `ex4-${uniqueId}`, "output-value": "-", symbol: "-", id: `ex4-${uniqueId}` }, output: "-" });      // For summary F1 test
+  await addExample(page, { input: { "run-id": `ex1-${uniqueId}`, "output-value": "out", text: "short", id: `ex1-${uniqueId}` }, output: "out", searchText: `ex1-${uniqueId}` }); // For conciseness test
+  await addExample(page, { input: { "run-id": `ex2-${uniqueId}`, "output-value": "10", value: 5, id: `ex2-${uniqueId}` }, output: "10", searchText: `ex2-${uniqueId}` });         // For comparative test
+  await addExample(page, { input: { "run-id": `ex3-${uniqueId}`, "output-value": "+", symbol: "+", id: `ex3-${uniqueId}` }, output: "+", searchText: `ex3-${uniqueId}` });      // For summary F1 test
+  await addExample(page, { input: { "run-id": `ex4-${uniqueId}`, "output-value": "-", symbol: "-", id: `ex4-${uniqueId}` }, output: "-", searchText: `ex4-${uniqueId}` });      // For summary F1 test
 
   console.log('--- Evaluator and Dataset Creation Complete ---');
 

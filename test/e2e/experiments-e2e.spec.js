@@ -118,7 +118,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     await page.getByRole('link', { name: datasetName }).click();
     await page.getByRole('link', { name: 'Examples' }).click();
     for (const ex of examples) {
-      await addExample(page, ex);
+      await addExample(page, { ...ex, searchText: ex.input['run-id'] });
     }
     await expect(page.locator('table tbody tr')).toHaveCount(4);
     console.log('Setup complete: All resources created.');
