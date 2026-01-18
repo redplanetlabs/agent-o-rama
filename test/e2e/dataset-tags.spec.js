@@ -47,9 +47,9 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     const example2 = { input: { "run-id": `ex2-${uniqueId}`, "output-value": "output for example 2" }, output: "output for example 2" };
     const example3 = { input: { "run-id": `ex3-${uniqueId}`, "output-value": "output for example 3" }, output: "output for example 3" };
 
-    await addExample(page, example1);
-    await addExample(page, example2);
-    await addExample(page, example3);
+    await addExample(page, { ...example1, searchText: example1.input["run-id"] });
+    await addExample(page, { ...example2, searchText: example2.input["run-id"] });
+    await addExample(page, { ...example3, searchText: example3.input["run-id"] });
 
     const row1 = page.locator('table tbody tr').filter({ hasText: example1.input["run-id"] });
     const row2 = page.locator('table tbody tr').filter({ hasText: example2.input["run-id"] });
@@ -183,9 +183,9 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     const example2 = { input: { "run-id": `ex2-${uniqueId}`, "output-value": "output 2" }, output: "output 2" };
     const example3 = { input: { "run-id": `ex3-${uniqueId}`, "output-value": "output 3" }, output: "output 3" };
 
-    await addExample(page, example1);
-    await addExample(page, example2);
-    await addExample(page, example3);
+    await addExample(page, { ...example1, searchText: example1.input["run-id"] });
+    await addExample(page, { ...example2, searchText: example2.input["run-id"] });
+    await addExample(page, { ...example3, searchText: example3.input["run-id"] });
     console.log('--- Test Setup Complete ---');
 
     // --- 2. VERIFY BUTTONS APPEAR WHEN EXAMPLES SELECTED ---
