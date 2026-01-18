@@ -110,10 +110,10 @@
     (foreign-invoke-query queue-info-query queue-name)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items
-  [{:keys [manager queue-name pagination]} uid]
+  [{:keys [manager queue-name pagination limit]} uid]
   (let [underlying-objects (aor-types/underlying-objects manager)
         queue-page-query (:human-feedback-queue-page-query underlying-objects)
-        query-limit 20
+        query-limit (or limit 20)
         ;; If pagination is a UUID string (initial cursor from item-id),
         ;; decrement it by 1 so search-loop with inclusive?=false includes the target item
         adjusted-pagination (if (string? pagination)

@@ -881,16 +881,16 @@
           :enabled? (boolean (and decoded-module-id decoded-queue-id))})
         queue-info data
 
-        ;; Fetch queue items starting from current item-id (backend decrements it)
-        ;; Use item-id in query key so each item has independent cache
+        ;; Fetch queue items with shared cache for review session
+        ;; On first load (no cache), start from current item-id
         {:keys [data isLoading hasMore loadMore]}
         (queries/use-paginated-query
-         {:query-key [:human-feedback-queue-items-from module-id queue-id item-id]
+         {:query-key [:human-feedback-queue-items-review module-id queue-id]
           :sente-event [:human-feedback/get-queue-items
                         {:module-id decoded-module-id
                          :queue-name decoded-queue-id}]
           :page-size 50
-          :initial-pagination item-id  ;; Backend decrements this to include current item
+          :initial-pagination item-id  ;; Only used on first load, backend decrements
           :enabled? (boolean (and decoded-module-id decoded-queue-id item-id))})
         items-loading? isLoading
         items (or data [])
@@ -916,11 +916,14 @@
         
         ;; Navigation: 
         ;; - Previous disabled if we're at index 0 (started from URL cursor)
-        ;; - Next enabled if there are more items in array
+        ;; - Next enabled if there are more items in array OR hasMore on backend
         has-prev? (and current-idx (> current-idx 0))
-        has-next? (and current-idx (< current-idx (dec (count items))))
+        has-next? (and current-idx 
+                       (or (< current-idx (dec (count items)))
+                           hasMore))
         prev-item-id (when has-prev? (str (:id (nth items (dec current-idx)))))
-        next-item-id (when has-next? (str (:id (nth items (inc current-idx)))))
+        next-item-id (when (and current-idx (< current-idx (dec (count items))))
+                       (str (:id (nth items (inc current-idx)))))
 
         ;; Form state
         [scores set-scores] (uix/use-state {})
