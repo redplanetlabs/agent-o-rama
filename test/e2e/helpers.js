@@ -418,6 +418,9 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   
   // Type character by character to properly trigger React onChange and open dropdown
   await searchInput.pressSequentially(evaluatorName);
+  
+  // Wait for search to settle after typing
+  await page.waitForTimeout(1000);
 
   // Wait for the dropdown container (listbox) to appear.
   // The popover is rendered in a portal, so target it globally.
@@ -432,8 +435,8 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
     .first();
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
   
-  // Click the evaluator in the dropdown (use force to handle re-renders)
-  await evaluatorOption.click({ force: true });
+  // Click the evaluator in the dropdown
+  await evaluatorOption.click();
   
   // Verify the evaluator was added by checking for its badge
   await expect(modal.getByText(evaluatorName, { exact: true })).toBeVisible();
