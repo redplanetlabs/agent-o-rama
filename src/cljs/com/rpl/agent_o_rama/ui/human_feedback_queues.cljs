@@ -706,11 +706,28 @@
 
 (def TARGET-DOES-NOT-EXIST :com.rpl.agent-o-rama.impl.queries/target-does-not-exist)
 
+(defn agent-target?
+  "Returns true if the target is an agent (not a node)"
+  [target]
+  (nil? (:node-invoke target)))
+
+(defn unwrap-agent-output
+  "For agent targets, output is {:val <value> :failure? <bool>}.
+   Returns {:failed? bool :value <unwrapped-value-or-original>}"
+  [output target]
+  (if (agent-target? target)
+    {:failed? (:failure? output)
+     :value (:val output)}
+    {:failed? false
+     :value output}))
+
 (defui queue-item-row [{:keys [item module-id queue-id]}]
   (let [input (:input item)
         output (:output item)
+        target (:target item)
         input-unavailable? (= input TARGET-DOES-NOT-EXIST)
-        output-unavailable? (= output TARGET-DOES-NOT-EXIST)]
+        output-unavailable? (= output TARGET-DOES-NOT-EXIST)
+        {:keys [failed? value]} (unwrap-agent-output output target)]
     ($ :tr.hover:bg-gray-50.cursor-pointer
        {:onClick #(rfe/push-state :module/human-feedback-queue-item
                                   {:module-id module-id
@@ -722,10 +739,12 @@
           (if input-unavailable?
             ($ :span.text-gray-400.italic "Data unavailable")
             (common/to-json input)))
-       ($ :td.px-4.py-3.text-sm.text-gray-600.max-w-xs.truncate
-          (if output-unavailable?
-            ($ :span.text-gray-400.italic "Data unavailable")
-            (common/to-json output))))))
+       ($ :td.px-4.py-3.text-sm.max-w-xs.truncate
+          {:className (if failed? "text-red-600 font-semibold" "text-gray-600")}
+          (cond
+            output-unavailable? ($ :span.text-gray-400.italic "Data unavailable")
+            failed? "FAILED"
+            :else (common/to-json value))))))
 
 (defui detail []
   (let [{:keys [module-id queue-id]} (state/use-sub [:route :path-params])
@@ -1127,19 +1146,22 @@
               ($ :div.text-sm.text-blue-800 (:comment current-item))))
 
          ;; Input/Output Display
-         ($ :div.grid.grid-cols-2.gap-4.mb-6
-            ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
-               {:data-id "item-input"}
-               ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Input")
-               ($ ExpandableJsonContent {:content (:input current-item)
-                                        :title "Input"
-                                        :max-lines 30}))
-            ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
-               {:data-id "item-output"}
-               ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Output")
-               ($ ExpandableJsonContent {:content (:output current-item)
-                                        :title "Output"
-                                        :max-lines 30})))
+         (let [{:keys [failed? value]} (unwrap-agent-output (:output current-item) (:target current-item))]
+           ($ :div.grid.grid-cols-2.gap-4.mb-6
+              ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
+                 {:data-id "item-input"}
+                 ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Input")
+                 ($ ExpandableJsonContent {:content (:input current-item)
+                                          :title "Input"
+                                          :max-lines 30}))
+              ($ :div.bg-white.border.border-gray-200.rounded-md.p-4
+                 {:data-id "item-output"}
+                 ($ :h3.text-sm.font-semibold.text-gray-700.mb-2 "Output")
+                 (if failed?
+                   ($ :div.text-red-600.font-semibold.text-lg "FAILED")
+                   ($ ExpandableJsonContent {:content value
+                                            :title "Output"
+                                            :max-lines 30})))))
 
          ;; Evaluation Form
          ($ :div.bg-white.border.border-gray-200.rounded-md.p-6.mb-6
