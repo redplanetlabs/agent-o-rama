@@ -373,6 +373,10 @@ export async function deleteHumanMetric(page, name) {
   // Wait a bit for dialog to appear and be handled
   await page.waitForTimeout(500);
   
+  // Clear search to avoid false positives from similar metric names
+  await page.getByRole('textbox', { name: /Search metrics/ }).clear();
+  await page.waitForTimeout(300);
+  
   // Wait for the row to disappear after deletion
   await expect(metricRow).not.toBeVisible({ timeout: 10000 });
   console.log(`Successfully deleted metric: ${name}`);
