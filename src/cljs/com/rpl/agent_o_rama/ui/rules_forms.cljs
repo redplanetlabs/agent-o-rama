@@ -157,7 +157,7 @@
                             [:human-feedback/get-queues
                              {:module-id module-id
                               :filters {:search-string search-string}}])
-          :items-key :queues
+          :items-key :items
           :item-id-fn :name
           :item-label-fn :name
           :item-sublabel-fn :description
