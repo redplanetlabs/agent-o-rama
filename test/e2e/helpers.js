@@ -259,11 +259,24 @@ export async function deleteDataset(page, name) {
   };
   page.once('dialog', dialogHandler);
   
+  // Search for the dataset to ensure it's visible
+  const searchInput = page.getByPlaceholder('Search datasets...');
+  if (await searchInput.isVisible()) {
+    await searchInput.fill(name);
+    await page.waitForTimeout(500);
+  }
+  
   const datasetRow = page.locator('table tbody tr').filter({ hasText: name });
   await datasetRow.getByRole('button', { name: 'Delete' }).click();
   
   // Wait a bit for dialog to appear and be handled
   await page.waitForTimeout(500);
+  
+  // Clear search to avoid false positives from similar dataset names
+  if (await searchInput.isVisible()) {
+    await searchInput.clear();
+    await page.waitForTimeout(300);
+  }
   
   // Wait for the row to disappear after deletion
   await expect(datasetRow).not.toBeVisible({ timeout: 10000 });
@@ -419,8 +432,8 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
     .first();
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
   
-  // Click the evaluator in the dropdown
-  await evaluatorOption.click();
+  // Click the evaluator in the dropdown (use force to handle re-renders)
+  await evaluatorOption.click({ force: true });
   
   // Verify the evaluator was added by checking for its badge
   await expect(modal.getByText(evaluatorName, { exact: true })).toBeVisible();
