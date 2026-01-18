@@ -460,8 +460,11 @@ export async function createHumanMetric(page, { name, type, min, max, categories
   await createButton.click();
   await expect(modal).not.toBeVisible({ timeout: 10000 });
   
-  // Verify metric was created
+  // Search for the metric to ensure it's visible
+  await page.getByRole('textbox', { name: /Search metrics/ }).fill(name);
   await page.waitForTimeout(500);
+  
+  // Verify metric was created
   await expect(page.locator('table tbody tr').filter({ hasText: name })).toBeVisible({ timeout: 5000 });
   
   console.log(`Successfully created metric: ${name}`);

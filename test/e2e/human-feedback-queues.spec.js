@@ -96,16 +96,16 @@ test.describe('Human Feedback Queues', () => {
     const firstRubric = modal.getByTestId('rubric-0');
     await expect(firstRubric).toBeVisible();
     
-    // Click on the metric selector input to open dropdown
-    await firstRubric.getByTestId('metric-selector-input').click();
+    // Click on the metric selector input to open dropdown and search for metric
+    const metricInput1 = firstRubric.getByTestId('metric-selector-input');
+    await metricInput1.click();
+    await metricInput1.fill(metricName1);
     
     // Wait for dropdown to appear (it's portaled to the page level)
     await expect(page.locator('[role="listbox"]')).toBeVisible({ timeout: 10000 });
     
-    // Wait for options to load
-    await page.locator('[role="option"]').first().waitFor({ timeout: 15000 });
-    
-    // Select first test metric by name
+    // Wait for the specific metric to appear and select it
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).waitFor({ timeout: 15000 });
     await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     
     // Toggle required checkbox
@@ -119,8 +119,10 @@ test.describe('Human Feedback Queues', () => {
     await expect(secondRubric).toBeVisible();
     
     // Select metric for second rubric (not required)
-    await secondRubric.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    const metricInput2 = secondRubric.getByTestId('metric-selector-input');
+    await metricInput2.click();
+    await metricInput2.fill(metricName2);
+    await page.locator('[role="option"]').filter({ hasText: metricName2 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName2 }).click();
     
     console.log('✓ Added second rubric');
@@ -150,14 +152,20 @@ test.describe('Human Feedback Queues', () => {
     // Add rubric
     await modal.getByTestId('add-rubric-button').click();
     const rubric0 = modal.getByTestId('rubric-0');
-    await rubric0.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    const metricInput = rubric0.getByTestId('metric-selector-input');
+    await metricInput.click();
+    await metricInput.fill(metricName1);
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     await rubric0.getByTestId('metric-required-checkbox').check();
     
     // Submit
     await createButton.click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
+    
+    // Search for the queue to ensure it's visible
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName1);
+    await page.waitForTimeout(500);
     
     // Verify queue appears in table
     const queue1Row = page.getByTestId(`queue-row-${queueName1}`);
@@ -179,14 +187,18 @@ test.describe('Human Feedback Queues', () => {
     // Add two rubrics with the SAME metric (to trigger duplicate validation)
     await modal.getByTestId('add-rubric-button').click();
     const rubric0_2 = modal.getByTestId('rubric-0');
-    await rubric0_2.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    const metricInput0_2 = rubric0_2.getByTestId('metric-selector-input');
+    await metricInput0_2.click();
+    await metricInput0_2.fill(metricName1);
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     
     await modal.getByTestId('add-rubric-button').click();
     let rubric1_2 = modal.getByTestId('rubric-1');
-    await rubric1_2.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    const metricInput1_2 = rubric1_2.getByTestId('metric-selector-input');
+    await metricInput1_2.click();
+    await metricInput1_2.fill(metricName1);
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     
     // Verify duplicate validation error appears
@@ -201,8 +213,10 @@ test.describe('Human Feedback Queues', () => {
     // Add second rubric with a DIFFERENT metric
     await modal.getByTestId('add-rubric-button').click();
     rubric1_2 = modal.getByTestId('rubric-1');
-    await rubric1_2.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    const metricInput1_2_new = rubric1_2.getByTestId('metric-selector-input');
+    await metricInput1_2_new.click();
+    await metricInput1_2_new.fill(metricName2);
+    await page.locator('[role="option"]').filter({ hasText: metricName2 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName2 }).click();
     
     // Verify button is now enabled
@@ -211,6 +225,10 @@ test.describe('Human Feedback Queues', () => {
     
     await createButton.click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
+    
+    // Search for the second queue
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName2);
+    await page.waitForTimeout(500);
     
     const queue2Row = page.getByTestId(`queue-row-${queueName2}`);
     await expect(queue2Row).toBeVisible({ timeout: 5000 });
@@ -336,12 +354,18 @@ test.describe('Human Feedback Queues', () => {
     // Add one rubric
     await modal.getByTestId('add-rubric-button').click();
     const rubric = modal.getByTestId('rubric-0');
-    await rubric.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    const metricInputRubric = rubric.getByTestId('metric-selector-input');
+    await metricInputRubric.click();
+    await metricInputRubric.fill(metricName1);
+    await page.locator('[role="option"]').filter({ hasText: metricName1 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     
     await modal.getByRole('button', { name: 'Create' }).click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
+    
+    // Search for the queue to ensure it's visible
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+    await page.waitForTimeout(500);
     
     // Navigate to queue detail page
     const queueRow = page.getByTestId(`queue-row-${queueName}`);
@@ -372,8 +396,10 @@ test.describe('Human Feedback Queues', () => {
     // Add a new rubric with metricName2 and mark it as required
     await modal.getByTestId('add-rubric-button').click();
     const newRubric = modal.getByTestId('rubric-0');
-    await newRubric.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    const metricInput2 = newRubric.getByTestId('metric-selector-input');
+    await metricInput2.click();
+    await metricInput2.fill(metricName2);
+    await page.locator('[role="option"]').filter({ hasText: metricName2 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName2 }).click();
     await newRubric.getByTestId('metric-required-checkbox').check();
     await expect(newRubric.getByTestId('metric-required-checkbox')).toBeChecked();
@@ -447,8 +473,10 @@ test.describe('Human Feedback Queues', () => {
     // Add a rubric with our newly created metric
     await modal.getByTestId('add-rubric-button').click();
     const rubric = modal.getByTestId('rubric-0');
-    await rubric.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    const metricInput = rubric.getByTestId('metric-selector-input');
+    await metricInput.click();
+    await metricInput.fill(metricName);
+    await page.locator('[role="option"]').filter({ hasText: metricName }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName }).click();
     
     await modal.getByRole('button', { name: 'Create' }).click();
@@ -523,6 +551,10 @@ test.describe('Human Feedback Queues', () => {
     console.log('Step 5: Verifying queue items');
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
     
+    // Search for the queue to ensure it's visible
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+    await page.waitForTimeout(500);
+    
     const queueRow = page.getByTestId(`queue-row-${queueName}`);
     await expect(queueRow).toBeVisible({ timeout: 5000 });
     await queueRow.getByTestId('queue-name-link').click();
@@ -592,6 +624,8 @@ test.describe('Human Feedback Queues', () => {
     
     // Navigate back and verify queue is empty
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+    await page.waitForTimeout(500);
     const queueRowFinal = page.getByTestId(`queue-row-${queueName}`);
     await queueRowFinal.getByTestId('queue-name-link').click();
     await expect(page.getByText('No items in this queue yet')).toBeVisible();
@@ -607,6 +641,8 @@ test.describe('Human Feedback Queues', () => {
       
       // Delete queue
       await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+      await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+      await page.waitForTimeout(500);
       const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
       await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
       page.once('dialog', dialog => dialog.accept());
@@ -649,7 +685,10 @@ test.describe('Human Feedback Queues', () => {
     await modal.getByTestId('queue-name-input').fill(queueName);
     await modal.getByTestId('queue-description-input').fill('Navigation test queue');
     await modal.getByTestId('add-rubric-button').click();
-    await modal.getByTestId('rubric-0').getByTestId('metric-selector-input').click();
+    const metricInputNav = modal.getByTestId('rubric-0').getByTestId('metric-selector-input');
+    await metricInputNav.click();
+    await metricInputNav.fill(metricName);
+    await page.locator('[role="option"]').filter({ hasText: metricName }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName }).click();
     await modal.getByRole('button', { name: 'Create' }).click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
@@ -679,6 +718,8 @@ test.describe('Human Feedback Queues', () => {
     // =============================================================================
     console.log('Test 1: Testing Previous/Next navigation');
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+    await page.waitForTimeout(500);
     const queueRow = page.getByTestId(`queue-row-${queueName}`);
     await queueRow.getByTestId('queue-name-link').click();
     
@@ -741,6 +782,8 @@ test.describe('Human Feedback Queues', () => {
       // Navigate back to queue list page first
       await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
       await expect(page).toHaveURL(/human-feedback-queues$/);
+      await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+      await page.waitForTimeout(500);
       
       const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
       await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });

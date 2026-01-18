@@ -57,8 +57,10 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     // Add rubric
     await modal.getByTestId('add-rubric-button').click();
     const rubric = modal.getByTestId('rubric-0');
-    await rubric.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 15000 });
+    const metricInput = rubric.getByTestId('metric-selector-input');
+    await metricInput.click();
+    await metricInput.fill(metricName);
+    await page.locator('[role="option"]').filter({ hasText: metricName }).waitFor({ timeout: 15000 });
     await page.locator('[role="option"]').filter({ hasText: metricName }).click();
     
     await modal.getByRole('button', { name: 'Create' }).click();
@@ -145,6 +147,10 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     console.log('Step 7: Verifying failed trace appears in queue');
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
     
+    // Search for the queue to ensure it's visible
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+    await page.waitForTimeout(500);
+    
     const queueRow = page.getByTestId(`queue-row-${queueName}`);
     await expect(queueRow).toBeVisible({ timeout: 10000 });
     await queueRow.getByTestId('queue-name-link').click();
@@ -219,6 +225,8 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
       
       // Delete queue
       await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+      await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+      await page.waitForTimeout(500);
       const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
       await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
       page.once('dialog', dialog => dialog.accept());
