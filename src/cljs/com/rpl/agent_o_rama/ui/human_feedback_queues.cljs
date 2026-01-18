@@ -889,24 +889,11 @@
           :sente-event [:human-feedback/get-queue-items
                         {:module-id decoded-module-id
                          :queue-name decoded-queue-id}]
-          :page-size 50
+          :page-size 20
           :initial-pagination item-id  ;; Only used on first load, backend decrements
           :enabled? (boolean (and decoded-module-id decoded-queue-id item-id))})
         items-loading? isLoading
         items (or data [])
-        
-        ;; Auto-load more when approaching end of loaded items
-        _ (uix/use-effect
-           (fn []
-             (let [item-id-str (str item-id)
-                   current-idx (some (fn [[idx item]] (when (= (str (:id item)) item-id-str) idx))
-                                     (map-indexed vector items))]
-               ;; Load more if we're in the last 10 items or current item not found
-               (when (and hasMore (not isLoading)
-                          (or (nil? current-idx)
-                              (>= current-idx (- (count items) 10))))
-                 (loadMore))))
-           [item-id items hasMore isLoading loadMore])
 
         ;; Find current item and navigation indices
         item-id-str (str item-id)

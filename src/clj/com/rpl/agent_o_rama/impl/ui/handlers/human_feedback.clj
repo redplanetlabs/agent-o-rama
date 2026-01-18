@@ -114,10 +114,10 @@
   (let [underlying-objects (aor-types/underlying-objects manager)
         queue-page-query (:human-feedback-queue-page-query underlying-objects)
         query-limit (or limit 20)
-        ;; If pagination is a UUID string (initial cursor from item-id),
-        ;; decrement it by 1 so search-loop with inclusive?=false includes the target item
-        adjusted-pagination (if (string? pagination)
-                              (h/uuid-dec (java.util.UUID/fromString pagination))
+        ;; If pagination is a UUID from item-id, decrement it by 1 so
+        ;; search-loop with inclusive?=false includes the target item.
+        adjusted-pagination (if (uuid? pagination)
+                              (h/uuid-dec pagination)
                               pagination)]
     (foreign-invoke-query queue-page-query queue-name query-limit adjusted-pagination)))
 
