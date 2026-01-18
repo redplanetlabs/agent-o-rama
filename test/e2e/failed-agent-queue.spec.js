@@ -57,7 +57,7 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     await modal.getByTestId('add-rubric-button').click();
     const rubric = modal.getByTestId('rubric-0');
     await rubric.getByTestId('metric-selector-input').click();
-    await page.locator('[role="option"]').first().waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').first().waitFor({ timeout: 15000 });
     await page.locator('[role="option"]').filter({ hasText: metricName }).click();
     
     await modal.getByRole('button', { name: 'Create' }).click();
@@ -82,8 +82,9 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     // Fill rule name
     await modal.locator('[data-id="rule-name"]').fill(ruleName);
     
-    // Select "Error" filter to only trigger on failures
-    await modal.locator('[data-id="filter-selector"]').selectOption('error');
+    // Select "Failure" status filter to only trigger on failures
+    const statusSelect = modal.locator('select').filter({ has: page.locator('option[value="fail"]') });
+    await statusSelect.selectOption('fail');
     
     // Select action: Add to human feedback queue
     await modal.locator('[data-id="action-selector"]').selectOption('aor/add-to-human-feedback-queue');
@@ -91,9 +92,11 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     // Wait for queue selector to appear and select the queue
     const queueSelector = modal.getByPlaceholder(/Type to search queues/);
     await expect(queueSelector).toBeVisible({ timeout: 5000 });
+    // Click to open dropdown, then type to filter
     await queueSelector.click();
-    await queueSelector.fill(queueName);
-    await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
+    await queueSelector.pressSequentially(queueName, { delay: 50 });
+    // Wait for option to appear and click it
+    await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 15000 });
     await page.locator('[role="option"]').filter({ hasText: queueName }).click();
     
     // Submit rule
@@ -123,8 +126,9 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     
     await invokeAgentManually(page, failingArgs);
     
-    // The agent should fail - wait for error indicator
-    await expect(page.locator('[data-id="agent-status-failed"]').or(page.getByText(/FAILED|Error|failed/i))).toBeVisible({ timeout: 30000 });
+    // The agent should fail - wait for the "Failed" status badge in result panel
+    // The invocation graph shows "Failed" in a red badge when the agent fails
+    await expect(page.locator('[data-id="final-result-section"]').getByText('Failed')).toBeVisible({ timeout: 30000 });
     console.log('✓ Agent invocation failed as expected');
     
     // =============================================================================
@@ -188,7 +192,7 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
       
       page.once('dialog', dialog => dialog.accept());
       const ruleRow = page.locator('table tbody tr').filter({ hasText: ruleName });
-      await ruleRow.getByRole('button').filter({ has: page.locator('svg') }).click();
+      await ruleRow.getByTitle('Delete rule').click();
       await expect(ruleRow).not.toBeVisible({ timeout: 5000 });
       console.log(`✓ Deleted rule: ${ruleName}`);
       

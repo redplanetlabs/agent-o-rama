@@ -248,7 +248,7 @@
                    :onChange #((:on-change status-filter-field) (keyword (.. % -target -value)))}
           ($ :option {:value "success"} "Success")
           ($ :option {:value "all"} "All")
-          ($ :option {:value "failure"} "Failure"))
+          ($ :option {:value "fail"} "Failure"))
        (if (:error status-filter-field)
          ($ :p.text-sm.text-red-600.mt-1 (:error status-filter-field))
          ($ :div.mt-1.h-5)))))
