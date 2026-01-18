@@ -164,6 +164,16 @@
        js/undefined)
      [is-open?])
 
+    ;; Close dropdown on any scroll (prevents stranded dropdown when modal scrolls)
+    (uix/use-effect
+     (fn []
+       (when is-open?
+         (let [handle-scroll (fn [_e] (set-open! false))]
+           (.addEventListener js/document "scroll" handle-scroll true)
+           (fn [] (.removeEventListener js/document "scroll" handle-scroll true))))
+       js/undefined)
+     [is-open?])
+
     ($ :div.relative
        {:ref container-ref
         :data-testid (str data-testid "-container")}
