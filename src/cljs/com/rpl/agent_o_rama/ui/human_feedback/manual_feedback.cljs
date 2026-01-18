@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
+   [com.rpl.agent-o-rama.ui.queries :as queries]
    [clojure.string :as str]))
 
 ;; Separate component for each metric row in the manual feedback form
@@ -13,13 +14,45 @@
 (defui MetricRow [{:keys [form-id idx metric-data editing? on-remove on-select module-id]}]
   ;; metric-data has :name, :metric (the definition), :value, :required
   (let [value-field (forms/use-form-field form-id [:metrics idx :value])
-        has-metric? (some? (:name metric-data))]
+        metric-name (:name metric-data)
+        has-metric-name? (some? metric-name)
+        has-definition? (some? (:metric metric-data))
+        
+        ;; Fetch metric definition if we have a name but no definition
+        fetch-result (when (and has-metric-name? (not has-definition?))
+                       (queries/use-sente-query
+                        {:query-key [:human-metric-definition module-id metric-name]
+                         :sente-event [:human-feedback/get-metrics
+                                       {:module-id module-id
+                                        :filters {:search-string metric-name}}]}))
+        
+        ;; Extract the metric definition from the fetch result
+        fetched-metric (when fetch-result
+                         (let [items (get-in fetch-result [:data :items])]
+                           (->> items
+                                (filter #(= (:name %) metric-name))
+                                first
+                                :metric)))
+        
+        ;; Check if query completed but metric not found
+        query-completed? (and fetch-result 
+                              (not (:loading? fetch-result))
+                              (not (:error fetch-result)))
+        metric-not-found? (and query-completed? (nil? fetched-metric))
+        
+        ;; Use fetched definition if available, otherwise use what was passed in
+        ;; Use :not-found sentinel value when metric doesn't exist
+        metric-def (cond
+                     (:metric metric-data) (:metric metric-data)
+                     fetched-metric fetched-metric
+                     metric-not-found? :not-found
+                     :else nil)]
 
-    (if has-metric?
+    (if has-metric-name?
       ;; Show input field when metric is selected
       ($ metric-input/MetricInput
-         {:metric (:metric metric-data)
-          :label (:name metric-data)
+         {:metric metric-def
+          :label metric-name
           :required? (:required metric-data)
           :value (:value value-field)
           :on-change (:on-change value-field)

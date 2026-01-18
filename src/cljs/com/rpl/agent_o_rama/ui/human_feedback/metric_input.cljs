@@ -52,7 +52,8 @@
    - :error - External error message (inline validation also applied)
    - :data-testid - Optional test ID for the input"
   [{:keys [metric label description required? value on-change on-remove error data-testid]}]
-  (let [is-category? (category-metric? metric)
+  (let [metric-not-found? (= metric :not-found)
+        is-category? (category-metric? metric)
         is-numeric? (numeric-metric? metric)
         ;; Inline validation
         inline-error (validate-metric-value metric value)
@@ -79,6 +80,11 @@
 
        ;; Input control based on metric type
        (cond
+         metric-not-found?
+         ($ :div.p-3.bg-red-50.border.border-red-200.rounded-md
+            ($ :div.text-sm.text-red-600
+               (str "Metric \"" label "\" not found. It may have been deleted.")))
+
          is-category?
          (let [sorted-categories (sort (:categories metric))
                dropdown-items (mapv (fn [category]
@@ -114,15 +120,10 @@
             ($ :div.text-xs.text-gray-500.mt-1
                (str "Valid range: " (:min metric) " - " (:max metric))))
 
-         ;; No metric definition (editing legacy feedback) - show simple text input
+         ;; No metric definition - show loading spinner (metric definitions still loading)
          :else
-         ($ :input.w-full.p-2.border.border-gray-300.rounded-md.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-            {:type "text"
-             :value (or value "")
-             :onChange #(on-change (.. % -target -value))
-             :placeholder "Enter value..."
-             :className (if display-error "border-red-500" "")
-             :data-testid data-testid}))
+         ($ :div.flex.items-center.justify-center.p-4
+            ($ common/spinner {:size :medium})))
 
        ;; Error message
        (when display-error

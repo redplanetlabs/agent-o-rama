@@ -76,36 +76,24 @@
                      :title "Edit feedback"
                      :data-testid "edit-feedback-button"
                      :onClick (fn [_]
-                                ;; Fetch metric definitions first, then open the modal
-                                (sente/request!
-                                 [:human-feedback/get-metrics {:module-id module-id :filters {}}]
-                                 10000
-                                 (fn [reply]
-                                   (let [all-metrics (when (:success reply)
-                                                       (get-in reply [:data :items]))
-                                         ;; Build a map of name -> metric definition
-                                         defs-by-name (into {}
-                                                            (for [m all-metrics]
-                                                              [(:name m) (:metric m)]))
-                                         ;; Convert scores to metrics format with definitions
-                                         metrics-from-scores (mapv (fn [[k v]]
-                                                                     (let [metric-name (name k)]
-                                                                       {:name metric-name
-                                                                        :metric (get defs-by-name metric-name)
-                                                                        :value (str v)
-                                                                        :required false}))
-                                                                   scores)]
-                                     (state/dispatch [:modal/show-form :add-manual-feedback
-                                                      {:module-id module-id
-                                                       :agent-name agent-name
-                                                       :invoke-id invoke-id
-                                                       :node-task-id node-task-id
-                                                       :node-invoke-id node-invoke-id
-                                                       :feedback-id (str feedback-id)
-                                                       :editing? true
-                                                       :reviewer-name human-name
-                                                       :comment (or comment "")
-                                                       :metrics metrics-from-scores}])))))}
+                                ;; Open modal immediately - MetricRow will fetch definitions as needed
+                                (let [metrics-from-scores (mapv (fn [[k v]]
+                                                                  {:name (name k)
+                                                                   :metric nil  ;; Will be fetched by MetricRow
+                                                                   :value (str v)
+                                                                   :required false})
+                                                                scores)]
+                                  (state/dispatch [:modal/show-form :add-manual-feedback
+                                                   {:module-id module-id
+                                                    :agent-name agent-name
+                                                    :invoke-id invoke-id
+                                                    :node-task-id node-task-id
+                                                    :node-invoke-id node-invoke-id
+                                                    :feedback-id (str feedback-id)
+                                                    :editing? true
+                                                    :reviewer-name human-name
+                                                    :comment (or comment "")
+                                                    :metrics metrics-from-scores}])))}
                     ($ PencilIcon {:className "h-4 w-4"}))
                  
                  ($ :button.p-1.text-red-600.hover:text-red-800.hover:bg-red-100.rounded.transition-colors.cursor-pointer
