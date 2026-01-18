@@ -117,7 +117,7 @@ async function runExperimentFromSelectionBar(page, { experimentName, selectedExa
   console.log(`Verified experiment ran on ${expectedCount} examples as expected.`);
 
   // 4. Navigate back to the experiments list
-  await page.getByText('Back').click();
+  await page.getByRole('link', { name: 'Back', exact: true }).click();
   console.log(`--- Finished Experiment: "${experimentName}" ---`);
 }
 
@@ -182,7 +182,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
   console.log(`Verified experiment ran on ${expectedCount} examples as expected.`);
 
   // 4. Navigate back to the experiments list
-  await page.getByText('Back').click();
+  await page.getByRole('link', { name: 'Back', exact: true }).click();
   console.log(`--- Finished Experiment: "${experimentName}" ---`);
 }
 

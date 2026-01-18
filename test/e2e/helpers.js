@@ -377,30 +377,24 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   const searchInput = modal.getByPlaceholder(/Search evaluators/);
   await expect(searchInput).toBeVisible();
   
-  // Click the search input to focus it and open the dropdown
+  // Click the search input to focus it
   await searchInput.click();
-
-  // Clear any existing text and type the evaluator name to search for it
+  
+  // Clear any existing text
   await searchInput.clear();
-  await searchInput.fill(evaluatorName);
+  
+  // Type character by character to properly trigger React onChange and open dropdown
+  await searchInput.pressSequentially(evaluatorName);
 
   // Wait for the dropdown container (listbox) to appear.
   // The popover is rendered in a portal, so target it globally.
-  const listboxes = page.getByRole('listbox', { name: 'Evaluator search results' });
-  await expect(listboxes.first()).toBeVisible({ timeout: 15000 });
+  const listbox = page.getByRole('listbox', { name: 'Evaluator search results' });
+  await expect(listbox).toBeVisible({ timeout: 15000 });
 
-  // Check if we see "Loading..." and wait for it to finish
-  const loadingText = listboxes.getByText('Loading...');
-  const hasLoading = await loadingText.isVisible().catch(() => false);
-  if (hasLoading) {
-    console.log(`Waiting for evaluator search results for "${evaluatorName}"...`);
-    await expect(loadingText).not.toBeVisible({ timeout: 30000 });
-  }
-
-  // Now wait for the specific evaluator option to appear in the dropdown
+  // Wait for the specific evaluator option to appear in the dropdown
   // The option's accessible name includes both name and description, so use filter
-  const evaluatorOption = page
-    .getByRole('option')
+  const evaluatorOption = listbox
+    .locator('[role="option"]')
     .filter({ hasText: evaluatorName })
     .first();
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
