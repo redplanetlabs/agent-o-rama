@@ -272,6 +272,16 @@
        :score-name (name score-name)
        :metric-id metric-id})))
 
+(defn- parse-human-metric-id
+  "Parse a human metric ID like [:human :quality] into component parts."
+  [metric-id]
+  (when (and (vector? metric-id)
+             (= 2 (count metric-id))
+             (= :human (first metric-id)))
+    (let [[_ metric-name] metric-id]
+      {:metric-name (name metric-name)
+       :metric-id metric-id})))
+
 (defn- detect-categories
   "Detect categories in telemetry data.
   Returns nil for numeric data (only _aor/default), or vector of category names for categorical.
@@ -325,6 +335,24 @@
    :variant-opts {:metrics #{:mean 0.99 :max}}
    :y-label "Score"
    :eval-metric? true})
+
+(defn- create-human-chart-config
+  "Create a chart configuration for a human telemetry metric.
+  
+  Spec: For numeric data (only _aor/default category), display :mean, 0.99, and :max.
+  If there are categories besides _aor/default, only display count for each category.
+  
+  We request both :mean/:max/0.99 and :count so the data is available for both cases."
+  [{:keys [metric-name metric-id]}]
+  {:id (keyword (str "human-" metric-name))
+   :title (str "Human telemetry " metric-name)
+   :description (str "Human feedback metric for " metric-name)
+   :variant :multi-metric
+   :metric-id metric-id
+   :metrics-set #{:mean 0.99 :max :count}
+   :variant-opts {:metrics #{:mean 0.99 :max}}
+   :y-label "Score"
+   :human-metric? true})
 
 (defn- group-charts-by-metric
   "Group charts by their metric-id and compute union of metrics-set for each group.
@@ -676,6 +704,80 @@
              :variant actual-variant
              :variant-opts actual-variant-opts})))))
 
+(defui human-chart-card
+  "Renders a human telemetry chart - handles its own data fetching to avoid hooks-in-loop issues.
+  
+  Props:
+  - :config - Chart configuration
+  - :module-id, :agent-name - Agent identifiers
+  - :granularity-config - Current granularity configuration
+  - :time-window - Current time window
+  - :metadata-key - Current metadata key (or nil)
+  - :refresh-counter - Refresh counter for live mode"
+  [{:keys [config module-id agent-name granularity-config time-window metadata-key refresh-counter]}]
+  (let [{:keys [title description variant variant-opts y-label color metric-id metrics-set]} config
+
+        ;; Fetch data for this human metric
+        {:keys [data loading? error]}
+        (queries/use-sente-query
+         {:query-key [:analytics-telemetry
+                      metric-id
+                      module-id
+                      agent-name
+                      (:seconds granularity-config)
+                      (:start-time-millis time-window)
+                      metadata-key
+                      refresh-counter]
+          :sente-event [:analytics/fetch-telemetry
+                        {:module-id module-id
+                         :agent-name agent-name
+                         :granularity (:seconds granularity-config)
+                         :metric-id metric-id
+                         :start-time-millis (:start-time-millis time-window)
+                         :end-time-millis (:end-time-millis time-window)
+                         :metrics-set metrics-set
+                         :metadata-key metadata-key}]
+          :enabled? (boolean (and module-id agent-name))})
+
+        ;; Detect if data is categorical and adjust config accordingly
+        categories (uix/use-memo
+                    (fn [] (detect-categories data metadata-key))
+                    [data metadata-key])
+
+        ;; Dynamically adjust variant for categorical data
+        actual-variant (if categories :multi-category variant)
+        actual-variant-opts (if categories
+                              {:categories categories
+                               :metric-key :count}
+                              variant-opts)
+        actual-y-label (if categories "Count" y-label)]
+
+    ($ :div.bg-white.p-6.rounded-lg.shadow-md.border.border-gray-200
+       ($ :h3.text-lg.font-medium.text-gray-700.mb-2 title)
+       ($ :p.text-sm.text-gray-500.mb-4 description)
+
+       (cond
+         loading?
+         ($ :div.flex.items-center.justify-center.h-64.gap-2.text-blue-600
+            ($ common/spinner {:size :medium}) "Loading...")
+
+         error
+         ($ :div.text-red-600 "Error: " (str error))
+
+         :else
+         ($ chart/analytics-chart
+            {:data (or data {})
+             :granularity (:seconds granularity-config)
+             :metadata-key metadata-key
+             :start-time-millis (:start-time-millis time-window)
+             :end-time-millis (:end-time-millis time-window)
+             :height 300
+             :title nil
+             :y-label actual-y-label
+             :color color
+             :variant actual-variant
+             :variant-opts actual-variant-opts})))))
+
 (defui analytics-page []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
         ;; Get coerced parameters from Reitit - these are already typed correctly
@@ -760,6 +862,15 @@
                                      (keep parse-eval-metric-id)
                                      (mapv create-eval-chart-config))))
                             [all-metrics])
+
+        human-chart-configs (uix/use-memo
+                             (fn []
+                               (when all-metrics
+                                 (->> all-metrics
+                                      (filter #(and (vector? %) (= :human (first %))))
+                                      (keep parse-human-metric-id)
+                                      (mapv create-human-chart-config))))
+                             [all-metrics])
 
         ;; Group ONLY static charts by metric-id (stable hook count)
         static-metric-groups (uix/use-memo
@@ -848,4 +959,25 @@
                           :time-window time-window
                           :metadata-key metadata-key
                           :refresh-counter refresh-counter}))
-                    eval-chart-configs)))))))
+                    eval-chart-configs))))
+
+       ;; Human telemetry section (if any exist)
+       (when (seq human-chart-configs)
+         ($ :div
+            ;; Section header
+            ($ :h3.text-xl.font-bold.text-gray-900.mt-8.mb-4.border-t.border-gray-200.pt-6
+               "Human Telemetry")
+
+            ;; Human telemetry charts grid - each handles its own query
+            ($ :div.grid.grid-cols-1.lg:grid-cols-2.gap-6
+               (map (fn [config]
+                      ($ human-chart-card
+                         {:key (:id config)
+                          :config config
+                          :module-id module-id
+                          :agent-name decoded-agent-name
+                          :granularity-config granularity-config
+                          :time-window time-window
+                          :metadata-key metadata-key
+                          :refresh-counter refresh-counter}))
+                    human-chart-configs)))))))
