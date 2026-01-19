@@ -372,4 +372,114 @@ test.describe('Queue Review Pagination', () => {
       console.log('✓ Cleanup complete');
     }
   });
+
+  test('should paginate while submitting reviews via Submit & Continue', async ({ page }) => {
+    test.setTimeout(240000); // 4 minutes
+
+    const uniqueId = randomUUID().substring(0, 8);
+    const queueName = `e2e-submit-pagination-queue-${uniqueId}`;
+    const metricName = `e2e-submit-pagination-metric-${uniqueId}`;
+    const NUM_ITEMS = 30;
+
+    console.log('--- Setup: Creating queue with 30 items for submit pagination test ---');
+    await page.goto('/');
+    const agentRow = await getE2ETestAgentRow(page);
+    await agentRow.click();
+
+    await page.getByText('Human Metrics').click();
+    await createHumanMetric(page, {
+      name: metricName,
+      type: 'categorical',
+      categories: ['Good', 'Bad']
+    });
+
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByTestId('create-queue-button').click();
+    const modal = page.locator('[role="dialog"]');
+    await modal.getByTestId('queue-name-input').fill(queueName);
+    await modal.getByTestId('queue-description-input').fill('Submit pagination test');
+    await modal.getByTestId('add-rubric-button').click();
+    const metricSelector = modal.getByTestId('rubric-0').getByTestId('metric-selector-input');
+    await metricSelector.click();
+    await metricSelector.fill(metricName);
+    await page.locator('[role="option"]').filter({ hasText: metricName }).waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName }).click();
+    await modal.getByRole('button', { name: 'Create' }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+
+    console.log(`Adding ${NUM_ITEMS} items...`);
+    await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+
+    for (let i = 0; i < NUM_ITEMS; i++) {
+      if (i % 10 === 0) console.log(`  Adding item ${i + 1}/${NUM_ITEMS}...`);
+
+      await invokeAgentManually(page, [{ query: `submit pagination test ${i}` }]);
+      await page.locator('[data-id="feedback-tab"]').click();
+      await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
+      await expect(modal).toBeVisible();
+      await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+      await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
+      await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+      await modal.getByRole('button', { name: 'Add to Queue' }).click();
+      await expect(modal).not.toBeVisible({ timeout: 5000 });
+
+      if (i < NUM_ITEMS - 1) {
+        await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+      }
+    }
+    console.log(`✓ Added ${NUM_ITEMS} items`);
+
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByPlaceholder('Search queues...').fill(queueName);
+    await page.waitForTimeout(500);
+    await page.getByTestId(`queue-row-${queueName}`).getByTestId('queue-name-link').click();
+
+    const itemRows = page.locator('tbody').getByRole('row');
+    await itemRows.first().waitFor({ timeout: 5000 });
+    await itemRows.first().click();
+    await expect(page).toHaveURL(/item/);
+
+    for (let i = 0; i < NUM_ITEMS; i++) {
+      await expect(page.getByText('Target Information')).toBeVisible();
+      await expect(page.getByText(metricName)).toBeVisible();
+
+      const metricDropdown = page.getByTestId('metric-value-0');
+      await metricDropdown.click();
+      await page.getByText('Good').click();
+
+      await page.getByPlaceholder('Your name').fill('Test Reviewer');
+      await page.getByRole('button', { name: 'Submit & Continue' }).click();
+
+      if (i < NUM_ITEMS - 1) {
+        await expect(page).toHaveURL(/item/);
+        await page.waitForTimeout(250);
+      }
+    }
+
+    await expect(page.getByText(/Reached end of.*queue|No more items|All items reviewed/i)).toBeVisible({ timeout: 10000 });
+    console.log('✓ Reviewed all items with Submit & Continue (pagination boundary included)');
+
+    if (!shouldSkipCleanup()) {
+      console.log('--- Cleanup ---');
+      await page.goto('/');
+      await agentRow.click();
+
+      await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+      await expect(page).toHaveURL(/human-feedback-queues$/);
+
+      await page.getByPlaceholder('Search queues...').fill(queueName);
+      await page.waitForTimeout(500);
+
+      const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
+      await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
+
+      page.once('dialog', dialog => dialog.accept());
+      await queueRowForDelete.getByTestId('delete-queue-button').click();
+      await expect(queueRowForDelete).not.toBeVisible({ timeout: 5000 });
+
+      await page.getByText('Human Metrics').click();
+      await deleteHumanMetric(page, metricName);
+      console.log('✓ Cleanup complete');
+    }
+  });
 });
