@@ -904,7 +904,8 @@
                         {:module-id decoded-module-id
                          :queue-name decoded-queue-id}]
           :page-size 20
-          :initial-pagination item-id  ;; Only used on first load, backend decrements
+          :initial-pagination item-id
+          :include-initial-cursor? true
           :enabled? (boolean (and decoded-module-id decoded-queue-id item-id))})
         items-loading? isLoading
         items (or data [])

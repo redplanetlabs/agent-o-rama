@@ -48,7 +48,10 @@ test.describe('Queue Review Pagination', () => {
     
     await modal.getByTestId('add-rubric-button').click();
     const rubric = modal.getByTestId('rubric-0');
-    await rubric.getByTestId('metric-selector-input').click();
+    const metricInput = rubric.getByTestId('metric-selector-input');
+    await metricInput.click();
+    await metricInput.fill(metricName);
+    await page.locator('[role="option"]').filter({ hasText: metricName }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName }).click();
     
     await modal.getByRole('button', { name: 'Create' }).click();
@@ -74,6 +77,7 @@ test.describe('Queue Review Pagination', () => {
       await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).toBeVisible();
       await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+      await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
       await page.locator('[role="option"]').filter({ hasText: queueName }).click();
       await modal.getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).not.toBeVisible({ timeout: 5000 });
@@ -90,6 +94,10 @@ test.describe('Queue Review Pagination', () => {
     // =============================================================================
     console.log('Step 2: Verifying queue list shows pagination');
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    
+    // Search for the specific queue to avoid pagination issues
+    await page.getByPlaceholder('Search queues...').fill(queueName);
+    await page.waitForTimeout(500); // Allow search to filter results
     
     const queueRow = page.getByTestId(`queue-row-${queueName}`);
     await expect(queueRow).toBeVisible({ timeout: 5000 });
@@ -147,6 +155,10 @@ test.describe('Queue Review Pagination', () => {
       await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
       await expect(page).toHaveURL(/human-feedback-queues$/);
       
+      // Search for the queue before trying to delete it
+      await page.getByPlaceholder('Search queues...').fill(queueName);
+      await page.waitForTimeout(500);
+      
       const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
       await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
       
@@ -191,7 +203,10 @@ test.describe('Queue Review Pagination', () => {
     await modal.getByTestId('queue-name-input').fill(queueName);
     await modal.getByTestId('queue-description-input').fill('Cursor test');
     await modal.getByTestId('add-rubric-button').click();
-    await modal.getByTestId('rubric-0').getByTestId('metric-selector-input').click();
+    const metricSelector = modal.getByTestId('rubric-0').getByTestId('metric-selector-input');
+    await metricSelector.click();
+    await metricSelector.fill(metricName);
+    await page.locator('[role="option"]').filter({ hasText: metricName }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName }).click();
     await modal.getByRole('button', { name: 'Create' }).click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
@@ -209,6 +224,7 @@ test.describe('Queue Review Pagination', () => {
       await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).toBeVisible();
       await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+      await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
       await page.locator('[role="option"]').filter({ hasText: queueName }).click();
       await modal.getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).not.toBeVisible({ timeout: 5000 });
@@ -234,6 +250,11 @@ test.describe('Queue Review Pagination', () => {
     
     // Go to queue detail WITHOUT clicking Load More
     await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    
+    // Search for the queue to find it in the list
+    await page.getByPlaceholder('Search queues...').fill(queueName);
+    await page.waitForTimeout(500);
+    
     const queueRow = page.getByTestId(`queue-row-${queueName}`);
     await queueRow.getByTestId('queue-name-link').click();
     
@@ -314,6 +335,10 @@ test.describe('Queue Review Pagination', () => {
       
       await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
       await expect(page).toHaveURL(/human-feedback-queues$/);
+      
+      // Search for the queue before trying to delete it
+      await page.getByPlaceholder('Search queues...').fill(queueName);
+      await page.waitForTimeout(500);
       
       const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
       await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });

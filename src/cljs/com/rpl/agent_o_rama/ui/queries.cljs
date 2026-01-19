@@ -114,6 +114,7 @@
    - :sente-event - The base Sente event vector. Pagination params will be merged into it.
    - :page-size - The number of items to fetch per page.
    - :initial-pagination - Optional starting pagination cursor (e.g., UUID to start from).
+   - :include-initial-cursor? - If true, includes the initial cursor item in first page.
    - :enabled? - Boolean to control if the query should run.
 
    Returns a map with:
@@ -124,7 +125,7 @@
    - :error - Error message if a fetch fails.
    - :loadMore - A function to call to fetch the next page.
    - :refetch - A function to clear all data and start from page 1."
-  [{:keys [query-key sente-event page-size initial-pagination enabled?]
+  [{:keys [query-key sente-event page-size initial-pagination include-initial-cursor? enabled?]
     :or {page-size 20 enabled? true}}]
   (let [state-path (into [:queries] query-key)
         query-state (state/use-sub state-path)
@@ -147,10 +148,15 @@
                           (state/dispatch [:db/set-value (into state-path [:fetching-more?]) true])
                           (state/dispatch [:db/set-value (into state-path [:status]) :loading]))
 
-                        (let [[event-id event-data] sente-event
-                              paginated-event [event-id (assoc event-data
-                                                               :pagination pagination-cursor
-                                                               :limit page-size)]]
+                        (let [include-cursor? (and include-initial-cursor?
+                                                   (not append?)
+                                                   (some? pagination-cursor))
+                              [event-id event-data] sente-event
+                              paginated-event [event-id (cond-> (assoc event-data
+                                                                      :pagination pagination-cursor
+                                                                      :limit page-size)
+                                                          include-cursor?
+                                                          (assoc :include-cursor? true))]]
                           (sente/request!
                            paginated-event
                            15000
@@ -183,7 +189,7 @@
                                  (state/dispatch [:db/set-value (into state-path [:status]) :error])
                                  (state/dispatch [:db/set-value (into state-path [:error])
                                                   (or (:error reply) "Failed to fetch data")]))))))))
-                    [enabled? connected? sente-event page-size state-path])
+                    [enabled? connected? sente-event page-size state-path include-initial-cursor?])
 
         load-more (uix/use-callback
                    (fn []
