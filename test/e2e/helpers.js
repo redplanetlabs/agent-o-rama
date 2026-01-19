@@ -413,14 +413,12 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   // Click the search input to focus it
   await searchInput.click();
   
-  // Clear any existing text
-  await searchInput.clear();
+  // Type first 10 chars to trigger search (faster than full name)
+  const searchText = evaluatorName.substring(0, Math.min(10, evaluatorName.length));
+  await searchInput.pressSequentially(searchText, { delay: 50 });
   
-  // Type character by character to properly trigger React onChange and open dropdown
-  await searchInput.pressSequentially(evaluatorName);
-  
-  // Wait for search to settle after typing
-  await page.waitForTimeout(1000);
+  // Wait for search debounce (300ms) + buffer
+  await page.waitForTimeout(600);
 
   // Wait for the dropdown container (listbox) to appear.
   // The popover is rendered in a portal, so target it globally.
