@@ -1,6 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback-queues
   (:require
-   [uix.core :as uix :refer [defui $]]
+   [uix.core :as uix :refer [defui defhook $]]
    [reitit.frontend.easy :as rfe]
    ["@heroicons/react/24/outline" :refer [PencilIcon ChevronLeftIcon ChevronRightIcon XMarkIcon TrashIcon ArrowTopRightOnSquareIcon]]
    ["react" :refer [useState]]
@@ -721,6 +721,125 @@
     {:failed? false
      :value output}))
 
+(defn- queue-item-matches?
+  [item item-id]
+  (= (str (:id item)) (str item-id)))
+
+(defn- merge-queue-items
+  [existing-items new-items]
+  (let [by-id (reduce (fn [acc item]
+                        (assoc acc (str (:id item)) item))
+                      {}
+                      (concat existing-items new-items))]
+    (->> (vals by-id)
+         (sort-by (comp str :id))
+         vec)))
+
+(defhook use-queue-items
+  [{:keys [module-id queue-id initial-cursor include-initial-cursor? enabled?]
+    :or {enabled? true}}]
+  (let [decoded-module-id (common/url-decode module-id)
+        decoded-queue-id (common/url-decode queue-id)
+        state-path [:queries :human-feedback-queue-items module-id queue-id]
+        query-state (state/use-sub state-path)
+        should-refetch? (:should-refetch? query-state)
+        connected? (state/use-sub [:sente :connected?])
+        data (or (:data query-state) [])
+        pagination-params (:pagination-params query-state)
+        has-more? (get query-state :has-more? true)
+        is-loading? (= (:status query-state) :loading)
+        is-fetching-more? (:fetching-more? query-state)
+        error (when (= (:status query-state) :error) (:error query-state))
+        initial-needed? (and initial-cursor
+                             (not (some #(queue-item-matches? % initial-cursor) data)))]
+
+    (let [fetch-page (uix/use-callback
+                      (fn [pagination-cursor append? include-cursor? merge?]
+                        (when (and enabled? connected?)
+                          (if append?
+                            (state/dispatch [:db/set-value (into state-path [:fetching-more?]) true])
+                            (state/dispatch [:db/set-value (into state-path [:status]) :loading]))
+
+                          (let [paginated-event [:human-feedback/get-queue-items
+                                                 (cond-> {:module-id decoded-module-id
+                                                          :queue-name decoded-queue-id
+                                                          :pagination pagination-cursor
+                                                          :limit 20}
+                                                   include-cursor?
+                                                   (assoc :include-cursor? true))]]
+                            (sente/request!
+                             paginated-event
+                             15000
+                             (fn [reply]
+                               (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false])
+                               (if (:success reply)
+                                 (let [response-data (:data reply)
+                                       new-items (or (:items response-data) [])
+                                       new-pagination (:pagination-params response-data)
+                                       new-has-more? (queries/has-more-pages? new-pagination)
+                                       current-data (or (get-in @state/app-db (into state-path [:data])) [])]
+                                   (cond
+                                     append?
+                                     (state/dispatch [:db/set-value (into state-path [:data])
+                                                      (vec (concat current-data new-items))])
+
+                                     (and merge? (seq current-data))
+                                     (state/dispatch [:db/set-value (into state-path [:data])
+                                                      (merge-queue-items current-data new-items)])
+
+                                     :else
+                                     (state/dispatch [:db/set-value (into state-path [:data]) new-items]))
+                                   (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
+                                   (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?])
+                                   (state/dispatch [:db/set-value (into state-path [:status]) :success]))
+                                 (do
+                                   (state/dispatch [:db/set-value (into state-path [:status]) :error])
+                                   (state/dispatch [:db/set-value (into state-path [:error])
+                                                    (or (:error reply) "Failed to fetch data")]))))))))
+                      [enabled? connected? decoded-module-id decoded-queue-id state-path])
+
+          load-more (uix/use-callback
+                     (fn []
+                       (when (and has-more? (not is-loading?) (not is-fetching-more?))
+                         (fetch-page pagination-params true false false)))
+                     [has-more? is-loading? is-fetching-more? pagination-params fetch-page])
+
+          refetch (uix/use-callback
+                   (fn []
+                     (state/dispatch [:db/set-value state-path
+                                      {:status :idle
+                                       :data []
+                                       :pagination-params nil
+                                       :has-more? true
+                                       :fetching-more? false
+                                       :error nil
+                                       :should-refetch? false}])
+                     (fetch-page nil false false false))
+                   [fetch-page state-path])]
+
+      (uix/use-effect
+       (fn []
+         (when (and connected? enabled?
+                    (or (empty? data) initial-needed?))
+           (fetch-page initial-cursor false include-initial-cursor? initial-needed?))
+         js/undefined)
+       [connected? enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
+
+      (uix/use-effect
+       (fn []
+         (when (and should-refetch? connected? enabled?)
+           (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
+           (refetch)))
+       [should-refetch? connected? enabled? refetch state-path])
+
+      {:data data
+       :isLoading is-loading?
+       :isFetchingMore is-fetching-more?
+       :hasMore has-more?
+       :error error
+       :loadMore load-more
+       :refetch refetch})))
+
 (defui queue-item-row [{:keys [item module-id queue-id]}]
   (let [input (:input item)
         output (:output item)
@@ -760,16 +879,15 @@
           :enabled? (boolean (and decoded-module-id decoded-queue-id))})
 
         queue-info data
+        queue-info-error error
 
         ;; Query for paginated queue items
-        {:keys [data isLoading isFetchingMore hasMore loadMore error] :as items-query}
-        (queries/use-paginated-query
-         {:query-key [:human-feedback-queue-items module-id queue-id]
-          :sente-event [:human-feedback/get-queue-items
-                        {:module-id decoded-module-id
-                         :queue-name decoded-queue-id}]
-          :page-size 20
+        {:keys [data isLoading isFetchingMore hasMore loadMore error]}
+        (use-queue-items
+         {:module-id module-id
+          :queue-id queue-id
           :enabled? (boolean (and decoded-module-id decoded-queue-id))})
+        items-error error
 
         queue-items data]
 
@@ -778,9 +896,9 @@
       ($ :div.p-6.flex.justify-center.items-center.py-12
          ($ common/spinner {:size :large}))
 
-      (or error (:error items-query))
+      (or queue-info-error items-error)
       ($ :div.p-6.text-red-500
-         "Error loading queue: " (str (or error (:error items-query))))
+         "Error loading queue: " (str (or queue-info-error items-error)))
 
       :else
       ($ :div.p-6
@@ -884,6 +1002,7 @@
   (let [{:keys [module-id queue-id item-id]} (state/use-sub [:route :path-params])
         decoded-module-id (common/url-decode module-id)
         decoded-queue-id (common/url-decode queue-id)
+        item-id-str (str item-id)
 
         ;; Fetch queue info for rubrics
         {:keys [data queue-info-loading?]}
@@ -896,22 +1015,18 @@
         queue-info data
 
         ;; Fetch queue items with shared cache for review session
-        ;; On first load (no cache), start from current item-id
+        ;; If item isn't in cache yet, load from its cursor and merge.
         {:keys [data isLoading hasMore loadMore]}
-        (queries/use-paginated-query
-         {:query-key [:human-feedback-queue-items-review module-id queue-id]
-          :sente-event [:human-feedback/get-queue-items
-                        {:module-id decoded-module-id
-                         :queue-name decoded-queue-id}]
-          :page-size 20
-          :initial-pagination item-id
+        (use-queue-items
+         {:module-id module-id
+          :queue-id queue-id
+          :initial-cursor item-id
           :include-initial-cursor? true
           :enabled? (boolean (and decoded-module-id decoded-queue-id item-id))})
         items-loading? isLoading
         items (or data [])
 
         ;; Find current item and navigation indices
-        item-id-str (str item-id)
         current-idx (some (fn [[idx item]] (when (= (str (:id item)) item-id-str) idx))
                           (map-indexed vector items))
         current-item (when current-idx (nth items current-idx nil))
