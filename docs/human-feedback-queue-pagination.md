@@ -138,3 +138,5 @@ The backend pagination via `search-loop` works correctly. It returns items in UU
 - Track "starting cursor" in cache state to avoid unnecessary refetches
 - Implement merge logic (Option C) for seamless bidirectional navigation
 - Add "get single item" endpoint for true deep link support without loading pages
+
+test
