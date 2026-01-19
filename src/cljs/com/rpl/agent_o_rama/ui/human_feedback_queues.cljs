@@ -1025,6 +1025,7 @@
           :enabled? (boolean (and decoded-module-id decoded-queue-id item-id))})
         items-loading? isLoading
         items (or data [])
+        [pending-next? set-pending-next?] (uix/use-state false)
 
         ;; Find current item and navigation indices
         current-idx (some (fn [[idx item]] (when (= (str (:id item)) item-id-str) idx))
@@ -1041,6 +1042,23 @@
         prev-item-id (when has-prev? (str (:id (nth items (dec current-idx)))))
         next-item-id (when (and current-idx (< current-idx (dec (count items))))
                        (str (:id (nth items (inc current-idx)))))
+
+        handle-next (fn []
+                      (cond
+                        next-item-id
+                        (rfe/push-state :module/human-feedback-queue-item
+                                        {:module-id module-id
+                                         :queue-id queue-id
+                                         :item-id next-item-id})
+
+                        hasMore
+                        (do
+                          (set-pending-next? true)
+                          (loadMore))
+
+                        :else
+                        nil))
+
 
         ;; Form state
         [scores set-scores] (uix/use-state {})
@@ -1157,6 +1175,17 @@
                                                   {:module-id module-id
                                                    :queue-id queue-id}))
                                 (js/alert (str "Error dismissing: " (:error reply))))))))]
+                              
+    (uix/use-effect
+     (fn []
+       (when (and pending-next? next-item-id)
+         (set-pending-next? false)
+         (rfe/push-state :module/human-feedback-queue-item
+                         {:module-id module-id
+                          :queue-id queue-id
+                          :item-id next-item-id}))
+       js/undefined)
+     [pending-next? next-item-id module-id queue-id])
 
     (cond
       ;; Loading state
@@ -1189,11 +1218,7 @@
                ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                   {:disabled (not has-next?)
                    :data-testid "next-item-button"
-                   :onClick #(when has-next?
-                               (rfe/push-state :module/human-feedback-queue-item
-                                               {:module-id module-id
-                                                :queue-id queue-id
-                                                :item-id next-item-id}))}
+                   :onClick #(when has-next? (handle-next))}
                   ($ ChevronRightIcon {:className "h-5 w-5"}))))
 
          ;; Target Info Panel (Agent/Node with trace link)
