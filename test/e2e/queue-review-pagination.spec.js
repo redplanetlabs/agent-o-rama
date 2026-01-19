@@ -110,8 +110,28 @@ test.describe('Queue Review Pagination', () => {
     const initialCount = await initialItems.count();
     console.log(`✓ Initial page shows ${initialCount} items`);
     
-    // Verify Load More exists (if there are more than one page)
+    // Verify next-button pagination from the last item on the first page
     if (NUM_ITEMS > initialCount) {
+      console.log('Step 2b: Verifying Next button loads after page boundary');
+      const lastVisibleItem = itemsTable.getByRole('row').nth(initialCount - 1);
+      await expect(lastVisibleItem).toBeVisible();
+      await lastVisibleItem.click();
+      await expect(page).toHaveURL(/item/);
+      await expect(page.getByText('Target Information')).toBeVisible();
+
+      const currentItemUrl = page.url();
+      const nextBtn = page.getByTestId('next-item-button');
+      await expect(nextBtn).toBeEnabled();
+      await nextBtn.click();
+      await expect(page).not.toHaveURL(currentItemUrl);
+      await expect(page.getByText('Target Information')).toBeVisible();
+
+      // Return to queue detail for Load More checks
+      await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+      await page.getByPlaceholder('Search queues...').fill(queueName);
+      await page.waitForTimeout(500);
+      await page.getByTestId(`queue-row-${queueName}`).getByTestId('queue-name-link').click();
+
       const loadMoreCell = page.getByRole('cell', { name: 'Load More' });
       await expect(loadMoreCell).toBeVisible();
       
