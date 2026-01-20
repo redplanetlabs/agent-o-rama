@@ -4,8 +4,9 @@
    [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.client :as client]
    [com.rpl.agent-o-rama.impl.ui.server :as srv]
-   [com.rpl.agent-o-rama.impl.ui.sente :as sente] ; <--- Add this
+   [com.rpl.agent-o-rama.impl.ui.sente :as sente]
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [clojure.tools.logging :as cljlogging]
    [org.httpkit.server :as http-kit])
@@ -26,36 +27,34 @@
     
     (cljlogging/trace "Refreshing agent from modules" {:modules modules})
     (doseq [mod modules]
-      (let [manager (try
-                      (aor/agent-manager rama-client mod)
-                      (catch Exception e
-                        (cljlogging/trace "AOR not found in module" {:module mod})
-                        ::no-aor))]
-        (when-not (= ::no-aor manager)
-          (setval [ATOM :aor-cache (keypath mod) :manager]
-                  manager
-                  ui/system)
-          (let [agent-names (aor/agent-names manager)]
-            (cljlogging/trace "Found agents" {:agent-names agent-names :module mod})
-            (doseq [agent-name agent-names]
-              ;; nil? so that it doesn't waste resources on uneeded clients
-              ;; doesn't use constantly because that evals its body
-              (transform [ATOM :aor-cache (keypath mod) :clients (keypath agent-name) nil?]
-                         (fn [_] (aor/agent-client manager agent-name))
-                         ui/system))
+      (when (client/has-aor-modules?  mod)
+        ;; nil? check only creates manager when it's not already cached.
+        (transform [ATOM :aor-cache (keypath mod) :manager nil?]
+                   (fn [_] (aor/agent-manager rama-client mod))
+                   ui/system)
+        
+        (let [manager (select-one [ATOM :aor-cache (keypath mod) :manager] ui/system)
+              agent-names (aor/agent-names manager)]
+          (cljlogging/trace "Found agents" {:agent-names agent-names :module mod})
+          (doseq [agent-name agent-names]
+            ;; nil? so that it doesn't waste resources on uneeded clients
+            ;; doesn't use constantly because that evals its body
+            (transform [ATOM :aor-cache (keypath mod) :clients (keypath agent-name) nil?]
+                       (fn [_] (aor/agent-client manager agent-name))
+                       ui/system))
 
-            ;; stale agents
-            (let [stale-agents (clojure.set/difference
-                                (set
-                                 (select [ATOM :aor-cache (keypath mod) :clients MAP-KEYS]
-                                         ui/system))
-                                agent-names)]
-              (doseq [stale-agent stale-agents]
-                (transform [ATOM :aor-cache (keypath mod) :clients (keypath stale-agent)]
-                           (fn [client]
-                             (close! client)
-                             NONE)
-                           ui/system)))))))
+          ;; stale agents
+          (let [stale-agents (clojure.set/difference
+                              (set
+                               (select [ATOM :aor-cache (keypath mod) :clients MAP-KEYS]
+                                       ui/system))
+                              agent-names)]
+            (doseq [stale-agent stale-agents]
+              (transform [ATOM :aor-cache (keypath mod) :clients (keypath stale-agent)]
+                         (fn [client]
+                           (close! client)
+                           NONE)
+                         ui/system))))))
 
     ;; stale modules
     (let [stale-modules (clojure.set/difference

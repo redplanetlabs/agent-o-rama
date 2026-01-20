@@ -2,7 +2,8 @@
   (:use [com.rpl.rama]
         [com.rpl.rama path])
   (:require
-   [com.rpl.agent-o-rama.impl.helpers :as h])
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.queries :as queries])
   (:import
    [com.rpl.agentorama
     AgentInvoke
@@ -10,7 +11,9 @@
     AgentStreamByInvoke]
    [com.rpl.rama.diffs
     DestroyedDiff
-    Diff]))
+    Diff]
+   [rpl.rama.generated
+    TopologyDoesNotExistException]))
 
 (defn- new-items
   [new-chunks old-chunks]
@@ -234,3 +237,9 @@
      clojure.lang.IDeref
      (deref [this] (.get this)))
   ))
+
+
+(defn has-aor-modules? [cluster module-name]
+  (try
+    (do (foreign-query cluster module-name (queries/agent-get-names-query-name)) true)
+    (catch TopologyDoesNotExistException e false)))
