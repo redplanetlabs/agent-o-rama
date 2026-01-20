@@ -345,8 +345,7 @@
   We request both :mean/:max/0.99 and :count so the data is available for both cases."
   [{:keys [metric-name metric-id]}]
   {:id (keyword (str "human-" metric-name))
-   :title (str "Human telemetry " metric-name)
-   :description (str "Human feedback metric for " metric-name)
+   :title metric-name
    :variant :multi-metric
    :metric-id metric-id
    :metrics-set #{:mean 0.99 :max :count}

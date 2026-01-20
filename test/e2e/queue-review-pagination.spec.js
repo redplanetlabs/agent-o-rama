@@ -486,7 +486,8 @@ test.describe('Queue Review Pagination', () => {
       const metricDropdown = page.getByTestId('metric-value-0');
       await metricDropdown.click();
       await page.waitForTimeout(300); // Allow dropdown to render
-      await page.getByText('Good').last().click(); // Click the option (not the button label)
+      const choice = Math.random() < 0.5 ? 'Good' : 'Bad';
+      await page.getByText(choice).last().click(); // Randomly choose Good or Bad
 
       await page.getByPlaceholder('Your name').fill('Test Reviewer');
       await page.getByRole('button', { name: 'Submit & Continue' }).click();
