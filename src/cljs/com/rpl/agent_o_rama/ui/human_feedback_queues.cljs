@@ -736,7 +736,7 @@
          vec)))
 
 (defhook use-queue-items
-  [{:keys [module-id queue-id initial-cursor include-initial-cursor? enabled?]
+  [{:keys [module-id queue-id initial-cursor include-initial-cursor? force-from-start? enabled?]
     :or {enabled? true}}]
   (let [decoded-module-id (common/url-decode module-id)
         decoded-queue-id (common/url-decode queue-id)
@@ -817,6 +817,14 @@
                      (fetch-page nil false false false))
                    [fetch-page state-path])]
 
+      ;; Effect: Force refetch from start if flag is set and cache exists
+      (uix/use-effect
+       (fn []
+         (when (and force-from-start? (seq data) connected? enabled?)
+           (refetch))
+         js/undefined)
+       [force-from-start?]) ; Only run on mount
+
       (uix/use-effect
        (fn []
          (when (and connected? enabled?
@@ -882,10 +890,12 @@
         queue-info-error error
 
         ;; Query for paginated queue items
+        ;; Force refetch from start to ensure list always shows items 0-19
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
         (use-queue-items
          {:module-id module-id
           :queue-id queue-id
+          :force-from-start? true
           :enabled? (boolean (and decoded-module-id decoded-queue-id))})
         items-error error
 
