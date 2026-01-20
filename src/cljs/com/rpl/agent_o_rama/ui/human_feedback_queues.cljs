@@ -1138,6 +1138,9 @@
                                (fn [reply]
                                  (if (:success reply)
                                    (do
+                                     ;; Invalidate the queue items cache
+                                     (state/dispatch [:query/invalidate
+                                                      {:query-key-pattern [:human-feedback-queue-items module-id queue-id]}])
                                      ;; Clear form state before navigating
                                      (set-scores {})
                                      (set-comment "")
@@ -1162,15 +1165,19 @@
                             10000
                             (fn [reply]
                               (if (:success reply)
-                                ;; Navigate to next item or back to queue
-                                (if has-next?
-                                  (rfe/push-state :module/human-feedback-queue-item
-                                                  {:module-id module-id
-                                                   :queue-id queue-id
-                                                   :item-id next-item-id})
-                                  (rfe/push-state :module/human-feedback-queue-detail
-                                                  {:module-id module-id
-                                                   :queue-id queue-id}))
+                                (do
+                                  ;; Invalidate the queue items cache
+                                  (state/dispatch [:query/invalidate
+                                                   {:query-key-pattern [:human-feedback-queue-items module-id queue-id]}])
+                                  ;; Navigate to next item or back to queue
+                                  (if has-next?
+                                    (rfe/push-state :module/human-feedback-queue-item
+                                                    {:module-id module-id
+                                                     :queue-id queue-id
+                                                     :item-id next-item-id})
+                                    (rfe/push-state :module/human-feedback-queue-detail
+                                                    {:module-id module-id
+                                                     :queue-id queue-id})))
                                 (js/alert (str "Error dismissing: " (:error reply))))))))]
                               
     (uix/use-effect

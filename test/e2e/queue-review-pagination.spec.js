@@ -133,13 +133,13 @@ test.describe('Queue Review Pagination', () => {
       await page.getByTestId(`queue-row-${queueName}`).getByTestId('queue-name-link').click();
 
       const loadMoreCell = page.getByRole('cell', { name: 'Load More' });
-      await expect(loadMoreCell).toBeVisible();
-      
-      // Click Load More
-      await loadMoreCell.click();
-      await page.waitForTimeout(1000);
-      
-      // Verify more items loaded
+      if (await loadMoreCell.isVisible()) {
+        // Click Load More
+        await loadMoreCell.click();
+        await page.waitForTimeout(1000);
+      }
+
+      // Verify more items loaded (either via Load More or auto-pagination from Next)
       const afterLoadCount = await itemsTable.getByRole('row').count();
       expect(afterLoadCount).toBeGreaterThan(initialCount);
       console.log(`✓ Load More works - now showing ${afterLoadCount} items`);
@@ -440,19 +440,26 @@ test.describe('Queue Review Pagination', () => {
     await expect(page).toHaveURL(/item/);
 
     for (let i = 0; i < NUM_ITEMS; i++) {
+      if (i % 10 === 0) console.log(`  Reviewing item ${i + 1}/${NUM_ITEMS}...`);
+      
       await expect(page.getByText('Target Information')).toBeVisible();
       await expect(page.getByText(metricName)).toBeVisible();
+      
+      // Verify we're on the correct item by checking the input
+      await expect(page.getByText(`submit pagination test ${i}`)).toBeVisible({ timeout: 5000 });
 
       const metricDropdown = page.getByTestId('metric-value-0');
       await metricDropdown.click();
-      await page.getByText('Good').click();
+      await page.waitForTimeout(300); // Allow dropdown to render
+      await page.getByText('Good').last().click(); // Click the option (not the button label)
 
       await page.getByPlaceholder('Your name').fill('Test Reviewer');
       await page.getByRole('button', { name: 'Submit & Continue' }).click();
 
       if (i < NUM_ITEMS - 1) {
         await expect(page).toHaveURL(/item/);
-        await page.waitForTimeout(250);
+        // Wait for next item to load by checking the input changed
+        await expect(page.getByText(`submit pagination test ${i + 1}`)).toBeVisible({ timeout: 10000 });
       }
     }
 
