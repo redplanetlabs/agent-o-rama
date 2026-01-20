@@ -346,6 +346,41 @@ test.describe('Queue Review Pagination', () => {
     await page2.close();
     
     // =============================================================================
+    // TEST: Breadcrumb navigation from deep-linked item returns to list start
+    // =============================================================================
+    console.log('Test: Breadcrumb back to queue list after deep link');
+    
+    // Open NEW page context to simulate deep link with no prior cache
+    const page3 = await page.context().newPage();
+    
+    // Navigate directly to item #25 URL
+    await page3.goto(targetUrl);
+    await page3.waitForTimeout(2000);
+    
+    // Verify we're on item #25 with no previous items
+    await expect(page3.getByText('Target Information')).toBeVisible({ timeout: 10000 });
+    await expect(page3.getByTestId('previous-item-button')).toBeDisabled();
+    
+    // Click breadcrumb to go back to queue list
+    await page3.getByRole('link', { name: queueName }).click();
+    await expect(page3).toHaveURL(new RegExp(`human-feedback-queues/${encodeURIComponent(queueName)}$`));
+    
+    // Wait for queue items to load
+    await page3.locator('tbody').getByRole('row').first().waitFor({ timeout: 5000 });
+    
+    // Verify list shows items from the beginning (not from item 25)
+    const firstRowText = await page3.locator('tbody').getByRole('row').first().textContent();
+    expect(firstRowText).toContain('cursor test 0');
+    
+    // Verify we have the first page of items (not starting from 25)
+    const visibleRows = await page3.locator('tbody').getByRole('row').count();
+    expect(visibleRows).toBe(20); // First page should be 20 items
+    
+    console.log('✓ Breadcrumb navigation returns to list start (not item 25)');
+    
+    await page3.close();
+    
+    // =============================================================================
     // CLEANUP
     // =============================================================================
     if (!shouldSkipCleanup()) {
