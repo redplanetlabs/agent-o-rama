@@ -335,13 +335,21 @@
   [m]
   (let [ret (select-keys m
                          [:start-time-millis :finish-time-millis
-                          :invoke-args :result :graph-version])]
+                          :invoke-args :graph-version])]
     (assoc ret
      :human-request?
      (-> m
          :human-requests
          empty?
-         not))))
+         not)
+
+     :status
+     (let [r (:result m)]
+       (cond (nil? r) :pending
+             (:failure? r) :failure
+             :else :success)
+
+     ))))
 
 (defbasicblocksegmacro get-distributed-page*
   [page-size pagination-params pstate-name res info-transformer page-result-fn max-key-fn initial-path]

@@ -63,19 +63,25 @@
                                        [:forms (:form-id form-state) :error]
                                        (str "Error: " (or (:error reply) "Unknown error"))]))))))})
 
-(defui result-badge [{:keys [result human-request?]}]
-  (cond
-    human-request?
-    ($ :span.px-2.py-1.bg-amber-100.text-amber-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
-       "🙋 Needs input")
-    (nil? result)
-    ($ :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
-       ($ common/spinner {:size :small})
-       "Pending")
-    (:failure? result)
-    ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
-    :else
-    ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))
+(defui result-badge
+ [{:keys [status human-request?]}]
+ (cond
+   human-request?
+   ($
+    :span.px-2.py-1.bg-amber-100.text-amber-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
+    "🙋 Needs input")
+
+   (= status :pending)
+   ($
+    :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
+    ($ common/spinner {:size :small})
+    "Pending")
+
+   (= status :failure)
+   ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
+
+   :else
+   ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))
 
 (defui invocation-row [{:keys [invoke module-id agent-name on-click]}]
   (let [task-id (:task-id invoke)
