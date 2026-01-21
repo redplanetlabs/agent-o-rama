@@ -20,46 +20,47 @@
 (defn refresh-agent-modules!
   []
   (let [rama-client (ui/get-object :rama-client)
-        modules     (deployed-module-names rama-client)]
+        modules     (deployed-module-names rama-client)
+        aor-modules (set (filter #(queries/has-aor-modules? rama-client %) modules))]
     
     ;; so that get-object doesn't throw on :aor-cache on fresh startup
     (setval [ATOM :aor-cache nil?] {} ui/system)
     
     (cljlogging/trace "Refreshing agent from modules" {:modules modules})
-    (doseq [mod modules]
-      (when (queries/has-aor-modules? rama-client mod)
-        ;; nil? check only creates manager when it's not already cached.
-        (transform [ATOM :aor-cache (keypath mod) :manager nil?]
-                   (fn [_] (aor/agent-manager rama-client mod))
-                   ui/system)
-        
-        (let [manager (select-one [ATOM :aor-cache (keypath mod) :manager] ui/system)
-              agent-names (aor/agent-names manager)]
-          (cljlogging/trace "Found agents" {:agent-names agent-names :module mod})
-          (doseq [agent-name agent-names]
-            ;; nil? so that it doesn't waste resources on uneeded clients
-            ;; doesn't use constantly because that evals its body
-            (transform [ATOM :aor-cache (keypath mod) :clients (keypath agent-name) nil?]
-                       (fn [_] (aor/agent-client manager agent-name))
-                       ui/system))
+    (doseq [mod aor-modules]
+      ;; nil? check only creates manager when it's not already cached.
+      (transform [ATOM :aor-cache (keypath mod) :manager nil?]
+                 (fn [_] (aor/agent-manager rama-client mod))
+                 ui/system)
+      
+      (let [manager (select-one [ATOM :aor-cache (keypath mod) :manager] ui/system)
+            agent-names (aor/agent-names manager)]
+        (cljlogging/trace "Found agents" {:agent-names agent-names :module mod})
+        (doseq [agent-name agent-names]
+          ;; nil? so that it doesn't waste resources on uneeded clients
+          ;; doesn't use constantly because that evals its body
+          (transform [ATOM :aor-cache (keypath mod) :clients (keypath agent-name) nil?]
+                     (fn [_] (aor/agent-client manager agent-name))
+                     ui/system))
 
-          ;; stale agents
-          (let [stale-agents (clojure.set/difference
-                              (set
-                               (select [ATOM :aor-cache (keypath mod) :clients MAP-KEYS]
-                                       ui/system))
-                              agent-names)]
-            (doseq [stale-agent stale-agents]
-              (transform [ATOM :aor-cache (keypath mod) :clients (keypath stale-agent)]
-                         (fn [client]
-                           (close! client)
-                           NONE)
-                         ui/system))))))
+        ;; stale agents
+        (let [stale-agents (clojure.set/difference
+                            (set
+                             (select [ATOM :aor-cache (keypath mod) :clients MAP-KEYS]
+                                     ui/system))
+                            agent-names)]
+          (doseq [stale-agent stale-agents]
+            (transform [ATOM :aor-cache (keypath mod) :clients (keypath stale-agent)]
+                       (fn [client]
+                         (close! client)
+                         NONE)
+                       ui/system)))))
 
-    ;; stale modules
+    ;; stale modules - compares against aor-modules to handle modules that
+    ;; were updated to no longer have AOR support
     (let [stale-modules (clojure.set/difference
                          (set (select [ATOM :aor-cache MAP-KEYS] ui/system))
-                         modules)]
+                         aor-modules)]
       (doseq [mod stale-modules]
         (transform [ATOM :aor-cache (keypath mod) :clients MAP-VALS] close! ui/system)
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
@@ -71,7 +72,7 @@
                                                       :join? false}))
   (swap! ui/system assoc :rama-client ipc)
   (swap! ui/system assoc :background-exec (ScheduledThreadPoolExecutor. 1))
-  (.scheduleAtFixedRate
+  (.scheduleWithFixedDelay
    ^ScheduledThreadPoolExecutor (:background-exec @ui/system)
    (fn []
      (try
