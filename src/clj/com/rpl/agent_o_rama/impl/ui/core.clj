@@ -4,7 +4,7 @@
    [com.rpl.rama.path])
   (:require
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.impl.client :as client]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.ui.server :as srv]
    [com.rpl.agent-o-rama.impl.ui.sente :as sente]
    [com.rpl.agent-o-rama.impl.ui :as ui]
@@ -27,7 +27,7 @@
     
     (cljlogging/trace "Refreshing agent from modules" {:modules modules})
     (doseq [mod modules]
-      (when (client/has-aor-modules?  mod)
+      (when (queries/has-aor-modules? rama-client mod)
         ;; nil? check only creates manager when it's not already cached.
         (transform [ATOM :aor-cache (keypath mod) :manager nil?]
                    (fn [_] (aor/agent-manager rama-client mod))
