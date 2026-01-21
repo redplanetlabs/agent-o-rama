@@ -113,7 +113,7 @@
              args-json))
        ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
        ($ :td.px-4.py-3.text-sm
-          ($ result-badge {:result (:result invoke)
+          ($ result-badge {:status (:status invoke)
                            :human-request? (:human-request? invoke)})))))
 
 (defui index []
