@@ -188,7 +188,7 @@
         (doseq [page res]
           (doseq [m page]
             (let [expected-keys #{:start-time-millis :finish-time-millis
-                                  :invoke-args :result :task-id :agent-id
+                                  :invoke-args :status :task-id :agent-id
                                   :graph-version :human-request?}]
               (is (not (:human-request? m)))
               (is (= expected-keys
