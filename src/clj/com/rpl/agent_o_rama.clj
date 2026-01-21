@@ -1169,11 +1169,12 @@ Example:\n
           (foreign-query cluster
                          module-name
                          (queries/agent-get-names-query-name))
-          (catch TopologyDoesNotExistException e
-            (throw (h/ex-info e
-                              "Module does not host agents"
-                              {:module-name module-name}))
-          ))
+          (catch Exception e
+            (if (h/exception-cause? TopologyDoesNotExistException e)
+              (throw (h/ex-info e
+                                "Module does not host agents"
+                                {:module-name module-name}))
+              (throw e))))
 
         datasets-depot               (foreign-depot cluster
                                                     module-name

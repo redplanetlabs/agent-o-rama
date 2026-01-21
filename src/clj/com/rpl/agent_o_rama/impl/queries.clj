@@ -37,7 +37,10 @@
 (defn has-aor-modules? [cluster module-name]
   (try
     (do (foreign-query cluster module-name (agent-get-names-query-name)) true)
-    (catch TopologyDoesNotExistException e false)))
+    (catch Exception e
+      (if (h/exception-cause? TopologyDoesNotExistException e)
+        false
+        (throw e)))))
 
 (defn agent-get-fork-affected-aggs-query-name
   []

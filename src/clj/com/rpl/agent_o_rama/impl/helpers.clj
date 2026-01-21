@@ -409,3 +409,14 @@
        {"node" node-name
         "args" args})
      emits)))
+
+(defn exception-cause
+  [klass ^Throwable t]
+  (->> (iterate #(.getCause ^Throwable %) t)
+       (take-while identity)
+       (some #(when (instance? klass %)
+                %))))
+
+(defn exception-cause?
+  [klass ^Throwable t]
+  (boolean (exception-cause klass t)))
