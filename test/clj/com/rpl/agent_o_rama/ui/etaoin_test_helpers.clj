@@ -13,7 +13,6 @@
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-helpers :as th]
-   [clojure.java.io :as io]
    [etaoin.api :as e]
    [shadow.cljs.devtools.api :as shadow]
    [shadow.cljs.devtools.server])
@@ -33,15 +32,10 @@
 (def default-timeout 120)
 
 (def ^:private in-test-runner? (System/getProperty "aor.test.runner"))
-(defonce ^:private shadow-compiled? (atom false))
 
 (defn- url-encode
   [^String s]
   (java.net.URLEncoder/encode s "UTF-8"))
-
-(defn- release-build-present?
-  []
-  (.exists (io/file "resource/public/manifest.edn")))
 
 (defn setup-container
   "Create and start a Selenium webdriver container.
@@ -140,12 +134,7 @@
   [system {:keys [port] :or {port default-port}}]
   (when-not (:ui-launched system)
     (if in-test-runner?
-      (when-not @shadow-compiled?
-        (if (release-build-present?)
-          (reset! shadow-compiled? true)
-          (do
-            (shadow/release :frontend)
-            (reset! shadow-compiled? true))))
+      nil
       (do
         (shadow.cljs.devtools.server/start!)
         (shadow/watch :dev)))

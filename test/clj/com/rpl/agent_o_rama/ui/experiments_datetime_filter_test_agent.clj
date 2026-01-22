@@ -95,7 +95,7 @@
            (aor-types/->valid-ExperimentTarget
             (aor-types/->valid-AgentTarget "DatetimeFilterTestAgent")
             {} ; metadata
-            ["$"])) ; input->args - "$" means pass the whole input as first arg
+            nil)) ; input->args
           1 ; num-repetitions
           1))] ; concurrency
 
