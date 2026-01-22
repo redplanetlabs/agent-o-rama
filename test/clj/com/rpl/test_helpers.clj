@@ -203,24 +203,6 @@
   [& body]
   `(condition-stable?* (fn [] ~@body)))
 
-(defn enable-fail-fast!
-  "Exit the JVM on the first test failure or error."
-  []
-  (alter-var-root
-   #'clojure.test/do-report
-   (fn [f]
-     (if (::fail-fast (meta f))
-       f
-       (with-meta
-         (fn [m]
-           (let [result (f m)]
-             (when (#{:fail :error} (:type m))
-               (System/exit 1))
-             result))
-         (assoc (meta f) ::fail-fast true))))))
-
-(enable-fail-fast!)
-
 (let [prev aor-types/get-config]
   (defn max-retries-override
     [max-retries]
