@@ -50,6 +50,15 @@ jobs:
         lein deps
         npm ci
 
+    - name: Build frontend for Etaoin tests
+      env:
+        NODE_ENV: production
+      run: |
+        rm -rf resource/public
+        mkdir -p resource/public
+        cp -r resource/assets/* resource/public
+        lein with-profile +ui run -m shadow.cljs.devtools.cli release :frontend
+
     - name: Run Etaoin E2E tests
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
