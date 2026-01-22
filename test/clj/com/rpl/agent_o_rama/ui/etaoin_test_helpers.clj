@@ -92,7 +92,9 @@
   [ipc module-name]
   (let [ready? (fn []
                  (try
-                   (queries/has-aor-modules? ipc module-name)
+                   (let [modules (set (rama/deployed-module-names ipc))]
+                     (and (contains? modules module-name)
+                          (queries/has-aor-modules? ipc module-name)))
                    (catch Exception _ false)))]
     (when-not (th/condition-attained?*
                ready?
