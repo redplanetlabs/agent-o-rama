@@ -1252,7 +1252,59 @@
               :target  target7}]))
      (is (nil? (:pagination-params res)))
 
-     ;; TODO: <<<<>>> test backwards pagination
+
+     (bind res (no-ids (foreign-invoke-query queue-page "q1" 3 true nil)))
+     (is (= (:items res)
+            [{:output  queries/TARGET-DOES-NOT-EXIST
+              :id      :*
+              :comment "comment 8"
+              :input   queries/TARGET-DOES-NOT-EXIST
+              :target  target7}
+             {:output  queries/TARGET-DOES-NOT-EXIST
+              :id      :*
+              :comment "comment 7"
+              :input   queries/TARGET-DOES-NOT-EXIST
+              :target  target6}
+             {:output  "b?"
+              :id      :*
+              :comment "comment 6"
+              :input   ["b?"]
+              :target  target5}
+            ]))
+
+     (bind res (no-ids (foreign-invoke-query queue-page "q1" 3 true (:pagination-params res))))
+     (is (= (:items res)
+            [{:output  [{"node" "end" "args" ["b?"]}]
+              :id      :*
+              :comment "comment 5"
+              :input   ["b"]
+              :target  target4}
+             {:output  queries/TARGET-DOES-NOT-EXIST
+              :id      :*
+              :comment "comment 4"
+              :input   queries/TARGET-DOES-NOT-EXIST
+              :target  target3}
+             {:output  queries/TARGET-DOES-NOT-EXIST
+              :id      :*
+              :comment "comment 3"
+              :input   queries/TARGET-DOES-NOT-EXIST
+              :target  target2}
+            ]))
+
+     (bind res (no-ids (foreign-invoke-query queue-page "q1" 3 true (:pagination-params res))))
+     (is (= (:items res)
+            [{:output  (aor-types/->AgentResult "b?" false)
+              :id      :*
+              :comment "comment 2"
+              :input   ["b"]
+              :target  target1}
+             {:output  (aor-types/->AgentResult "a!" false)
+              :id      :*
+              :comment "comment 1"
+              :input   ["a"]
+              :target  target0}
+            ]))
+     (is (nil? (:pagination-params res)))
 
 
      (bind all-ids-fn
