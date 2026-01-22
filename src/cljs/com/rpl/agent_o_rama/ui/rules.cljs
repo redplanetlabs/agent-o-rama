@@ -317,21 +317,26 @@
         [rules set-rules!] (uix/use-state nil)
         [loading? set-loading!] (uix/use-state true)
         [error set-error!] (uix/use-state nil)
+        connected? (state/use-sub [:sente :connected?])
         refetch-trigger (state/use-sub [:ui :rules :refetch-trigger module-id agent-name])]
 
     (uix/use-effect
      (fn []
-       (set-loading! true)
-       (sente/request!
-        [:analytics/fetch-rules {:module-id module-id :agent-name agent-name}]
-        5000
-        (fn [reply]
-          (set-loading! false)
-          (if (:success reply)
-            (set-rules! (:data reply))
-            (set-error! (or (:error reply) "Failed to fetch rules")))))
+       (when connected?
+         (set-loading! true)
+         (set-error! nil)
+         (sente/request!
+          [:analytics/fetch-rules {:module-id module-id :agent-name agent-name}]
+          15000
+          (fn [reply]
+            (set-loading! false)
+            (if (:success reply)
+              (set-rules! (:data reply))
+              (set-error! (or (:error reply)
+                              (when (= reply :chsk/closed) "Connection closed")
+                              "Failed to fetch rules"))))))
        js/undefined)
-     [module-id agent-name refetch-trigger])
+     [module-id agent-name refetch-trigger connected?])
 
     ($ :div.p-6
        ($ :div.flex.justify-end.items-center.mb-4
