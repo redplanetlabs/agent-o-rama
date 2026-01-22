@@ -111,15 +111,15 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items
   [{:keys [manager queue-name pagination limit include-cursor?]} uid]
-  (let [underlying-objects (aor-types/underlying-objects manager)
-        queue-page-query (:human-feedback-queue-page-query underlying-objects)
-        query-limit (or limit 20)
+  (let [underlying-objects  (aor-types/underlying-objects manager)
+        queue-page-query    (:human-feedback-queue-page-query underlying-objects)
+        query-limit         (or limit 20)
         ;; If pagination is a UUID from item-id and we want inclusive behavior,
         ;; decrement it by 1 so search-loop with inclusive?=false includes the target item.
         adjusted-pagination (if (and include-cursor? (uuid? pagination))
                               (h/uuid-dec pagination)
                               pagination)]
-    (foreign-invoke-query queue-page-query queue-name query-limit adjusted-pagination)))
+    (foreign-invoke-query queue-page-query queue-name query-limit false adjusted-pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/add-to-queue
   [{:keys [manager queue-name agent-name invoke-id node-task-id node-invoke-id comment]} uid]
@@ -139,24 +139,26 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/resolve-queue-item
   [{:keys [manager queue-name item-id target reviewer-name scores comment]} uid]
-  (let [underlying-objects (aor-types/underlying-objects manager)
+  (let [underlying-objects   (aor-types/underlying-objects manager)
         global-actions-depot (:global-actions-depot underlying-objects)
         ;; Parse item-id
-        item-uuid (if (uuid? item-id) item-id (UUID/fromString (str item-id)))
+        item-uuid            (if (uuid? item-id) item-id (UUID/fromString (str item-id)))
         ;; Build feedback target from the target data
         {:keys [agent-name agent-invoke node-invoke]} target
-        agent-invoke-impl (aor-types/->AgentInvokeImpl 
-                           (:task-id agent-invoke)
-                           (:agent-invoke-id agent-invoke))
-        node-invoke-impl (when node-invoke
-                           (aor-types/->NodeInvokeImpl
-                            (:task-id node-invoke)
-                            (:node-invoke-id node-invoke)))
-        feedback-target (aor-types/->FeedbackTarget agent-name agent-invoke-impl node-invoke-impl)]
-    (evals/resolve-human-feedback-queue-item! 
-     global-actions-depot 
-     queue-name 
-     item-uuid 
+        agent-invoke-impl    (aor-types/->AgentInvokeImpl
+                              (:task-id agent-invoke)
+                              (:agent-invoke-id agent-invoke))
+        node-invoke-impl     (when node-invoke
+                               (aor-types/->NodeInvokeImpl
+                                (:task-id node-invoke)
+                                (:node-invoke-id node-invoke)))
+        feedback-target      (aor-types/->FeedbackTarget agent-name
+                                                         agent-invoke-impl
+                                                         node-invoke-impl)]
+    (evals/resolve-human-feedback-queue-item!
+     global-actions-depot
+     queue-name
+     item-uuid
      feedback-target
      reviewer-name
      scores
