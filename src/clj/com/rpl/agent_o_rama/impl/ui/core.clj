@@ -85,10 +85,14 @@
 
 (defn stop-ui []
   (sente/stop-sente!)
+  ;; Gracefully shutdown executor and wait for in-flight refresh task to complete
+  ;; before closing clients (avoids race condition with cluster shutdown)
+  (let [exec ^ScheduledThreadPoolExecutor (:background-exec @ui/system)]
+    (.shutdown exec)
+    (.awaitTermination exec 10 TimeUnit/SECONDS))
   (transform [ATOM :aor-cache MAP-VALS :clients MAP-VALS] close! ui/system)
   (setval [ATOM :aor-cache MAP-VALS :clients MAP-VALS] NONE ui/system)
-  ((:server @ui/system))
-  (.shutdownNow ^ScheduledThreadPoolExecutor (:background-exec @ui/system)))
+  ((:server @ui/system)))
 
 (defn start-ui
   ^AutoCloseable
