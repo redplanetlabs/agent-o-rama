@@ -219,6 +219,8 @@
              result))
          (assoc (meta f) ::fail-fast true))))))
 
+(enable-fail-fast!)
+
 (let [prev aor-types/get-config]
   (defn max-retries-override
     [max-retries]

@@ -97,10 +97,7 @@
                                          [net.java.dev.jna/jna "5.17.0"]
                                          [org.clojure/clojure "1.12.2"]
                                          [prismatic/schema "1.4.1"]]}
-             :test       {:jvm-opts ["-Daor.test.runner=1"]
-                          :injections [(do
-                                         (require 'com.rpl.test-helpers)
-                                         (com.rpl.test-helpers/enable-fail-fast!))]}
+             :test       {:jvm-opts ["-Daor.test.runner=1"]}
              :nrepl-port {:repl-options {:port 7888}}}
   :codox {:source-paths ["src/clj"]
           :metadata     {:doc/format :markdown}
