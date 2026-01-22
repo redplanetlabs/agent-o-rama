@@ -92,6 +92,8 @@
     (.awaitTermination exec 10 TimeUnit/SECONDS))
   (transform [ATOM :aor-cache MAP-VALS :clients MAP-VALS] close! ui/system)
   (setval [ATOM :aor-cache MAP-VALS :clients MAP-VALS] NONE ui/system)
+  ;; Clear managers/clients so fresh IPC creates new ones on restart.
+  (setval [ATOM :aor-cache] {} ui/system)
   ((:server @ui/system)))
 
 (defn start-ui
