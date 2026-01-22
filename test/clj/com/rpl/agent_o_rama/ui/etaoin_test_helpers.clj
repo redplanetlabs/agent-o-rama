@@ -32,6 +32,7 @@
 (def default-timeout 120)
 
 (def ^:private in-test-runner? (System/getProperty "aor.test.runner"))
+(defonce ^:private shadow-compiled? (atom false))
 
 (defn- url-encode
   [^String s]
@@ -132,7 +133,9 @@
   [system {:keys [port] :or {port default-port}}]
   (when-not (:ui-launched system)
     (if in-test-runner?
-      (shadow/compile :dev)
+      (when-not @shadow-compiled?
+        (shadow/release :frontend)
+        (reset! shadow-compiled? true))
       (do
         (shadow.cljs.devtools.server/start!)
         (shadow/watch :dev)))
