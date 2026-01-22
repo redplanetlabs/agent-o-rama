@@ -13,9 +13,7 @@
    [com.rpl.rama :as rama]
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-helpers :as th]
-   [etaoin.api :as e]
-   [shadow.cljs.devtools.api :as shadow]
-   [shadow.cljs.devtools.server])
+   [etaoin.api :as e])
   (:import
    [com.rpl.agentorama
     AgentInvoke]
@@ -127,17 +125,14 @@
 
 (defn setup-agent-ui
   "Start the agent UI server.
-   Returns true if UI was started, false if already running.
+   Frontend must be pre-built before running tests.
 
    Options:
    - :port - UI server port (default: 8080)"
   [system {:keys [port] :or {port default-port}}]
   (when-not (:ui-launched system)
-    (if in-test-runner?
-      nil
-      (do
-        (shadow.cljs.devtools.server/start!)
-        (shadow/watch :dev)))
+    ;; Frontend should be pre-built (by CI or manually).
+    ;; Test harness never builds the frontend.
     (aor/start-ui (:ipc system) {:port port})
     {:ui-launched true
      :port port}))
@@ -169,8 +164,6 @@
 (defn- teardown-agent-ui
   [{:keys [ui-launched]}]
   (when ui-launched
-    (when-not in-test-runner?
-      (shadow.cljs.devtools.server/stop!))
     (aor/stop-ui)
     {:ui-launched nil
      :port nil}))
