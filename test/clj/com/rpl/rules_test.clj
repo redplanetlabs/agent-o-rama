@@ -2509,7 +2509,7 @@
 
 
        (bind items
-         (->> (foreign-invoke-query queue-page "q1" 10 nil)
+         (->> (foreign-invoke-query queue-page "q1" 10 false nil)
               :items
               (setval [ALL :id] :*)))
        (is (= 2 (count items)))
@@ -2525,7 +2525,7 @@
                  :input   ["b"]
                  :target  (aor-types/->FeedbackTarget "foo" inv2 nil)}}))
 
-       (bind res (foreign-invoke-query queue-page "q2" 10 nil))
+       (bind res (foreign-invoke-query queue-page "q2" 10 false nil))
        (bind items
          (->> res
               :items

@@ -1184,7 +1184,7 @@
   (let [human-feedback-pstate-sym (symbol (po/human-feedback-task-global-name))]
     (<<query-topology topologies
       (human-feedback-queue-page-name)
-      [*queue-name *limit *pagination-params :> *res]
+      [*queue-name *limit *reverse? *pagination-params :> *res]
       (|global)
       (<<ramafn %filter
         [*id _]
@@ -1194,7 +1194,7 @@
                    %filter
                    *limit
                    *pagination-params
-                   false
+                   *reverse?
                    :> *items *page-key)
       (loop<- [*l []
                *next-items *items
