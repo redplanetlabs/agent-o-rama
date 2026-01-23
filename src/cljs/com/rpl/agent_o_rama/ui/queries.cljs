@@ -40,11 +40,12 @@
                  (fn [db {:keys [query-key data]}]
                    ;; Store queries in a flat map with the full query-key as the map key
                    (into (state/path->specter-path (into [:queries] query-key))
-                         [(s/terminal (fn [_]
-                                        {:status :success
-                                         :data data
-                                         :error nil
-                                         :fetching? false}))])))
+                         [(s/terminal (fn [current-state]
+                                        (-> current-state
+                                            (assoc :status :success
+                                                   :data data
+                                                   :error nil
+                                                   :fetching? false))))])))
 
 (state/reg-event :query/fetch-error
                  (fn [db {:keys [query-key error]}]
@@ -128,68 +129,176 @@
         query-state (state/use-sub state-path)
         should-refetch? (:should-refetch? query-state)
         connected? (state/use-sub [:sente :connected?])
-        query-key-str (str (vec query-key))
-        sente-event-str (str sente-event)
-
-        ;; Use the page visibility hook
         page-is-visible? (common/use-page-visibility)
+        ready? (and enabled? connected? page-is-visible?)
+        ctx-ref (uix/use-ref nil)
+        timer-ref (uix/use-ref nil)
+        send-event-ref (uix/use-ref nil)]
 
-        ;; Define the fetch function inside the hook so it has access to the closure
-        fetch-data (uix/use-callback
-                    (fn []
-                      (state/dispatch [:query/fetch-start {:query-key query-key}])
-                      (sente/request! sente-event timeout-ms
-                                      (fn [reply]
-                                        (if (:success reply)
-                                          (state/dispatch [:query/fetch-success {:query-key query-key :data (:data reply)}])
-                                          (state/dispatch [:query/fetch-error {:query-key query-key
-                                                                               :error (or (:error reply)
-                                                                                          (when (= reply :chsk/closed) "Connection closed")
-                                                                                          "Request failed")}])))))
-                    [sente-event query-key query-key-str sente-event-str timeout-ms])]
+    (set! (.-current ctx-ref)
+          {:query-key query-key
+           :state-path state-path
+           :sente-event sente-event
+           :timeout-ms timeout-ms
+           :enabled? enabled?
+           :connected? connected?
+           :page-visible? page-is-visible?
+           :refetch-interval-ms refetch-interval-ms
+           :refetch-on-mount? refetch-on-mount})
 
-    ;; Effect for initial fetch and polling setup
-    (uix/use-effect
-     (fn []
-       (let [interval-id (atom nil)]
-         (when (and connected? enabled? page-is-visible?)
-           ;; Control initial fetch with new option
-           (when refetch-on-mount (fetch-data))
+    (letfn [(ctx [] (.-current ctx-ref))
+            (get-state []
+              (or (get-in @state/app-db (:state-path (ctx))) {}))
+            (ready-now? []
+              (let [{:keys [enabled? connected? page-visible?]} (ctx)]
+                (and enabled? connected? page-visible?)))
+            (can-start? [st]
+              (and (ready-now?) (not (:fetching? st))))
+            (set-value! [path value]
+              (state/dispatch [:db/set-value (into (:state-path (ctx)) path) value]))
+            (set-pending! [value]
+              (set-value! [:pending?] value))
+            (cancel-poll! []
+              (when-let [timeout-id (.-current timer-ref)]
+                (js/clearTimeout timeout-id)
+                (set! (.-current timer-ref) nil)))
+            (schedule-poll! []
+              (cancel-poll!)
+              (let [{:keys [refetch-interval-ms]} (ctx)]
+                (when (and (ready-now?) refetch-interval-ms)
+                  (set! (.-current timer-ref)
+                        (js/setTimeout
+                         (fn []
+                           (when-let [send! (.-current send-event-ref)]
+                             (send! {:type :poll-tick})))
+                         refetch-interval-ms)))))
+            (start-request! []
+              (let [{:keys [query-key sente-event timeout-ms]} (ctx)]
+                (cancel-poll!)
+                (set-pending! false)
+                (state/dispatch [:query/fetch-start {:query-key query-key}])
+                (sente/request!
+                 sente-event
+                 timeout-ms
+                 (fn [reply]
+                   (when-let [send! (.-current send-event-ref)]
+                     (if (:success reply)
+                       (send! {:type :response-success :data (:data reply)})
+                       (send! {:type :response-error
+                               :error (or (:error reply)
+                                          (when (= reply :chsk/closed) "Connection closed")
+                                          "Request failed")})))))))
+            (handle-trigger! [st _]
+              (if (can-start? st)
+                (start-request!)
+                (set-pending! true)))
+            (handle-mount! [st _]
+              (when (:refetch-on-mount? (ctx))
+                (handle-trigger! st nil)))
+            (handle-resume! [st _]
+              (when (and (:pending? st) (can-start? st))
+                (start-request!))
+              (when (and (not (:fetching? st)) (not (:pending? st)))
+                (schedule-poll!)))
+            (handle-pause! [_ _]
+              (cancel-poll!))
+            (handle-response-success! [_ ev]
+              (let [{:keys [query-key]} (ctx)]
+                (state/dispatch [:query/fetch-success {:query-key query-key :data (:data ev)}])
+                (let [next-state (get-state)]
+                  (if (and (:pending? next-state) (can-start? next-state))
+                    (start-request!)
+                    (schedule-poll!)))))
+            (handle-response-error! [_ ev]
+              (let [{:keys [query-key]} (ctx)]
+                (state/dispatch [:query/fetch-error {:query-key query-key :error (:error ev)}])
+                (let [next-state (get-state)]
+                  (if (and (:pending? next-state) (can-start? next-state))
+                    (start-request!)
+                    (schedule-poll!)))))]
 
-           (when refetch-interval-ms
-             (reset! interval-id (js/setInterval fetch-data refetch-interval-ms))))
+      (let [trigger-events #{:mount :manual-refetch :invalidate :poll-tick}
+            trigger-handlers {:mount handle-mount!
+                              :manual-refetch handle-trigger!
+                              :invalidate handle-trigger!
+                              :poll-tick handle-trigger!}
+            handler-map {:states {:idle trigger-handlers
+                                  :loading trigger-handlers
+                                  :success trigger-handlers
+                                  :error trigger-handlers}
+                         :any {:resume handle-resume!
+                               :pause handle-pause!
+                               :response-success handle-response-success!
+                               :response-error handle-response-error!}}]
+        (set! (.-current send-event-ref)
+              (fn [event]
+                (let [st (get-state)
+                      status (or (:status st) :idle)
+                      event-type (:type event)
+                      handler (or (get-in handler-map [:states status event-type])
+                                  (get-in handler-map [:any event-type]))]
+                  (cond
+                    (and (contains? trigger-events event-type) (:fetching? st))
+                    (set-pending! true)
+
+                    handler
+                    (handler st event)
+
+                    :else nil))))
+
+        ;; Effect for mount (per query-key)
+        (uix/use-effect
          (fn []
-           (when @interval-id
-             (js/clearInterval @interval-id)
-             (reset! interval-id nil)))))
-     ;; Re-run effect if `fetch-data` identity changes
-     [connected? enabled? page-is-visible? refetch-interval-ms fetch-data refetch-on-mount])
+           (when-let [send! (.-current send-event-ref)]
+             (send! {:type :mount}))
+           js/undefined)
+         [state-path])
 
-    ;; Effect to watch for invalidation flag and auto-refetch
-    (uix/use-effect
-     (fn []
-       (when (and should-refetch? connected? enabled? page-is-visible?)
-         ;; Clear the flag first to prevent infinite loops
-         (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
-         ;; Then refetch the data
-         (fetch-data)))
-     ;; CRITICAL: Only watch the boolean value itself, not state-path or query-state
-     ;; state-path is not needed because it's derived from query-key which is in fetch-data deps
-     ;; Including state-path or query-state causes infinite loops
-     [should-refetch? connected? enabled? page-is-visible? fetch-data])
+        ;; Effect to handle ready/pause transitions and polling updates
+        (uix/use-effect
+         (fn []
+           (when-let [send! (.-current send-event-ref)]
+             (if ready?
+               (send! {:type :resume})
+               (send! {:type :pause})))
+           js/undefined)
+         [ready? refetch-interval-ms])
 
-    ;; Return the result map including the refetch function
-    (let [default-state {:data nil :status nil :error nil :fetching? false}
-          current-state (or query-state default-state)
-          data (:data current-state)
-          loading? (= (:status current-state) :loading)
-          error (when (= (:status current-state) :error) (:error current-state))
-          fetching? (:fetching? current-state)]
-      {:data data
-       :loading? loading?
-       :fetching? fetching?
-       :error error
-       :refetch fetch-data})))
+        ;; Effect to watch invalidation flag and trigger refetch
+        (uix/use-effect
+         (fn []
+           (when should-refetch?
+             ;; Clear the flag first to prevent infinite loops
+             (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
+             (when-let [send! (.-current send-event-ref)]
+               (send! {:type :invalidate})))
+           js/undefined)
+         [should-refetch? state-path])
+
+        ;; Cleanup on unmount
+        (uix/use-effect
+         (fn []
+           (fn []
+             (cancel-poll!)))
+         [])
+
+        ;; Return the result map including the refetch function
+        (let [default-state {:data nil :status :idle :error nil :fetching? false :pending? false}
+              current-state (merge default-state query-state)
+              data (:data current-state)
+              loading? (= (:status current-state) :loading)
+              error (when (= (:status current-state) :error) (:error current-state))
+              fetching? (:fetching? current-state)
+              refetch (uix/use-callback
+                       (fn []
+                         (when-let [send! (.-current send-event-ref)]
+                           (send! {:type :manual-refetch})))
+                       [])]
+          {:data data
+           :loading? loading?
+           :fetching? fetching?
+           :error error
+           :refetch refetch})))))
 
 (defhook use-paginated-query
   "A hook for paginated Sente queries that supports a 'load more' pattern.

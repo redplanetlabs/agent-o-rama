@@ -58,6 +58,7 @@
 
    ;; Regular query keys
    (s/optional-key :fetching?) s/Bool
+   (s/optional-key :pending?) s/Bool
 
    ;; Paginated query keys
    (s/optional-key :pagination-params) s/Any
