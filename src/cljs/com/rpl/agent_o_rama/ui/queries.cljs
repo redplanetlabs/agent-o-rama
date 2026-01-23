@@ -293,61 +293,61 @@
                       edge (first (filter #(edge-matches? % ctx st event)
                                           (:edges query-machine)))]
                   (when-let [action (:action edge)]
-                    (action ctx st event)))))))
+                    (action ctx st event))))))
 
-        ;; Effect for mount (per query-key)
-        (uix/use-effect
-         (fn []
-           (when-let [send! @send-event-ref]
-             (send! {:type :mount}))
-           js/undefined)
-         [state-path])
+    ;; Effect for mount (per query-key)
+    (uix/use-effect
+     (fn []
+       (when-let [send! @send-event-ref]
+         (send! {:type :mount}))
+       js/undefined)
+     [state-path])
 
-        ;; Effect to handle ready/pause transitions and polling updates
-        (uix/use-effect
-         (fn []
-           (when-let [send! @send-event-ref]
-             (if ready?
-               (send! {:type :resume})
-               (send! {:type :pause})))
-           js/undefined)
-         [ready? refetch-interval-ms])
+    ;; Effect to handle ready/pause transitions and polling updates
+    (uix/use-effect
+     (fn []
+       (when-let [send! @send-event-ref]
+         (if ready?
+           (send! {:type :resume})
+           (send! {:type :pause})))
+       js/undefined)
+     [ready? refetch-interval-ms])
 
-        ;; Effect to watch invalidation flag and trigger refetch
-        (uix/use-effect
-         (fn []
-           (when should-refetch?
-             ;; Clear the flag first to prevent infinite loops
-             (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
-             (when-let [send! @send-event-ref]
-               (send! {:type :invalidate})))
-           js/undefined)
-         [should-refetch? state-path])
+    ;; Effect to watch invalidation flag and trigger refetch
+    (uix/use-effect
+     (fn []
+       (when should-refetch?
+         ;; Clear the flag first to prevent infinite loops
+         (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
+         (when-let [send! @send-event-ref]
+           (send! {:type :invalidate})))
+       js/undefined)
+     [should-refetch? state-path])
 
-        ;; Cleanup on unmount
-        (uix/use-effect
-         (fn []
-           (fn []
-             (when-let [ctx @ctx-ref]
-               (cancel-poll! ctx))))
-         [])
+    ;; Cleanup on unmount
+    (uix/use-effect
+     (fn []
+       (fn []
+         (when-let [ctx @ctx-ref]
+           (cancel-poll! ctx))))
+     [])
 
-        ;; Return the result map including the refetch function
-        (let [current-state (merge default-query-state query-state)
-              data (:data current-state)
-              loading? (= (:status current-state) :loading)
-              error (when (= (:status current-state) :error) (:error current-state))
-              fetching? (:fetching? current-state)
-              refetch (uix/use-callback
-                       (fn []
-                         (when-let [send! @send-event-ref]
-                           (send! {:type :manual-refetch})))
-                       [])]
-          {:data data
-           :loading? loading?
-           :fetching? fetching?
-           :error error
-           :refetch refetch}))
+    ;; Return the result map including the refetch function
+    (let [current-state (merge default-query-state query-state)
+          data (:data current-state)
+          loading? (= (:status current-state) :loading)
+          error (when (= (:status current-state) :error) (:error current-state))
+          fetching? (:fetching? current-state)
+          refetch (uix/use-callback
+                   (fn []
+                     (when-let [send! @send-event-ref]
+                       (send! {:type :manual-refetch})))
+                   [])]
+      {:data data
+       :loading? loading?
+       :fetching? fetching?
+       :error error
+       :refetch refetch})))
 
 (defhook use-paginated-query
   "A hook for paginated Sente queries that supports a 'load more' pattern.
