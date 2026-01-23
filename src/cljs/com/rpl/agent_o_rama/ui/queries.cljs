@@ -338,7 +338,7 @@
            :loading? loading?
            :fetching? fetching?
            :error error
-           :refetch refetch})))))
+           :refetch refetch})))
 
 (defhook use-paginated-query
   "A hook for paginated Sente queries that supports a 'load more' pattern.
