@@ -85,145 +85,142 @@
 
 (defonce query-machine (atom {}))
 
-(defonce query-machine-init
-  (do
-    (s/setval [s/ATOM :trigger-events]
-              #{:mount :manual-refetch :invalidate :poll-tick}
-              query-machine)
+(s/setval [s/ATOM :trigger-events]
+          #{:mount :manual-refetch :invalidate :poll-tick}
+          query-machine)
 
-    (s/setval [s/ATOM :states :idle :mount]
-              (fn [ctx st _]
-                (when (:refetch-on-mount? ctx)
-                  (if (can-start? ctx st)
-                    (start-request! ctx st)
-                    (set-pending! ctx st true))))
-              query-machine)
-    (s/setval [s/ATOM :states :loading :mount]
-              (fn [ctx st _]
-                (when (:refetch-on-mount? ctx)
-                  (if (can-start? ctx st)
-                    (start-request! ctx st)
-                    (set-pending! ctx st true))))
-              query-machine)
-    (s/setval [s/ATOM :states :success :mount]
-              (fn [ctx st _]
-                (when (:refetch-on-mount? ctx)
-                  (if (can-start? ctx st)
-                    (start-request! ctx st)
-                    (set-pending! ctx st true))))
-              query-machine)
-    (s/setval [s/ATOM :states :error :mount]
-              (fn [ctx st _]
-                (when (:refetch-on-mount? ctx)
-                  (if (can-start? ctx st)
-                    (start-request! ctx st)
-                    (set-pending! ctx st true))))
-              query-machine)
+(s/setval [s/ATOM :states :idle :mount]
+          (fn [ctx st _]
+            (when (:refetch-on-mount? ctx)
+              (if (can-start? ctx st)
+                (start-request! ctx st)
+                (set-pending! ctx st true))))
+          query-machine)
+(s/setval [s/ATOM :states :loading :mount]
+          (fn [ctx st _]
+            (when (:refetch-on-mount? ctx)
+              (if (can-start? ctx st)
+                (start-request! ctx st)
+                (set-pending! ctx st true))))
+          query-machine)
+(s/setval [s/ATOM :states :success :mount]
+          (fn [ctx st _]
+            (when (:refetch-on-mount? ctx)
+              (if (can-start? ctx st)
+                (start-request! ctx st)
+                (set-pending! ctx st true))))
+          query-machine)
+(s/setval [s/ATOM :states :error :mount]
+          (fn [ctx st _]
+            (when (:refetch-on-mount? ctx)
+              (if (can-start? ctx st)
+                (start-request! ctx st)
+                (set-pending! ctx st true))))
+          query-machine)
 
-    (s/setval [s/ATOM :states :idle :manual-refetch]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
-    (s/setval [s/ATOM :states :idle :invalidate]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
-    (s/setval [s/ATOM :states :idle :poll-tick]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
+(s/setval [s/ATOM :states :idle :manual-refetch]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
+(s/setval [s/ATOM :states :idle :invalidate]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
+(s/setval [s/ATOM :states :idle :poll-tick]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
 
-    (s/setval [s/ATOM :states :loading :manual-refetch]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
-    (s/setval [s/ATOM :states :loading :invalidate]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
-    (s/setval [s/ATOM :states :loading :poll-tick]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
+(s/setval [s/ATOM :states :loading :manual-refetch]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
+(s/setval [s/ATOM :states :loading :invalidate]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
+(s/setval [s/ATOM :states :loading :poll-tick]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
 
-    (s/setval [s/ATOM :states :success :manual-refetch]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
-    (s/setval [s/ATOM :states :success :invalidate]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
-    (s/setval [s/ATOM :states :success :poll-tick]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
+(s/setval [s/ATOM :states :success :manual-refetch]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
+(s/setval [s/ATOM :states :success :invalidate]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
+(s/setval [s/ATOM :states :success :poll-tick]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
 
-    (s/setval [s/ATOM :states :error :manual-refetch]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
-    (s/setval [s/ATOM :states :error :invalidate]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
-    (s/setval [s/ATOM :states :error :poll-tick]
-              (fn [ctx st _]
-                (if (can-start? ctx st)
-                  (start-request! ctx st)
-                  (set-pending! ctx st true)))
-              query-machine)
+(s/setval [s/ATOM :states :error :manual-refetch]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
+(s/setval [s/ATOM :states :error :invalidate]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
+(s/setval [s/ATOM :states :error :poll-tick]
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
+          query-machine)
 
-    (s/setval [s/ATOM :any :resume]
-              (fn [ctx st _]
-                (when (and (:pending? st) (can-start? ctx st))
-                  (start-request! ctx st))
-                (when (and (not (:fetching? st)) (not (:pending? st)))
-                  (schedule-poll! ctx)))
-              query-machine)
-    (s/setval [s/ATOM :any :pause]
-              (fn [ctx _ _]
-                (cancel-poll! ctx))
-              query-machine)
-    (s/setval [s/ATOM :any :response-success]
-              (fn [ctx _ ev]
-                (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
-                (let [next-state (query-state ctx)]
-                  (if (and (:pending? next-state) (can-start? ctx next-state))
-                    (start-request! ctx next-state)
-                    (schedule-poll! ctx))))
-              query-machine)
-    (s/setval [s/ATOM :any :response-error]
-              (fn [ctx _ ev]
-                (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
-                (let [next-state (query-state ctx)]
-                  (if (and (:pending? next-state) (can-start? ctx next-state))
-                    (start-request! ctx next-state)
-                    (schedule-poll! ctx))))
-              query-machine)
-    true))
+(s/setval [s/ATOM :any :resume]
+          (fn [ctx st _]
+            (when (and (:pending? st) (can-start? ctx st))
+              (start-request! ctx st))
+            (when (and (not (:fetching? st)) (not (:pending? st)))
+              (schedule-poll! ctx)))
+          query-machine)
+(s/setval [s/ATOM :any :pause]
+          (fn [ctx _ _]
+            (cancel-poll! ctx))
+          query-machine)
+(s/setval [s/ATOM :any :response-success]
+          (fn [ctx _ ev]
+            (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
+            (let [next-state (query-state ctx)]
+              (if (and (:pending? next-state) (can-start? ctx next-state))
+                (start-request! ctx next-state)
+                (schedule-poll! ctx))))
+          query-machine)
+(s/setval [s/ATOM :any :response-error]
+          (fn [ctx _ ev]
+            (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
+            (let [next-state (query-state ctx)]
+              (if (and (:pending? next-state) (can-start? ctx next-state))
+                (start-request! ctx next-state)
+                (schedule-poll! ctx))))
+          query-machine)
 
 ;; =============================================================================
 ;; QUERY EVENT HANDLERS
