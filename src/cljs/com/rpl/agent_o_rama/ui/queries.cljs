@@ -20,6 +20,91 @@
      (uuid? pagination-params) true
      :else false)))
 
+;; =============================================================================
+;; QUERY EVENT HANDLERS
+;; =============================================================================
+
+(state/reg-event :query/fetch-start
+                 (fn [db {:keys [query-key]}]
+                   ;; Convert query-key with raw UUIDs to Specter path before navigating
+                   (into (state/path->specter-path (into [:queries] query-key))
+                         [(s/terminal (fn [current-state]
+                                        (let [has-data? (some? (:data current-state))]
+                                          (-> current-state
+                                              (assoc :error nil
+                                                     :fetching? true)
+                                              (cond-> (not has-data?)
+                                                (assoc :status :loading))))))])))
+
+(state/reg-event :query/fetch-success
+                 (fn [db {:keys [query-key data]}]
+                   ;; Store queries in a flat map with the full query-key as the map key
+                   (into (state/path->specter-path (into [:queries] query-key))
+                         [(s/terminal (fn [_]
+                                        {:status :success
+                                         :data data
+                                         :error nil
+                                         :fetching? false}))])))
+
+(state/reg-event :query/fetch-error
+                 (fn [db {:keys [query-key error]}]
+                   ;; Convert query-key with raw UUIDs to Specter path before navigating
+                   (into (state/path->specter-path (into [:queries] query-key))
+                         [(s/terminal (fn [current-state]
+                                        (-> current-state
+                                            (assoc :error error
+                                                   :fetching? false)
+                                            (cond-> (nil? (:data current-state))
+                                              (assoc :status :error)))))])))
+
+(state/reg-event :query/invalidate
+                 (fn [db {:keys [query-key-pattern]}]
+                   ;; Find all query keys that match the pattern and mark them for refetch
+                   ;; Supports nested query-key vectors stored under :queries as nested maps
+                   (let [queries-path [:queries]
+                         current-queries (get-in @state/app-db queries-path {})
+                         ;; Collect all full query-key vectors under :queries (leaf maps contain :status)
+                         all-query-keys (letfn [(collect-keys [m prefix acc]
+                                                  (reduce-kv
+                                                   (fn [a k v]
+                                                     (let [new-prefix (conj prefix k)]
+                                                       (cond
+                                                         (and (map? v) (contains? v :status))
+                                                         (conj a (vec new-prefix))
+
+                                                         (map? v)
+                                                         (collect-keys v new-prefix a)
+                                                         :else a)))
+                                                   acc
+                                                   m))]
+                                          (collect-keys current-queries [] []))
+                         matching-keys (filter
+                                        (fn [query-key]
+                                          (cond
+                                            ;; Case 1: Pattern is a keyword: match first segment
+                                            (keyword? query-key-pattern)
+                                            (= (first query-key) query-key-pattern)
+
+                                            ;; Case 2: Pattern is a vector: prefix match
+                                            (vector? query-key-pattern)
+                                            (and (>= (count query-key) (count query-key-pattern))
+                                                 (= query-key-pattern (subvec query-key 0 (count query-key-pattern))))
+
+                                            ;; Case 3: Pattern is a function (for complex logic)
+                                            (fn? query-key-pattern)
+                                            (query-key-pattern query-key)
+
+                                            :else false))
+                                        all-query-keys)]
+                     ;; Mark matching queries as stale by setting a flag (:should-refetch?)
+                     ;; Convert query-key paths to Specter paths before navigation
+                     (when (seq matching-keys)
+                       (apply s/multi-path
+                              (map (fn [query-key]
+                                     (into (state/path->specter-path (into queries-path query-key))
+                                           [:should-refetch? (s/terminal-val true)]))
+                                   matching-keys))))))
+
 (defhook use-sente-query
   "A hook for making Sente-based queries with automatic connection handling.
 
