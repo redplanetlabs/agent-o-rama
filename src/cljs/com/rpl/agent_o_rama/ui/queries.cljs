@@ -27,7 +27,8 @@
 (def default-query-state
   {:status :idle
    :fetching? false
-   :pending? false})
+   :pending? false
+   :retry-count 0})
 
 (defn current-query-state
   [ctx]
@@ -47,6 +48,27 @@
    [:db/set-value (:state-path ctx)
     (assoc (merge default-query-state st) :pending? value)]))
 
+(defn retry-base-ms
+  [ctx]
+  (or (:retry-base-ms ctx) (:refetch-interval-ms ctx)))
+
+(defn next-poll-delay-ms
+  [ctx st]
+  (let [base (:refetch-interval-ms ctx)
+        retry-base (retry-base-ms ctx)
+        retry-factor (or (:retry-factor ctx) 2)
+        retry-max-ms (:retry-max-ms ctx)
+        retry-count (max 0 (or (:retry-count st) 0))]
+    (cond
+      (= (:status st) :error)
+      (when retry-base
+        (let [delay (* retry-base (js/Math.pow retry-factor (max 0 (dec retry-count))))]
+          (if retry-max-ms
+            (min retry-max-ms delay)
+            delay)))
+
+      :else base)))
+
 (defn cancel-poll!
   [ctx]
   (when-let [timeout-id @(-> ctx :timer-ref)]
@@ -54,16 +76,16 @@
     (reset! (:timer-ref ctx) nil)))
 
 (defn schedule-poll!
-  [ctx]
+  [ctx st]
   (cancel-poll! ctx)
-  (let [{:keys [refetch-interval-ms]} ctx]
-    (when (and (ready-now? ctx) refetch-interval-ms)
+  (when-let [delay-ms (next-poll-delay-ms ctx st)]
+    (when (ready-now? ctx)
       (reset! (:timer-ref ctx)
               (js/setTimeout
                (fn []
                  (when-let [send! @(:send-event-ref ctx)]
                    (send! {:type :poll-tick})))
-               refetch-interval-ms)))))
+               delay-ms)))))
 
 (defn start-request!
   [ctx st]
@@ -113,7 +135,7 @@
       {:from states
        :event :resume
        :guard (fn [ctx st _] (and (not (:fetching? st)) (not (:pending? st))))
-       :action (fn [ctx _ _] (schedule-poll! ctx))}
+       :action (fn [ctx st _] (schedule-poll! ctx st))}
       {:from states
        :event :pause
        :action (fn [ctx _ _] (cancel-poll! ctx))}
@@ -124,7 +146,7 @@
                  (let [next-state (current-query-state ctx)]
                    (if (and (:pending? next-state) (can-start? ctx next-state))
                      (start-request! ctx next-state)
-                     (schedule-poll! ctx))))}
+                     (schedule-poll! ctx next-state))))}
       {:from states
        :event :response-error
        :action (fn [ctx _ ev]
@@ -132,7 +154,7 @@
                  (let [next-state (current-query-state ctx)]
                    (if (and (:pending? next-state) (can-start? ctx next-state))
                      (start-request! ctx next-state)
-                     (schedule-poll! ctx))))}]}))
+                     (schedule-poll! ctx next-state))))}]}))
 
 (defn edge-matches?
   [edge ctx st ev]
@@ -183,7 +205,8 @@
                                             (assoc :status :success
                                                    :data data
                                                    :error nil
-                                                   :fetching? false))))])))
+                                                   :fetching? false
+                                                   :retry-count 0))))])))
 
 (state/reg-event :query/fetch-error
                  (fn [db {:keys [query-key error]}]
@@ -192,9 +215,9 @@
                          [(s/terminal (fn [current-state]
                                         (-> current-state
                                             (assoc :error error
-                                                   :fetching? false)
-                                            (cond-> (nil? (:data current-state))
-                                              (assoc :status :error)))))])))
+                                                   :fetching? false
+                                                   :retry-count (inc (or (:retry-count current-state) 0))
+                                                   :status :error))))])))
 
 (state/reg-event :query/invalidate
                  (fn [db {:keys [query-key-pattern]}]
@@ -254,6 +277,10 @@
    - :enabled? - Boolean to control if query should run (default: true)
    - :refetch-interval-ms - If set, will refetch data at this interval (in ms)
                             but only when the browser tab is visible.
+   - :retry-base-ms - Base delay for exponential retry after errors (in ms).
+                      Defaults to :refetch-interval-ms when unset.
+   - :retry-max-ms - Optional max delay cap for exponential retry.
+   - :retry-factor - Exponential backoff factor (default: 2).
    - :refetch-on-mount - Boolean to control initial fetch (default: true)
 
    Returns:
@@ -261,8 +288,9 @@
    - :loading? - Boolean indicating if request is in progress
    - :error - Error message if request failed
    - :refetch - Function to manually trigger a refetch"
-  [{:keys [query-key sente-event timeout-ms enabled? refetch-interval-ms refetch-on-mount]
-    :or {timeout-ms 10000 enabled? true refetch-on-mount true}}]
+  [{:keys [query-key sente-event timeout-ms enabled? refetch-interval-ms refetch-on-mount
+           retry-base-ms retry-max-ms retry-factor]
+    :or {timeout-ms 10000 enabled? true refetch-on-mount true retry-factor 2}}]
   (let [state-path (into [:queries] query-key)
         query-state (state/use-sub state-path)
         should-refetch? (:should-refetch? query-state)
@@ -282,6 +310,9 @@
              :connected? connected?
              :page-visible? page-is-visible?
              :refetch-interval-ms refetch-interval-ms
+             :retry-base-ms retry-base-ms
+             :retry-max-ms retry-max-ms
+             :retry-factor retry-factor
              :refetch-on-mount? refetch-on-mount
              :timer-ref timer-ref
              :send-event-ref send-event-ref})

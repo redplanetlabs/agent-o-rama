@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.impl.ui.handlers.analytics]
    [com.rpl.agent-o-rama.impl.ui.handlers.config]
    [com.rpl.agent-o-rama.impl.ui.handlers.datasets]
+   [com.rpl.agent-o-rama.impl.ui.handlers.debug]
    [com.rpl.agent-o-rama.impl.ui.handlers.evaluators]
    [com.rpl.agent-o-rama.impl.ui.handlers.experiments]
    [com.rpl.agent-o-rama.impl.ui.handlers.human-feedback]
