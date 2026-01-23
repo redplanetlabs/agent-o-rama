@@ -61,10 +61,17 @@
    (s/optional-key :pending?) s/Bool
    (s/optional-key :retry-count) s/Int
 
-   ;; Paginated query keys
+   ;; Paginated query keys (legacy)
    (s/optional-key :pagination-params) s/Any
    (s/optional-key :has-more?) s/Bool
    (s/optional-key :fetching-more?) s/Bool
+
+   ;; Bidirectional pagination keys
+   (s/optional-key :next-cursor) s/Any
+   (s/optional-key :prev-cursor) s/Any
+   (s/optional-key :has-more-next?) s/Bool
+   (s/optional-key :has-more-prev?) s/Bool
+   (s/optional-key :fetch-direction) (s/maybe (s/enum :forward :backward))
 
    (s/optional-key :should-refetch?) s/Bool})
 
