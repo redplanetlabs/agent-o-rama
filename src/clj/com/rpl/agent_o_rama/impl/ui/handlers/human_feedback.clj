@@ -118,19 +118,12 @@
         ;; decrement it by 1 so search-loop with inclusive?=false includes the target item.
         adjusted-pagination (if (and include-cursor? (uuid? pagination))
                               (h/uuid-dec pagination)
-                              pagination)
-        
-        result (foreign-invoke-query queue-page-query 
-                                     queue-name 
-                                     query-limit 
-                                     (boolean reverse?) 
-                                     adjusted-pagination)]
-    ;; Return with explicit cursors
-    (if reverse?
-      {:items (:items result)
-       :prev-cursor (:pagination-params result)}
-      {:items (:items result)
-       :next-cursor (:pagination-params result)})))
+                              pagination)]
+    (foreign-invoke-query queue-page-query 
+                          queue-name 
+                          query-limit 
+                          (boolean reverse?) 
+                          adjusted-pagination)))
 
 ;; Bidirectional fetch for deep-linking: fetches items both before and after cursor
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items-bidirectional
