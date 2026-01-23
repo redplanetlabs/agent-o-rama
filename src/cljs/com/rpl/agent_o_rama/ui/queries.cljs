@@ -466,9 +466,12 @@
         current-data (or (get-in @state/app-db (into state-path [:data])) [])
         new-items (extract-items-from-response response-data)
         
-        ;; Backend always returns explicit cursors
+        ;; Backend returns either:
+        ;; - Bidirectional: {:items [...] :next-cursor ... :prev-cursor ...}
+        ;; - Normal queries: {:items [...] :pagination-params ...}
         next-cursor (:next-cursor response-data)
         prev-cursor (:prev-cursor response-data)
+        pagination-params (:pagination-params response-data)
         
         merge-fn (or (:merge-fn ctx) (fn [existing new dir]
                                         (if (= dir :backward)
@@ -497,15 +500,15 @@
                                :has-more-next? (has-more-pages? next-cursor)
                                :has-more-prev? (has-more-pages? prev-cursor)}
                               
-                              ;; Backward fetch: only prev-cursor
+                              ;; Backward fetch: explicit prev-cursor or fallback to pagination-params
                               (= direction :backward)
-                              {:prev-cursor (or prev-cursor first-item-id)
-                               :has-more-prev? (has-more-pages? prev-cursor)}
+                              {:prev-cursor (or prev-cursor pagination-params first-item-id)
+                               :has-more-prev? (has-more-pages? (or prev-cursor pagination-params))}
                               
-                              ;; Forward fetch: only next-cursor
+                              ;; Forward fetch: explicit next-cursor or fallback to pagination-params
                               :else
-                              {:next-cursor next-cursor
-                               :has-more-next? (has-more-pages? next-cursor)
+                              {:next-cursor (or next-cursor pagination-params)
+                               :has-more-next? (has-more-pages? (or next-cursor pagination-params))
                                :prev-cursor (or first-item-id (:prev-cursor (paginated-query-state ctx)))}))])))
 
 (defn start-paginated-request!
