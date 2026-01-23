@@ -29,7 +29,7 @@
    :fetching? false
    :pending? false})
 
-(defn query-state
+(defn current-query-state
   [ctx]
   (or (get-in @state/app-db (:state-path ctx)) {}))
 
@@ -125,7 +125,7 @@
 (s/setval [s/ATOM :any :response-success]
           (fn [ctx _ ev]
             (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
-            (let [next-state (query-state ctx)]
+            (let [next-state (current-query-state ctx)]
               (if (and (:pending? next-state) (can-start? ctx next-state))
                 (start-request! ctx next-state)
                 (schedule-poll! ctx))))
@@ -133,7 +133,7 @@
 (s/setval [s/ATOM :any :response-error]
           (fn [ctx _ ev]
             (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
-            (let [next-state (query-state ctx)]
+            (let [next-state (current-query-state ctx)]
               (if (and (:pending? next-state) (can-start? ctx next-state))
                 (start-request! ctx next-state)
                 (schedule-poll! ctx))))
@@ -271,7 +271,7 @@
     (reset! send-event-ref
             (fn [event]
               (let [ctx @ctx-ref
-                    st (query-state ctx)
+                    st (current-query-state ctx)
                     status (or (:status st) :idle)
                     event-type (:type event)
                     machine @query-machine
@@ -320,7 +320,8 @@
         (uix/use-effect
          (fn []
            (fn []
-             (cancel-poll!)))
+             (when-let [ctx @ctx-ref]
+               (cancel-poll! ctx))))
          [])
 
         ;; Return the result map including the refetch function
