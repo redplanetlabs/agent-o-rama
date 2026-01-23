@@ -21,6 +21,142 @@
      :else false)))
 
 ;; =============================================================================
+;; QUERY STATE MACHINE
+;; =============================================================================
+
+(def default-query-state
+  {:status :idle
+   :fetching? false
+   :pending? false})
+
+(defn query-state
+  [ctx]
+  (or (get-in @state/app-db (:state-path ctx)) {}))
+
+(defn ready-now?
+  [ctx]
+  (and (:enabled? ctx) (:connected? ctx) (:page-visible? ctx)))
+
+(defn can-start?
+  [ctx st]
+  (and (ready-now? ctx) (not (:fetching? st))))
+
+(defn set-pending!
+  [ctx st value]
+  (state/dispatch
+   [:db/set-value (:state-path ctx)
+    (assoc (merge default-query-state st) :pending? value)]))
+
+(defn cancel-poll!
+  [ctx]
+  (when-let [timeout-id @(-> ctx :timer-ref)]
+    (js/clearTimeout timeout-id)
+    (reset! (:timer-ref ctx) nil)))
+
+(defn schedule-poll!
+  [ctx]
+  (cancel-poll! ctx)
+  (let [{:keys [refetch-interval-ms]} ctx]
+    (when (and (ready-now? ctx) refetch-interval-ms)
+      (reset! (:timer-ref ctx)
+              (js/setTimeout
+               (fn []
+                 (when-let [send! @(:send-event-ref ctx)]
+                   (send! {:type :poll-tick})))
+               refetch-interval-ms)))))
+
+(defn start-request!
+  [ctx st]
+  (let [{:keys [query-key sente-event timeout-ms]} ctx]
+    (cancel-poll! ctx)
+    (set-pending! ctx st false)
+    (state/dispatch [:query/fetch-start {:query-key query-key}])
+    (sente/request!
+     sente-event
+     timeout-ms
+     (fn [reply]
+       (when-let [send! @(:send-event-ref ctx)]
+         (if (:success reply)
+           (send! {:type :response-success :data (:data reply)})
+           (send! {:type :response-error
+                   :error (or (:error reply)
+                              (when (= reply :chsk/closed) "Connection closed")
+                              "Request failed")})))))))
+
+(defn handle-trigger
+  [ctx st _]
+  (if (can-start? ctx st)
+    (start-request! ctx st)
+    (set-pending! ctx st true)))
+
+(defn handle-mount
+  [ctx st _]
+  (when (:refetch-on-mount? ctx)
+    (handle-trigger ctx st nil)))
+
+(defn handle-resume
+  [ctx st _]
+  (when (and (:pending? st) (can-start? ctx st))
+    (start-request! ctx st))
+  (when (and (not (:fetching? st)) (not (:pending? st)))
+    (schedule-poll! ctx)))
+
+(defn handle-pause
+  [ctx _ _]
+  (cancel-poll! ctx))
+
+(defn handle-response-success
+  [ctx _ ev]
+  (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
+  (let [next-state (query-state ctx)]
+    (if (and (:pending? next-state) (can-start? ctx next-state))
+      (start-request! ctx next-state)
+      (schedule-poll! ctx))))
+
+(defn handle-response-error
+  [ctx _ ev]
+  (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
+  (let [next-state (query-state ctx)]
+    (if (and (:pending? next-state) (can-start? ctx next-state))
+      (start-request! ctx next-state)
+      (schedule-poll! ctx))))
+
+(defonce query-machine (atom {}))
+
+(defonce query-machine-init
+  (do
+    (s/setval [s/ATOM :trigger-events]
+              #{:mount :manual-refetch :invalidate :poll-tick}
+              query-machine)
+
+    (s/setval [s/ATOM :states :idle :mount] handle-mount query-machine)
+    (s/setval [s/ATOM :states :loading :mount] handle-mount query-machine)
+    (s/setval [s/ATOM :states :success :mount] handle-mount query-machine)
+    (s/setval [s/ATOM :states :error :mount] handle-mount query-machine)
+
+    (s/setval [s/ATOM :states :idle :manual-refetch] handle-trigger query-machine)
+    (s/setval [s/ATOM :states :idle :invalidate] handle-trigger query-machine)
+    (s/setval [s/ATOM :states :idle :poll-tick] handle-trigger query-machine)
+
+    (s/setval [s/ATOM :states :loading :manual-refetch] handle-trigger query-machine)
+    (s/setval [s/ATOM :states :loading :invalidate] handle-trigger query-machine)
+    (s/setval [s/ATOM :states :loading :poll-tick] handle-trigger query-machine)
+
+    (s/setval [s/ATOM :states :success :manual-refetch] handle-trigger query-machine)
+    (s/setval [s/ATOM :states :success :invalidate] handle-trigger query-machine)
+    (s/setval [s/ATOM :states :success :poll-tick] handle-trigger query-machine)
+
+    (s/setval [s/ATOM :states :error :manual-refetch] handle-trigger query-machine)
+    (s/setval [s/ATOM :states :error :invalidate] handle-trigger query-machine)
+    (s/setval [s/ATOM :states :error :poll-tick] handle-trigger query-machine)
+
+    (s/setval [s/ATOM :any :resume] handle-resume query-machine)
+    (s/setval [s/ATOM :any :pause] handle-pause query-machine)
+    (s/setval [s/ATOM :any :response-success] handle-response-success query-machine)
+    (s/setval [s/ATOM :any :response-error] handle-response-error query-machine)
+    true))
+
+;; =============================================================================
 ;; QUERY EVENT HANDLERS
 ;; =============================================================================
 
@@ -132,7 +268,6 @@
         connected? (state/use-sub [:sente :connected?])
         page-is-visible? (common/use-page-visibility)
         ready? (and enabled? connected? page-is-visible?)
-        default-state {:status :idle :fetching? false :pending? false}
         ctx-ref (uix/use-ref nil)
         timer-ref (uix/use-ref nil)
         send-event-ref (uix/use-ref nil)]
@@ -146,108 +281,28 @@
              :connected? connected?
              :page-visible? page-is-visible?
              :refetch-interval-ms refetch-interval-ms
-             :refetch-on-mount? refetch-on-mount})
+             :refetch-on-mount? refetch-on-mount
+             :timer-ref timer-ref
+             :send-event-ref send-event-ref})
 
-    (letfn [(ctx [] @ctx-ref)
-            (get-state []
-              (or (get-in @state/app-db (:state-path (ctx))) {}))
-            (ready-now? []
-              (let [{:keys [enabled? connected? page-visible?]} (ctx)]
-                (and enabled? connected? page-visible?)))
-            (can-start? [st]
-              (and (ready-now?) (not (:fetching? st))))
-            (set-pending! [value]
-              (let [current-state (get-state)]
-                (state/dispatch
-                 [:db/set-value (:state-path (ctx))
-                  (assoc (merge default-state current-state) :pending? value)])))
-            (cancel-poll! []
-              (when-let [timeout-id @timer-ref]
-                (js/clearTimeout timeout-id)
-                (reset! timer-ref nil)))
-            (schedule-poll! []
-              (cancel-poll!)
-              (let [{:keys [refetch-interval-ms]} (ctx)]
-                (when (and (ready-now?) refetch-interval-ms)
-                  (reset! timer-ref
-                          (js/setTimeout
-                           (fn []
-                             (when-let [send! @send-event-ref]
-                               (send! {:type :poll-tick})))
-                           refetch-interval-ms)))))
-            (start-request! []
-              (let [{:keys [query-key sente-event timeout-ms]} (ctx)]
-                (cancel-poll!)
-                (set-pending! false)
-                (state/dispatch [:query/fetch-start {:query-key query-key}])
-                (sente/request!
-                 sente-event
-                 timeout-ms
-                 (fn [reply]
-                   (when-let [send! @send-event-ref]
-                     (if (:success reply)
-                       (send! {:type :response-success :data (:data reply)})
-                       (send! {:type :response-error
-                               :error (or (:error reply)
-                                          (when (= reply :chsk/closed) "Connection closed")
-                                          "Request failed")})))))))
-            (handle-trigger! [st _]
-              (if (can-start? st)
-                (start-request!)
-                (set-pending! true)))
-            (handle-mount! [st _]
-              (when (:refetch-on-mount? (ctx))
-                (handle-trigger! st nil)))
-            (handle-resume! [st _]
-              (when (and (:pending? st) (can-start? st))
-                (start-request!))
-              (when (and (not (:fetching? st)) (not (:pending? st)))
-                (schedule-poll!)))
-            (handle-pause! [_ _]
-              (cancel-poll!))
-            (handle-response-success! [_ ev]
-              (let [{:keys [query-key]} (ctx)]
-                (state/dispatch [:query/fetch-success {:query-key query-key :data (:data ev)}])
-                (let [next-state (get-state)]
-                  (if (and (:pending? next-state) (can-start? next-state))
-                    (start-request!)
-                    (schedule-poll!)))))
-            (handle-response-error! [_ ev]
-              (let [{:keys [query-key]} (ctx)]
-                (state/dispatch [:query/fetch-error {:query-key query-key :error (:error ev)}])
-                (let [next-state (get-state)]
-                  (if (and (:pending? next-state) (can-start? next-state))
-                    (start-request!)
-                    (schedule-poll!)))))]
+    (reset! send-event-ref
+            (fn [event]
+              (let [ctx @ctx-ref
+                    st (query-state ctx)
+                    status (or (:status st) :idle)
+                    event-type (:type event)
+                    machine @query-machine
+                    trigger-events (:trigger-events machine)
+                    handler (or (get-in machine [:states status event-type])
+                                (get-in machine [:any event-type]))]
+                (cond
+                  (and (contains? trigger-events event-type) (:fetching? st))
+                  (set-pending! ctx st true)
 
-      (let [trigger-events #{:mount :manual-refetch :invalidate :poll-tick}
-            trigger-handlers {:mount handle-mount!
-                              :manual-refetch handle-trigger!
-                              :invalidate handle-trigger!
-                              :poll-tick handle-trigger!}
-            handler-map {:states {:idle trigger-handlers
-                                  :loading trigger-handlers
-                                  :success trigger-handlers
-                                  :error trigger-handlers}
-                         :any {:resume handle-resume!
-                               :pause handle-pause!
-                               :response-success handle-response-success!
-                               :response-error handle-response-error!}}]
-        (reset! send-event-ref
-                (fn [event]
-                  (let [st (get-state)
-                        status (or (:status st) :idle)
-                        event-type (:type event)
-                        handler (or (get-in handler-map [:states status event-type])
-                                    (get-in handler-map [:any event-type]))]
-                    (cond
-                      (and (contains? trigger-events event-type) (:fetching? st))
-                      (set-pending! true)
+                  handler
+                  (handler ctx st event)
 
-                      handler
-                      (handler st event)
-
-                      :else nil))))
+                  :else nil))))
 
         ;; Effect for mount (per query-key)
         (uix/use-effect
@@ -286,7 +341,7 @@
          [])
 
         ;; Return the result map including the refetch function
-        (let [current-state (merge default-state query-state)
+        (let [current-state (merge default-query-state query-state)
               data (:data current-state)
               loading? (= (:status current-state) :loading)
               error (when (= (:status current-state) :error) (:error current-state))
