@@ -84,43 +84,78 @@
                               "Request failed")})))))))
 
 (def query-machine
-  (let [mount-handler (fn [ctx st _]
-                        (when (:refetch-on-mount? ctx)
-                          (if (can-start? ctx st)
-                            (start-request! ctx st)
-                            (set-pending! ctx st true))))
-        trigger-handler (fn [ctx st _]
-                          (if (can-start? ctx st)
-                            (start-request! ctx st)
-                            (set-pending! ctx st true)))
-        state-handlers {:mount mount-handler
-                        :manual-refetch trigger-handler
-                        :invalidate trigger-handler
-                        :poll-tick trigger-handler}
-        states (zipmap
-                [:idle :loading :success :error]
-                (repeat state-handlers))]
-    {:trigger-events #{:mount :manual-refetch :invalidate :poll-tick}
-     :states states
-     :any {:resume (fn [ctx st _]
-                     (when (and (:pending? st) (can-start? ctx st))
-                       (start-request! ctx st))
-                     (when (and (not (:fetching? st)) (not (:pending? st)))
-                       (schedule-poll! ctx)))
-           :pause (fn [ctx _ _]
-                    (cancel-poll! ctx))
-           :response-success (fn [ctx _ ev]
-                               (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
-                               (let [next-state (current-query-state ctx)]
-                                 (if (and (:pending? next-state) (can-start? ctx next-state))
-                                   (start-request! ctx next-state)
-                                   (schedule-poll! ctx))))
-           :response-error (fn [ctx _ ev]
-                             (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
-                             (let [next-state (current-query-state ctx)]
-                               (if (and (:pending? next-state) (can-start? ctx next-state))
-                                 (start-request! ctx next-state)
-                                 (schedule-poll! ctx))))}}))
+  (let [states #{:idle :loading :success :error}
+        trigger-events #{:manual-refetch :invalidate :poll-tick}]
+    {:nodes states
+     :edges
+     [{:from states
+       :event :mount
+       :guard (fn [ctx st _]
+                (and (:refetch-on-mount? ctx) (can-start? ctx st)))
+       :action start-request!}
+      {:from states
+       :event :mount
+       :guard (fn [ctx st _]
+                (and (:refetch-on-mount? ctx) (not (can-start? ctx st))))
+       :action (fn [ctx st _] (set-pending! ctx st true))}
+      {:from states
+       :event trigger-events
+       :guard (fn [ctx st _] (can-start? ctx st))
+       :action start-request!}
+      {:from states
+       :event trigger-events
+       :guard (fn [ctx st _] (not (can-start? ctx st)))
+       :action (fn [ctx st _] (set-pending! ctx st true))}
+      {:from states
+       :event :resume
+       :guard (fn [ctx st _] (and (:pending? st) (can-start? ctx st)))
+       :action start-request!}
+      {:from states
+       :event :resume
+       :guard (fn [ctx st _] (and (not (:fetching? st)) (not (:pending? st))))
+       :action (fn [ctx _ _] (schedule-poll! ctx))}
+      {:from states
+       :event :pause
+       :action (fn [ctx _ _] (cancel-poll! ctx))}
+      {:from states
+       :event :response-success
+       :action (fn [ctx _ ev]
+                 (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
+                 (let [next-state (current-query-state ctx)]
+                   (if (and (:pending? next-state) (can-start? ctx next-state))
+                     (start-request! ctx next-state)
+                     (schedule-poll! ctx))))}
+      {:from states
+       :event :response-error
+       :action (fn [ctx _ ev]
+                 (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
+                 (let [next-state (current-query-state ctx)]
+                   (if (and (:pending? next-state) (can-start? ctx next-state))
+                     (start-request! ctx next-state)
+                     (schedule-poll! ctx))))}]}))
+
+(defn edge-matches?
+  [edge ctx st ev]
+  (let [status (:status st)
+        event-type (:type ev)
+        from (:from edge)
+        event (:event edge)
+        from-match? (cond
+                      (nil? from) false
+                      (keyword? from) (= from status)
+                      (set? from) (contains? from status)
+                      (vector? from) (some #(= status %) from)
+                      :else false)
+        event-match? (cond
+                       (nil? event) false
+                       (keyword? event) (= event event-type)
+                       (set? event) (contains? event event-type)
+                       (vector? event) (some #(= event-type %) event)
+                       :else false)
+        guard (:guard edge)]
+    (and from-match?
+         event-match?
+         (if guard (guard ctx st ev) true))))
 
 ;; =============================================================================
 ;; QUERY EVENT HANDLERS
@@ -253,22 +288,12 @@
 
     (reset! send-event-ref
             (fn [event]
-              (let [ctx @ctx-ref
-                    st (current-query-state ctx)
-                    status (or (:status st) :idle)
-                    event-type (:type event)
-                    machine query-machine
-                    trigger-events (:trigger-events machine)
-                    handler (or (get-in machine [:states status event-type])
-                                (get-in machine [:any event-type]))]
-                (cond
-                  (and (contains? trigger-events event-type) (:fetching? st))
-                  (set-pending! ctx st true)
-
-                  handler
-                  (handler ctx st event)
-
-                  :else nil))))
+              (when-let [ctx @ctx-ref]
+                (let [st (merge default-query-state (current-query-state ctx))
+                      edge (first (filter #(edge-matches? % ctx st event)
+                                          (:edges query-machine)))]
+                  (when-let [action (:action edge)]
+                    (action ctx st event)))))))
 
         ;; Effect for mount (per query-key)
         (uix/use-effect
@@ -322,7 +347,7 @@
            :loading? loading?
            :fetching? fetching?
            :error error
-           :refetch refetch})))
+           :refetch refetch}))
 
 (defhook use-paginated-query
   "A hook for paginated Sente queries that supports a 'load more' pattern.
