@@ -108,4 +108,4 @@
           (e/click driver {:data-id "debug-start"})
           (wait-for-text driver "query-status" "error")
 
-          (is (= "1" (text-by-id driver "query-retry-count")))))))))
+          (is (= "1" (text-by-id driver "query-retry-count"))))))))
