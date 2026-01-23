@@ -83,17 +83,6 @@
                               (when (= reply :chsk/closed) "Connection closed")
                               "Request failed")})))))))
 
-(defn trigger-handler
-  [ctx st _]
-  (if (can-start? ctx st)
-    (start-request! ctx st)
-    (set-pending! ctx st true)))
-
-(defn mount-handler
-  [ctx st _]
-  (when (:refetch-on-mount? ctx)
-    (trigger-handler ctx st nil)))
-
 (defonce query-machine (atom {}))
 
 (s/setval [s/ATOM :trigger-events]
@@ -104,14 +93,21 @@
            :states
            (s/multi-path :idle :loading :success :error)
            :mount]
-          mount-handler
+          (fn [ctx st _]
+            (when (:refetch-on-mount? ctx)
+              (if (can-start? ctx st)
+                (start-request! ctx st)
+                (set-pending! ctx st true))))
           query-machine)
 
 (s/setval [s/ATOM
            :states
            (s/multi-path :idle :loading :success :error)
            (s/multi-path :manual-refetch :invalidate :poll-tick)]
-          trigger-handler
+          (fn [ctx st _]
+            (if (can-start? ctx st)
+              (start-request! ctx st)
+              (set-pending! ctx st true)))
           query-machine)
 
 (s/setval [s/ATOM :any :resume]
