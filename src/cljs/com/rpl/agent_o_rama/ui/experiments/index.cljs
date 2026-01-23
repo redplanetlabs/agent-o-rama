@@ -94,7 +94,7 @@
                                     (seq times-filter)
                                     (assoc :times times-filter))}]
           :enabled? (boolean (and module-id dataset-id))
-          :refresh-interval-ms 1000})
+          :refetch-interval-ms 1000})
 
         experiments (get data :items)
         {:keys [columns ambiguous-metrics] :as evaluator-metadata}
