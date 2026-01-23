@@ -132,8 +132,8 @@
       {:items (:items result)
        :next-cursor (:pagination-params result)})))
 
+;; Bidirectional fetch for deep-linking: fetches items both before and after cursor
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items-bidirectional
-  "Bidirectional fetch for deep-linking: fetches items both before and after cursor."
   [{:keys [manager queue-name cursor limit include-cursor?]} uid]
   (let [underlying-objects  (aor-types/underlying-objects manager)
         queue-page-query    (:human-feedback-queue-page-query underlying-objects)
