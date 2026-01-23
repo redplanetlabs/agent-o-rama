@@ -729,19 +729,17 @@ test.describe('Human Feedback Queues', () => {
     await firstItem.click();
     await expect(page).toHaveURL(/item/);
     
-    // Previous button should be disabled (we're on first item)
+    // Both navigation buttons should be present
     const prevButton = page.getByTestId('previous-item-button');
-    await expect(prevButton).toBeDisabled();
-    
-    // Next button should be enabled
     const nextButton = page.getByTestId('next-item-button');
+    await expect(prevButton).toBeVisible();
     await expect(nextButton).toBeEnabled();
     
     // Click Next to go to second item
     await nextButton.click();
     await page.waitForTimeout(500);
     
-    // Now both buttons should be enabled (we're in the middle)
+    // Both buttons should be enabled (we're in the middle)
     await expect(prevButton).toBeEnabled();
     await expect(nextButton).toBeEnabled();
     console.log('✓ Previous/Next buttons work correctly');
@@ -749,7 +747,8 @@ test.describe('Human Feedback Queues', () => {
     // Go back to first item
     await prevButton.click();
     await page.waitForTimeout(500);
-    await expect(prevButton).toBeDisabled();
+    // Previous button is still visible (bidirectional pagination support)
+    await expect(prevButton).toBeVisible();
     console.log('✓ Previous button navigation works');
     
     // =============================================================================

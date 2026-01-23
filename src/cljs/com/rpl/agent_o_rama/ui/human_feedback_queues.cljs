@@ -743,11 +743,16 @@
    - :initial-cursor - Optional cursor to start from (e.g., item UUID)
    - :include-initial-cursor? - Include the cursor item in results
    - :force-from-start? - Force refetch from beginning on mount
-   - :has-more-prev? - Whether there are items before the initial cursor
+   - :has-more-prev? - Whether there are items before the initial cursor.
+                       Defaults to true if initial-cursor provided, false otherwise.
    - :enabled? - Whether the query is enabled (default: true)"
   [{:keys [module-id queue-id initial-cursor include-initial-cursor? force-from-start? has-more-prev? enabled?]
-    :or {enabled? true has-more-prev? false}}]
-  (let [decoded-module-id (common/url-decode module-id)
+    :or {enabled? true}}]
+  ;; Smart default: if loading from cursor, assume there might be items before
+  (let [has-more-prev? (if (some? has-more-prev?)
+                         has-more-prev?
+                         (some? initial-cursor))
+        decoded-module-id (common/url-decode module-id)
         decoded-queue-id (common/url-decode queue-id)
         connected? (state/use-sub [:sente :connected?])
 
@@ -966,14 +971,14 @@
 
         ;; Fetch queue items with shared cache for review session
         ;; If item isn't in cache yet, load from its cursor and merge.
-        ;; We start in the middle of the list, so has-more-prev? is true
+        ;; has-more-prev? defaults to true since we're loading from a cursor
+        ;; (there may be items before this one in the queue)
         {:keys [data isLoading hasMoreNext hasMorePrev loadMore loadPrevious]}
         (use-queue-items
          {:module-id module-id
           :queue-id queue-id
           :initial-cursor item-id
           :include-initial-cursor? true
-          :has-more-prev? true  ; Starting from middle, there may be items before
           :enabled? (boolean (and decoded-module-id decoded-queue-id item-id))})
         items-loading? isLoading
         items (or data [])

@@ -329,8 +329,8 @@ test.describe('Queue Review Pagination', () => {
     await expect(page2.getByText('Target Information')).toBeVisible({ timeout: 10000 });
     await expect(page2.getByText(metricName)).toBeVisible();
     
-    // Previous button should be disabled (loaded from cursor, no earlier items)
-    await expect(page2.getByTestId('previous-item-button')).toBeDisabled();
+    // With bidirectional pagination, previous button is enabled (items 0-24 exist before item 25)
+    await expect(page2.getByTestId('previous-item-button')).toBeEnabled();
     
     // Next button should be enabled (items 26-30 exist)
     const nextBtn = page2.getByTestId('next-item-button');
@@ -341,7 +341,7 @@ test.describe('Queue Review Pagination', () => {
     await page2.waitForTimeout(500);
     await expect(page2.getByText('Target Information')).toBeVisible();
     
-    console.log('✓ Direct URL navigation works - loaded from cursor without pre-cached items');
+    console.log('✓ Direct URL navigation works with bidirectional pagination support');
     
     await page2.close();
     
@@ -357,9 +357,9 @@ test.describe('Queue Review Pagination', () => {
     await page3.goto(targetUrl);
     await page3.waitForTimeout(2000);
     
-    // Verify we're on item #25 with no previous items
+    // Verify we're on item #25 with bidirectional pagination enabled
     await expect(page3.getByText('Target Information')).toBeVisible({ timeout: 10000 });
-    await expect(page3.getByTestId('previous-item-button')).toBeDisabled();
+    await expect(page3.getByTestId('previous-item-button')).toBeEnabled();
     
     // Click breadcrumb to go back to queue list
     await page3.getByRole('link', { name: queueName }).click();
