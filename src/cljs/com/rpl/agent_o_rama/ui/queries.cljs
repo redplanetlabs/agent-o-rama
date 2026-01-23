@@ -100,23 +100,19 @@
           #{:mount :manual-refetch :invalidate :poll-tick}
           query-machine)
 
-(s/setval [s/ATOM :states :idle :mount] mount-handler query-machine)
-(s/setval [s/ATOM :states :loading :mount] mount-handler query-machine)
-(s/setval [s/ATOM :states :success :mount] mount-handler query-machine)
-(s/setval [s/ATOM :states :error :mount] mount-handler query-machine)
+(s/setval [s/ATOM
+           :states
+           (s/multi-path :idle :loading :success :error)
+           :mount]
+          mount-handler
+          query-machine)
 
-(s/setval [s/ATOM :states :idle :manual-refetch] trigger-handler query-machine)
-(s/setval [s/ATOM :states :idle :invalidate] trigger-handler query-machine)
-(s/setval [s/ATOM :states :idle :poll-tick] trigger-handler query-machine)
-(s/setval [s/ATOM :states :loading :manual-refetch] trigger-handler query-machine)
-(s/setval [s/ATOM :states :loading :invalidate] trigger-handler query-machine)
-(s/setval [s/ATOM :states :loading :poll-tick] trigger-handler query-machine)
-(s/setval [s/ATOM :states :success :manual-refetch] trigger-handler query-machine)
-(s/setval [s/ATOM :states :success :invalidate] trigger-handler query-machine)
-(s/setval [s/ATOM :states :success :poll-tick] trigger-handler query-machine)
-(s/setval [s/ATOM :states :error :manual-refetch] trigger-handler query-machine)
-(s/setval [s/ATOM :states :error :invalidate] trigger-handler query-machine)
-(s/setval [s/ATOM :states :error :poll-tick] trigger-handler query-machine)
+(s/setval [s/ATOM
+           :states
+           (s/multi-path :idle :loading :success :error)
+           (s/multi-path :manual-refetch :invalidate :poll-tick)]
+          trigger-handler
+          query-machine)
 
 (s/setval [s/ATOM :any :resume]
           (fn [ctx st _]
@@ -125,6 +121,7 @@
             (when (and (not (:fetching? st)) (not (:pending? st)))
               (schedule-poll! ctx)))
           query-machine)
+
 (s/setval [s/ATOM :any :pause]
           (fn [ctx _ _]
             (cancel-poll! ctx))
