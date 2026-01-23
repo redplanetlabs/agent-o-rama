@@ -33,56 +33,53 @@
    [com.rpl.agent-o-rama.ui.datasets.add-from-trace]
    [com.rpl.agent-o-rama.ui.rules :as rules]
    [com.rpl.agent-o-rama.ui.action-log :as action-log]
-   [com.rpl.agent-o-rama.ui.human-feedback-queues :as human-feedback-queues]
-   [com.rpl.agent-o-rama.ui.debug.queries :as debug-queries]))
+   [com.rpl.agent-o-rama.ui.human-feedback-queues :as human-feedback-queues]))
 
 (def routes
-  (cond-> [""
-           ["/" {:name :home, :views [agents/index]}]
-           ["/agents"
-            ["" {:name :agents/index, :views [agents/index]}]
-            ["/:module-id"
-             ["" {:name :module/detail, :views [module-page/index]}]
-             ["/datasets"
-              ["" {:name :module/datasets, :views [datasets/index]}]
-              ["/:dataset-id"
-               {:name :module/dataset, :views [datasets/detail]}
-               ["" {:name :module/dataset-detail, :views [datasets/detail-examples-router]}]
-               ["/examples" {:name :module/dataset-detail.examples, :views [datasets/detail-examples-router]}]
-               ["/experiments" {:name :module/dataset-detail.experiments, :views [experiments/index]}]
-               ["/experiments/:experiment-id" {:name :module/dataset-detail.experiment-detail, :views [experiments-detail/regular-experiment-detail-page]}]
-               ["/comparative-experiments" {:name :module/dataset-detail.comparative-experiments, :views [comparative-experiments/index]}]
-               ["/comparative-experiments/:experiment-id" {:name :module/dataset-detail.comparative-experiment-detail, :views [comparative-experiments-detail/detail-page]}]]]
-             ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
-             ["/human-metrics" {:name :module/human-metrics, :views [human-feedback-queues/metrics-index]}]
-             ["/human-feedback-queues"
-              ["" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
-              ["/:queue-id"
-               ["" {:name :module/human-feedback-queue-detail, :views [human-feedback-queues/detail]}]
-               ["/items/:item-id" {:name :module/human-feedback-queue-item, :views [human-feedback-queues/item-detail]}]
-               ["/end" {:name :module/human-feedback-queue-end, :views [human-feedback-queues/queue-end]}]]]
-             ["/global-config" {:name :module/global-config, :views [global-config-page/page]}]
-             ["/agent/:agent-name"
-              ["" {:name :agent/detail, :views [agents/agent]}]
+  [""
+   ["/" {:name :home, :views [agents/index]}]
+   ["/agents"
+    ["" {:name :agents/index, :views [agents/index]}]
+    ["/:module-id"
+     ["" {:name :module/detail, :views [module-page/index]}]
+     ["/datasets"
+      ["" {:name :module/datasets, :views [datasets/index]}]
+      ["/:dataset-id"
+       {:name :module/dataset, :views [datasets/detail]}
+       ["" {:name :module/dataset-detail, :views [datasets/detail-examples-router]}]
+       ["/examples" {:name :module/dataset-detail.examples, :views [datasets/detail-examples-router]}]
+       ["/experiments" {:name :module/dataset-detail.experiments, :views [experiments/index]}]
+       ["/experiments/:experiment-id" {:name :module/dataset-detail.experiment-detail, :views [experiments-detail/regular-experiment-detail-page]}]
+       ["/comparative-experiments" {:name :module/dataset-detail.comparative-experiments, :views [comparative-experiments/index]}]
+       ["/comparative-experiments/:experiment-id" {:name :module/dataset-detail.comparative-experiment-detail, :views [comparative-experiments-detail/detail-page]}]]]
+     ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
+     ["/human-metrics" {:name :module/human-metrics, :views [human-feedback-queues/metrics-index]}]
+     ["/human-feedback-queues"
+      ["" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
+      ["/:queue-id"
+       ["" {:name :module/human-feedback-queue-detail, :views [human-feedback-queues/detail]}]
+       ["/items/:item-id" {:name :module/human-feedback-queue-item, :views [human-feedback-queues/item-detail]}]
+       ["/end" {:name :module/human-feedback-queue-end, :views [human-feedback-queues/queue-end]}]]]
+     ["/global-config" {:name :module/global-config, :views [global-config-page/page]}]
+     ["/agent/:agent-name"
+      ["" {:name :agent/detail, :views [agents/agent]}]
 
-              ["/invocations"
-               ["" {:name :agent/invocations, :views [agents/invocations]}]
-               ["/:invoke-id" {:name :agent/invocation-detail
-                               :views [agents/invoke]
-                               :parameters {:query [:map
-                                                    [:node {:optional true} :string]]}}]]
-              ["/analytics" {:name :agent/analytics
-                             :views [analytics/analytics-page]
-                             :parameters {:query [:map
-                                                  [:granularity {:optional true} :keyword]
-                                                  [:timeOffset {:optional true} :int]
-                                                  [:metadataKey {:optional true} :string]]}}]
-              ["/rules"
-               ["" {:name :agent/rules, :views [rules/rules-page]}]
-               ["/:rule-name/action-log" {:name :agent/action-log, :views [action-log/action-log-page]}]]
-              ["/config" {:name :agent/config, :views [config-page/config-page]}]]]]]
-    ^boolean js/goog.DEBUG
-    (conj ["/__debug__/queries" {:name :debug/queries :views [debug-queries/page]}])))
+      ["/invocations"
+       ["" {:name :agent/invocations, :views [agents/invocations]}]
+       ["/:invoke-id" {:name :agent/invocation-detail
+                       :views [agents/invoke]
+                       :parameters {:query [:map
+                                            [:node {:optional true} :string]]}}]]
+      ["/analytics" {:name :agent/analytics
+                     :views [analytics/analytics-page]
+                     :parameters {:query [:map
+                                          [:granularity {:optional true} :keyword]
+                                          [:timeOffset {:optional true} :int]
+                                          [:metadataKey {:optional true} :string]]}}]
+      ["/rules"
+       ["" {:name :agent/rules, :views [rules/rules-page]}]
+       ["/:rule-name/action-log" {:name :agent/action-log, :views [action-log/action-log-page]}]]
+      ["/config" {:name :agent/config, :views [config-page/config-page]}]]]]])
 
 (defui ViewStack []
   (let [match (state/use-sub [:route])
