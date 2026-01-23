@@ -83,61 +83,44 @@
                               (when (= reply :chsk/closed) "Connection closed")
                               "Request failed")})))))))
 
-(defonce query-machine (atom {}))
-
-(s/setval [s/ATOM :trigger-events]
-          #{:mount :manual-refetch :invalidate :poll-tick}
-          query-machine)
-
-(s/setval [s/ATOM
-           :states
-           (s/multi-path :idle :loading :success :error)
-           :mount]
-          (fn [ctx st _]
-            (when (:refetch-on-mount? ctx)
-              (if (can-start? ctx st)
-                (start-request! ctx st)
-                (set-pending! ctx st true))))
-          query-machine)
-
-(s/setval [s/ATOM
-           :states
-           (s/multi-path :idle :loading :success :error)
-           (s/multi-path :manual-refetch :invalidate :poll-tick)]
-          (fn [ctx st _]
-            (if (can-start? ctx st)
-              (start-request! ctx st)
-              (set-pending! ctx st true)))
-          query-machine)
-
-(s/setval [s/ATOM :any :resume]
-          (fn [ctx st _]
-            (when (and (:pending? st) (can-start? ctx st))
-              (start-request! ctx st))
-            (when (and (not (:fetching? st)) (not (:pending? st)))
-              (schedule-poll! ctx)))
-          query-machine)
-
-(s/setval [s/ATOM :any :pause]
-          (fn [ctx _ _]
-            (cancel-poll! ctx))
-          query-machine)
-(s/setval [s/ATOM :any :response-success]
-          (fn [ctx _ ev]
-            (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
-            (let [next-state (current-query-state ctx)]
-              (if (and (:pending? next-state) (can-start? ctx next-state))
-                (start-request! ctx next-state)
-                (schedule-poll! ctx))))
-          query-machine)
-(s/setval [s/ATOM :any :response-error]
-          (fn [ctx _ ev]
-            (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
-            (let [next-state (current-query-state ctx)]
-              (if (and (:pending? next-state) (can-start? ctx next-state))
-                (start-request! ctx next-state)
-                (schedule-poll! ctx))))
-          query-machine)
+(def query-machine
+  (let [mount-handler (fn [ctx st _]
+                        (when (:refetch-on-mount? ctx)
+                          (if (can-start? ctx st)
+                            (start-request! ctx st)
+                            (set-pending! ctx st true))))
+        trigger-handler (fn [ctx st _]
+                          (if (can-start? ctx st)
+                            (start-request! ctx st)
+                            (set-pending! ctx st true)))
+        state-handlers {:mount mount-handler
+                        :manual-refetch trigger-handler
+                        :invalidate trigger-handler
+                        :poll-tick trigger-handler}
+        states (zipmap
+                [:idle :loading :success :error]
+                (repeat state-handlers))]
+    {:trigger-events #{:mount :manual-refetch :invalidate :poll-tick}
+     :states states
+     :any {:resume (fn [ctx st _]
+                     (when (and (:pending? st) (can-start? ctx st))
+                       (start-request! ctx st))
+                     (when (and (not (:fetching? st)) (not (:pending? st)))
+                       (schedule-poll! ctx)))
+           :pause (fn [ctx _ _]
+                    (cancel-poll! ctx))
+           :response-success (fn [ctx _ ev]
+                               (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
+                               (let [next-state (current-query-state ctx)]
+                                 (if (and (:pending? next-state) (can-start? ctx next-state))
+                                   (start-request! ctx next-state)
+                                   (schedule-poll! ctx))))
+           :response-error (fn [ctx _ ev]
+                             (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
+                             (let [next-state (current-query-state ctx)]
+                               (if (and (:pending? next-state) (can-start? ctx next-state))
+                                 (start-request! ctx next-state)
+                                 (schedule-poll! ctx))))}}))
 
 ;; =============================================================================
 ;; QUERY EVENT HANDLERS
@@ -274,7 +257,7 @@
                     st (current-query-state ctx)
                     status (or (:status st) :idle)
                     event-type (:type event)
-                    machine @query-machine
+                    machine query-machine
                     trigger-events (:trigger-events machine)
                     handler (or (get-in machine [:states status event-type])
                                 (get-in machine [:any event-type]))]
