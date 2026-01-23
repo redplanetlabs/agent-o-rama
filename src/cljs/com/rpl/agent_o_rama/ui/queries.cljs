@@ -21,7 +21,51 @@
      :else false)))
 
 ;; =============================================================================
-;; QUERY STATE MACHINE
+;; SHARED STATE MACHINE PRIMITIVES
+;; =============================================================================
+
+(defn edge-matches?
+  "Check if a state machine edge matches the current state and event."
+  [edge ctx st ev]
+  (let [status (:status st)
+        event-type (:type ev)
+        from (:from edge)
+        event (:event edge)
+        from-match? (cond
+                      (nil? from) false
+                      (keyword? from) (= from status)
+                      (set? from) (contains? from status)
+                      (vector? from) (some #(= status %) from)
+                      :else false)
+        event-match? (cond
+                       (nil? event) false
+                       (keyword? event) (= event event-type)
+                       (set? event) (contains? event event-type)
+                       (vector? event) (some #(= event-type %) event)
+                       :else false)
+        guard (:guard edge)]
+    (and from-match?
+         event-match?
+         (if guard (guard ctx st ev) true))))
+
+(defn send-machine-event!
+  "Send an event to a state machine, finding and executing the matching edge action."
+  [machine ctx-ref event]
+  (when-let [ctx @ctx-ref]
+    (let [get-state (:get-state ctx)
+          default-state (:default-state ctx)
+          st (merge default-state (get-state ctx))
+          edge (first (filter #(edge-matches? % ctx st event) (:edges machine)))]
+      (when-let [action (:action edge)]
+        (action ctx st event)))))
+
+(defn can-fetch?
+  "Shared predicate: can we start a fetch right now?"
+  [ctx st]
+  (and (:enabled? ctx) (:connected? ctx) (not (:fetching? st))))
+
+;; =============================================================================
+;; POLLING QUERY STATE MACHINE (use-sente-query)
 ;; =============================================================================
 
 (def default-query-state
@@ -30,15 +74,17 @@
    :pending? false
    :retry-count 0})
 
-(defn current-query-state
+(defn polling-query-state
   [ctx]
   (or (get-in @state/app-db (:state-path ctx)) {}))
 
 (defn ready-now?
+  "For polling queries: ready when enabled, connected, AND page visible."
   [ctx]
   (and (:enabled? ctx) (:connected? ctx) (:page-visible? ctx)))
 
-(defn can-start?
+(defn can-start-polling?
+  "For polling queries: can start when ready AND not already fetching."
   [ctx st]
   (and (ready-now? ctx) (not (:fetching? st))))
 
@@ -87,9 +133,9 @@
                    (send! {:type :poll-tick})))
                delay-ms)))))
 
-(defn start-request!
+(defn start-polling-request!
   [ctx st]
-  (let [{:keys [query-key sente-event timeout-ms]} ctx]
+  (let [{:keys [query-key sente-event timeout-ms send-event-ref]} ctx]
     (cancel-poll! ctx)
     (set-pending! ctx st false)
     (state/dispatch [:query/fetch-start {:query-key query-key}])
@@ -97,7 +143,7 @@
      sente-event
      timeout-ms
      (fn [reply]
-       (when-let [send! @(:send-event-ref ctx)]
+       (when-let [send! @send-event-ref]
          (if (:success reply)
            (send! {:type :response-success :data (:data reply)})
            (send! {:type :response-error
@@ -105,7 +151,7 @@
                               (when (= reply :chsk/closed) "Connection closed")
                               "Request failed")})))))))
 
-(def query-machine
+(def polling-query-machine
   (let [states #{:idle :loading :success :error}
         trigger-events #{:manual-refetch :invalidate :poll-tick}]
     {:nodes states
@@ -113,25 +159,25 @@
      [{:from states
        :event :mount
        :guard (fn [ctx st _]
-                (and (:refetch-on-mount? ctx) (can-start? ctx st)))
-       :action start-request!}
+                (and (:refetch-on-mount? ctx) (can-start-polling? ctx st)))
+       :action start-polling-request!}
       {:from states
        :event :mount
        :guard (fn [ctx st _]
-                (and (:refetch-on-mount? ctx) (not (can-start? ctx st))))
+                (and (:refetch-on-mount? ctx) (not (can-start-polling? ctx st))))
        :action (fn [ctx st _] (set-pending! ctx st true))}
       {:from states
        :event trigger-events
-       :guard (fn [ctx st _] (can-start? ctx st))
-       :action start-request!}
+       :guard (fn [ctx st _] (can-start-polling? ctx st))
+       :action start-polling-request!}
       {:from states
        :event trigger-events
-       :guard (fn [ctx st _] (not (can-start? ctx st)))
+       :guard (fn [ctx st _] (not (can-start-polling? ctx st)))
        :action (fn [ctx st _] (set-pending! ctx st true))}
       {:from states
        :event :resume
-       :guard (fn [ctx st _] (and (:pending? st) (can-start? ctx st)))
-       :action start-request!}
+       :guard (fn [ctx st _] (and (:pending? st) (can-start-polling? ctx st)))
+       :action start-polling-request!}
       {:from states
        :event :resume
        :guard (fn [ctx st _] (and (not (:fetching? st)) (not (:pending? st))))
@@ -143,41 +189,18 @@
        :event :response-success
        :action (fn [ctx _ ev]
                  (state/dispatch [:query/fetch-success {:query-key (:query-key ctx) :data (:data ev)}])
-                 (let [next-state (current-query-state ctx)]
-                   (if (and (:pending? next-state) (can-start? ctx next-state))
-                     (start-request! ctx next-state)
+                 (let [next-state (polling-query-state ctx)]
+                   (if (and (:pending? next-state) (can-start-polling? ctx next-state))
+                     (start-polling-request! ctx next-state)
                      (schedule-poll! ctx next-state))))}
       {:from states
        :event :response-error
        :action (fn [ctx _ ev]
                  (state/dispatch [:query/fetch-error {:query-key (:query-key ctx) :error (:error ev)}])
-                 (let [next-state (current-query-state ctx)]
-                   (if (and (:pending? next-state) (can-start? ctx next-state))
-                     (start-request! ctx next-state)
+                 (let [next-state (polling-query-state ctx)]
+                   (if (and (:pending? next-state) (can-start-polling? ctx next-state))
+                     (start-polling-request! ctx next-state)
                      (schedule-poll! ctx next-state))))}]}))
-
-(defn edge-matches?
-  [edge ctx st ev]
-  (let [status (:status st)
-        event-type (:type ev)
-        from (:from edge)
-        event (:event edge)
-        from-match? (cond
-                      (nil? from) false
-                      (keyword? from) (= from status)
-                      (set? from) (contains? from status)
-                      (vector? from) (some #(= status %) from)
-                      :else false)
-        event-match? (cond
-                       (nil? event) false
-                       (keyword? event) (= event event-type)
-                       (set? event) (contains? event event-type)
-                       (vector? event) (some #(= event-type %) event)
-                       :else false)
-        guard (:guard edge)]
-    (and from-match?
-         event-match?
-         (if guard (guard ctx st ev) true))))
 
 ;; =============================================================================
 ;; QUERY EVENT HANDLERS
@@ -315,16 +338,13 @@
              :retry-factor retry-factor
              :refetch-on-mount? refetch-on-mount
              :timer-ref timer-ref
-             :send-event-ref send-event-ref})
+             :send-event-ref send-event-ref
+             :get-state polling-query-state
+             :default-state default-query-state})
 
     (reset! send-event-ref
             (fn [event]
-              (when-let [ctx @ctx-ref]
-                (let [st (merge default-query-state (current-query-state ctx))
-                      edge (first (filter #(edge-matches? % ctx st event)
-                                          (:edges query-machine)))]
-                  (when-let [action (:action edge)]
-                    (action ctx st event))))))
+              (send-machine-event! polling-query-machine ctx-ref event)))
 
     ;; Effect for mount (per query-key)
     (uix/use-effect
@@ -380,145 +400,289 @@
        :error error
        :refetch refetch})))
 
+;; =============================================================================
+;; PAGINATED QUERY STATE MACHINE
+;; =============================================================================
+
+(def default-paginated-state
+  {:status :idle
+   :fetching? false
+   :data []
+   :error nil
+   :retry-count 0
+   ;; Bidirectional pagination cursors
+   :next-cursor nil      ; cursor for loading more (forward)
+   :prev-cursor nil      ; first item ID for loading previous (backward)
+   :has-more-next? true  ; more items forward
+   :has-more-prev? false ; more items backward (starts false at beginning)
+   :fetch-direction nil}) ; :forward or :backward
+
+(defn paginated-query-state
+  [ctx]
+  (or (get-in @state/app-db (:state-path ctx)) {}))
+
+(defn extract-items-from-response
+  "Extract items array from paginated response, handling various backend formats."
+  [response-data]
+  (or (:items response-data)
+      (:agent-invokes response-data)
+      (:datasets response-data)
+      (:examples response-data)
+      []))
+
+(defn build-paginated-event
+  "Build the sente event with pagination parameters."
+  [ctx cursor direction]
+  (let [[event-id event-data] (:sente-event ctx)
+        page-size (:page-size ctx)
+        reverse? (= direction :backward)]
+    [event-id (cond-> (assoc event-data
+                             :pagination cursor
+                             :limit page-size)
+                reverse? (assoc :reverse? true)
+                (:include-cursor? ctx) (assoc :include-cursor? true))]))
+
+(defn update-paginated-state-for-success!
+  "Update state after a successful paginated fetch."
+  [ctx direction new-items new-cursor]
+  (let [state-path (:state-path ctx)
+        current-data (or (get-in @state/app-db (into state-path [:data])) [])
+        merge-fn (or (:merge-fn ctx) (fn [existing new dir]
+                                        (if (= dir :backward)
+                                          (vec (concat new existing))
+                                          (vec (concat existing new)))))
+        updated-data (if (empty? current-data)
+                       (vec new-items)
+                       (merge-fn current-data new-items direction))
+        ;; Track first item ID for backwards pagination
+        first-item-id (when (seq updated-data)
+                        (:id (first updated-data)))]
+    ;; Update all state in one batch for consistency
+    (state/dispatch [:db/set-value state-path
+                     (merge (paginated-query-state ctx)
+                            {:status :success
+                             :fetching? false
+                             :error nil
+                             :retry-count 0
+                             :data updated-data
+                             :fetch-direction nil}
+                            (if (= direction :backward)
+                              {:prev-cursor first-item-id
+                               :has-more-prev? (has-more-pages? new-cursor)}
+                              {:next-cursor new-cursor
+                               :has-more-next? (has-more-pages? new-cursor)
+                               :prev-cursor (or first-item-id (:prev-cursor (paginated-query-state ctx)))}))])))
+
+(defn start-paginated-request!
+  "Start a paginated fetch request in the given direction."
+  [ctx st direction]
+  (let [{:keys [state-path timeout-ms send-event-ref]} ctx
+        cursor (if (= direction :backward)
+                 (:prev-cursor st)
+                 (:next-cursor st))]
+    ;; Mark as fetching
+    (state/dispatch [:db/set-value state-path
+                     (assoc st
+                            :fetching? true
+                            :error nil
+                            :fetch-direction direction)])
+    ;; Send request
+    (sente/request!
+     (build-paginated-event ctx cursor direction)
+     (or timeout-ms 15000)
+     (fn [reply]
+       (when-let [send! @send-event-ref]
+         (if (:success reply)
+           (send! {:type :response-success
+                   :data (:data reply)
+                   :direction direction})
+           (send! {:type :response-error
+                   :error (or (:error reply)
+                              (when (= reply :chsk/closed) "Connection closed")
+                              "Request failed")
+                   :direction direction})))))))
+
+(def paginated-query-machine
+  (let [states #{:idle :loading :success :error}]
+    {:nodes states
+     :edges
+     [;; Mount: fetch initial data if empty
+      {:from #{:idle}
+       :event :mount
+       :guard (fn [ctx st _] (and (can-fetch? ctx st) (empty? (:data st))))
+       :action (fn [ctx st _]
+                 (state/dispatch [:db/set-value (:state-path ctx) (assoc st :status :loading)])
+                 (start-paginated-request! ctx (assoc st :status :loading) :forward))}
+
+      ;; Load more (forward)
+      {:from #{:success :error}
+       :event :load-more
+       :guard (fn [ctx st _] (and (can-fetch? ctx st) (:has-more-next? st)))
+       :action (fn [ctx st _] (start-paginated-request! ctx st :forward))}
+
+      ;; Load previous (backward)
+      {:from #{:success :error}
+       :event :load-previous
+       :guard (fn [ctx st _] (and (can-fetch? ctx st) (:has-more-prev? st)))
+       :action (fn [ctx st _] (start-paginated-request! ctx st :backward))}
+
+      ;; Invalidate: reset and refetch
+      {:from states
+       :event :invalidate
+       :guard (fn [ctx st _] (can-fetch? ctx st))
+       :action (fn [ctx _ _]
+                 (let [fresh-state (assoc default-paginated-state :status :loading)]
+                   (state/dispatch [:db/set-value (:state-path ctx) fresh-state])
+                   (start-paginated-request! ctx fresh-state :forward)))}
+
+      ;; Manual refetch: same as invalidate
+      {:from states
+       :event :manual-refetch
+       :guard (fn [ctx st _] (can-fetch? ctx st))
+       :action (fn [ctx _ _]
+                 (let [fresh-state (assoc default-paginated-state :status :loading)]
+                   (state/dispatch [:db/set-value (:state-path ctx) fresh-state])
+                   (start-paginated-request! ctx fresh-state :forward)))}
+
+      ;; Response success
+      {:from states
+       :event :response-success
+       :action (fn [ctx _ ev]
+                 (let [response-data (:data ev)
+                       direction (:direction ev)
+                       new-items (extract-items-from-response response-data)
+                       new-cursor (:pagination-params response-data)]
+                   (update-paginated-state-for-success! ctx direction new-items new-cursor)))}
+
+      ;; Response error
+      {:from states
+       :event :response-error
+       :action (fn [ctx st ev]
+                 (state/dispatch [:db/set-value (:state-path ctx)
+                                  (-> st
+                                      (assoc :status :error
+                                             :fetching? false
+                                             :error (:error ev)
+                                             :fetch-direction nil)
+                                      (update :retry-count inc))]))}]}))
+
 (defhook use-paginated-query
-  "A hook for paginated Sente queries that supports a 'load more' pattern.
+  "A hook for paginated Sente queries with bidirectional support.
 
    Options:
    - :query-key - A unique vector key to identify this query's state.
    - :sente-event - The base Sente event vector. Pagination params will be merged into it.
-   - :page-size - The number of items to fetch per page.
-   - :initial-pagination - Optional starting pagination cursor (e.g., UUID to start from).
-   - :enabled? - Boolean to control if the query should run.
+   - :page-size - The number of items to fetch per page (default: 20).
+   - :timeout-ms - Request timeout in milliseconds (default: 15000).
+   - :enabled? - Boolean to control if the query should run (default: true).
+   - :initial-cursor - Optional starting pagination cursor (e.g., UUID to start from).
+   - :include-cursor? - If true, include the cursor item in results (default: false).
+   - :merge-fn - Custom function (existing, new, direction) -> merged for deduplication.
+   - :has-more-prev? - Initial value for backward pagination availability (default: false).
 
    Returns a map with:
    - :data - Vector of all items fetched so far.
    - :isLoading - True only during the initial fetch.
-   - :isFetchingMore - True during subsequent 'load more' fetches.
-   - :hasMore - Boolean indicating if more pages are available.
+   - :isFetching - True during any fetch operation.
+   - :hasMoreNext - Boolean indicating if more pages are available forward.
+   - :hasMorePrev - Boolean indicating if more pages are available backward.
    - :error - Error message if a fetch fails.
-   - :loadMore - A function to call to fetch the next page.
-   - :refetch - A function to clear all data and start from page 1."
-  [{:keys [query-key sente-event page-size initial-pagination enabled?]
-    :or {page-size 20 enabled? true}}]
+   - :loadMore - A function to fetch the next page (forward).
+   - :loadPrevious - A function to fetch the previous page (backward).
+   - :refetch - A function to clear all data and start from beginning."
+  [{:keys [query-key sente-event page-size timeout-ms enabled?
+           initial-cursor include-cursor? merge-fn has-more-prev?]
+    :or {page-size 20 timeout-ms 15000 enabled? true has-more-prev? false}}]
   (let [state-path (into [:queries] query-key)
         query-state (state/use-sub state-path)
         should-refetch? (:should-refetch? query-state)
         connected? (state/use-sub [:sente :connected?])
+        ctx-ref (uix/use-ref nil)
+        send-event-ref (uix/use-ref nil)
 
-        ;; Extract data from app-db state
-        data (or (:data query-state) [])
-        pagination-params (:pagination-params query-state)
-        has-more? (get query-state :has-more? true)
-        is-loading? (= (:status query-state) :loading)
-        is-fetching-more? (:fetching-more? query-state)
-        error (when (= (:status query-state) :error) (:error query-state))
+        ;; Extract state
+        current-state (merge default-paginated-state query-state)
+        data (:data current-state)
+        is-loading? (= (:status current-state) :loading)
+        is-fetching? (:fetching? current-state)
+        has-more-next? (:has-more-next? current-state)
+        has-more-prev-state? (:has-more-prev? current-state)
+        error (when (= (:status current-state) :error) (:error current-state))]
 
-        fetch-page (uix/use-callback
-                    (fn [pagination-cursor append?]
-                      (when (and enabled? connected?)
-                        ;; Set loading state
-                        (if append?
-                          (state/dispatch [:db/set-value (into state-path [:fetching-more?]) true])
-                          (state/dispatch [:db/set-value (into state-path [:status]) :loading]))
+    ;; Update context ref
+    (reset! ctx-ref
+            {:query-key query-key
+             :state-path state-path
+             :sente-event sente-event
+             :page-size page-size
+             :timeout-ms timeout-ms
+             :enabled? enabled?
+             :connected? connected?
+             :initial-cursor initial-cursor
+             :include-cursor? include-cursor?
+             :merge-fn merge-fn
+             :send-event-ref send-event-ref
+             :get-state paginated-query-state
+             :default-state default-paginated-state})
 
-                        (let [[event-id event-data] sente-event
-                              paginated-event [event-id (assoc event-data
-                                                               :pagination pagination-cursor
-                                                               :limit page-size)]]
-                          (sente/request!
-                           paginated-event
-                           15000
-                           (fn [reply]
-                             ;; Clear fetching-more state
-                             (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false])
+    ;; Set up event sender
+    (reset! send-event-ref
+            (fn [event]
+              (send-machine-event! paginated-query-machine ctx-ref event)))
 
-                             (if (:success reply)
-                               (let [response-data (:data reply)
-                                     new-items (or (:items response-data)
-                                                   (:agent-invokes response-data)
-                                                   (:datasets response-data)
-                                                   (:examples response-data)
-                                                   [])
-                                     new-pagination (:pagination-params response-data)
-                                     ;; Check if more pages are available (handles both string and map formats)
-                                     new-has-more? (has-more-pages? new-pagination)
-                                     current-data (or (get-in @state/app-db (into state-path [:data])) [])]
-                                ;; Update data in app-db
-                                (if append?
-                                  (state/dispatch [:db/set-value (into state-path [:data])
-                                                   (vec (concat current-data new-items))])
-                                  (state/dispatch [:db/set-value (into state-path [:data]) new-items]))
-                                 (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
-                                 (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?])
-                                 ;; Set status to success AFTER data is updated
-                                 (state/dispatch [:db/set-value (into state-path [:status]) :success]))
-                               ;; Handle error
-                               (do
-                                 (state/dispatch [:db/set-value (into state-path [:status]) :error])
-                                 (state/dispatch [:db/set-value (into state-path [:error])
-                                                  (or (:error reply) "Failed to fetch data")]))))))))
-                    [enabled? connected? sente-event page-size state-path])
-
-        load-more (uix/use-callback
-                   (fn []
-                     (when (and has-more? (not is-loading?) (not is-fetching-more?))
-                       (fetch-page pagination-params true)))
-                   [has-more? is-loading? is-fetching-more? pagination-params fetch-page])
-
-        refetch (uix/use-callback
-                 (fn []
-                   ;; Reset to initial state and fetch
-                   (state/dispatch [:db/set-value state-path
-                                    {:status :idle
-                                     :data []
-                                     :pagination-params nil
-                                     :has-more? true
-                                     :fetching-more? false
-                                     :error nil
-                                     :should-refetch? false}])
-                   (fetch-page nil false))
-                 [fetch-page state-path])]
-
-    ;; Effect to reset state when query-key changes
-    ;; This prevents stale data from being briefly visible
+    ;; Effect: reset state when query-key changes
     (uix/use-effect
      (fn []
-       ;; Always reset to initial idle state when query-key changes
        (state/dispatch [:db/set-value state-path
-                        {:status :idle
-                         :data []
-                         :pagination-params nil
-                         :has-more? true
-                         :fetching-more? false
-                         :error nil
-                         :should-refetch? false}])
+                        (assoc default-paginated-state
+                               :has-more-prev? has-more-prev?
+                               :next-cursor initial-cursor)])
        js/undefined)
-     [state-path]) ; Re-run whenever state-path (derived from query-key) changes
+     [state-path])
 
-    ;; Effect for initial load - watches connection and enabled state
+    ;; Effect: mount - fetch if needed
     (uix/use-effect
      (fn []
-       ;; Only fetch if connected, enabled, and we don't have data yet
-       (when (and connected? enabled? (empty? data))
-         (fetch-page initial-pagination false))
+       (when (and connected? enabled?)
+         (when-let [send! @send-event-ref]
+           (send! {:type :mount})))
        js/undefined)
-     ;; Re-run when connection status or enabled changes, or when fetch-page changes
-     [connected? enabled? data fetch-page initial-pagination])
+     [connected? enabled? state-path])
 
-    ;; Effect to watch for invalidation flag and auto-refetch
+    ;; Effect: watch invalidation flag
     (uix/use-effect
      (fn []
        (when (and should-refetch? connected? enabled?)
-         ;; Clear the flag first to prevent infinite loops
          (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
-         ;; Then refetch the data (reset to page 1)
-         (refetch)))
-     [should-refetch? connected? enabled? refetch state-path])
+         (when-let [send! @send-event-ref]
+           (send! {:type :invalidate})))
+       js/undefined)
+     [should-refetch? connected? enabled? state-path])
 
-    {:data data
-     :isLoading is-loading?
-     :isFetchingMore is-fetching-more?
-     :hasMore has-more?
-     :error error
-     :loadMore load-more
-     :refetch refetch}))
+    ;; Return API
+    (let [load-more (uix/use-callback
+                     (fn []
+                       (when-let [send! @send-event-ref]
+                         (send! {:type :load-more})))
+                     [])
+          load-previous (uix/use-callback
+                         (fn []
+                           (when-let [send! @send-event-ref]
+                             (send! {:type :load-previous})))
+                         [])
+          refetch (uix/use-callback
+                   (fn []
+                     (when-let [send! @send-event-ref]
+                       (send! {:type :manual-refetch})))
+                   [])]
+      {:data data
+       :isLoading is-loading?
+       :isFetching is-fetching?
+       :isFetchingMore (and is-fetching? (not is-loading?)) ; backwards compat
+       :hasMore has-more-next?  ; backwards compat alias
+       :hasMoreNext has-more-next?
+       :hasMorePrev has-more-prev-state?
+       :error error
+       :loadMore load-more
+       :loadPrevious load-previous
+       :refetch refetch})))
