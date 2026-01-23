@@ -431,22 +431,45 @@
       []))
 
 (defn build-paginated-event
-  "Build the sente event with pagination parameters."
+  "Build the sente event with pagination parameters.
+   Uses bidirectional handler for initial cursor-based loads (deep-linking)."
   [ctx cursor direction]
-  (let [[event-id event-data] (:sente-event ctx)
+  (let [[base-event-id event-data] (:sente-event ctx)
         page-size (:page-size ctx)
-        reverse? (= direction :backward)]
-    [event-id (cond-> (assoc event-data
-                             :pagination cursor
-                             :limit page-size)
-                reverse? (assoc :reverse? true)
-                (:include-cursor? ctx) (assoc :include-cursor? true))]))
+        reverse? (= direction :backward)
+        ;; Use bidirectional fetch for initial cursor-based loads
+        use-bidirectional? (and (:initial-cursor ctx) 
+                                cursor 
+                                (= direction :forward)
+                                (empty? (get-in @state/app-db (into (:state-path ctx) [:data]))))]
+    
+    (if use-bidirectional?
+      ;; Bidirectional handler: different event with cursor param
+      (let [bidirectional-event-id (keyword (namespace base-event-id)
+                                             (str (name base-event-id) "-bidirectional"))]
+        [bidirectional-event-id (cond-> (assoc event-data
+                                               :cursor cursor
+                                               :limit page-size)
+                                  (:include-cursor? ctx) (assoc :include-cursor? true))])
+      
+      ;; Regular unidirectional handler
+      [base-event-id (cond-> (assoc event-data
+                                    :pagination cursor
+                                    :limit page-size)
+                       reverse? (assoc :reverse? true)
+                       (:include-cursor? ctx) (assoc :include-cursor? true))])))
 
 (defn update-paginated-state-for-success!
   "Update state after a successful paginated fetch."
-  [ctx direction new-items new-cursor]
+  [ctx direction response-data]
   (let [state-path (:state-path ctx)
         current-data (or (get-in @state/app-db (into state-path [:data])) [])
+        new-items (extract-items-from-response response-data)
+        
+        ;; Backend always returns explicit cursors
+        next-cursor (:next-cursor response-data)
+        prev-cursor (:prev-cursor response-data)
+        
         merge-fn (or (:merge-fn ctx) (fn [existing new dir]
                                         (if (= dir :backward)
                                           (vec (concat new existing))
@@ -454,7 +477,7 @@
         updated-data (if (empty? current-data)
                        (vec new-items)
                        (merge-fn current-data new-items direction))
-        ;; Track first item ID for backwards pagination
+        ;; Track first item ID for cursor calculation
         first-item-id (when (seq updated-data)
                         (:id (first updated-data)))]
     ;; Update all state in one batch for consistency
@@ -466,11 +489,23 @@
                              :retry-count 0
                              :data updated-data
                              :fetch-direction nil}
-                            (if (= direction :backward)
-                              {:prev-cursor first-item-id
-                               :has-more-prev? (has-more-pages? new-cursor)}
-                              {:next-cursor new-cursor
-                               :has-more-next? (has-more-pages? new-cursor)
+                            (cond
+                              ;; Bidirectional response: has both cursors
+                              (and next-cursor prev-cursor)
+                              {:next-cursor next-cursor
+                               :prev-cursor prev-cursor
+                               :has-more-next? (has-more-pages? next-cursor)
+                               :has-more-prev? (has-more-pages? prev-cursor)}
+                              
+                              ;; Backward fetch: only prev-cursor
+                              (= direction :backward)
+                              {:prev-cursor (or prev-cursor first-item-id)
+                               :has-more-prev? (has-more-pages? prev-cursor)}
+                              
+                              ;; Forward fetch: only next-cursor
+                              :else
+                              {:next-cursor next-cursor
+                               :has-more-next? (has-more-pages? next-cursor)
                                :prev-cursor (or first-item-id (:prev-cursor (paginated-query-state ctx)))}))])))
 
 (defn start-paginated-request!
@@ -549,10 +584,8 @@
        :event :response-success
        :action (fn [ctx _ ev]
                  (let [response-data (:data ev)
-                       direction (:direction ev)
-                       new-items (extract-items-from-response response-data)
-                       new-cursor (:pagination-params response-data)]
-                   (update-paginated-state-for-success! ctx direction new-items new-cursor)))}
+                       direction (:direction ev)]
+                   (update-paginated-state-for-success! ctx direction response-data)))}
 
       ;; Response error
       {:from states

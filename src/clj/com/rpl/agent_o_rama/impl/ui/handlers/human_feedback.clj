@@ -110,7 +110,7 @@
     (foreign-invoke-query queue-info-query queue-name)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items
-  [{:keys [manager queue-name pagination limit include-cursor?]} uid]
+  [{:keys [manager queue-name pagination limit include-cursor? reverse?]} uid]
   (let [underlying-objects  (aor-types/underlying-objects manager)
         queue-page-query    (:human-feedback-queue-page-query underlying-objects)
         query-limit         (or limit 20)
@@ -118,8 +118,54 @@
         ;; decrement it by 1 so search-loop with inclusive?=false includes the target item.
         adjusted-pagination (if (and include-cursor? (uuid? pagination))
                               (h/uuid-dec pagination)
-                              pagination)]
-    (foreign-invoke-query queue-page-query queue-name query-limit false adjusted-pagination)))
+                              pagination)
+        
+        result (foreign-invoke-query queue-page-query 
+                                     queue-name 
+                                     query-limit 
+                                     (boolean reverse?) 
+                                     adjusted-pagination)]
+    ;; Return with explicit cursors
+    (if reverse?
+      {:items (:items result)
+       :prev-cursor (:pagination-params result)}
+      {:items (:items result)
+       :next-cursor (:pagination-params result)})))
+
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items-bidirectional
+  "Bidirectional fetch for deep-linking: fetches items both before and after cursor."
+  [{:keys [manager queue-name cursor limit include-cursor?]} uid]
+  (let [underlying-objects  (aor-types/underlying-objects manager)
+        queue-page-query    (:human-feedback-queue-page-query underlying-objects)
+        query-limit         (or limit 20)
+        half-limit          (quot query-limit 2)
+        ;; If we want inclusive behavior, decrement cursor for backward fetch
+        adjusted-cursor     (if (and include-cursor? (uuid? cursor))
+                              (h/uuid-dec cursor)
+                              cursor)
+        
+        ;; Fetch backward (items before cursor)
+        backward-result (foreign-invoke-query queue-page-query 
+                                              queue-name 
+                                              half-limit 
+                                              true  ; reverse
+                                              adjusted-cursor)
+        backward-items (:items backward-result)
+        prev-cursor (:pagination-params backward-result)
+        
+        ;; Fetch forward (items from cursor onward)
+        forward-result (foreign-invoke-query queue-page-query 
+                                             queue-name 
+                                             half-limit 
+                                             false  ; not reverse
+                                             adjusted-cursor)
+        forward-items (:items forward-result)
+        next-cursor (:pagination-params forward-result)]
+    
+    ;; Return merged results with both cursors
+    {:items (vec (concat backward-items forward-items))
+     :next-cursor next-cursor
+     :prev-cursor prev-cursor}))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/add-to-queue
   [{:keys [manager queue-name agent-name invoke-id node-task-id node-invoke-id comment]} uid]
