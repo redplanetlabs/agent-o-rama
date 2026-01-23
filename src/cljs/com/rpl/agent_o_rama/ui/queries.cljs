@@ -32,7 +32,8 @@
                                         (let [has-data? (some? (:data current-state))]
                                           (-> current-state
                                               (assoc :error nil
-                                                     :fetching? true)
+                                                     :fetching? true
+                                                     :pending? false)
                                               (cond-> (not has-data?)
                                                 (assoc :status :loading))))))])))
 
@@ -131,22 +132,23 @@
         connected? (state/use-sub [:sente :connected?])
         page-is-visible? (common/use-page-visibility)
         ready? (and enabled? connected? page-is-visible?)
+        default-state {:status :idle :fetching? false :pending? false}
         ctx-ref (uix/use-ref nil)
         timer-ref (uix/use-ref nil)
         send-event-ref (uix/use-ref nil)]
 
-    (set! (.-current ctx-ref)
-          {:query-key query-key
-           :state-path state-path
-           :sente-event sente-event
-           :timeout-ms timeout-ms
-           :enabled? enabled?
-           :connected? connected?
-           :page-visible? page-is-visible?
-           :refetch-interval-ms refetch-interval-ms
-           :refetch-on-mount? refetch-on-mount})
+    (reset! ctx-ref
+            {:query-key query-key
+             :state-path state-path
+             :sente-event sente-event
+             :timeout-ms timeout-ms
+             :enabled? enabled?
+             :connected? connected?
+             :page-visible? page-is-visible?
+             :refetch-interval-ms refetch-interval-ms
+             :refetch-on-mount? refetch-on-mount})
 
-    (letfn [(ctx [] (.-current ctx-ref))
+    (letfn [(ctx [] @ctx-ref)
             (get-state []
               (or (get-in @state/app-db (:state-path (ctx))) {}))
             (ready-now? []
@@ -154,24 +156,25 @@
                 (and enabled? connected? page-visible?)))
             (can-start? [st]
               (and (ready-now?) (not (:fetching? st))))
-            (set-value! [path value]
-              (state/dispatch [:db/set-value (into (:state-path (ctx)) path) value]))
             (set-pending! [value]
-              (set-value! [:pending?] value))
+              (let [current-state (get-state)]
+                (state/dispatch
+                 [:db/set-value (:state-path (ctx))
+                  (assoc (merge default-state current-state) :pending? value)])))
             (cancel-poll! []
-              (when-let [timeout-id (.-current timer-ref)]
+              (when-let [timeout-id @timer-ref]
                 (js/clearTimeout timeout-id)
-                (set! (.-current timer-ref) nil)))
+                (reset! timer-ref nil)))
             (schedule-poll! []
               (cancel-poll!)
               (let [{:keys [refetch-interval-ms]} (ctx)]
                 (when (and (ready-now?) refetch-interval-ms)
-                  (set! (.-current timer-ref)
-                        (js/setTimeout
-                         (fn []
-                           (when-let [send! (.-current send-event-ref)]
-                             (send! {:type :poll-tick})))
-                         refetch-interval-ms)))))
+                  (reset! timer-ref
+                          (js/setTimeout
+                           (fn []
+                             (when-let [send! @send-event-ref]
+                               (send! {:type :poll-tick})))
+                           refetch-interval-ms)))))
             (start-request! []
               (let [{:keys [query-key sente-event timeout-ms]} (ctx)]
                 (cancel-poll!)
@@ -181,7 +184,7 @@
                  sente-event
                  timeout-ms
                  (fn [reply]
-                   (when-let [send! (.-current send-event-ref)]
+                   (when-let [send! @send-event-ref]
                      (if (:success reply)
                        (send! {:type :response-success :data (:data reply)})
                        (send! {:type :response-error
@@ -230,26 +233,26 @@
                                :pause handle-pause!
                                :response-success handle-response-success!
                                :response-error handle-response-error!}}]
-        (set! (.-current send-event-ref)
-              (fn [event]
-                (let [st (get-state)
-                      status (or (:status st) :idle)
-                      event-type (:type event)
-                      handler (or (get-in handler-map [:states status event-type])
-                                  (get-in handler-map [:any event-type]))]
-                  (cond
-                    (and (contains? trigger-events event-type) (:fetching? st))
-                    (set-pending! true)
+        (reset! send-event-ref
+                (fn [event]
+                  (let [st (get-state)
+                        status (or (:status st) :idle)
+                        event-type (:type event)
+                        handler (or (get-in handler-map [:states status event-type])
+                                    (get-in handler-map [:any event-type]))]
+                    (cond
+                      (and (contains? trigger-events event-type) (:fetching? st))
+                      (set-pending! true)
 
-                    handler
-                    (handler st event)
+                      handler
+                      (handler st event)
 
-                    :else nil))))
+                      :else nil))))
 
         ;; Effect for mount (per query-key)
         (uix/use-effect
          (fn []
-           (when-let [send! (.-current send-event-ref)]
+           (when-let [send! @send-event-ref]
              (send! {:type :mount}))
            js/undefined)
          [state-path])
@@ -257,7 +260,7 @@
         ;; Effect to handle ready/pause transitions and polling updates
         (uix/use-effect
          (fn []
-           (when-let [send! (.-current send-event-ref)]
+           (when-let [send! @send-event-ref]
              (if ready?
                (send! {:type :resume})
                (send! {:type :pause})))
@@ -270,7 +273,7 @@
            (when should-refetch?
              ;; Clear the flag first to prevent infinite loops
              (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
-             (when-let [send! (.-current send-event-ref)]
+             (when-let [send! @send-event-ref]
                (send! {:type :invalidate})))
            js/undefined)
          [should-refetch? state-path])
@@ -283,15 +286,14 @@
          [])
 
         ;; Return the result map including the refetch function
-        (let [default-state {:data nil :status :idle :error nil :fetching? false :pending? false}
-              current-state (merge default-state query-state)
+        (let [current-state (merge default-state query-state)
               data (:data current-state)
               loading? (= (:status current-state) :loading)
               error (when (= (:status current-state) :error) (:error current-state))
               fetching? (:fetching? current-state)
               refetch (uix/use-callback
                        (fn []
-                         (when-let [send! (.-current send-event-ref)]
+                         (when-let [send! @send-event-ref]
                            (send! {:type :manual-refetch})))
                        [])]
           {:data data
