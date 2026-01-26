@@ -61,8 +61,11 @@
 
    ;; Paginated query keys
    (s/optional-key :pagination-params) s/Any
+   (s/optional-key :reverse-pagination-params) s/Any
    (s/optional-key :has-more?) s/Bool
+   (s/optional-key :has-more-before?) s/Bool
    (s/optional-key :fetching-more?) s/Bool
+   (s/optional-key :fetching-before?) s/Bool
 
    (s/optional-key :should-refetch?) s/Bool})
 
