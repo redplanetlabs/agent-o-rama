@@ -329,8 +329,8 @@ test.describe('Queue Review Pagination', () => {
     await expect(page2.getByText('Target Information')).toBeVisible({ timeout: 10000 });
     await expect(page2.getByText(metricName)).toBeVisible();
     
-    // Previous button should be disabled (loaded from cursor, no earlier items)
-    await expect(page2.getByTestId('previous-item-button')).toBeDisabled();
+    // With bidirectional pagination, previous button is enabled (items 0-24 exist before item 25)
+    await expect(page2.getByTestId('previous-item-button')).toBeEnabled();
     
     // Next button should be enabled (items 26-30 exist)
     const nextBtn = page2.getByTestId('next-item-button');
@@ -341,7 +341,7 @@ test.describe('Queue Review Pagination', () => {
     await page2.waitForTimeout(500);
     await expect(page2.getByText('Target Information')).toBeVisible();
     
-    console.log('✓ Direct URL navigation works - loaded from cursor without pre-cached items');
+    console.log('✓ Direct URL navigation works with bidirectional pagination support');
     
     await page2.close();
     
@@ -357,9 +357,9 @@ test.describe('Queue Review Pagination', () => {
     await page3.goto(targetUrl);
     await page3.waitForTimeout(2000);
     
-    // Verify we're on item #25 with no previous items
+    // Verify we're on item #25 with bidirectional pagination enabled
     await expect(page3.getByText('Target Information')).toBeVisible({ timeout: 10000 });
-    await expect(page3.getByTestId('previous-item-button')).toBeDisabled();
+    await expect(page3.getByTestId('previous-item-button')).toBeEnabled();
     
     // Click breadcrumb to go back to queue list
     await page3.getByRole('link', { name: queueName }).click();
@@ -379,6 +379,75 @@ test.describe('Queue Review Pagination', () => {
     console.log('✓ Breadcrumb navigation returns to list start (not item 25)');
     
     await page3.close();
+    
+    // =============================================================================
+    // TEST: Backward pagination - clicking Previous button loads earlier items
+    // =============================================================================
+    console.log('Test: Backward pagination from deep item');
+    
+    // Open new page and navigate to item #15 (middle of dataset)
+    const page4 = await page.context().newPage();
+    await page4.goto('/');
+    const agentRow4 = await getE2ETestAgentRow(page4);
+    await agentRow4.click();
+    
+    await page4.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page4.getByPlaceholder('Search queues...').fill(queueName);
+    await page4.waitForTimeout(500);
+    
+    const queueRow4 = page4.getByTestId(`queue-row-${queueName}`);
+    await queueRow4.getByTestId('queue-name-link').click();
+    
+    // Navigate to item #15 by clicking through items
+    await page4.locator('tbody').getByRole('row').first().waitFor({ timeout: 5000 });
+    await page4.locator('tbody').getByRole('row').first().click();
+    
+    // Click next 14 times to get to item #15 (0-indexed, so 15th item)
+    for (let i = 0; i < 14; i++) {
+      await page4.getByTestId('next-item-button').click();
+      await page4.waitForTimeout(300);
+    }
+    
+    // Verify we're on item #15
+    const item15Url = page4.url();
+    expect(item15Url).toContain('/items/');
+    console.log('✓ Navigated to item #15');
+    
+    // Now test backward pagination - click Previous 5 times
+    const prevBtn = page4.getByTestId('previous-item-button');
+    await expect(prevBtn).toBeEnabled();
+    
+    for (let i = 0; i < 5; i++) {
+      const beforeUrl = page4.url();
+      await prevBtn.click();
+      await page4.waitForTimeout(500);
+      
+      // Verify navigation happened
+      const afterUrl = page4.url();
+      expect(afterUrl).not.toBe(beforeUrl);
+      
+      // Verify we can still see the content
+      await expect(page4.getByText('Target Information')).toBeVisible({ timeout: 5000 });
+      console.log(`✓ Backward navigation step ${i + 1}/5 successful`);
+    }
+    
+    // After 5 backward steps, we should be on item #10
+    const item10Url = page4.url();
+    expect(item10Url).toContain('/items/');
+    
+    // Both previous and next should be enabled (we're in the middle)
+    await expect(prevBtn).toBeEnabled();
+    await expect(page4.getByTestId('next-item-button')).toBeEnabled();
+    
+    console.log('✓ Backward pagination works correctly');
+    
+    // Test that we can go forward again after going backward
+    await page4.getByTestId('next-item-button').click();
+    await page4.waitForTimeout(500);
+    await expect(page4.getByText('Target Information')).toBeVisible();
+    console.log('✓ Can navigate forward again after backward navigation');
+    
+    await page4.close();
     
     // =============================================================================
     // CLEANUP
