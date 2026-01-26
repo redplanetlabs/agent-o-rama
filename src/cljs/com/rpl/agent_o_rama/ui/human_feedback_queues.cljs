@@ -746,9 +746,12 @@
         connected? (state/use-sub [:sente :connected?])
         data (or (:data query-state) [])
         pagination-params (:pagination-params query-state)
+        reverse-pagination-params (:reverse-pagination-params query-state)
         has-more? (get query-state :has-more? true)
+        has-more-before? (get query-state :has-more-before? true)
         is-loading? (= (:status query-state) :loading)
         is-fetching-more? (:fetching-more? query-state)
+        is-fetching-before? (:fetching-before? query-state)
         error (when (= (:status query-state) :error) (:error query-state))
         initial-needed? (and initial-cursor
                              (not (some #(queue-item-matches? % initial-cursor) data)))]
@@ -756,8 +759,14 @@
     (let [fetch-page (uix/use-callback
                       (fn [pagination-cursor append? include-cursor? merge? reverse?]
                         (when (and enabled? connected?)
-                          (if append?
+                          (cond
+                            reverse?
+                            (state/dispatch [:db/set-value (into state-path [:fetching-before?]) true])
+
+                            append?
                             (state/dispatch [:db/set-value (into state-path [:fetching-more?]) true])
+
+                            :else
                             (state/dispatch [:db/set-value (into state-path [:status]) :loading]))
 
                           (let [paginated-event [:human-feedback/get-queue-items
@@ -772,7 +781,9 @@
                              paginated-event
                              15000
                              (fn [reply]
-                               (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false])
+                               (if reverse?
+                                 (state/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
+                                 (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
                                (if (:success reply)
                                  (let [response-data (:data reply)
                                        new-items (or (:items response-data) [])
@@ -791,9 +802,13 @@
 
                                      :else
                                      (state/dispatch [:db/set-value (into state-path [:data]) new-items]))
-                                   (when update-pagination?
-                                     (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
-                                     (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?]))
+                                   (if update-pagination?
+                                     (do
+                                       (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
+                                       (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?]))
+                                     (do
+                                       (state/dispatch [:db/set-value (into state-path [:reverse-pagination-params]) new-pagination])
+                                       (state/dispatch [:db/set-value (into state-path [:has-more-before?]) new-has-more?])))
                                    (state/dispatch [:db/set-value (into state-path [:status]) :success]))
                                  (do
                                    (state/dispatch [:db/set-value (into state-path [:status]) :error])
@@ -807,14 +822,24 @@
                          (fetch-page pagination-params true false false false)))
                      [has-more? is-loading? is-fetching-more? pagination-params fetch-page])
 
+          load-more-before (uix/use-callback
+                            (fn []
+                              (let [cursor (or reverse-pagination-params (:id (first data)))]
+                                (when (and cursor has-more-before? (not is-loading?) (not is-fetching-before?))
+                                  (fetch-page cursor false false true true))))
+                            [reverse-pagination-params data has-more-before? is-loading? is-fetching-before? fetch-page])
+
           refetch (uix/use-callback
                    (fn []
                      (state/dispatch [:db/set-value state-path
                                       {:status :idle
                                        :data []
                                        :pagination-params nil
+                                       :reverse-pagination-params nil
                                        :has-more? true
+                                       :has-more-before? true
                                        :fetching-more? false
+                                       :fetching-before? false
                                        :error nil
                                        :should-refetch? false}])
                      (fetch-page nil false false false false))
@@ -850,9 +875,12 @@
       {:data data
        :isLoading is-loading?
        :isFetchingMore is-fetching-more?
+       :isFetchingBefore is-fetching-before?
        :hasMore has-more?
+       :hasMoreBefore has-more-before?
        :error error
        :loadMore load-more
+       :loadMoreBefore load-more-before
        :refetch refetch})))
 
 (defui queue-item-row [{:keys [item module-id queue-id]}]
@@ -1033,7 +1061,7 @@
 
         ;; Fetch queue items with shared cache for review session
         ;; If item isn't in cache yet, load from its cursor and merge.
-        {:keys [data isLoading hasMore loadMore]}
+        {:keys [data isLoading hasMore hasMoreBefore loadMore loadMoreBefore]}
         (use-queue-items
          {:module-id module-id
           :queue-id queue-id
@@ -1043,6 +1071,7 @@
         items-loading? isLoading
         items (or data [])
         [pending-next? set-pending-next?] (uix/use-state false)
+        [pending-prev? set-pending-prev?] (uix/use-state false)
 
         ;; Find current item and navigation indices
         current-idx (some (fn [[idx item]] (when (= (str (:id item)) item-id-str) idx))
@@ -1052,13 +1081,30 @@
         ;; Navigation: 
         ;; - Previous disabled if we're at index 0 (started from URL cursor)
         ;; - Next enabled if there are more items in array OR hasMore on backend
-        has-prev? (and current-idx (> current-idx 0))
+        has-prev? (and current-idx (or (> current-idx 0) hasMoreBefore))
         has-next? (and current-idx 
                        (or (< current-idx (dec (count items)))
                            hasMore))
-        prev-item-id (when has-prev? (str (:id (nth items (dec current-idx)))))
+        prev-item-id (when (and current-idx (> current-idx 0))
+                       (str (:id (nth items (dec current-idx)))))
         next-item-id (when (and current-idx (< current-idx (dec (count items))))
                        (str (:id (nth items (inc current-idx)))))
+
+        handle-prev (fn []
+                      (cond
+                        (and current-idx (> current-idx 0))
+                        (rfe/push-state :module/human-feedback-queue-item
+                                        {:module-id module-id
+                                         :queue-id queue-id
+                                         :item-id prev-item-id})
+
+                        hasMoreBefore
+                        (do
+                          (set-pending-prev? true)
+                          (loadMoreBefore))
+
+                        :else
+                        nil))
 
         handle-next (fn []
                       (cond
@@ -1208,6 +1254,17 @@
        js/undefined)
      [pending-next? next-item-id module-id queue-id])
 
+    (uix/use-effect
+     (fn []
+       (when (and pending-prev? current-idx (> current-idx 0) prev-item-id)
+         (set-pending-prev? false)
+         (rfe/push-state :module/human-feedback-queue-item
+                         {:module-id module-id
+                          :queue-id queue-id
+                          :item-id prev-item-id}))
+       js/undefined)
+     [pending-prev? current-idx prev-item-id module-id queue-id])
+
     (cond
       ;; Loading state
       (or queue-info-loading? items-loading?)
@@ -1230,11 +1287,7 @@
                ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                   {:disabled (not has-prev?)
                    :data-testid "previous-item-button"
-                   :onClick #(when has-prev?
-                               (rfe/push-state :module/human-feedback-queue-item
-                                               {:module-id module-id
-                                                :queue-id queue-id
-                                                :item-id prev-item-id}))}
+                   :onClick #(when has-prev? (handle-prev))}
                   ($ ChevronLeftIcon {:className "h-5 w-5"}))
                ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                   {:disabled (not has-next?)
