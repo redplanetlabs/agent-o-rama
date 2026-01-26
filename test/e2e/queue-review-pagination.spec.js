@@ -336,6 +336,18 @@ test.describe('Queue Review Pagination', () => {
     const nextBtn = page2.getByTestId('next-item-button');
     await expect(nextBtn).toBeEnabled();
     
+    // Walk backward all the way to item 0
+    await expect(page2.getByText('cursor test 24')).toBeVisible();
+    for (let i = 24; i > 0; i--) {
+      const prevBtn = page2.getByTestId('previous-item-button');
+      await expect(prevBtn).toBeEnabled();
+      await prevBtn.click();
+      await page2.waitForTimeout(500);
+      await expect(page2.getByText('Target Information')).toBeVisible();
+      await expect(page2.getByText(`cursor test ${i - 1}`)).toBeVisible();
+    }
+    await expect(page2.getByTestId('previous-item-button')).toBeDisabled();
+    
     // Navigate forward successfully
     await nextBtn.click();
     await page2.waitForTimeout(500);
