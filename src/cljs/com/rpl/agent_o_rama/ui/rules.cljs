@@ -185,10 +185,10 @@
   "Tooltip component that shows content on hover."
   [{:keys [truncated-content full-content]}]
   (let [[show-tooltip? set-show-tooltip!] (uix/use-state false)]
-    ($ :div.relative.inline-block
+    ($ :div.relative.w-full
        {:on-mouse-enter #(set-show-tooltip! true)
         :on-mouse-leave #(set-show-tooltip! false)}
-       ($ :div.truncate.cursor-help truncated-content)
+       ($ :div.truncate.cursor-help.w-full truncated-content)
        (when show-tooltip?
          ($ :div.fixed.z-50.bg-gray-900.text-white.text-xs.rounded.shadow-lg.p-3.max-w-lg.whitespace-pre-wrap.break-words.pointer-events-none
             {:style {:transform "translateY(4px)"}}
@@ -231,7 +231,7 @@
        ($ :td.px-4.py-1.text-sm.text-gray-700 (action-friendly-name action-name))
 
        ;; action-params column with truncated JSON and hover tooltip
-       ($ :td.px-4.py-1.text-sm.max-w-xs
+       ($ :td.px-4.py-1.text-sm.w-64
           (if action-params
             (let [json-str (js/JSON.stringify (clj->js action-params))
                   truncated (truncate-json json-str 50)
