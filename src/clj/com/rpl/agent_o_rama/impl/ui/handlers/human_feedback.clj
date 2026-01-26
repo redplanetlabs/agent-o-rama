@@ -110,16 +110,22 @@
     (foreign-invoke-query queue-info-query queue-name)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items
-  [{:keys [manager queue-name pagination limit include-cursor?]} uid]
+  [{:keys [manager queue-name pagination limit include-cursor? reverse?]} uid]
   (let [underlying-objects  (aor-types/underlying-objects manager)
         queue-page-query    (:human-feedback-queue-page-query underlying-objects)
         query-limit         (or limit 20)
         ;; If pagination is a UUID from item-id and we want inclusive behavior,
-        ;; decrement it by 1 so search-loop with inclusive?=false includes the target item.
-        adjusted-pagination (if (and include-cursor? (uuid? pagination))
+        ;; adjust it so search-loop with inclusive?=false includes the target item.
+        adjusted-pagination (cond
+                              (and include-cursor? (uuid? pagination) reverse?)
+                              (h/uuid-inc pagination)
+
+                              (and include-cursor? (uuid? pagination))
                               (h/uuid-dec pagination)
+
+                              :else
                               pagination)]
-    (foreign-invoke-query queue-page-query queue-name query-limit false adjusted-pagination)))
+    (foreign-invoke-query queue-page-query queue-name query-limit (boolean reverse?) adjusted-pagination)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/add-to-queue
   [{:keys [manager queue-name agent-name invoke-id node-task-id node-invoke-id comment]} uid]

@@ -754,7 +754,7 @@
                              (not (some #(queue-item-matches? % initial-cursor) data)))]
 
     (let [fetch-page (uix/use-callback
-                      (fn [pagination-cursor append? include-cursor? merge?]
+                      (fn [pagination-cursor append? include-cursor? merge? reverse?]
                         (when (and enabled? connected?)
                           (if append?
                             (state/dispatch [:db/set-value (into state-path [:fetching-more?]) true])
@@ -764,7 +764,8 @@
                                                  (cond-> {:module-id decoded-module-id
                                                           :queue-name decoded-queue-id
                                                           :pagination pagination-cursor
-                                                          :limit 20}
+                                                          :limit 20
+                                                          :reverse? reverse?}
                                                    include-cursor?
                                                    (assoc :include-cursor? true))]]
                             (sente/request!
@@ -777,7 +778,8 @@
                                        new-items (or (:items response-data) [])
                                        new-pagination (:pagination-params response-data)
                                        new-has-more? (queries/has-more-pages? new-pagination)
-                                       current-data (or (get-in @state/app-db (into state-path [:data])) [])]
+                                       current-data (or (get-in @state/app-db (into state-path [:data])) [])
+                                       update-pagination? (not reverse?)]
                                    (cond
                                      append?
                                      (state/dispatch [:db/set-value (into state-path [:data])
@@ -789,8 +791,9 @@
 
                                      :else
                                      (state/dispatch [:db/set-value (into state-path [:data]) new-items]))
-                                   (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
-                                   (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?])
+                                   (when update-pagination?
+                                     (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
+                                     (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?]))
                                    (state/dispatch [:db/set-value (into state-path [:status]) :success]))
                                  (do
                                    (state/dispatch [:db/set-value (into state-path [:status]) :error])
@@ -801,7 +804,7 @@
           load-more (uix/use-callback
                      (fn []
                        (when (and has-more? (not is-loading?) (not is-fetching-more?))
-                         (fetch-page pagination-params true false false)))
+                         (fetch-page pagination-params true false false false)))
                      [has-more? is-loading? is-fetching-more? pagination-params fetch-page])
 
           refetch (uix/use-callback
@@ -814,7 +817,7 @@
                                        :fetching-more? false
                                        :error nil
                                        :should-refetch? false}])
-                     (fetch-page nil false false false))
+                     (fetch-page nil false false false false))
                    [fetch-page state-path])]
 
       ;; Effect: Force refetch from start if flag is set and cache exists
@@ -829,7 +832,11 @@
        (fn []
          (when (and connected? enabled?
                     (or (empty? data) initial-needed?))
-           (fetch-page initial-cursor false include-initial-cursor? initial-needed?))
+          (if (and initial-needed? initial-cursor include-initial-cursor?)
+            (do
+              (fetch-page initial-cursor false true true false)
+              (fetch-page initial-cursor false true true true))
+            (fetch-page initial-cursor false include-initial-cursor? false false)))
          js/undefined)
        [connected? enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
 
