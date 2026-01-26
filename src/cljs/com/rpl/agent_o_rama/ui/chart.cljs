@@ -526,7 +526,8 @@
                             :grid {:show true :stroke "#e2e8f0" :width 1}
                             :ticks {:show true :stroke "#cbd5e1"}
                             :label (or y-label "Value")
-                            :labelSize 14
+                            :labelSize 60
+                            :labelGap 50
                             :values (when is-percentage?
                                       (fn [_self splits]
                                         (.map splits (fn [v] (str (int v) "%")))))}]
