@@ -748,7 +748,7 @@
         pagination-params (:pagination-params query-state)
         reverse-pagination-params (:reverse-pagination-params query-state)
         has-more? (get query-state :has-more? true)
-        has-more-before? (get query-state :has-more-before? true)
+        has-more-before? (get query-state :has-more-before? false)
         is-loading? (= (:status query-state) :loading)
         is-fetching-more? (:fetching-more? query-state)
         is-fetching-before? (:fetching-before? query-state)
@@ -837,7 +837,7 @@
                                        :pagination-params nil
                                        :reverse-pagination-params nil
                                        :has-more? true
-                                       :has-more-before? true
+                                       :has-more-before? false
                                        :fetching-more? false
                                        :fetching-before? false
                                        :error nil
