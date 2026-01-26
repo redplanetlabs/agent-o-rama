@@ -282,13 +282,23 @@ test.describe('Queue Review Pagination', () => {
     // Wait for table to load
     await page.locator('tbody').getByRole('row').first().waitFor({ timeout: 5000 });
     
+    // Capture first item URL from the first row
+    let rows = page.locator('tbody').getByRole('row');
+    await rows.first().click();
+    const firstItemUrl = page.url();
+    await expect(page.getByText('Target Information')).toBeVisible({ timeout: 10000 });
+    
+    // Return to queue detail list
+    await page.getByRole('link', { name: queueName }).click();
+    await page.locator('tbody').getByRole('row').first().waitFor({ timeout: 5000 });
+    
     // Click the last visible row to get its ID
-    const rows = page.locator('tbody').getByRole('row');
+    rows = page.locator('tbody').getByRole('row');
     const lastVisibleRow = rows.nth(19); // 20th row (0-indexed)
     await lastVisibleRow.click();
     
-    const firstItemUrl = page.url();
-    const firstItemIdMatch = firstItemUrl.match(/items\/([^/?]+)/); // Note: "items" plural
+    const lastVisibleItemUrl = page.url();
+    const firstItemIdMatch = lastVisibleItemUrl.match(/items\/([^/?]+)/); // Note: "items" plural
     expect(firstItemIdMatch).toBeTruthy();
     const deepItemId = firstItemIdMatch[1];
     
@@ -297,6 +307,7 @@ test.describe('Queue Review Pagination', () => {
     // Now navigate to item #25 (which is NOT in the initial 20-item cache)
     // We'll construct URL by going to next item 5 times
     let targetItemId = deepItemId;
+    let targetUrl = page.url();
     for (let i = 0; i < 5; i++) {
       const nextBtn = page.getByTestId('next-item-button');
       await nextBtn.click();
@@ -304,13 +315,23 @@ test.describe('Queue Review Pagination', () => {
       
       if (i === 4) {
         // This is item #25
-        const targetUrl = page.url();
+        targetUrl = page.url();
         const targetMatch = targetUrl.match(/items\/([^/?]+)/); // Note: "items" plural
         targetItemId = targetMatch[1];
       }
     }
     
     console.log(`✓ Navigated to item #25: ${targetItemId}`);
+    
+    // Navigate to the last item URL (item #30)
+    let lastItemUrl = targetUrl;
+    for (let i = 0; i < 5; i++) {
+      const nextBtn = page.getByTestId('next-item-button');
+      await nextBtn.click();
+      await page.waitForTimeout(500);
+      await expect(page.getByText('Target Information')).toBeVisible({ timeout: 10000 });
+      lastItemUrl = page.url();
+    }
     
     // =============================================================================
     // TEST: Direct URL navigation with cursor-based loading
@@ -321,8 +342,8 @@ test.describe('Queue Review Pagination', () => {
     const page2 = await page.context().newPage();
     
     // Navigate directly to item #25 URL
-    const targetUrl = page.url(); // Current URL with item #25
-    await page2.goto(targetUrl);
+    const targetItemUrl = page.url(); // Current URL with item #25
+    await page2.goto(targetItemUrl);
     await page2.waitForTimeout(2000);
     
     // Verify page loaded correctly using cursor-based pagination
@@ -358,6 +379,28 @@ test.describe('Queue Review Pagination', () => {
     await page2.close();
     
     // =============================================================================
+    // TEST: Deep link to first item keeps Previous disabled
+    // =============================================================================
+    const page2a = await page.context().newPage();
+    await page2a.goto(firstItemUrl);
+    await page2a.waitForTimeout(2000);
+    await expect(page2a.getByText('Target Information')).toBeVisible({ timeout: 10000 });
+    await expect(page2a.getByTestId('previous-item-button')).toBeDisabled();
+    await expect(page2a.getByTestId('next-item-button')).toBeEnabled();
+    await page2a.close();
+    
+    // =============================================================================
+    // TEST: Deep link to last item keeps Next disabled
+    // =============================================================================
+    const page2b = await page.context().newPage();
+    await page2b.goto(lastItemUrl);
+    await page2b.waitForTimeout(2000);
+    await expect(page2b.getByText('Target Information')).toBeVisible({ timeout: 10000 });
+    await expect(page2b.getByTestId('next-item-button')).toBeDisabled();
+    await expect(page2b.getByTestId('previous-item-button')).toBeEnabled();
+    await page2b.close();
+    
+    // =============================================================================
     // TEST: Breadcrumb navigation from deep-linked item returns to list start
     // =============================================================================
     console.log('Test: Breadcrumb back to queue list after deep link');
@@ -366,7 +409,7 @@ test.describe('Queue Review Pagination', () => {
     const page3 = await page.context().newPage();
     
     // Navigate directly to item #25 URL
-    await page3.goto(targetUrl);
+    await page3.goto(targetItemUrl);
     await page3.waitForTimeout(2000);
     
     // Verify we're on item #25 with bidirectional pagination enabled
