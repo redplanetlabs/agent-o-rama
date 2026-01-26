@@ -527,7 +527,7 @@
                             :ticks {:show true :stroke "#cbd5e1"}
                             :label (or y-label "Value")
                             :labelSize 60
-                            :labelGap 50
+                            :labelGap 30
                             :values (when is-percentage?
                                       (fn [_self splits]
                                         (.map splits (fn [v] (str (int v) "%")))))}]
