@@ -342,7 +342,7 @@ test.describe('Queue Review Pagination', () => {
     const page2 = await page.context().newPage();
     
     // Navigate directly to item #25 URL
-    const targetItemUrl = page.url(); // Current URL with item #25
+    const targetItemUrl = targetUrl; // Current URL with item #25
     await page2.goto(targetItemUrl);
     await page2.waitForTimeout(2000);
     
