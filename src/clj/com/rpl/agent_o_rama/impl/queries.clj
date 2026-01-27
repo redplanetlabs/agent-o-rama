@@ -24,7 +24,8 @@
    [java.util.concurrent
     CompletableFuture]
    [rpl.rama.generated
-    TopologyDoesNotExistException]))
+    TopologyDoesNotExistException
+    ModuleNotAliveException]))
 
 (defn tracing-query-name
   []
@@ -38,9 +39,9 @@
   (try
     (do (foreign-query cluster module-name (agent-get-names-query-name)) true)
     (catch Exception e
-      (if (h/exception-cause? TopologyDoesNotExistException e)
-        false
-        (throw e)))))
+      (cond (h/exception-cause? TopologyDoesNotExistException e) false
+            (h/exception-cause? ModuleNotAliveException e) false
+            :else (throw e)))))
 
 (defn agent-get-fork-affected-aggs-query-name
   []
