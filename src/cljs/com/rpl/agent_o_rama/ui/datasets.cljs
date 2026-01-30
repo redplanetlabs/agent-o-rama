@@ -700,7 +700,7 @@
                     :placeholder "Search datasets..."})))
 
           ($ :div.flex.items-center.gap-2
-             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
                 {:onClick #(state/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
                 ($ PlusIcon {:className "h-5 w-5 mr-2"})
                 "Create Dataset")))
@@ -718,7 +718,7 @@
             ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No datasets yet")
             ($ :p.text-gray-500.mb-6 "Create your first dataset to get started.")
-            ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+            ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
                {:onClick #(state/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
                ($ PlusIcon {:className "h-5 w-5 mr-2"})
                "Create Dataset"))
