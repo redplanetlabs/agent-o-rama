@@ -435,6 +435,10 @@ test.describe('Human Feedback Queues', () => {
     const uniqueId = randomUUID().substring(0, 8);
     const queueName = `e2e-trace-queue-${uniqueId}`;
     const metricName = `e2e-trace-metric-${uniqueId}`;
+    const longOutputLineCount = 60;
+    const longOutput = Array.from({ length: longOutputLineCount }, (_, idx) =>
+      `Line ${idx + 1}: ${'x'.repeat(80)}`
+    ).join('\n');
     
     // =============================================================================
     // STEP 0: Create a test metric using E2ETestAgent module
@@ -490,7 +494,7 @@ test.describe('Human Feedback Queues', () => {
     await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
     await expect(page).toHaveURL(/agent\/E2ETestAgent$/);
     
-    await invokeAgentManually(page, [{ query: 'test query for queue' }]);
+    await invokeAgentManually(page, [{ query: 'test query for queue', "output-value": longOutput }]);
     
     // invokeAgentManually already navigates to the trace page
     await expect(page).toHaveURL(/invocations/);
@@ -563,6 +567,25 @@ test.describe('Human Feedback Queues', () => {
     const itemRows = page.locator('tbody').getByRole('row');
     await expect(itemRows).toHaveCount(2, { timeout: 5000 });
     console.log('✓ Queue shows 2 items');
+    
+    const longOutputRow = itemRows.filter({ hasText: 'test query for queue' }).first();
+    await expect(longOutputRow).toBeVisible({ timeout: 5000 });
+    
+    const outputCell = longOutputRow.locator('td').nth(3);
+    await expect(outputCell).toContainText('Line 1:');
+    const outputPreview = outputCell.locator('div').first();
+    const truncateInfo = await outputPreview.evaluate((el) => ({
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+      overflow: getComputedStyle(el).overflow,
+      textOverflow: getComputedStyle(el).textOverflow,
+      whiteSpace: getComputedStyle(el).whiteSpace
+    }));
+    expect(truncateInfo.textOverflow).toBe('ellipsis');
+    expect(truncateInfo.whiteSpace).toBe('nowrap');
+    expect(truncateInfo.overflow).toBe('hidden');
+    expect(truncateInfo.scrollWidth).toBeGreaterThan(truncateInfo.clientWidth);
+    console.log('✓ Output column truncates long content');
     
     // =============================================================================
     // STEP 6: Review first item (agent invocation)
@@ -698,7 +721,7 @@ test.describe('Human Feedback Queues', () => {
     await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
     
     for (let i = 0; i < 3; i++) {
-      await invokeAgentManually(page, [{ query: `test query ${i}` }]);
+      await invokeAgentManually(page, [{ query: `test query ${i}`, "output-value": `nav output ${i}` }]);
       await page.locator('[data-id="feedback-tab"]').click();
       await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).toBeVisible();

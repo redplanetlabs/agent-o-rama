@@ -897,15 +897,17 @@
                                    :item-id (str (:id item))})}
        ($ :td.px-4.py-3.text-sm.text-gray-900.font-mono (str (:id item)))
        ($ :td.px-4.py-3.text-sm.text-gray-600 (or (:comment item) ""))
-       ($ :td.px-4.py-3.text-sm.text-gray-600.max-w-xs.truncate
-          (if input-unavailable?
-            ($ :span.text-gray-400.italic "Data unavailable")
-            (common/to-json input)))
-       ($ :td.px-4.py-3.text-sm.max-w-xs.truncate
+       ($ :td.px-4.py-3.text-sm.text-gray-600
+          ($ :div.max-w-xs.truncate
+             (if input-unavailable?
+               ($ :span.text-gray-400.italic "Data unavailable")
+               (common/to-json input))))
+       ($ :td.px-4.py-3.text-sm
           {:className (if failed? "text-red-600 font-semibold" "text-gray-600")}
-          (if output-unavailable?
-            ($ :span.text-gray-400.italic "Data unavailable")
-            (common/to-json value))))))
+          ($ :div.max-w-xs.truncate
+             (if output-unavailable?
+               ($ :span.text-gray-400.italic "Data unavailable")
+               (common/to-json value)))))))
 
 (defui detail []
   (let [{:keys [module-id queue-id]} (state/use-sub [:route :path-params])

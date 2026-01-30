@@ -70,7 +70,7 @@ test.describe('Queue Review Pagination', () => {
         console.log(`  Adding item ${i + 1}/${NUM_ITEMS}...`);
       }
       
-      await invokeAgentManually(page, [{ query: `pagination test ${i}` }]);
+      await invokeAgentManually(page, [{ query: `pagination test ${i}`, "output-value": `pagination output ${i}` }]);
       
       // Add to queue
       await page.locator('[data-id="feedback-tab"]').click();
@@ -239,7 +239,7 @@ test.describe('Queue Review Pagination', () => {
     for (let i = 0; i < NUM_ITEMS; i++) {
       if (i % 10 === 0) console.log(`  Adding item ${i + 1}/${NUM_ITEMS}...`);
       
-      await invokeAgentManually(page, [{ query: `cursor test ${i}` }]);
+      await invokeAgentManually(page, [{ query: `cursor test ${i}`, "output-value": `cursor output ${i}` }]);
       await page.locator('[data-id="feedback-tab"]').click();
       await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).toBeVisible();
@@ -572,7 +572,7 @@ test.describe('Queue Review Pagination', () => {
     for (let i = 0; i < NUM_ITEMS; i++) {
       if (i % 10 === 0) console.log(`  Adding item ${i + 1}/${NUM_ITEMS}...`);
 
-      await invokeAgentManually(page, [{ query: `submit pagination test ${i}` }]);
+      await invokeAgentManually(page, [{ query: `submit pagination test ${i}`, "output-value": `submit output ${i}` }]);
       await page.locator('[data-id="feedback-tab"]').click();
       await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).toBeVisible();
