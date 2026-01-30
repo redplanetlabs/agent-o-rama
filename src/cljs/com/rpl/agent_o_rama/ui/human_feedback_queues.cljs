@@ -301,13 +301,13 @@
                 ;; Numeric fields
                 ($ :div.flex.gap-4
                    ($ :div.flex-1
-                      ($ forms/form-field (merge {:label "Min"
+                      ($ forms/form-field (merge {:label "Min (inclusive)"
                                                   :type :number
                                                   :required? true
                                                   :placeholder "1"}
                                                  min-field)))
                    ($ :div.flex-1
-                      ($ forms/form-field (merge {:label "Max"
+                      ($ forms/form-field (merge {:label "Max (inclusive)"
                                                   :type :number
                                                   :required? true
                                                   :placeholder "10"}
