@@ -93,10 +93,8 @@
     ($ :tr.hover:bg-gray-50.transition-colors.duration-150
        {:key href}
        ($ :td.px-4.py-3
-          ($ :button.px-3.py-1.bg-blue-100.text-blue-700.rounded.text-xs.font-medium.hover:bg-blue-200.transition-colors.duration-150.cursor-pointer
-             {:onClick (fn [e]
-                         (. e stopPropagation)
-                         (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id invoke-id}))}
+          ($ :a.px-3.py-1.bg-blue-100.text-blue-700.rounded.text-xs.font-medium.hover:bg-blue-200.transition-colors.duration-150.cursor-pointer
+             {:href href}
              "View trace"))
        ($ :td.px-4.py-3.text-sm.text-gray-600.font-mono
           {:title (common/format-timestamp start-time)}
