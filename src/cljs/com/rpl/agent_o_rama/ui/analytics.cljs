@@ -558,14 +558,14 @@
           ;; Left side: Navigation controls and time range
           ($ :div.flex.items-center.gap-3
              ;; Back button
-             ($ :button.p-2.rounded.border.border-gray-300.bg-white.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed
+             ($ :button.p-2.rounded.border.border-gray-300.bg-white.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:onClick go-back
                  :title "Go back 60 buckets"
                  :data-testid "time-nav-back"}
                 ($ ChevronLeftIcon {:className "h-5 w-5 text-gray-600"}))
 
              ;; Forward button
-             ($ :button.p-2.rounded.border.border-gray-300.bg-white.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed
+             ($ :button.p-2.rounded.border.border-gray-300.bg-white.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:onClick go-forward
                  :disabled is-live?
                  :title (if is-live? "Already at live view" "Go forward 60 buckets")
