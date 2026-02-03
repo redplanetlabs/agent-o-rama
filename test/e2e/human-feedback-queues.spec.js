@@ -599,7 +599,7 @@ test.describe('Human Feedback Queues', () => {
     // Verify item detail page elements
     await expect(page.getByText('Target Information')).toBeVisible();
     await expect(page.getByText('Input')).toBeVisible();
-    await expect(page.getByText('Output')).toBeVisible();
+    await expect(page.locator('[data-id="item-output"]').getByRole('heading', { name: 'Output' })).toBeVisible();
     await expect(page.getByText(metricName)).toBeVisible();
     
     // Fill out the review form
