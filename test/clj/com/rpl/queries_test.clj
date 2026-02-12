@@ -198,3 +198,83 @@
                                            set))))
             )))))
     )))
+
+(deftest invokes-page-query-filters-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node {:keys [route sleep-ms]}]
+               (when sleep-ms
+                 (Thread/sleep sleep-ms))
+               (cond
+                 (= route :fail)
+                 (throw (ex-info "boom" {:route route}))
+
+                 (= route :slow)
+                 (aor/result! agent-node {:ok true :route route})
+
+                 :else
+                 (aor/result! agent-node {:ok true :route :fast})))))))
+     (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
+     (bind module-name (get-module-name module))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind q (:invokes-page-query (aor-types/underlying-objects foo)))
+
+     ;; Build a mixed population across success/failure and latency buckets.
+     (bind runs
+       [{:route :fast :sleep-ms 1}
+        {:route :fast :sleep-ms 1}
+        {:route :slow :sleep-ms 90}
+        {:route :slow :sleep-ms 100}
+        {:route :fail :sleep-ms 20}
+        {:route :fail :sleep-ms 30}])
+
+     (doseq [args runs]
+       (let [inv (aor/agent-initiate foo args)]
+         (try
+           (aor/agent-result foo inv)
+           (catch Throwable _))))
+
+     ;; This is the desired API for the new filter-capable query:
+     ;; [page-size pagination-params filters]
+     ;; It should accept filter params and return only matching invokes.
+     ;; This assertion intentionally fails until query topology is upgraded.
+     (bind slow-res
+       (try
+         {:data (foreign-invoke-query q
+                                      10
+                                      nil
+                                      {:node-name "start"
+                                       :latency-ms {:min 80}
+                                       :has-error? false})}
+         (catch Throwable t {:error t})))
+     (is (nil? (:error slow-res))
+         "invokes-page query should accept filter params without arity/runtime errors")
+     (when-let [rows (-> slow-res :data :agent-invokes)]
+       (is (seq rows))
+       (is (every? #(= :success (:status %)) rows))
+       (is (every? (fn [m]
+                     (let [lat (- (:finish-time-millis m) (:start-time-millis m))]
+                       (>= lat 80)))
+                   rows)))
+
+     (bind err-res
+       (try
+         {:data (foreign-invoke-query q
+                                      10
+                                      nil
+                                      {:has-error? true})}
+         (catch Throwable t {:error t})))
+     (is (nil? (:error err-res))
+         "invokes-page query should support has-error filter")
+     (when-let [rows (-> err-res :data :agent-invokes)]
+       (is (seq rows))
+       (is (every? #(= :failure (:status %)) rows))))))
