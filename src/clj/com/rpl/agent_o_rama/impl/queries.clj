@@ -356,9 +356,76 @@
     (when (and (some? start) (some? finish))
       (- finish start))))
 
+(defn invoke-source-string
+  [m]
+  (when-let [source (:source m)]
+    (aor-types/source-string source)))
+
+(defn invoke-from-experiment?
+  [m]
+  (aor-types/ExperimentSourceImpl? (:source m)))
+
+(defn invoke-source-matches?
+  [m source-filter]
+  (if (nil? source-filter)
+    true
+    (let [source-str (invoke-source-string m)]
+      (cond
+        (keyword? source-filter)
+        (= (name source-filter) source-str)
+
+        (string? source-filter)
+        (= source-filter source-str)
+
+        :else
+        false))))
+
+(defn feedback-source-matches?
+  [feedback feedback-source]
+  (cond
+    (or (nil? feedback-source) (= feedback-source :any))
+    true
+
+    (= feedback-source :human)
+    (aor-types/HumanSourceImpl? (:source feedback))
+
+    (= feedback-source :non-human)
+    (not (aor-types/HumanSourceImpl? (:source feedback)))
+
+    (keyword? feedback-source)
+    (= (name feedback-source) (aor-types/source-string (:source feedback)))
+
+    (string? feedback-source)
+    (= feedback-source (aor-types/source-string (:source feedback)))
+
+    :else
+    false))
+
+(defn feedback-entry-matches?
+  [feedback {:keys [metric-name comparator value source]}]
+  (let [score-value (get (:scores feedback) metric-name ::missing)]
+    (and (feedback-source-matches? feedback source)
+         (not= ::missing score-value)
+         (try
+           (aor-types/comparator-spec-matches?
+            {:comparator comparator
+             :value      value}
+            score-value)
+           (catch Throwable _
+             false)))))
+
+(defn invoke-feedback-matches?
+  [m feedback-metric]
+  (if (nil? feedback-metric)
+    true
+    (let [results (get-in m [:feedback :results])]
+      (and (seq results)
+           (some #(feedback-entry-matches? % feedback-metric)
+                 results)))))
+
 (defn invoke-matches-filters?
   [m filters]
-  (let [{:keys [node-name has-error? latency-ms]} filters
+  (let [{:keys [node-name has-error? latency-ms source from-experiment? feedback-metric]} filters
         status (invoke-status m)
         latency (invoke-latency-millis m)
         {:keys [min max]} latency-ms
@@ -375,7 +442,12 @@
        true)
      (if (some? max)
        (and (some? latency) (<= latency max))
-       true))))
+       true)
+     (invoke-source-matches? m source)
+     (if (some? from-experiment?)
+       (= from-experiment? (invoke-from-experiment? m))
+       true)
+     (invoke-feedback-matches? m feedback-metric))))
 
 (defn relevant-invoke-submap
   ([m]

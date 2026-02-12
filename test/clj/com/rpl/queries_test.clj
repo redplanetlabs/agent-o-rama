@@ -6,6 +6,7 @@
   (:require
    [clojure.set :as set]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.evaluators :as evals]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.rama.aggs :as aggs]
@@ -226,19 +227,34 @@
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
      (bind foo (aor/agent-client agent-manager "foo"))
+     (bind global-actions-depot
+       (:global-actions-depot (aor-types/underlying-objects agent-manager)))
      (bind q (:invokes-page-query (aor-types/underlying-objects foo)))
 
      ;; Build a mixed population across success/failure and latency buckets.
+     (bind experiment-source
+       (aor-types/->valid-ExperimentSourceImpl
+        (java.util.UUID/randomUUID)
+        (java.util.UUID/randomUUID)))
      (bind runs
-       [{:route :fast :sleep-ms 1}
-        {:route :fast :sleep-ms 1}
-        {:route :slow :sleep-ms 90}
-        {:route :slow :sleep-ms 100}
-        {:route :fail :sleep-ms 20}
-        {:route :fail :sleep-ms 30}])
+       [{:name :fast-1 :args {:route :fast :sleep-ms 1}}
+        {:name :fast-2 :args {:route :fast :sleep-ms 1}}
+        {:name :slow-exp :args {:route :slow :sleep-ms 90} :source experiment-source}
+        {:name :slow-2 :args {:route :slow :sleep-ms 100}}
+        {:name :fail-1 :args {:route :fail :sleep-ms 20}}
+        {:name :fail-2 :args {:route :fail :sleep-ms 30}}])
 
-     (doseq [args runs]
-       (let [inv (aor/agent-initiate foo args)]
+     (bind created-runs
+       (vec
+        (for [{:keys [name args source]} runs]
+          (let [inv (if source
+                      (binding [aor-types/OPERATION-SOURCE source]
+                        (aor/agent-initiate foo args))
+                      (aor/agent-initiate foo args))]
+            {:name name :invoke inv}))))
+
+     (doseq [{:keys [invoke]} created-runs]
+       (let [inv invoke]
          (try
            (aor/agent-result foo inv)
            (catch Throwable _))))
@@ -277,4 +293,57 @@
          "invokes-page query should support has-error filter")
      (when-let [rows (-> err-res :data :agent-invokes)]
        (is (seq rows))
-       (is (every? #(= :failure (:status %)) rows))))))
+       (is (every? #(= :failure (:status %)) rows)))
+
+     ;; Add human feedback scores for metric-filter testing.
+     (bind fast-target
+       (aor-types/->valid-FeedbackTarget
+        "foo"
+        (:invoke (first (filter #(= :fast-1 (:name %)) created-runs)))
+        nil))
+     (bind slow-exp-target
+       (aor-types/->valid-FeedbackTarget
+        "foo"
+        (:invoke (first (filter #(= :slow-exp (:name %)) created-runs)))
+        nil))
+     (evals/add-human-feedback! global-actions-depot fast-target "reviewer-1" {"quality" 2} "bad")
+     (evals/add-human-feedback! global-actions-depot slow-exp-target "reviewer-2" {"quality" 8} "good")
+
+     (bind feedback-res
+       (try
+         {:data (foreign-invoke-query q
+                                      10
+                                      nil
+                                      {:feedback-metric {:metric-name "quality"
+                                                         :comparator :<=
+                                                         :value 3
+                                                         :source :human}})}
+         (catch Throwable t {:error t})))
+     (is (nil? (:error feedback-res))
+         "invokes-page query should support feedback metric comparator filter")
+     (when-let [rows (-> feedback-res :data :agent-invokes)]
+       (is (= 1 (count rows))))
+
+     (bind source-res
+       (try
+         {:data (foreign-invoke-query q
+                                      10
+                                      nil
+                                      {:source "experiment"})}
+         (catch Throwable t {:error t})))
+     (is (nil? (:error source-res))
+         "invokes-page query should support source string filter")
+     (when-let [rows (-> source-res :data :agent-invokes)]
+       (is (= 1 (count rows))))
+
+     (bind non-exp-res
+       (try
+         {:data (foreign-invoke-query q
+                                      10
+                                      nil
+                                      {:from-experiment? false})}
+         (catch Throwable t {:error t})))
+     (is (nil? (:error non-exp-res))
+         "invokes-page query should support experiment source flag filter")
+     (when-let [rows (-> non-exp-res :data :agent-invokes)]
+       (is (= 5 (count rows)))))))
