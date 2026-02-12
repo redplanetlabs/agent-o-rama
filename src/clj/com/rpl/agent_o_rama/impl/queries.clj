@@ -342,25 +342,75 @@
   [i]
   (if (= i 1) 3 (inc i)))
 
-(defn relevant-invoke-submap
+(defn invoke-status
   [m]
-  (let [ret (select-keys m
-                         [:start-time-millis :finish-time-millis
-                          :invoke-args :graph-version])]
-    (assoc ret
-     :human-request?
-     (-> m
-         :human-requests
-         empty?
-         not)
+  (let [r (:result m)]
+    (cond (nil? r) :pending
+          (:failure? r) :failure
+          :else :success)))
 
-     :status
-     (let [r (:result m)]
-       (cond (nil? r) :pending
-             (:failure? r) :failure
-             :else :success)
+(defn invoke-latency-millis
+  [m]
+  (let [start (:start-time-millis m)
+        finish (:finish-time-millis m)]
+    (when (and (some? start) (some? finish))
+      (- finish start))))
 
-     ))))
+(defn invoke-matches-filters?
+  [m filters]
+  (let [{:keys [node-name has-error? latency-ms]} filters
+        status (invoke-status m)
+        latency (invoke-latency-millis m)
+        {:keys [min max]} latency-ms
+        node-stats (get-in m [:stats :basic-stats :node-stats])]
+    (and
+     (if (some? node-name)
+       (contains? node-stats node-name)
+       true)
+     (if (some? has-error?)
+       (= has-error? (= status :failure))
+       true)
+     (if (some? min)
+       (and (some? latency) (>= latency min))
+       true)
+     (if (some? max)
+       (and (some? latency) (<= latency max))
+       true))))
+
+(defn relevant-invoke-submap
+  ([m]
+   (relevant-invoke-submap m nil))
+  ([m filters]
+   (when (invoke-matches-filters? m filters)
+     (let [ret (select-keys m
+                            [:start-time-millis :finish-time-millis
+                             :invoke-args :graph-version])]
+       (assoc ret
+        :human-request?
+        (-> m
+            :human-requests
+            empty?
+            not)
+
+        :status
+        (invoke-status m))))))
+
+(def INVOKES-SCAN-MULTIPLIER-LIMIT 64)
+
+(defn filter-invokes-task-page
+  [m filters]
+  (into (sorted-map)
+        (keep (fn [[id info]]
+                (when-let [submap (relevant-invoke-submap info filters)]
+                  [id submap])))
+        m))
+
+(defn should-stop-invokes-scan?
+  [raw-page filtered-page scan-amt page-size]
+  (or (< (count raw-page) scan-amt)
+      (>= (count filtered-page) (adjust-page-size page-size))
+      (>= scan-amt
+          (* INVOKES-SCAN-MULTIPLIER-LIMIT (adjust-page-size page-size)))))
 
 (defbasicblocksegmacro get-distributed-page*
   [page-size pagination-params pstate-name res info-transformer page-result-fn max-key-fn initial-path]
@@ -431,13 +481,40 @@
 
 (defn declare-get-invokes-page-topology
   [topologies]
-  (declare-get-agent-distributed-page-topology
-   topologies
-   (agent-get-invokes-page-query-name)
-   po/agent-root-task-global-name
-   relevant-invoke-submap
-   to-invokes-page-result
-   h/max-uuid))
+  (<<query-topology topologies
+    (agent-get-invokes-page-query-name)
+    [*agent-name *page-size *pagination-params *filters :> *res]
+    (po/agent-root-task-global-name *agent-name :> *pstate-name)
+    (|all)
+    (ops/current-task-id :> *task-id)
+    (get *pagination-params *task-id (h/max-uuid) :> *end-id)
+    (<<if (nil? *end-id)
+      (identity (sorted-map) :> *task-page)
+     (else>)
+      (loop<- [*scan-amt (adjust-page-size *page-size)
+               :> *task-page]
+        (local-select>
+         [(sorted-map-range-to *end-id
+                               {:inclusive? true
+                                :max-amt    *scan-amt})]
+         (this-module-pobject-task-global *pstate-name)
+         :> *raw-page)
+        (filter-invokes-task-page *raw-page *filters :> *task-page)
+        (should-stop-invokes-scan? *raw-page
+                                   *task-page
+                                   *scan-amt
+                                   *page-size
+                                   :> *stop?)
+        (<<if *stop?
+          (:> *task-page)
+         (else>)
+          (* 2 *scan-amt :> *next-scan-amt)
+          (continue> *next-scan-amt))))
+    (|origin)
+    (aggs/+map-agg *task-id *task-page :> *pages-map)
+    (to-invokes-page-result *pages-map
+                            (adjust-page-size *page-size)
+                            :> *res)))
 
 (defn declare-agent-get-names-query-topology
   [topologies agent-names]

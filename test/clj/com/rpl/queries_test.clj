@@ -171,7 +171,7 @@
           (loop [ret    []
                  params nil]
             (let [{:keys [agent-invokes pagination-params]}
-                  (foreign-invoke-query q i params)
+                 (foreign-invoke-query q i params nil)
                   ret (conj ret agent-invokes)]
               (if (every? nil? (vals pagination-params))
                 ret
@@ -212,7 +212,7 @@
              nil
              (fn [agent-node {:keys [route sleep-ms]}]
                (when sleep-ms
-                 (Thread/sleep sleep-ms))
+                 (Thread/sleep ^long sleep-ms))
                (cond
                  (= route :fail)
                  (throw (ex-info "boom" {:route route}))
