@@ -118,7 +118,7 @@
              :completed "✅ Completed"
              :failed "❌ Failed"
              ($ :<> ($ common/spinner {:size :small}) "Running")))
-        ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
+        ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
            {:onClick on-rerun}
            ($ PlayIcon {:className "h-5 w-5 mr-2"})
            "Re-run Experiment"))))
