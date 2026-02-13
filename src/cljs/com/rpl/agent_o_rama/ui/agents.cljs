@@ -159,32 +159,174 @@
 
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+        [draft-filters set-draft-filters!] (uix/use-state
+                                            {:node-name ""
+                                             :latency-min ""
+                                             :latency-max ""
+                                             :error-filter "all"
+                                             :source "all"
+                                             :experiment-filter "all"
+                                             :feedback-metric-name ""
+                                             :feedback-comparator "<="
+                                             :feedback-value ""
+                                             :feedback-source "any"})
+        [applied-filters set-applied-filters!] (uix/use-state {})
+        filter-key (common/to-json applied-filters)
+
+        parse-filter-value
+        (fn [s]
+          (let [trimmed (str/trim (or s ""))
+                parsed (js/Number trimmed)]
+            (if (or (str/blank? trimmed) (js/isNaN parsed))
+              trimmed
+              parsed)))
+        build-filter-map
+        (fn [f]
+          (let [latency-min (parse-filter-value (:latency-min f))
+                latency-max (parse-filter-value (:latency-max f))
+                feedback-value (parse-filter-value (:feedback-value f))]
+            (cond-> {}
+              (not (str/blank? (:node-name f)))
+              (assoc :node-name (str/trim (:node-name f)))
+
+              (number? latency-min)
+              (assoc-in [:latency-ms :min] latency-min)
+
+              (number? latency-max)
+              (assoc-in [:latency-ms :max] latency-max)
+
+              (= "errors-only" (:error-filter f))
+              (assoc :has-error? true)
+
+              (= "no-errors" (:error-filter f))
+              (assoc :has-error? false)
+
+              (not= "all" (:source f))
+              (assoc :source (:source f))
+
+              (= "experiment-only" (:experiment-filter f))
+              (assoc :from-experiment? true)
+
+              (= "non-experiment-only" (:experiment-filter f))
+              (assoc :from-experiment? false)
+
+              (and (not (str/blank? (:feedback-metric-name f)))
+                   (not (str/blank? (:feedback-value f))))
+              (assoc :feedback-metric
+                     (cond-> {:metric-name (str/trim (:feedback-metric-name f))
+                              :comparator (keyword (:feedback-comparator f))
+                              :value feedback-value}
+                       (not= "any" (:feedback-source f))
+                       (assoc :source (keyword (:feedback-source f))))))))
+        apply-filters! (fn []
+                         (set-applied-filters! (build-filter-map draft-filters)))
+        reset-filters! (fn []
+                         (let [defaults {:node-name ""
+                                         :latency-min ""
+                                         :latency-max ""
+                                         :error-filter "all"
+                                         :source "all"
+                                         :experiment-filter "all"
+                                         :feedback-metric-name ""
+                                         :feedback-comparator "<="
+                                         :feedback-value ""
+                                         :feedback-source "any"}]
+                           (set-draft-filters! defaults)
+                           (set-applied-filters! {})))
 
         ;; Use the new paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
         (queries/use-paginated-query
-         {:query-key [:invocations module-id agent-name]
+         {:query-key [:invocations module-id agent-name filter-key]
           :sente-event [:invocations/get-page {:module-id module-id
-                                               :agent-name agent-name}]
+                                               :agent-name agent-name
+                                               :filters applied-filters}]
           :page-size 20
           :enabled? (boolean (and module-id agent-name))})]
 
-    (cond
-      ;; Use isLoading for the initial loading state
-      (and isLoading (empty? data))
-      ($ :div.flex.justify-center.items-center.py-8
-         ($ :div.text-gray-500 "Loading invocations..."))
+    ($ :div.p-4.space-y-4
+       ($ :div.bg-white.rounded-md.border.border-gray-200.p-4.shadow-sm
+          ($ :div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-4.gap-3
+             ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                {:placeholder "Node name (e.g. start)"
+                 :value (:node-name draft-filters)
+                 :onChange #(set-draft-filters! (assoc draft-filters :node-name (.. % -target -value)))})
+             ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                {:type "number"
+                 :placeholder "Latency min (ms)"
+                 :value (:latency-min draft-filters)
+                 :onChange #(set-draft-filters! (assoc draft-filters :latency-min (.. % -target -value)))})
+             ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                {:type "number"
+                 :placeholder "Latency max (ms)"
+                 :value (:latency-max draft-filters)
+                 :onChange #(set-draft-filters! (assoc draft-filters :latency-max (.. % -target -value)))})
+             ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                {:value (:error-filter draft-filters)
+                 :onChange #(set-draft-filters! (assoc draft-filters :error-filter (.. % -target -value)))}
+                ($ :option {:value "all"} "Result: All")
+                ($ :option {:value "errors-only"} "Result: Errors only")
+                ($ :option {:value "no-errors"} "Result: No errors"))
+             ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                {:value (:source draft-filters)
+                 :onChange #(set-draft-filters! (assoc draft-filters :source (.. % -target -value)))}
+                ($ :option {:value "all"} "Source: All")
+                ($ :option {:value "experiment"} "Source: Experiment")
+                ($ :option {:value "api"} "Source: API")
+                ($ :option {:value "ai"} "Source: AI")
+                ($ :option {:value "bulkUpload"} "Source: Bulk Upload"))
+             ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                {:value (:experiment-filter draft-filters)
+                 :onChange #(set-draft-filters! (assoc draft-filters :experiment-filter (.. % -target -value)))}
+                ($ :option {:value "all"} "Experiment: All")
+                ($ :option {:value "experiment-only"} "Experiment only")
+                ($ :option {:value "non-experiment-only"} "Non-experiment only"))
+             ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                {:placeholder "Feedback metric (e.g. quality)"
+                 :value (:feedback-metric-name draft-filters)
+                 :onChange #(set-draft-filters! (assoc draft-filters :feedback-metric-name (.. % -target -value)))})
+             ($ :div.flex.gap-2
+                ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white.flex-none
+                   {:value (:feedback-comparator draft-filters)
+                    :onChange #(set-draft-filters! (assoc draft-filters :feedback-comparator (.. % -target -value)))}
+                   ($ :option {:value "<="} "<=")
+                   ($ :option {:value "<"} "<")
+                   ($ :option {:value "="} "=")
+                   ($ :option {:value "not="} "!=")
+                   ($ :option {:value ">"} ">")
+                   ($ :option {:value ">="} ">="))
+                ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm.flex-1
+                   {:placeholder "Feedback value"
+                    :value (:feedback-value draft-filters)
+                    :onChange #(set-draft-filters! (assoc draft-filters :feedback-value (.. % -target -value)))})
+                ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white.flex-none
+                   {:value (:feedback-source draft-filters)
+                    :onChange #(set-draft-filters! (assoc draft-filters :feedback-source (.. % -target -value)))}
+                   ($ :option {:value "any"} "Any")
+                   ($ :option {:value "human"} "Human")
+                   ($ :option {:value "non-human"} "Non-human"))))
+          ($ :div.flex.justify-end.gap-2.mt-3
+             ($ :button.px-3.py-2.text-sm.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
+                {:onClick reset-filters!}
+                "Reset")
+             ($ :button.px-3.py-2.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.cursor-pointer
+                {:onClick apply-filters!}
+                "Apply filters")))
+       (cond
+         ;; Use isLoading for the initial loading state
+         (and isLoading (empty? data))
+         ($ :div.flex.justify-center.items-center.py-8
+            ($ :div.text-gray-500 "Loading invocations..."))
 
-      error
-      ($ :div.flex.justify-center.items-center.py-8
-         ($ :div.text-red-500 "Error loading invocations: " error))
+         error
+         ($ :div.flex.justify-center.items-center.py-8
+            ($ :div.text-red-500 "Error loading invocations: " error))
 
-      (empty? data)
-      ($ :div.flex.justify-center.items-center.py-8
-         ($ :div.text-gray-500 "No invocations found"))
+         (empty? data)
+         ($ :div.flex.justify-center.items-center.py-8
+            ($ :div.text-gray-500 "No invocations found"))
 
-      :else
-      ($ :div.p-4
+         :else
          ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm
             ($ :table.w-full.text-sm
                ($ :thead.bg-gray-50.border-b.border-gray-200
