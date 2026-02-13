@@ -155,7 +155,9 @@ test.describe('Invocations filters', () => {
       const expModal = page.locator('[role="dialog"]');
       await expModal.getByLabel('Experiment Name').fill(`e2e-inv-filter-exp-${uniqueId}`);
       await expModal.getByTestId('agent-name-dropdown').click();
-      await expModal.getByText('E2ETestAgent', { exact: true }).click();
+      const agentListbox = page.getByRole('listbox');
+      await expect(agentListbox).toBeVisible();
+      await agentListbox.getByRole('option', { name: 'E2ETestAgent', exact: true }).click();
       await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
       await addEvaluatorToExperiment(page, expModal, 'random-float');
       await expModal.getByRole('button', { name: 'Run Experiment' }).click();
