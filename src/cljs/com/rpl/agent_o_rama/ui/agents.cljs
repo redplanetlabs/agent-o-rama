@@ -83,7 +83,7 @@
    :else
    ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))
 
-(defui invocation-row [{:keys [invoke module-id agent-name on-click]}]
+(defui invocation-row [{:keys [invoke module-id agent-name on-click show-feedback-metric?]}]
   (let [task-id (:task-id invoke)
         agent-id (:agent-id invoke)
         start-time (:start-time-millis invoke)
@@ -112,7 +112,11 @@
        ($ :td.px-4.py-3.font-mono.text-gray-600 (:graph-version invoke))
        ($ :td.px-4.py-3.text-sm
           ($ result-badge {:status (:status invoke)
-                           :human-request? (:human-request? invoke)})))))
+                           :human-request? (:human-request? invoke)}))
+       (when show-feedback-metric?
+         ($ :td.px-4.py-3.text-sm.text-gray-700.font-mono
+            (let [v (:feedback-metric-value invoke)]
+              (if (nil? v) "-" (str v))))))))
 
 (defui index []
   (let [{:keys [data loading? error]}
@@ -181,6 +185,17 @@
         [active-filter-types set-active-filter-types!] (uix/use-state [])
         [open-filter-type set-open-filter-type!] (uix/use-state nil)
         filter-key (common/to-json applied-filters)
+        filter-options-query
+        (queries/use-sente-query
+         {:query-key [:invocations/filter-options module-id agent-name]
+          :sente-event [:invocations/get-filter-options {:module-id module-id
+                                                         :agent-name agent-name}]
+          :enabled? (boolean (and module-id agent-name))
+          :refetch-interval-ms 30000})
+        filter-options-data (:data filter-options-query)
+        node-options (or (:nodes filter-options-data) [])
+        feedback-metric-options (or (:feedback-metrics filter-options-data) [])
+        show-feedback-metric-column? (contains? applied-filters :feedback-metric)
 
         parse-filter-value
         (fn [s]
@@ -350,11 +365,13 @@
                      "Apply"))
                (case open-filter-type
                  :node
-                 ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                    {:placeholder "Node name (e.g. start)"
-                     :value (:node-name draft-filters)
+                 ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                    {:value (:node-name draft-filters)
                      :onChange #(set-draft-filters! (fn [prev]
-                                                      (assoc prev :node-name (.. % -target -value))))})
+                                                      (assoc prev :node-name (.. % -target -value))))}
+                    ($ :option {:value ""} "Any node")
+                    (for [node-name node-options]
+                      ($ :option {:key node-name :value node-name} node-name)))
 
                  :latency
                  ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
@@ -402,11 +419,13 @@
 
                  :feedback
                  ($ :div.space-y-2
-                    ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                       {:placeholder "Feedback metric (e.g. quality)"
-                        :value (:feedback-metric-name draft-filters)
+                    ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                       {:value (:feedback-metric-name draft-filters)
                         :onChange #(set-draft-filters! (fn [prev]
-                                                         (assoc prev :feedback-metric-name (.. % -target -value))))})
+                                                         (assoc prev :feedback-metric-name (.. % -target -value))))}
+                       ($ :option {:value ""} "Select metric")
+                       (for [metric-name feedback-metric-options]
+                         ($ :option {:key metric-name :value metric-name} metric-name)))
                     ($ :div.grid.grid-cols-1.md:grid-cols-3.gap-2
                        ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                           {:value (:feedback-comparator draft-filters)
@@ -433,8 +452,7 @@
                     ($ :div.text-xs.text-gray-500
                        "Matches invokes where any feedback entry satisfies this comparator."))
 
-                 ($ :div.text-sm.text-gray-500 "Unknown filter"))))
-          )
+                 ($ :div.text-sm.text-gray-500 "Unknown filter")))))
        (cond
          ;; Use isLoading for the initial loading state
          (and isLoading (empty? data))
@@ -458,13 +476,17 @@
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Start Time")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Arguments")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
-                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")))
+                     ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")
+                     (when show-feedback-metric-column?
+                       ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide
+                          "Metric value"))))
                ($ :tbody.divide-y.divide-gray-200
                   (for [invoke data]
                     ($ invocation-row {:key (str (:task-id invoke) "-" (:agent-id invoke))
                                        :invoke invoke
                                        :module-id module-id
                                        :agent-name agent-name
+                                       :show-feedback-metric? show-feedback-metric-column?
                                        :on-click (fn [url] (set! (.-href (.-location js/window)) url))})))
 
                ;; Load More button
@@ -472,7 +494,7 @@
                  ($ :tfoot.bg-gray-50.border-t.border-gray-200
                     ($ :tr.hover:bg-gray-100.transition-colors.duration-150
                        {:onClick (when-not isFetchingMore loadMore)}
-                       ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
+                       ($ :td.px-4.py-3.cursor-pointer {:colSpan (if show-feedback-metric-column? 6 5)}
                           ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                              ($ :span.mr-2.text-sm.font-medium (if isFetchingMore "Loading..." "Load More"))
                              (when-not isFetchingMore
@@ -512,6 +534,7 @@
                                     :invoke invoke
                                     :module-id module-id
                                     :agent-name agent-name
+                                    :show-feedback-metric? false
                                     :on-click (fn [url] (set! (.-href (.-location js/window)) url))})))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150
@@ -708,6 +731,8 @@
                       ($ :path {:fillRule "evenodd"
                                 :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 :clipRule "evenodd"})))))))))
+
+
 
 (defui manual-run [{:keys [form-id]}]
   (let [form (forms/use-form form-id)

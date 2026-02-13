@@ -414,14 +414,34 @@
            (catch Throwable _
              false)))))
 
+(defn feedback-entry-matched-score
+  [feedback feedback-metric]
+  (let [{:keys [metric-name]} feedback-metric
+        score-value (get (:scores feedback) metric-name ::missing)]
+    (when (and (feedback-source-matches? feedback (:source feedback-metric))
+               (not= ::missing score-value)
+               (try
+                 (aor-types/comparator-spec-matches?
+                  {:comparator (:comparator feedback-metric)
+                   :value      (:value feedback-metric)}
+                  score-value)
+                 (catch Throwable _
+                   false)))
+      score-value)))
+
+(defn invoke-feedback-metric-value
+  [m feedback-metric]
+  (when (some? feedback-metric)
+    (let [results (get-in m [:feedback :results])]
+      (when (seq results)
+        (some #(feedback-entry-matched-score % feedback-metric)
+              results)))))
+
 (defn invoke-feedback-matches?
   [m feedback-metric]
   (if (nil? feedback-metric)
     true
-    (let [results (get-in m [:feedback :results])]
-      (and (seq results)
-           (some #(feedback-entry-matches? % feedback-metric)
-                 results)))))
+    (some? (invoke-feedback-metric-value m feedback-metric))))
 
 (defn invoke-matches-filters?
   [m filters]
@@ -456,16 +476,19 @@
    (when (invoke-matches-filters? m filters)
      (let [ret (select-keys m
                             [:start-time-millis :finish-time-millis
-                             :invoke-args :graph-version])]
-       (assoc ret
-        :human-request?
-        (-> m
-            :human-requests
-            empty?
-            not)
-
-        :status
-        (invoke-status m))))))
+                             :invoke-args :graph-version])
+           feedback-metric (:feedback-metric filters)
+           feedback-metric-value (invoke-feedback-metric-value m feedback-metric)]
+       (cond-> (assoc ret
+                 :human-request?
+                 (-> m
+                     :human-requests
+                     empty?
+                     not)
+                 :status
+                 (invoke-status m))
+         (some? feedback-metric)
+         (assoc :feedback-metric-value feedback-metric-value))))))
 
 (def INVOKES-SCAN-MULTIPLIER-LIMIT 64)
 

@@ -322,7 +322,9 @@
      (is (nil? (:error feedback-res))
          "invokes-page query should support feedback metric comparator filter")
      (when-let [rows (-> feedback-res :data :agent-invokes)]
-       (is (= 1 (count rows))))
+      (is (= 1 (count rows)))
+      (is (every? #(contains? % :feedback-metric-value) rows))
+      (is (every? #(number? (:feedback-metric-value %)) rows)))
 
      (bind source-res
        (try

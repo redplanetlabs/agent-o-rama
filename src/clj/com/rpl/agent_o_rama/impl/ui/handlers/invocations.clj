@@ -18,6 +18,30 @@
        (:invokes-page-query (aor-types/underlying-objects client))
        10 pages filters))))
 
+(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-filter-options
+  [{:keys [client manager agent-name]} uid]
+  (let [graph-nodes (if client
+                      (let [graph-res (foreign-invoke-query
+                                       (:current-graph-query (aor-types/underlying-objects client)))]
+                        (-> graph-res
+                            :graph
+                            :node-map
+                            keys
+                            sort
+                            vec))
+                      [])
+        human-metrics (if manager
+                        (let [search-human-metrics-query (:search-human-metrics-query
+                                                          (aor-types/underlying-objects manager))
+                              metric-res (foreign-invoke-query search-human-metrics-query {} 1000 nil)]
+                          (->> (:items metric-res)
+                               (map :name)
+                               sort
+                               vec))
+                        [])]
+    {:nodes graph-nodes
+     :feedback-metrics human-metrics}))
+
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/run-agent
   [{:keys [client args metadata]} uid]
   (when-not (vector? args)
