@@ -231,18 +231,20 @@
         (fn [filter-type]
           (set-draft-filters!
            (fn [prev]
-             (case filter-type
-               :node (assoc prev :node-name "")
-               :latency (assoc prev :latency-min "" :latency-max "")
-               :error (assoc prev :error-filter "all")
-               :source (assoc prev :source "all")
-               :experiment (assoc prev :experiment-filter "all")
-               :feedback (assoc prev
-                                :feedback-metric-name ""
-                                :feedback-comparator "<="
-                                :feedback-value ""
-                                :feedback-source "any")
-               prev)))
+             (let [next-draft (case filter-type
+                                :node (assoc prev :node-name "")
+                                :latency (assoc prev :latency-min "" :latency-max "")
+                                :error (assoc prev :error-filter "all")
+                                :source (assoc prev :source "all")
+                                :experiment (assoc prev :experiment-filter "all")
+                                :feedback (assoc prev
+                                                 :feedback-metric-name ""
+                                                 :feedback-comparator "<="
+                                                 :feedback-value ""
+                                                 :feedback-source "any")
+                                prev)]
+               (set-applied-filters! (build-filter-map next-draft))
+               next-draft)))
           (set-active-filter-types!
            (fn [types]
              (vec (remove #(= % filter-type) types))))
@@ -297,14 +299,9 @@
                 :disabled? (boolean (some #(= % filter-type) active-filter-types))
                 :on-select #(add-filter-type! filter-type)})
              filter-type-order)
-        apply-filters! (fn []
-                         (set-applied-filters! (build-filter-map draft-filters)))
-        reset-filters! (fn []
-                         (do
-                           (set-draft-filters! default-draft-filters)
-                           (set-active-filter-types! [])
-                           (set-open-filter-type! nil)
-                           (set-applied-filters! {})))
+        apply-open-filter! (fn []
+                             (set-applied-filters! (build-filter-map draft-filters))
+                             (set-open-filter-type! nil))
 
         ;; Use the new paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
@@ -347,10 +344,10 @@
                ($ :div.flex.items-center.justify-between.mb-3
                   ($ :div.text-sm.font-medium.text-gray-800
                      (str "Edit " (get filter-type-labels open-filter-type) " filter"))
-                  ($ :button.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
+                  ($ :button.text-xs.px-2.py-1.bg-blue-600.text-white.rounded.hover:bg-blue-700.cursor-pointer
                      {:type "button"
-                      :onClick #(set-open-filter-type! nil)}
-                     "Close"))
+                      :onClick apply-open-filter!}
+                     "Apply"))
                (case open-filter-type
                  :node
                  ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
@@ -437,15 +434,7 @@
                        "Matches invokes where any feedback entry satisfies this comparator."))
 
                  ($ :div.text-sm.text-gray-500 "Unknown filter"))))
-          ($ :div.flex.justify-end.gap-2.mt-3
-             ($ :button.px-3.py-2.text-sm.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
-                {:type "button"
-                 :onClick reset-filters!}
-                "Reset")
-             ($ :button.px-3.py-2.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.cursor-pointer
-                {:type "button"
-                 :onClick apply-filters!}
-                "Apply filters")))
+          )
        (cond
          ;; Use isLoading for the initial loading state
          (and isLoading (empty? data))
