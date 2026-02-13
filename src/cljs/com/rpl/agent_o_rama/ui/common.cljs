@@ -3,7 +3,8 @@
    [cognitect.transit :as t]
    [clojure.string :as str]
    [uix.core :as uix :refer [defhook defui $]]
-   ["@heroicons/react/24/outline" :refer [ChevronDownIcon InformationCircleIcon]]))
+   ["@heroicons/react/24/outline" :refer [ChevronDownIcon InformationCircleIcon]]
+   ["react-dom" :refer [createPortal]]))
 
 ;; =============================================================================
 ;; EVALUATOR TYPE HELPERS (moved here to avoid circular dependencies)
@@ -293,6 +294,8 @@
   [{:keys [label disabled? display-text items loading? error? empty-content data-testid on-toggle full-width?]
     :or {full-width? true}}]
   (let [[open? set-open] (uix/use-state false)
+        [dropdown-pos set-dropdown-pos] (uix/use-state nil)
+        container-ref (uix/use-ref nil)
         close-dropdown (fn [] (set-open false))
         handle-toggle (fn [e]
                         (.stopPropagation e)
@@ -312,7 +315,33 @@
          #(.removeEventListener js/document "click" handle-click)))
      [open? close-dropdown])
 
-    ($ :div {:className (cn "relative inline-block text-left" (when full-width? "w-full"))}
+    (uix/use-effect
+     (fn []
+       (when (and open? @container-ref)
+         (let [rect (.getBoundingClientRect @container-ref)
+               viewport-width (.-innerWidth js/window)]
+           (set-dropdown-pos {:top (+ (.-bottom rect) 4)
+                              :left (.-left rect)
+                              :right (- viewport-width (.-right rect))
+                              :width (.-width rect)})))
+       js/undefined)
+     [open?])
+
+    (uix/use-effect
+     (fn []
+       (when open?
+         (let [handle-scroll (fn [_] (close-dropdown))
+               handle-resize (fn [] (close-dropdown))]
+           (.addEventListener js/document "scroll" handle-scroll true)
+           (.addEventListener js/window "resize" handle-resize)
+           (fn []
+             (.removeEventListener js/document "scroll" handle-scroll true)
+             (.removeEventListener js/window "resize" handle-resize))))
+       js/undefined)
+     [open? close-dropdown])
+
+    ($ :div {:ref container-ref
+             :className (cn "relative inline-block text-left" (when full-width? "w-full"))}
        ($ :button {:className (cn "inline-flex items-center justify-between px-3 py-2 text-xs bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:bg-gray-100 cursor-pointer"
                                   (when full-width? "w-full"))
                    :type "button"
@@ -322,22 +351,36 @@
           ($ :span.truncate (or display-text label))
           ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
 
-       (when (and open? (not disabled?))
-         ($ :div {:className (cn "origin-top-right absolute right-0 mt-1 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
-                                 (if full-width? "w-full" "min-w-full"))
-                  :onClick #(.stopPropagation %)}
-            ($ :div.py-1.max-h-60.overflow-y-auto
-               (cond
-                 loading? ($ :div.px-4.py-2.text-xs.text-gray-500 "Loading...")
-                 error? ($ :div.px-4.py-2.text-xs.text-red-500 "Error")
-                 (seq items) (for [{:keys [key label selected? disabled? on-select]} items]
-                               ($ DropdownRow {:key key
-                                               :label label
-                                               :selected? selected?
-                                               :disabled? disabled?
-                                               :on-select #(handle-select on-select)}))
-                 empty-content empty-content
-                 :else ($ :div.px-4.py-2.text-xs.text-gray-500 "No options available."))))))))
+       (when (and open? (not disabled?) dropdown-pos)
+         (createPortal
+          ($ :div {:className (cn "rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
+                                  (when-not full-width? "whitespace-nowrap"))
+                   :style (if full-width?
+                            {:position "fixed"
+                             :top (str (:top dropdown-pos) "px")
+                             :left (str (:left dropdown-pos) "px")
+                             :width (str (:width dropdown-pos) "px")
+                             :z-index 999999}
+                            {:position "fixed"
+                             :top (str (:top dropdown-pos) "px")
+                             :right (str (:right dropdown-pos) "px")
+                             :width "max-content"
+                             :max-width "calc(100vw - 16px)"
+                             :z-index 999999})
+                   :onClick #(.stopPropagation %)}
+             ($ :div.py-1.max-h-60.overflow-y-auto
+                (cond
+                  loading? ($ :div.px-4.py-2.text-xs.text-gray-500 "Loading...")
+                  error? ($ :div.px-4.py-2.text-xs.text-red-500 "Error")
+                  (seq items) (for [{:keys [key label selected? disabled? on-select]} items]
+                                ($ DropdownRow {:key key
+                                                :label label
+                                                :selected? selected?
+                                                :disabled? disabled?
+                                                :on-select #(handle-select on-select)}))
+                  empty-content empty-content
+                  :else ($ :div.px-4.py-2.text-xs.text-gray-500 "No options available."))))
+          (.-body js/document))))))
 
 ;; A simple modal component to display pre-formatted text content.
 (defui ContentDetailModal [{:keys [title content]}]
