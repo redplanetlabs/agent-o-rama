@@ -159,18 +159,27 @@
 
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
-        [draft-filters set-draft-filters!] (uix/use-state
-                                            {:node-name ""
-                                             :latency-min ""
-                                             :latency-max ""
-                                             :error-filter "all"
-                                             :source "all"
-                                             :experiment-filter "all"
-                                             :feedback-metric-name ""
-                                             :feedback-comparator "<="
-                                             :feedback-value ""
-                                             :feedback-source "any"})
+        default-draft-filters {:node-name ""
+                               :latency-min ""
+                               :latency-max ""
+                               :error-filter "all"
+                               :source "all"
+                               :experiment-filter "all"
+                               :feedback-metric-name ""
+                               :feedback-comparator "<="
+                               :feedback-value ""
+                               :feedback-source "any"}
+        filter-type-order [:node :latency :error :source :experiment :feedback]
+        filter-type-labels {:node "Node"
+                            :latency "Latency"
+                            :error "Error"
+                            :source "Source"
+                            :experiment "Experiment"
+                            :feedback "Feedback"}
+        [draft-filters set-draft-filters!] (uix/use-state default-draft-filters)
         [applied-filters set-applied-filters!] (uix/use-state {})
+        [active-filter-types set-active-filter-types!] (uix/use-state [])
+        [open-filter-type set-open-filter-type!] (uix/use-state nil)
         filter-key (common/to-json applied-filters)
 
         parse-filter-value
@@ -218,20 +227,83 @@
                               :value feedback-value}
                        (not= "any" (:feedback-source f))
                        (assoc :source (keyword (:feedback-source f))))))))
+        clear-filter-type!
+        (fn [filter-type]
+          (set-draft-filters!
+           (fn [prev]
+             (case filter-type
+               :node (assoc prev :node-name "")
+               :latency (assoc prev :latency-min "" :latency-max "")
+               :error (assoc prev :error-filter "all")
+               :source (assoc prev :source "all")
+               :experiment (assoc prev :experiment-filter "all")
+               :feedback (assoc prev
+                                :feedback-metric-name ""
+                                :feedback-comparator "<="
+                                :feedback-value ""
+                                :feedback-source "any")
+               prev)))
+          (set-active-filter-types!
+           (fn [types]
+             (vec (remove #(= % filter-type) types))))
+          (when (= open-filter-type filter-type)
+            (set-open-filter-type! nil)))
+        add-filter-type!
+        (fn [filter-type]
+          (set-active-filter-types!
+           (fn [types]
+             (if (some #(= % filter-type) types)
+               types
+               (conj (vec types) filter-type))))
+          (set-open-filter-type! filter-type))
+        chip-description
+        (fn [filter-type f]
+          (case filter-type
+            :node (if (str/blank? (:node-name f))
+                    "Any node"
+                    (str "Node: " (:node-name f)))
+            :latency (let [mn (str/trim (:latency-min f))
+                           mx (str/trim (:latency-max f))]
+                       (cond
+                         (and (str/blank? mn) (str/blank? mx)) "Any latency"
+                         (and (not (str/blank? mn)) (not (str/blank? mx))) (str mn "ms-" mx "ms")
+                         (not (str/blank? mn)) (str ">= " mn "ms")
+                         :else (str "<= " mx "ms")))
+            :error (case (:error-filter f)
+                     "errors-only" "Errors only"
+                     "no-errors" "No errors"
+                     "Any result")
+            :source (if (= "all" (:source f))
+                      "Any source"
+                      (str "Source: " (:source f)))
+            :experiment (case (:experiment-filter f)
+                          "experiment-only" "Experiment only"
+                          "non-experiment-only" "Non-experiment only"
+                          "Any invoke")
+            :feedback (let [metric (str/trim (:feedback-metric-name f))
+                            comparator (:feedback-comparator f)
+                            value (str/trim (:feedback-value f))
+                            source (:feedback-source f)]
+                        (if (or (str/blank? metric) (str/blank? value))
+                          "Metric unset"
+                          (str metric " " comparator " " value
+                               (when-not (= "any" source)
+                                 (str " (" source ")")))))
+            ""))
+        add-filter-items
+        (map (fn [filter-type]
+               {:key (name filter-type)
+                :label (get filter-type-labels filter-type)
+                :disabled? (boolean (some #(= % filter-type) active-filter-types))
+                :on-select #(add-filter-type! filter-type)})
+             filter-type-order)
         apply-filters! (fn []
                          (set-applied-filters! (build-filter-map draft-filters)))
         reset-filters! (fn []
-                         (let [defaults {:node-name ""
-                                         :latency-min ""
-                                         :latency-max ""
-                                         :error-filter "all"
-                                         :source "all"
-                                         :experiment-filter "all"
-                                         :feedback-metric-name ""
-                                         :feedback-comparator "<="
-                                         :feedback-value ""
-                                         :feedback-source "any"}]
-                           (set-draft-filters! defaults)
+                         (do
+                           (set-draft-filters! default-draft-filters)
+                           (set-active-filter-types! [])
+                           (set-open-filter-type! nil)
                            (set-applied-filters! {})))
 
         ;; Use the new paginated query hook
@@ -246,71 +318,133 @@
 
     ($ :div.p-4.space-y-4
        ($ :div.bg-white.rounded-md.border.border-gray-200.p-4.shadow-sm
-          ($ :div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-4.gap-3
-             ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                {:placeholder "Node name (e.g. start)"
-                 :value (:node-name draft-filters)
-                 :onChange #(set-draft-filters! (assoc draft-filters :node-name (.. % -target -value)))})
-             ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                {:type "number"
-                 :placeholder "Latency min (ms)"
-                 :value (:latency-min draft-filters)
-                 :onChange #(set-draft-filters! (assoc draft-filters :latency-min (.. % -target -value)))})
-             ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                {:type "number"
-                 :placeholder "Latency max (ms)"
-                 :value (:latency-max draft-filters)
-                 :onChange #(set-draft-filters! (assoc draft-filters :latency-max (.. % -target -value)))})
-             ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                {:value (:error-filter draft-filters)
-                 :onChange #(set-draft-filters! (assoc draft-filters :error-filter (.. % -target -value)))}
-                ($ :option {:value "all"} "Result: All")
-                ($ :option {:value "errors-only"} "Result: Errors only")
-                ($ :option {:value "no-errors"} "Result: No errors"))
-             ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                {:value (:source draft-filters)
-                 :onChange #(set-draft-filters! (assoc draft-filters :source (.. % -target -value)))}
-                ($ :option {:value "all"} "Source: All")
-                ($ :option {:value "experiment"} "Source: Experiment")
-                ($ :option {:value "api"} "Source: API")
-                ($ :option {:value "ai"} "Source: AI")
-                ($ :option {:value "bulkUpload"} "Source: Bulk Upload"))
-             ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                {:value (:experiment-filter draft-filters)
-                 :onChange #(set-draft-filters! (assoc draft-filters :experiment-filter (.. % -target -value)))}
-                ($ :option {:value "all"} "Experiment: All")
-                ($ :option {:value "experiment-only"} "Experiment only")
-                ($ :option {:value "non-experiment-only"} "Non-experiment only"))
-             ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                {:placeholder "Feedback metric (e.g. quality)"
-                 :value (:feedback-metric-name draft-filters)
-                 :onChange #(set-draft-filters! (assoc draft-filters :feedback-metric-name (.. % -target -value)))})
-             ($ :div.flex.gap-2
-                ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white.flex-none
-                   {:value (:feedback-comparator draft-filters)
-                    :onChange #(set-draft-filters! (assoc draft-filters :feedback-comparator (.. % -target -value)))}
-                   ($ :option {:value "<="} "<=")
-                   ($ :option {:value "<"} "<")
-                   ($ :option {:value "="} "=")
-                   ($ :option {:value "not="} "!=")
-                   ($ :option {:value ">"} ">")
-                   ($ :option {:value ">="} ">="))
-                ($ :input.px-3.py-2.border.border-gray-300.rounded-md.text-sm.flex-1
-                   {:placeholder "Feedback value"
-                    :value (:feedback-value draft-filters)
-                    :onChange #(set-draft-filters! (assoc draft-filters :feedback-value (.. % -target -value)))})
-                ($ :select.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white.flex-none
-                   {:value (:feedback-source draft-filters)
-                    :onChange #(set-draft-filters! (assoc draft-filters :feedback-source (.. % -target -value)))}
-                   ($ :option {:value "any"} "Any")
-                   ($ :option {:value "human"} "Human")
-                   ($ :option {:value "non-human"} "Non-human"))))
+          ($ :div.flex.flex-wrap.items-center.gap-2
+             ($ common/Dropdown
+                {:label "Add filter"
+                 :display-text "Add filter"
+                 :items add-filter-items
+                 :full-width? false
+                 :data-testid "add-invocations-filter"})
+             (if (seq active-filter-types)
+               (for [filter-type active-filter-types]
+                 ($ :button.inline-flex.items-center.gap-2.px-3.py-1.5.rounded-full.bg-blue-50.text-blue-700.text-xs.font-medium.border.border-blue-200.cursor-pointer.hover:bg-blue-100.transition-colors.duration-150
+                    {:key (name filter-type)
+                     :type "button"
+                     :onClick #(set-open-filter-type!
+                                (if (= open-filter-type filter-type)
+                                  nil
+                                  filter-type))}
+                    ($ :span (get filter-type-labels filter-type))
+                    ($ :span.text-blue-500 (chip-description filter-type draft-filters))
+                    ($ :span.text-blue-400.hover:text-blue-700.cursor-pointer
+                       {:onClick (fn [e]
+                                   (.stopPropagation e)
+                                   (clear-filter-type! filter-type))}
+                       "x")))
+               ($ :div.text-xs.text-gray-500 "No filters added")))
+          (when open-filter-type
+            ($ :div.mt-3.p-3.border.border-gray-200.rounded-md.bg-gray-50.max-w-2xl
+               ($ :div.flex.items-center.justify-between.mb-3
+                  ($ :div.text-sm.font-medium.text-gray-800
+                     (str "Edit " (get filter-type-labels open-filter-type) " filter"))
+                  ($ :button.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
+                     {:type "button"
+                      :onClick #(set-open-filter-type! nil)}
+                     "Close"))
+               (case open-filter-type
+                 :node
+                 ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                    {:placeholder "Node name (e.g. start)"
+                     :value (:node-name draft-filters)
+                     :onChange #(set-draft-filters! (fn [prev]
+                                                      (assoc prev :node-name (.. % -target -value))))})
+
+                 :latency
+                 ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
+                    ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                       {:type "number"
+                        :placeholder "Latency min (ms)"
+                        :value (:latency-min draft-filters)
+                        :onChange #(set-draft-filters! (fn [prev]
+                                                         (assoc prev :latency-min (.. % -target -value))))})
+                    ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                       {:type "number"
+                        :placeholder "Latency max (ms)"
+                        :value (:latency-max draft-filters)
+                        :onChange #(set-draft-filters! (fn [prev]
+                                                         (assoc prev :latency-max (.. % -target -value))))}))
+
+                 :error
+                 ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                    {:value (:error-filter draft-filters)
+                     :onChange #(set-draft-filters! (fn [prev]
+                                                      (assoc prev :error-filter (.. % -target -value))))}
+                    ($ :option {:value "all"} "All results")
+                    ($ :option {:value "errors-only"} "Errors only")
+                    ($ :option {:value "no-errors"} "No errors"))
+
+                 :source
+                 ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                    {:value (:source draft-filters)
+                     :onChange #(set-draft-filters! (fn [prev]
+                                                      (assoc prev :source (.. % -target -value))))}
+                    ($ :option {:value "all"} "All sources")
+                    ($ :option {:value "experiment"} "Experiment")
+                    ($ :option {:value "api"} "API")
+                    ($ :option {:value "ai"} "AI")
+                    ($ :option {:value "bulkUpload"} "Bulk Upload"))
+
+                 :experiment
+                 ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                    {:value (:experiment-filter draft-filters)
+                     :onChange #(set-draft-filters! (fn [prev]
+                                                      (assoc prev :experiment-filter (.. % -target -value))))}
+                    ($ :option {:value "all"} "All invokes")
+                    ($ :option {:value "experiment-only"} "Experiment only")
+                    ($ :option {:value "non-experiment-only"} "Non-experiment only"))
+
+                 :feedback
+                 ($ :div.space-y-2
+                    ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                       {:placeholder "Feedback metric (e.g. quality)"
+                        :value (:feedback-metric-name draft-filters)
+                        :onChange #(set-draft-filters! (fn [prev]
+                                                         (assoc prev :feedback-metric-name (.. % -target -value))))})
+                    ($ :div.grid.grid-cols-1.md:grid-cols-3.gap-2
+                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                          {:value (:feedback-comparator draft-filters)
+                           :onChange #(set-draft-filters! (fn [prev]
+                                                            (assoc prev :feedback-comparator (.. % -target -value))))}
+                          ($ :option {:value "<="} "<=")
+                          ($ :option {:value "<"} "<")
+                          ($ :option {:value "="} "=")
+                          ($ :option {:value "not="} "!=")
+                          ($ :option {:value ">"} ">")
+                          ($ :option {:value ">="} ">="))
+                       ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                          {:placeholder "Feedback value"
+                           :value (:feedback-value draft-filters)
+                           :onChange #(set-draft-filters! (fn [prev]
+                                                            (assoc prev :feedback-value (.. % -target -value))))})
+                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                          {:value (:feedback-source draft-filters)
+                           :onChange #(set-draft-filters! (fn [prev]
+                                                            (assoc prev :feedback-source (.. % -target -value))))}
+                          ($ :option {:value "any"} "Any source")
+                          ($ :option {:value "human"} "Human")
+                          ($ :option {:value "non-human"} "Non-human")))
+                    ($ :div.text-xs.text-gray-500
+                       "Matches invokes where any feedback entry satisfies this comparator."))
+
+                 ($ :div.text-sm.text-gray-500 "Unknown filter"))))
           ($ :div.flex.justify-end.gap-2.mt-3
              ($ :button.px-3.py-2.text-sm.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
-                {:onClick reset-filters!}
+                {:type "button"
+                 :onClick reset-filters!}
                 "Reset")
              ($ :button.px-3.py-2.text-sm.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.cursor-pointer
-                {:onClick apply-filters!}
+                {:type "button"
+                 :onClick apply-filters!}
                 "Apply filters")))
        (cond
          ;; Use isLoading for the initial loading state
