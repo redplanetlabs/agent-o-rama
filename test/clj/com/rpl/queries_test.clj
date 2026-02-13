@@ -338,14 +338,4 @@
      (when-let [rows (-> source-res :data :agent-invokes)]
        (is (= 1 (count rows))))
 
-     (bind non-exp-res
-       (try
-         {:data (foreign-invoke-query q
-                                      10
-                                      nil
-                                      {:from-experiment? false})}
-         (catch Throwable t {:error t})))
-     (is (nil? (:error non-exp-res))
-         "invokes-page query should support experiment source flag filter")
-     (when-let [rows (-> non-exp-res :data :agent-invokes)]
-       (is (= 5 (count rows)))))))
+     )))

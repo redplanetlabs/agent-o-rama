@@ -168,17 +168,15 @@
                                :latency-max ""
                                :error-filter "all"
                                :source "all"
-                               :experiment-filter "all"
                                :feedback-metric-name ""
                                :feedback-comparator "<="
                                :feedback-value ""
                                :feedback-source "any"}
-        filter-type-order [:node :latency :error :source :experiment :feedback]
+        filter-type-order [:node :latency :error :source :feedback]
         filter-type-labels {:node "Node"
                             :latency "Latency"
                             :error "Error"
                             :source "Source"
-                            :experiment "Experiment"
                             :feedback "Feedback"}
         [draft-filters set-draft-filters!] (uix/use-state default-draft-filters)
         [applied-filters set-applied-filters!] (uix/use-state {})
@@ -208,7 +206,7 @@
         (fn [f]
           (let [latency-min (parse-filter-value (:latency-min f))
                 latency-max (parse-filter-value (:latency-max f))
-                feedback-value (parse-filter-value (:feedback-value f))]
+                feedback-value (str/trim (or (:feedback-value f) ""))]
             (cond-> {}
               (not (str/blank? (:node-name f)))
               (assoc :node-name (str/trim (:node-name f)))
@@ -228,14 +226,8 @@
               (not= "all" (:source f))
               (assoc :source (:source f))
 
-              (= "experiment-only" (:experiment-filter f))
-              (assoc :from-experiment? true)
-
-              (= "non-experiment-only" (:experiment-filter f))
-              (assoc :from-experiment? false)
-
               (and (not (str/blank? (:feedback-metric-name f)))
-                   (not (str/blank? (:feedback-value f))))
+                   (not (str/blank? feedback-value)))
               (assoc :feedback-metric
                      (cond-> {:metric-name (str/trim (:feedback-metric-name f))
                               :comparator (keyword (:feedback-comparator f))
@@ -251,7 +243,6 @@
                                 :latency (assoc prev :latency-min "" :latency-max "")
                                 :error (assoc prev :error-filter "all")
                                 :source (assoc prev :source "all")
-                                :experiment (assoc prev :experiment-filter "all")
                                 :feedback (assoc prev
                                                  :feedback-metric-name ""
                                                  :feedback-comparator "<="
@@ -293,10 +284,6 @@
             :source (if (= "all" (:source f))
                       "Any source"
                       (str "Source: " (:source f)))
-            :experiment (case (:experiment-filter f)
-                          "experiment-only" "Experiment only"
-                          "non-experiment-only" "Non-experiment only"
-                          "Any invoke")
             :feedback (let [metric (str/trim (:feedback-metric-name f))
                             comparator (:feedback-comparator f)
                             value (str/trim (:feedback-value f))
@@ -360,13 +347,15 @@
                   ($ :div.text-sm.font-medium.text-gray-800
                      (str "Edit " (get filter-type-labels open-filter-type) " filter"))
                   ($ :button.text-xs.px-2.py-1.bg-blue-600.text-white.rounded.hover:bg-blue-700.cursor-pointer
-                     {:type "button"
+                    {:type "button"
+                     :data-testid "invocations-filter-apply"
                       :onClick apply-open-filter!}
                      "Apply"))
                (case open-filter-type
                  :node
                  ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                     {:value (:node-name draft-filters)
+                     :data-testid "invocations-filter-node-select"
                      :onChange #(set-draft-filters! (fn [prev]
                                                       (assoc prev :node-name (.. % -target -value))))}
                     ($ :option {:value ""} "Any node")
@@ -376,13 +365,15 @@
                  :latency
                  ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
                     ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                       {:type "number"
+                      {:type "number"
+                       :data-testid "invocations-filter-latency-min"
                         :placeholder "Latency min (ms)"
                         :value (:latency-min draft-filters)
                         :onChange #(set-draft-filters! (fn [prev]
                                                          (assoc prev :latency-min (.. % -target -value))))})
                     ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                       {:type "number"
+                      {:type "number"
+                       :data-testid "invocations-filter-latency-max"
                         :placeholder "Latency max (ms)"
                         :value (:latency-max draft-filters)
                         :onChange #(set-draft-filters! (fn [prev]
@@ -391,6 +382,7 @@
                  :error
                  ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                     {:value (:error-filter draft-filters)
+                     :data-testid "invocations-filter-error-select"
                      :onChange #(set-draft-filters! (fn [prev]
                                                       (assoc prev :error-filter (.. % -target -value))))}
                     ($ :option {:value "all"} "All results")
@@ -400,6 +392,7 @@
                  :source
                  ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                     {:value (:source draft-filters)
+                     :data-testid "invocations-filter-source-select"
                      :onChange #(set-draft-filters! (fn [prev]
                                                       (assoc prev :source (.. % -target -value))))}
                     ($ :option {:value "all"} "All sources")
@@ -408,19 +401,11 @@
                     ($ :option {:value "ai"} "AI")
                     ($ :option {:value "bulkUpload"} "Bulk Upload"))
 
-                 :experiment
-                 ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                    {:value (:experiment-filter draft-filters)
-                     :onChange #(set-draft-filters! (fn [prev]
-                                                      (assoc prev :experiment-filter (.. % -target -value))))}
-                    ($ :option {:value "all"} "All invokes")
-                    ($ :option {:value "experiment-only"} "Experiment only")
-                    ($ :option {:value "non-experiment-only"} "Non-experiment only"))
-
                  :feedback
                  ($ :div.space-y-2
                     ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                        {:value (:feedback-metric-name draft-filters)
+                        :data-testid "invocations-filter-feedback-metric"
                         :onChange #(set-draft-filters! (fn [prev]
                                                          (assoc prev :feedback-metric-name (.. % -target -value))))}
                        ($ :option {:value ""} "Select metric")
@@ -429,6 +414,7 @@
                     ($ :div.grid.grid-cols-1.md:grid-cols-3.gap-2
                        ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                           {:value (:feedback-comparator draft-filters)
+                           :data-testid "invocations-filter-feedback-comparator"
                            :onChange #(set-draft-filters! (fn [prev]
                                                             (assoc prev :feedback-comparator (.. % -target -value))))}
                           ($ :option {:value "<="} "<=")
@@ -439,11 +425,13 @@
                           ($ :option {:value ">="} ">="))
                        ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
                           {:placeholder "Feedback value"
+                           :data-testid "invocations-filter-feedback-value"
                            :value (:feedback-value draft-filters)
                            :onChange #(set-draft-filters! (fn [prev]
                                                             (assoc prev :feedback-value (.. % -target -value))))})
                        ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                           {:value (:feedback-source draft-filters)
+                           :data-testid "invocations-filter-feedback-source"
                            :onChange #(set-draft-filters! (fn [prev]
                                                             (assoc prev :feedback-source (.. % -target -value))))}
                           ($ :option {:value "any"} "Any source")

@@ -361,10 +361,6 @@
   (when-let [source (:source m)]
     (aor-types/source-string source)))
 
-(defn invoke-from-experiment?
-  [m]
-  (aor-types/ExperimentSourceImpl? (:source m)))
-
 (defn invoke-source-matches?
   [m source-filter]
   (if (nil? source-filter)
@@ -445,7 +441,7 @@
 
 (defn invoke-matches-filters?
   [m filters]
-  (let [{:keys [node-name has-error? latency-ms source from-experiment? feedback-metric]} filters
+  (let [{:keys [node-name has-error? latency-ms source feedback-metric]} filters
         status (invoke-status m)
         latency (invoke-latency-millis m)
         {:keys [min max]} latency-ms
@@ -464,9 +460,6 @@
        (and (some? latency) (<= latency max))
        true)
      (invoke-source-matches? m source)
-     (if (some? from-experiment?)
-       (= from-experiment? (invoke-from-experiment? m))
-       true)
      (invoke-feedback-matches? m feedback-metric))))
 
 (defn relevant-invoke-submap

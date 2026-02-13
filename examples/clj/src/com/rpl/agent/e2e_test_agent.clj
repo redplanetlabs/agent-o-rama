@@ -17,6 +17,11 @@
 
 (defonce E2E_RETRY_STORE "$$e2e-retries")
 
+(defn- maybe-sleep!
+  [params]
+  (when-let [timeout-ms (get params "timeout-ms")]
+    (Thread/sleep (long timeout-ms))))
+
 (defn- check-for-failure!
   "Helper function to deterministically fail a node based on params.
    It uses a PStateStore to track the number of times a node has been entered for a given run,
@@ -145,6 +150,7 @@
            (when run-id
              (store/put! retry-store run-id 0))
 
+           (maybe-sleep! params)
            (check-for-failure! agent-node params "start")
 
            (if (get params "long-node-names?")
