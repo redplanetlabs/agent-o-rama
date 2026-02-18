@@ -213,13 +213,21 @@ test.describe('Invocations filters', () => {
 
       // Source filter.
       await openFilterPanel(page, 'Source');
-      await page.getByTestId('invocations-filter-source-select').selectOption('experiment');
+      await page.getByTestId('invocations-filter-source-select').selectOption('EXPERIMENT');
       await applyCurrentFilter(page);
       await expect(page.locator('tbody tr').filter({ hasText: runIds.experiment }).first()).toBeVisible();
       await expect(page.locator('tbody tr').filter({ hasText: runIds.nodeShort })).toHaveCount(0);
 
+      // Source filter with NOT toggle.
+      await page.locator('button').filter({ hasText: 'Source' }).first().click();
+      await page.getByTestId('invocations-filter-source-not').check();
+      await applyCurrentFilter(page);
+      await expect(page.locator('tbody tr').filter({ hasText: runIds.nodeShort }).first()).toBeVisible();
+      await expect(page.locator('tbody tr').filter({ hasText: runIds.experiment })).toHaveCount(0);
+
       // Reset source.
       await page.locator('button').filter({ hasText: 'Source' }).first().click();
+      await page.getByTestId('invocations-filter-source-not').uncheck();
       await page.getByTestId('invocations-filter-source-select').selectOption('all');
       await applyCurrentFilter(page);
 

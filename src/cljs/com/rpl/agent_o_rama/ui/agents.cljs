@@ -168,6 +168,7 @@
                                :latency-max ""
                                :error-filter "all"
                                :source "all"
+                               :source-not? false
                                :feedback-metric-name ""
                                :feedback-comparator "<="
                                :feedback-value ""
@@ -226,6 +227,10 @@
               (not= "all" (:source f))
               (assoc :source (:source f))
 
+              (and (not= "all" (:source f))
+                   (:source-not? f))
+              (assoc :source-not? true)
+
               (and (not (str/blank? (:feedback-metric-name f)))
                    (not (str/blank? feedback-value)))
               (assoc :feedback-metric
@@ -242,7 +247,7 @@
                                 :node (assoc prev :node-name "")
                                 :latency (assoc prev :latency-min "" :latency-max "")
                                 :error (assoc prev :error-filter "all")
-                                :source (assoc prev :source "all")
+                               :source (assoc prev :source "all" :source-not? false)
                                 :feedback (assoc prev
                                                  :feedback-metric-name ""
                                                  :feedback-comparator "<="
@@ -283,7 +288,10 @@
                      "Any result")
             :source (if (= "all" (:source f))
                       "Any source"
-                      (str "Source: " (:source f)))
+                      (str "Source "
+                           (if (:source-not? f) "!=" "=")
+                           " "
+                           (:source f)))
             :feedback (let [metric (str/trim (:feedback-metric-name f))
                             comparator (:feedback-comparator f)
                             value (str/trim (:feedback-value f))
@@ -390,16 +398,27 @@
                     ($ :option {:value "no-errors"} "No errors"))
 
                  :source
-                 ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                    {:value (:source draft-filters)
-                     :data-testid "invocations-filter-source-select"
-                     :onChange #(set-draft-filters! (fn [prev]
-                                                      (assoc prev :source (.. % -target -value))))}
-                    ($ :option {:value "all"} "All sources")
-                    ($ :option {:value "experiment"} "Experiment")
-                    ($ :option {:value "api"} "API")
-                    ($ :option {:value "ai"} "AI")
-                    ($ :option {:value "bulkUpload"} "Bulk Upload"))
+                 ($ :div.space-y-2
+                    ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                       {:value (:source draft-filters)
+                        :data-testid "invocations-filter-source-select"
+                        :onChange #(set-draft-filters! (fn [prev]
+                                                         (assoc prev :source (.. % -target -value))))}
+                       ($ :option {:value "all"} "All sources")
+                       ($ :option {:value "API"} "API")
+                       ($ :option {:value "MANUAL"} "MANUAL")
+                       ($ :option {:value "EXPERIMENT"} "EXPERIMENT"))
+                    ($ :label.inline-flex.items-center.gap-2.text-sm.text-gray-700
+                       ($ :input.h-4.w-4.border.border-gray-300.rounded
+                          {:type "checkbox"
+                           :data-testid "invocations-filter-source-not"
+                           :checked (boolean (:source-not? draft-filters))
+                           :disabled (= "all" (:source draft-filters))
+                           :onChange #(set-draft-filters! (fn [prev]
+                                                            (assoc prev :source-not? (.. % -target -checked))))})
+                       ($ :span "Not selected source"))
+                    ($ :div.text-xs.text-gray-500
+                       "When enabled, returns invokes from all source types except the selected one."))
 
                  :feedback
                  ($ :div.space-y-2

@@ -388,20 +388,40 @@
   (when-let [source (:source m)]
     (aor-types/source-string source)))
 
+(def invoke-source-filter-types
+  #{"API" "MANUAL" "EXPERIMENT"})
+
+(defn invoke-source-filter-type
+  [m]
+  (let [source-str (invoke-source-string m)]
+    (cond
+      (= "api" source-str)
+      "API"
+
+      (= "experiment" source-str)
+      "EXPERIMENT"
+
+      :else
+      "MANUAL")))
+
+(defn valid-invoke-source-filter-type
+  [source-filter]
+  (when (string? source-filter)
+    (let [source-filter-upper (str/upper-case source-filter)]
+      (when (contains? invoke-source-filter-types source-filter-upper)
+        source-filter-upper))))
+
 (defn invoke-source-matches?
-  [m source-filter]
+  [m source-filter source-not?]
   (if (nil? source-filter)
     true
-    (let [source-str (invoke-source-string m)]
-      (cond
-        (keyword? source-filter)
-        (= (name source-filter) source-str)
-
-        (string? source-filter)
-        (= source-filter source-str)
-
-        :else
-        false))))
+    (if-let [source-filter-type (valid-invoke-source-filter-type source-filter)]
+      (let [matches? (= source-filter-type
+                        (invoke-source-filter-type m))]
+        (if source-not?
+          (not matches?)
+          matches?))
+      false)))
 
 (defn feedback-source-matches?
   [feedback feedback-source]
@@ -468,7 +488,7 @@
 
 (defn invoke-matches-filters?
   [m filters]
-  (let [{:keys [node-name has-error? latency-ms source feedback-metric]} filters
+  (let [{:keys [node-name has-error? latency-ms source source-not? feedback-metric]} filters
         status (invoke-status m)
         latency (invoke-latency-millis m)
         {:keys [min max]} latency-ms
@@ -486,7 +506,7 @@
      (if (some? max)
        (and (some? latency) (<= latency max))
        true)
-     (invoke-source-matches? m source)
+     (invoke-source-matches? m source source-not?)
      (invoke-feedback-matches? m feedback-metric))))
 
 (defn relevant-invoke-submap

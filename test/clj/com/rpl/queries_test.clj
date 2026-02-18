@@ -283,12 +283,37 @@
          {:data (foreign-invoke-query q
                                       10
                                       nil
-                                      {:source "experiment"})}
+                                      {:source "EXPERIMENT"})}
          (catch Throwable t {:error t})))
      (is (nil? (:error source-res))
          "invokes-page query should support source string filter")
      (when-let [rows (-> source-res :data :agent-invokes)]
        (is (= 1 (count rows))))
+
+     (bind source-not-res
+       (try
+         {:data (foreign-invoke-query q
+                                      20
+                                      nil
+                                      {:source "EXPERIMENT"
+                                       :source-not? true})}
+         (catch Throwable t {:error t})))
+     (is (nil? (:error source-not-res))
+         "invokes-page query should support source negation filter")
+     (when-let [rows (-> source-not-res :data :agent-invokes)]
+       (is (= 5 (count rows))))
+
+     (bind source-manual-res
+       (try
+         {:data (foreign-invoke-query q
+                                      20
+                                      nil
+                                      {:source "MANUAL"})}
+         (catch Throwable t {:error t})))
+     (is (nil? (:error source-manual-res))
+         "invokes-page query should support manual source class")
+     (when-let [rows (-> source-manual-res :data :agent-invokes)]
+       (is (= 5 (count rows))))
 
      )))
 
