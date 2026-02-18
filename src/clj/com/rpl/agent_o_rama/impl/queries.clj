@@ -332,7 +332,7 @@
 
 (defn to-invokes-page-result
   [pages-map page-size]
-  (let [task-pages pages-map
+  (let [task-pages (transform [MAP-VALS] :task-page pages-map)
         {:keys [agent-invokes pagination-params]}
         (to-page-result task-pages
                         page-size
@@ -343,16 +343,13 @@
      :pagination-params
      (reduce-kv
       (fn [ret task-id next-id]
-        (let [task-page (get task-pages task-id)
-              fallback-cursor (when (and (nil? next-id)
-                                         (>= (count task-page) page-size))
-                                (first (keys task-page)))
+        (let [{:keys [scan-end-id]} (get pages-map task-id)
               next-cursor (cond
                             (some? next-id)
                             {:end-id next-id :inclusive? true}
 
-                            (some? fallback-cursor)
-                            {:end-id fallback-cursor :inclusive? false}
+                            (some? scan-end-id)
+                            {:end-id scan-end-id :inclusive? false}
 
                             :else
                             nil)]
@@ -516,10 +513,10 @@
         m))
 
 (defn should-stop-invokes-scan?
-  [raw-page filtered-page scan-amt page-size]
+  [raw-page aggregated-filtered-page scanned-count scan-amt page-size]
   (or (< (count raw-page) scan-amt)
-      (>= (count filtered-page) (adjust-page-size page-size))
-      (>= scan-amt
+      (>= (count aggregated-filtered-page) (adjust-page-size page-size))
+      (>= scanned-count
           (* INVOKES-SCAN-MULTIPLIER-LIMIT (adjust-page-size page-size)))))
 
 (defbasicblocksegmacro get-distributed-page*
@@ -605,6 +602,7 @@
       (identity true :> *inclusive?)
 
      (case> (nil? *cursor))
+      (identity true :> *done?)
       (identity nil :> *end-id)
       (identity true :> *inclusive?)
 
@@ -614,32 +612,56 @@
       (get *cursor :inclusive? true :> *inclusive?)
 
      (default>)
-      (identity *cursor :> *end-id)
+      ;; Only structured cursor maps are supported.
+      ;; Any other cursor shape is treated as terminal.
+      (identity true :> *done?)
+      (identity nil :> *end-id)
       (identity true :> *inclusive?))
-    (<<if (nil? *end-id)
-      (identity (sorted-map) :> *task-page)
+    (<<if (or> *done? (nil? *end-id))
+      (hash-map :task-page (sorted-map) :scan-end-id nil :> *task-page-result)
      (else>)
-      (loop<- [*scan-amt (adjust-page-size *page-size)
-               :> *task-page]
+      (loop<- [*scan-end-id *end-id
+               *scan-inclusive? *inclusive?
+               *scan-amt (adjust-page-size *page-size)
+               *scanned-count 0
+               *task-page (sorted-map)
+               :> *task-page-result]
         (local-select>
-         [(sorted-map-range-to *end-id
-                               {:inclusive? *inclusive?
+         [(sorted-map-range-to *scan-end-id
+                               {:inclusive? *scan-inclusive?
                                 :max-amt    *scan-amt})]
          (this-module-pobject-task-global *pstate-name)
          :> *raw-page)
-        (filter-invokes-task-page *raw-page *filters :> *task-page)
+        (filter-invokes-task-page *raw-page *filters :> *filtered-page)
+        (into *task-page *filtered-page :> *next-task-page)
+        (+ *scanned-count (count *raw-page) :> *next-scanned-count)
+        (<<if (empty? *raw-page)
+          (identity nil :> *next-scan-end-id)
+         (else>)
+          (h/first-key *raw-page :> *next-scan-end-id))
         (should-stop-invokes-scan? *raw-page
-                                   *task-page
+                                   *next-task-page
+                                   *next-scanned-count
                                    *scan-amt
                                    *page-size
                                    :> *stop?)
         (<<if *stop?
-          (:> *task-page)
+          (<<if (< (count *raw-page) *scan-amt)
+            (identity nil :> *resume-end-id)
+           (else>)
+            (identity *next-scan-end-id :> *resume-end-id))
+          (hash-map :task-page *next-task-page
+                    :scan-end-id *resume-end-id
+                    :> *task-page-result)
+          (:> *task-page-result)
          (else>)
-          (* 2 *scan-amt :> *next-scan-amt)
-          (continue> *next-scan-amt))))
+          (continue> *next-scan-end-id
+                     false
+                     *scan-amt
+                     *next-scanned-count
+                     *next-task-page))))
     (|origin)
-    (aggs/+map-agg *task-id *task-page :> *pages-map)
+    (aggs/+map-agg *task-id *task-page-result :> *pages-map)
     (to-invokes-page-result *pages-map
                             (adjust-page-size *page-size)
                             :> *res)))

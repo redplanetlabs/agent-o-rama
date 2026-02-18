@@ -34,14 +34,16 @@
                          1 {:end-id 1 :inclusive? true}
                          2 {:end-id 0 :inclusive? true}}}
     (queries/to-invokes-page-result
-     {0 {}
-      1 {0 {:start-time-millis 10}
-         1 {:start-time-millis 11}
-         2 {:start-time-millis 19}}
-      2 {0 {:start-time-millis 9}
-         1 {:start-time-millis 12}
-         2 {:start-time-millis 14 :foo 1 :bar 2}
-         3 {:start-time-millis 18}}}
+     {0 {:task-page {} :scan-end-id nil}
+      1 {:task-page {0 {:start-time-millis 10}
+                     1 {:start-time-millis 11}
+                     2 {:start-time-millis 19}}
+         :scan-end-id nil}
+      2 {:task-page {0 {:start-time-millis 9}
+                     1 {:start-time-millis 12}
+                     2 {:start-time-millis 14 :foo 1 :bar 2}
+                     3 {:start-time-millis 18}}
+         :scan-end-id nil}}
      4)))
   (is
    (=
@@ -58,14 +60,16 @@
                          {:task-id 2 :agent-id 0 :start-time-millis 9}]
      :pagination-params {0 nil 1 nil 2 nil}}
     (queries/to-invokes-page-result
-     {0 {}
-      1 {0 {:start-time-millis 10}
-         1 {:start-time-millis 11}
-         2 {:start-time-millis 19}}
-      2 {0 {:start-time-millis 9}
-         1 {:start-time-millis 12}
-         2 {:start-time-millis 14 :foo 1 :bar 2}
-         3 {:start-time-millis 18}}}
+     {0 {:task-page {} :scan-end-id nil}
+      1 {:task-page {0 {:start-time-millis 10}
+                     1 {:start-time-millis 11}
+                     2 {:start-time-millis 19}}
+         :scan-end-id nil}
+      2 {:task-page {0 {:start-time-millis 9}
+                     1 {:start-time-millis 12}
+                     2 {:start-time-millis 14 :foo 1 :bar 2}
+                     3 {:start-time-millis 18}}
+         :scan-end-id nil}}
      5)))
   (is
    (=
@@ -73,8 +77,9 @@
                          {:task-id 0 :agent-id 10 :start-time-millis 10}]
      :pagination-params {0 {:end-id 10 :inclusive? false}}}
     (queries/to-invokes-page-result
-     {0 {10 {:start-time-millis 10}
-         11 {:start-time-millis 11}}}
+     {0 {:task-page {10 {:start-time-millis 10}
+                     11 {:start-time-millis 11}}
+         :scan-end-id 10}}
      2)))
 )
 
