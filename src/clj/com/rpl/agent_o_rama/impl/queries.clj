@@ -361,6 +361,14 @@
   [i]
   (if (= i 1) 3 (inc i)))
 
+(defn invokes-result-page-size
+  [i]
+  i)
+
+(defn invokes-scan-page-size
+  [result-page-size]
+  (max 3 result-page-size))
+
 (defn invoke-status
   [m]
   (let [r (:result m)]
@@ -502,8 +510,6 @@
          (some? feedback-metric)
          (assoc :feedback-metric-value feedback-metric-value))))))
 
-(def INVOKES-SCAN-MULTIPLIER-LIMIT 64)
-
 (defn filter-invokes-task-page
   [m filters]
   (into (sorted-map)
@@ -513,11 +519,9 @@
         m))
 
 (defn should-stop-invokes-scan?
-  [raw-page aggregated-filtered-page scanned-count scan-amt page-size]
+  [raw-page aggregated-filtered-page scan-amt result-page-size]
   (or (< (count raw-page) scan-amt)
-      (>= (count aggregated-filtered-page) (adjust-page-size page-size))
-      (>= scanned-count
-          (* INVOKES-SCAN-MULTIPLIER-LIMIT (adjust-page-size page-size)))))
+      (>= (count aggregated-filtered-page) result-page-size)))
 
 (defbasicblocksegmacro get-distributed-page*
   [page-size pagination-params pstate-name res info-transformer page-result-fn max-key-fn initial-path]
@@ -622,8 +626,7 @@
      (else>)
       (loop<- [*scan-end-id *end-id
                *scan-inclusive? *inclusive?
-               *scan-amt (adjust-page-size *page-size)
-               *scanned-count 0
+               *scan-amt (invokes-scan-page-size *page-size)
                *task-page (sorted-map)
                :> *task-page-result]
         (local-select>
@@ -634,16 +637,14 @@
          :> *raw-page)
         (filter-invokes-task-page *raw-page *filters :> *filtered-page)
         (into *task-page *filtered-page :> *next-task-page)
-        (+ *scanned-count (count *raw-page) :> *next-scanned-count)
         (<<if (empty? *raw-page)
           (identity nil :> *next-scan-end-id)
          (else>)
           (h/first-key *raw-page :> *next-scan-end-id))
         (should-stop-invokes-scan? *raw-page
                                    *next-task-page
-                                   *next-scanned-count
                                    *scan-amt
-                                   *page-size
+                                   (invokes-result-page-size *page-size)
                                    :> *stop?)
         (<<if *stop?
           (<<if (< (count *raw-page) *scan-amt)
@@ -658,12 +659,11 @@
           (continue> *next-scan-end-id
                      false
                      *scan-amt
-                     *next-scanned-count
                      *next-task-page))))
     (|origin)
     (aggs/+map-agg *task-id *task-page-result :> *pages-map)
     (to-invokes-page-result *pages-map
-                            (adjust-page-size *page-size)
+                            (invokes-result-page-size *page-size)
                             :> *res)))
 
 (defn declare-agent-get-names-query-topology
