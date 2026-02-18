@@ -332,11 +332,33 @@
 
 (defn to-invokes-page-result
   [pages-map page-size]
-  (to-page-result pages-map
-                  page-size
-                  :agent-id
-                  :agent-invokes
-                  :start-time-millis))
+  (let [task-pages pages-map
+        {:keys [agent-invokes pagination-params]}
+        (to-page-result task-pages
+                        page-size
+                        :agent-id
+                        :agent-invokes
+                        :start-time-millis)]
+    {:agent-invokes agent-invokes
+     :pagination-params
+     (reduce-kv
+      (fn [ret task-id next-id]
+        (let [task-page (get task-pages task-id)
+              fallback-cursor (when (and (nil? next-id)
+                                         (>= (count task-page) page-size))
+                                (first (keys task-page)))
+              next-cursor (cond
+                            (some? next-id)
+                            {:end-id next-id :inclusive? true}
+
+                            (some? fallback-cursor)
+                            {:end-id fallback-cursor :inclusive? false}
+
+                            :else
+                            nil)]
+          (assoc ret task-id next-cursor)))
+      {}
+      pagination-params)}))
 
 (defn adjust-page-size
   [i]
@@ -575,7 +597,25 @@
     (po/agent-root-task-global-name *agent-name :> *pstate-name)
     (|all)
     (ops/current-task-id :> *task-id)
-    (get *pagination-params *task-id (h/max-uuid) :> *end-id)
+    (get *pagination-params *task-id ::missing :> *cursor)
+    (<<cond
+     (case> (= *cursor ::missing))
+      (identity false :> *done?)
+      (identity (h/max-uuid) :> *end-id)
+      (identity true :> *inclusive?)
+
+     (case> (nil? *cursor))
+      (identity nil :> *end-id)
+      (identity true :> *inclusive?)
+
+     (case> (map? *cursor))
+      (identity false :> *done?)
+      (get *cursor :end-id :> *end-id)
+      (get *cursor :inclusive? true :> *inclusive?)
+
+     (default>)
+      (identity *cursor :> *end-id)
+      (identity true :> *inclusive?))
     (<<if (nil? *end-id)
       (identity (sorted-map) :> *task-page)
      (else>)
@@ -583,7 +623,7 @@
                :> *task-page]
         (local-select>
          [(sorted-map-range-to *end-id
-                               {:inclusive? true
+                               {:inclusive? *inclusive?
                                 :max-amt    *scan-amt})]
          (this-module-pobject-task-global *pstate-name)
          :> *raw-page)

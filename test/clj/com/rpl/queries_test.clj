@@ -30,7 +30,9 @@
                           :foo      1
                           :bar      2}
                          {:task-id 2 :agent-id 1 :start-time-millis 12}]
-     :pagination-params {0 nil 1 1 2 0}}
+     :pagination-params {0 nil
+                         1 {:end-id 1 :inclusive? true}
+                         2 {:end-id 0 :inclusive? true}}}
     (queries/to-invokes-page-result
      {0 {}
       1 {0 {:start-time-millis 10}
@@ -67,68 +69,13 @@
      5)))
   (is
    (=
-    {:agent-invokes     [{:task-id 1 :agent-id 0 :start-time-millis 10}
-                         {:task-id 2 :agent-id 0 :start-time-millis 9}]
-     :pagination-params {0 nil 1 nil 2 nil}}
+    {:agent-invokes     [{:task-id 0 :agent-id 11 :start-time-millis 11}
+                         {:task-id 0 :agent-id 10 :start-time-millis 10}]
+     :pagination-params {0 {:end-id 10 :inclusive? false}}}
     (queries/to-invokes-page-result
-     {0 {}
-      1 {0 {:start-time-millis 10}}
-      2 {0 {:start-time-millis 9}}}
-     1)))
-  (is
-   (=
-    {:agent-invokes     []
-     :pagination-params {0 nil 1 nil 2 nil 3 nil}}
-    (queries/to-invokes-page-result
-     {0 {}
-      1 {}
-      2 {}
-      3 {}}
-     10)))
-  (is
-   (=
-    {:agent-invokes     [{:task-id 2 :agent-id 12 :start-time-millis 11}
-                         {:task-id 2 :agent-id 11 :start-time-millis 10}
-                         {:task-id 2 :agent-id 10 :start-time-millis 9}]
-     :pagination-params {0 300 1 3 2 0}}
-    (queries/to-invokes-page-result
-     {0 {0   {:start-time-millis 0}
-         100 {:start-time-millis 1}
-         200 {:start-time-millis 2}
-         300 {:start-time-millis 3}}
-      1 {0 {:start-time-millis 4}
-         1 {:start-time-millis 5}
-         2 {:start-time-millis 6}
-         3 {:start-time-millis 7}}
-      2 {0  {:start-time-millis 8}
-         10 {:start-time-millis 9}
-         11 {:start-time-millis 10}
-         12 {:start-time-millis 11}}}
-     4)))
-  (is
-   (=
-    {:agent-invokes     [{:task-id 1 :agent-id 4 :start-time-millis 40}
-                         {:task-id 0 :agent-id 0 :start-time-millis 37}
-                         {:task-id 2 :agent-id 3 :start-time-millis 35}
-                         {:task-id 3 :agent-id 3 :start-time-millis 32}
-                         {:task-id 3 :agent-id 2 :start-time-millis 31}
-                         {:task-id 1 :agent-id 2 :start-time-millis 30}]
-     :pagination-params {0 nil 1 1 2 2 3 1}}
-    (queries/to-invokes-page-result
-     {0 {0 {:start-time-millis 37}}
-      1 {0 {:start-time-millis 10}
-         1 {:start-time-millis 20}
-         2 {:start-time-millis 30}
-         4 {:start-time-millis 40}}
-      2 {0 {:start-time-millis 5}
-         1 {:start-time-millis 8}
-         2 {:start-time-millis 25}
-         3 {:start-time-millis 35}}
-      3 {0 {:start-time-millis 1}
-         1 {:start-time-millis 22}
-         2 {:start-time-millis 31}
-         3 {:start-time-millis 32}}}
-     4)))
+     {0 {10 {:start-time-millis 10}
+         11 {:start-time-millis 11}}}
+     2)))
 )
 
 (deftest invokes-page-query-test
@@ -338,4 +285,80 @@
      (when-let [rows (-> source-res :data :agent-invokes)]
        (is (= 1 (count rows))))
 
+     )))
+
+(deftest invokes-page-query-filter-pagination-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node {:keys [route sleep-ms]}]
+               (when sleep-ms
+                 (Thread/sleep ^long sleep-ms))
+               (if (= route :fail)
+                 (throw (ex-info "boom" {:route route}))
+                 (aor/result! agent-node {:ok true :route :fast})))))))
+     (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
+     (bind module-name (get-module-name module))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind q (:invokes-page-query (aor-types/underlying-objects foo)))
+
+     ;; Sparse matches force scan-window growth; pagination should continue
+     ;; from each task's scan cursor without restarts or duplicates.
+     (bind runs
+       (vec
+        (for [i (range 40)]
+          (let [fail? (zero? (mod i 4))]
+            {:fail? fail?
+             :args {:route (if fail? :fail :fast)
+                    :sleep-ms 1}}))))
+
+     (bind created-runs
+       (vec
+        (for [{:keys [fail? args]} runs]
+          {:fail? fail?
+           :invoke (aor/agent-initiate foo args)})))
+
+     (doseq [{:keys [invoke]} created-runs]
+       (try
+         (aor/agent-result foo invoke)
+         (catch Throwable _)))
+
+     (bind expected-failed-invokes
+       (set
+        (for [{:keys [fail? invoke]} created-runs
+              :when fail?]
+          [(:task-id invoke) (:agent-invoke-id invoke)])))
+
+     (bind pages
+       (loop [ret []
+              params nil
+              i 0]
+         (when (> i 200)
+           (throw (ex-info "filtered pagination did not terminate"
+                           {:iterations i})))
+         (let [{:keys [agent-invokes pagination-params]}
+               (foreign-invoke-query q
+                                    2
+                                    params
+                                    {:has-error? true})
+               ret (conj ret agent-invokes)]
+           (if (every? nil? (vals pagination-params))
+             ret
+             (recur ret pagination-params (inc i))))))
+
+     (bind all (apply concat pages))
+     (bind all-ids (mapv (fn [m] [(:task-id m) (:agent-id m)]) all))
+
+     (is (> (count pages) 1))
+     (is (= (count all-ids) (count (set all-ids))))
+     (is (= expected-failed-invokes (set all-ids)))
+     (is (every? #(= :failure (:status %)) all))
      )))
