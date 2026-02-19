@@ -444,18 +444,43 @@
     :else
     false))
 
+(def ordered-feedback-comparators
+  #{:< :<= :> :>=})
+
+(defn parse-number-like-value
+  [v]
+  (try
+    (Long/parseLong v)
+    (catch Throwable _
+      v)))
+
+(defn normalized-feedback-compare-values
+  [feedback-metric score-value]
+  (let [{:keys [comparator value]} feedback-metric
+        normalized-score (parse-number-like-value score-value)
+        normalized-value (parse-number-like-value value)]
+    (if (contains? ordered-feedback-comparators comparator)
+      (when (and (number? normalized-score) (number? normalized-value))
+        [normalized-score normalized-value])
+      [normalized-score normalized-value])))
+
 (defn feedback-entry-matches?
   [feedback {:keys [metric-name comparator value source]}]
   (let [score-value (get (:scores feedback) metric-name ::missing)]
     (and (feedback-source-matches? feedback source)
          (not= ::missing score-value)
-         (try
-           (aor-types/comparator-spec-matches?
-            {:comparator comparator
-             :value      value}
-            score-value)
-           (catch Throwable _
-             false)))))
+         (if-let [[compare-score compare-value]
+                  (normalized-feedback-compare-values
+                   {:comparator comparator :value value}
+                   score-value)]
+           (try
+             (aor-types/comparator-spec-matches?
+              {:comparator comparator
+               :value      compare-value}
+              compare-score)
+             (catch Throwable _
+               false))
+           false))))
 
 (defn feedback-entry-matched-score
   [feedback feedback-metric]
@@ -463,14 +488,18 @@
         score-value (get (:scores feedback) metric-name ::missing)]
     (when (and (feedback-source-matches? feedback (:source feedback-metric))
                (not= ::missing score-value)
-               (try
-                 (aor-types/comparator-spec-matches?
-                  {:comparator (:comparator feedback-metric)
-                   :value      (:value feedback-metric)}
-                  score-value)
-                 (catch Throwable _
-                   false)))
-      score-value)))
+               (if-let [[compare-score compare-value]
+                        (normalized-feedback-compare-values feedback-metric
+                                                           score-value)]
+                 (try
+                   (aor-types/comparator-spec-matches?
+                    {:comparator (:comparator feedback-metric)
+                     :value      compare-value}
+                    compare-score)
+                   (catch Throwable _
+                     false))
+                 false))
+      (parse-number-like-value score-value))))
 
 (defn invoke-feedback-metric-value
   [m feedback-metric]
