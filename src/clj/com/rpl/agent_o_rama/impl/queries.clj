@@ -361,10 +361,6 @@
   [i]
   (if (= i 1) 3 (inc i)))
 
-(defn invokes-result-page-size
-  [i]
-  i)
-
 (defn invokes-scan-page-size
   [result-page-size]
   (max 3 result-page-size))
@@ -693,7 +689,7 @@
         (should-stop-invokes-scan? *raw-page
                                    *next-task-page
                                    *scan-amt
-                                   (invokes-result-page-size *page-size)
+                                   *page-size
                                    :> *stop?)
         (<<if *stop?
           (<<if (< (count *raw-page) *scan-amt)
@@ -712,7 +708,7 @@
     (|origin)
     (aggs/+map-agg *task-id *task-page-result :> *pages-map)
     (to-invokes-page-result *pages-map
-                            (invokes-result-page-size *page-size)
+                            *page-size
                             :> *res)))
 
 (defn declare-agent-get-names-query-topology
