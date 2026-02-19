@@ -620,58 +620,66 @@
     (po/agent-root-task-global-name *agent-name :> *pstate-name)
     (|all)
     (ops/current-task-id :> *task-id)
+    (adjust-page-size *page-size :> *result-page-size)
     (get *pagination-params *task-id ::missing :> *cursor)
     (<<cond
      (case> (= *cursor ::missing))
-      (identity false :> *done?)
       (identity (h/max-uuid) :> *end-id)
 
      (case> (nil? *cursor))
-      (identity true :> *done?)
       (identity nil :> *end-id)
 
-    (default>)
-      (identity false :> *done?)
+     (default>)
       (identity *cursor :> *end-id))
-
-    (<<if (or> *done? (nil? *end-id))
+    (<<if (nil? *end-id)
       (identity (sorted-map) :> *task-page-result)
      (else>)
-      (loop<- [*scan-end-id *end-id
-               *scan-inclusive? true
-               *scan-amt *page-size
-               *task-page (sorted-map)
-               :> *task-page-result]
-        (yield-if-overtime)
-        (local-select>
-         [(sorted-map-range-to *scan-end-id
-                               {:inclusive? *scan-inclusive?
-                                :max-amt    *scan-amt})]
-         (this-module-pobject-task-global *pstate-name)
-         :> *raw-page)
-        (filter-invokes-task-page *raw-page *filters :> *filtered-page)
-        (into *task-page *filtered-page :> *next-task-page)
-        (<<if (empty? *raw-page)
-          (identity nil :> *next-scan-end-id)
-         (else>)
-          (h/first-key *raw-page :> *next-scan-end-id))
-        (should-stop-invokes-scan? *raw-page
-                                   *next-task-page
-                                   *scan-amt
-                                   *page-size
-                                   :> *stop?)
-        (<<if *stop?
-          (identity *next-task-page :> *task-page-result)
-          (:> *task-page-result)
-         (else>)
-          (continue> *next-scan-end-id
-                     false
-                     *scan-amt
-                     *next-task-page))))
+      (local-select>
+       [(sorted-map-range-to *end-id
+                             {:inclusive? true
+                              :max-amt    *result-page-size})]
+       (this-module-pobject-task-global *pstate-name)
+       :> *raw-page)
+      (filter-invokes-task-page *raw-page *filters :> *filtered-page)
+      (into (sorted-map) *filtered-page :> *task-page)
+      (should-stop-invokes-scan? *raw-page
+                                 *task-page
+                                 *result-page-size
+                                 *result-page-size
+                                 :> *stop?)
+      (<<if (or> (empty? *raw-page) *stop?)
+        (identity *task-page :> *task-page-result)
+       (else>)
+        (h/first-key *raw-page :> *next-scan-end-id)
+        (loop<- [*scan-end-id *next-scan-end-id
+                 *task-page *task-page
+                 :> *task-page-result]
+          (yield-if-overtime)
+          (local-select>
+           [(sorted-map-range-to *scan-end-id
+                                 {:inclusive? false
+                                  :max-amt    *result-page-size})]
+           (this-module-pobject-task-global *pstate-name)
+           :> *raw-page)
+          (filter-invokes-task-page *raw-page *filters :> *filtered-page)
+          (into *task-page *filtered-page :> *next-task-page)
+          (<<if (empty? *raw-page)
+            (identity *next-task-page :> *task-page-result)
+           (else>)
+            (h/first-key *raw-page :> *next-scan-end-id)
+            (should-stop-invokes-scan? *raw-page
+                                       *next-task-page
+                                       *result-page-size
+                                       *result-page-size
+                                       :> *stop?)
+            (<<if *stop?
+              (identity *next-task-page :> *task-page-result)
+             (else>)
+              (continue> *next-scan-end-id *next-task-page))))))
     (|origin)
     (aggs/+map-agg *task-id *task-page-result :> *pages-map)
     (to-invokes-page-result *pages-map
-                            *page-size
+                            *result-page-size
                             :> *res)))
 
 (defn declare-agent-get-names-query-topology
