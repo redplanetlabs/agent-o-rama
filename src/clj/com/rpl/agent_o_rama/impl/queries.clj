@@ -361,10 +361,6 @@
   [i]
   (if (= i 1) 3 (inc i)))
 
-(defn invokes-scan-page-size
-  [result-page-size]
-  (max 3 result-page-size))
-
 (defn invoke-status
   [m]
   (let [r (:result m)]
@@ -655,27 +651,30 @@
       (identity nil :> *end-id)
       (identity true :> *inclusive?)
 
-     (case> (map? *cursor))
+;; this should be default, get rid of map?
+    (default>)
       (identity false :> *done?)
       (get *cursor :end-id :> *end-id)
-      (get *cursor :inclusive? true :> *inclusive?)
+      (get *cursor :inclusive? true :> *inclusive?))
 
-     (default>)
-      ;; Only structured cursor maps are supported.
-      ;; Any other cursor shape is treated as terminal.
-      (identity true :> *done?)
-      (identity nil :> *end-id)
-      (identity true :> *inclusive?))
     (<<if (or> *done? (nil? *end-id))
       (hash-map :task-page (sorted-map) :scan-end-id nil :> *task-page-result)
      (else>)
       (loop<- [*scan-end-id *end-id
+              ;; never inclusive?. 
                *scan-inclusive? *inclusive?
-               *scan-amt (invokes-scan-page-size *page-size)
+               ;; remove this. 
+               ;; revert the test queries_test.clj to_invokes_page_reverted
+               ;; like experiments_test 1962.
+               ;; put
+               *scan-amt *page-size
                *task-page (sorted-map)
                :> *task-page-result]
+               ;; scan-amt should be 100, constant
+        (yield-if-overtime)
         (local-select>
          [(sorted-map-range-to *scan-end-id
+                               ;; never inclusive?. can just be the arg 
                                {:inclusive? *scan-inclusive?
                                 :max-amt    *scan-amt})]
          (this-module-pobject-task-global *pstate-name)
