@@ -332,30 +332,11 @@
 
 (defn to-invokes-page-result
   [pages-map page-size]
-  (let [task-pages (transform [MAP-VALS] :task-page pages-map)
-        {:keys [agent-invokes pagination-params]}
-        (to-page-result task-pages
-                        page-size
-                        :agent-id
-                        :agent-invokes
-                        :start-time-millis)]
-    {:agent-invokes agent-invokes
-     :pagination-params
-     (reduce-kv
-      (fn [ret task-id next-id]
-        (let [{:keys [scan-end-id]} (get pages-map task-id)
-              next-cursor (cond
-                            (some? next-id)
-                            {:end-id next-id :inclusive? true}
-
-                            (some? scan-end-id)
-                            {:end-id scan-end-id :inclusive? false}
-
-                            :else
-                            nil)]
-          (assoc ret task-id next-cursor)))
-      {}
-      pagination-params)}))
+  (to-page-result pages-map
+                  page-size
+                  :agent-id
+                  :agent-invokes
+                  :start-time-millis))
 
 (defn adjust-page-size
   [i]
@@ -644,37 +625,26 @@
      (case> (= *cursor ::missing))
       (identity false :> *done?)
       (identity (h/max-uuid) :> *end-id)
-      (identity true :> *inclusive?)
 
      (case> (nil? *cursor))
       (identity true :> *done?)
       (identity nil :> *end-id)
-      (identity true :> *inclusive?)
 
-;; this should be default, get rid of map?
     (default>)
       (identity false :> *done?)
-      (get *cursor :end-id :> *end-id)
-      (get *cursor :inclusive? true :> *inclusive?))
+      (identity *cursor :> *end-id))
 
     (<<if (or> *done? (nil? *end-id))
-      (hash-map :task-page (sorted-map) :scan-end-id nil :> *task-page-result)
+      (identity (sorted-map) :> *task-page-result)
      (else>)
       (loop<- [*scan-end-id *end-id
-              ;; never inclusive?. 
-               *scan-inclusive? *inclusive?
-               ;; remove this. 
-               ;; revert the test queries_test.clj to_invokes_page_reverted
-               ;; like experiments_test 1962.
-               ;; put
+               *scan-inclusive? true
                *scan-amt *page-size
                *task-page (sorted-map)
                :> *task-page-result]
-               ;; scan-amt should be 100, constant
         (yield-if-overtime)
         (local-select>
          [(sorted-map-range-to *scan-end-id
-                               ;; never inclusive?. can just be the arg 
                                {:inclusive? *scan-inclusive?
                                 :max-amt    *scan-amt})]
          (this-module-pobject-task-global *pstate-name)
@@ -691,13 +661,7 @@
                                    *page-size
                                    :> *stop?)
         (<<if *stop?
-          (<<if (< (count *raw-page) *scan-amt)
-            (identity nil :> *resume-end-id)
-           (else>)
-            (identity *next-scan-end-id :> *resume-end-id))
-          (hash-map :task-page *next-task-page
-                    :scan-end-id *resume-end-id
-                    :> *task-page-result)
+          (identity *next-task-page :> *task-page-result)
           (:> *task-page-result)
          (else>)
           (continue> *next-scan-end-id

@@ -30,20 +30,16 @@
                           :foo      1
                           :bar      2}
                          {:task-id 2 :agent-id 1 :start-time-millis 12}]
-     :pagination-params {0 nil
-                         1 {:end-id 1 :inclusive? true}
-                         2 {:end-id 0 :inclusive? true}}}
+     :pagination-params {0 nil 1 1 2 0}}
     (queries/to-invokes-page-result
-     {0 {:task-page {} :scan-end-id nil}
-      1 {:task-page {0 {:start-time-millis 10}
-                     1 {:start-time-millis 11}
-                     2 {:start-time-millis 19}}
-         :scan-end-id nil}
-      2 {:task-page {0 {:start-time-millis 9}
-                     1 {:start-time-millis 12}
-                     2 {:start-time-millis 14 :foo 1 :bar 2}
-                     3 {:start-time-millis 18}}
-         :scan-end-id nil}}
+     {0 {}
+      1 {0 {:start-time-millis 10}
+         1 {:start-time-millis 11}
+         2 {:start-time-millis 19}}
+      2 {0 {:start-time-millis 9}
+         1 {:start-time-millis 12}
+         2 {:start-time-millis 14 :foo 1 :bar 2}
+         3 {:start-time-millis 18}}}
      4)))
   (is
    (=
@@ -60,27 +56,79 @@
                          {:task-id 2 :agent-id 0 :start-time-millis 9}]
      :pagination-params {0 nil 1 nil 2 nil}}
     (queries/to-invokes-page-result
-     {0 {:task-page {} :scan-end-id nil}
-      1 {:task-page {0 {:start-time-millis 10}
-                     1 {:start-time-millis 11}
-                     2 {:start-time-millis 19}}
-         :scan-end-id nil}
-      2 {:task-page {0 {:start-time-millis 9}
-                     1 {:start-time-millis 12}
-                     2 {:start-time-millis 14 :foo 1 :bar 2}
-                     3 {:start-time-millis 18}}
-         :scan-end-id nil}}
+     {0 {}
+      1 {0 {:start-time-millis 10}
+         1 {:start-time-millis 11}
+         2 {:start-time-millis 19}}
+      2 {0 {:start-time-millis 9}
+         1 {:start-time-millis 12}
+         2 {:start-time-millis 14 :foo 1 :bar 2}
+         3 {:start-time-millis 18}}}
      5)))
   (is
    (=
-    {:agent-invokes     [{:task-id 0 :agent-id 11 :start-time-millis 11}
-                         {:task-id 0 :agent-id 10 :start-time-millis 10}]
-     :pagination-params {0 {:end-id 10 :inclusive? false}}}
+    {:agent-invokes     [{:task-id 1 :agent-id 0 :start-time-millis 10}
+                         {:task-id 2 :agent-id 0 :start-time-millis 9}]
+     :pagination-params {0 nil 1 nil 2 nil}}
     (queries/to-invokes-page-result
-     {0 {:task-page {10 {:start-time-millis 10}
-                     11 {:start-time-millis 11}}
-         :scan-end-id 10}}
-     2)))
+     {0 {}
+      1 {0 {:start-time-millis 10}}
+      2 {0 {:start-time-millis 9}}}
+     1)))
+  (is
+   (=
+    {:agent-invokes     []
+     :pagination-params {0 nil 1 nil 2 nil 3 nil}}
+    (queries/to-invokes-page-result
+     {0 {}
+      1 {}
+      2 {}
+      3 {}}
+     10)))
+  (is
+   (=
+    {:agent-invokes     [{:task-id 2 :agent-id 12 :start-time-millis 11}
+                         {:task-id 2 :agent-id 11 :start-time-millis 10}
+                         {:task-id 2 :agent-id 10 :start-time-millis 9}]
+     :pagination-params {0 300 1 3 2 0}}
+    (queries/to-invokes-page-result
+     {0 {0   {:start-time-millis 0}
+         100 {:start-time-millis 1}
+         200 {:start-time-millis 2}
+         300 {:start-time-millis 3}}
+      1 {0 {:start-time-millis 4}
+         1 {:start-time-millis 5}
+         2 {:start-time-millis 6}
+         3 {:start-time-millis 7}}
+      2 {0  {:start-time-millis 8}
+         10 {:start-time-millis 9}
+         11 {:start-time-millis 10}
+         12 {:start-time-millis 11}}}
+     4)))
+  (is
+   (=
+    {:agent-invokes     [{:task-id 1 :agent-id 4 :start-time-millis 40}
+                         {:task-id 0 :agent-id 0 :start-time-millis 37}
+                         {:task-id 2 :agent-id 3 :start-time-millis 35}
+                         {:task-id 3 :agent-id 3 :start-time-millis 32}
+                         {:task-id 3 :agent-id 2 :start-time-millis 31}
+                         {:task-id 1 :agent-id 2 :start-time-millis 30}]
+     :pagination-params {0 nil 1 1 2 2 3 1}}
+    (queries/to-invokes-page-result
+     {0 {0 {:start-time-millis 37}}
+      1 {0 {:start-time-millis 10}
+         1 {:start-time-millis 20}
+         2 {:start-time-millis 30}
+         4 {:start-time-millis 40}}
+      2 {0 {:start-time-millis 5}
+         1 {:start-time-millis 8}
+         2 {:start-time-millis 25}
+         3 {:start-time-millis 35}}
+      3 {0 {:start-time-millis 1}
+         1 {:start-time-millis 22}
+         2 {:start-time-millis 31}
+         3 {:start-time-millis 32}}}
+     4)))
 )
 
 (deftest invokes-page-query-test
