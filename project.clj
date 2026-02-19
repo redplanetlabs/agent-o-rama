@@ -75,7 +75,7 @@
                            [thheller/shadow-cljs "3.1.7"]
                            [etaoin "1.1.43"]
                            [clj-test-containers/clj-test-containers "0.7.4"]
-                           [org.testcontainers/testcontainers "1.21.4"]
+                           [org.testcontainers/testcontainers "2.0.3"]
                            [clj-kondo "2025.09.22"]]}
              :examples   {:test-paths   ["examples/clj/test"]
                           :source-paths ["examples/clj/src"]}
