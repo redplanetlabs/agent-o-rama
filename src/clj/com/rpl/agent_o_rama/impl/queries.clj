@@ -620,7 +620,8 @@
     (po/agent-root-task-global-name *agent-name :> *pstate-name)
     (|all)
     (ops/current-task-id :> *task-id)
-    (adjust-page-size *page-size :> *result-page-size)
+    (identity *page-size :> *result-page-size)
+    (identity 100 :> *scan-page-size)
     (get *pagination-params *task-id ::missing :> *cursor)
     (<<cond
      (case> (= *cursor ::missing))
@@ -637,14 +638,14 @@
       (local-select>
        [(sorted-map-range-to *end-id
                              {:inclusive? true
-                              :max-amt    *result-page-size})]
+                              :max-amt    *scan-page-size})]
        (this-module-pobject-task-global *pstate-name)
        :> *raw-page)
       (filter-invokes-task-page *raw-page *filters :> *filtered-page)
       (into (sorted-map) *filtered-page :> *task-page)
       (should-stop-invokes-scan? *raw-page
                                  *task-page
-                                 *result-page-size
+                                 *scan-page-size
                                  *result-page-size
                                  :> *stop?)
       (<<if (or> (empty? *raw-page) *stop?)
@@ -658,7 +659,7 @@
           (local-select>
            [(sorted-map-range-to *scan-end-id
                                  {:inclusive? false
-                                  :max-amt    *result-page-size})]
+                                  :max-amt    *scan-page-size})]
            (this-module-pobject-task-global *pstate-name)
            :> *raw-page)
           (filter-invokes-task-page *raw-page *filters :> *filtered-page)
@@ -669,7 +670,7 @@
             (h/first-key *raw-page :> *next-scan-end-id)
             (should-stop-invokes-scan? *raw-page
                                        *next-task-page
-                                       *result-page-size
+                                       *scan-page-size
                                        *result-page-size
                                        :> *stop?)
             (<<if *stop?
@@ -679,7 +680,7 @@
     (|origin)
     (aggs/+map-agg *task-id *task-page-result :> *pages-map)
     (to-invokes-page-result *pages-map
-                            *result-page-size
+                            *page-size
                             :> *res)))
 
 (defn declare-agent-get-names-query-topology
