@@ -545,6 +545,32 @@
   (or (< (count raw-page) scan-amt)
       (>= (count aggregated-filtered-page) result-page-size)))
 
+(defn debug-invokes-page-cursor
+  [task-id cursor end-id]
+  (println "invokes-page cursor"
+           {:task-id task-id
+            :cursor cursor
+            :end-id end-id})
+  nil)
+
+(defn debug-invokes-scan-end-id
+  [task-id scan-end-id]
+  (println "invokes-page scan-end-id"
+           {:task-id task-id
+            :scan-end-id scan-end-id})
+  nil)
+
+(defn debug-invokes-scan-page
+  [task-id scan-end-id raw-page filtered-page]
+  (println "invokes-page scan-page"
+           {:task-id task-id
+            :scan-end-id scan-end-id
+            :raw-count (count raw-page)
+            :filtered-count (count filtered-page)
+            :raw-first-id (h/first-key raw-page)
+            :raw-last-id (h/last-key raw-page)})
+  nil)
+
 (defbasicblocksegmacro get-distributed-page*
   [page-size pagination-params pstate-name res info-transformer page-result-fn max-key-fn initial-path]
   (let [task-id-sym (gen-anyvar "task-id")
@@ -632,6 +658,7 @@
 
      (default>)
       (identity *cursor :> *end-id))
+    (debug-invokes-page-cursor *task-id *cursor *end-id :> *debug-cursor-log)
     (<<if (nil? *end-id)
       (hash-map :task-page (sorted-map)
                 :resume-end-id nil
@@ -641,6 +668,7 @@
                *task-page (sorted-map)
                :> *task-page-result]
         (yield-if-overtime)
+        (debug-invokes-scan-end-id *task-id *scan-end-id :> *debug-scan-end-id-log)
         (local-select>
          [(sorted-map-range-to *scan-end-id
                                {:inclusive? false
@@ -648,6 +676,11 @@
          (this-module-pobject-task-global *pstate-name)
          :> *raw-page)
         (filter-invokes-task-page *raw-page *filters :> *filtered-page)
+        (debug-invokes-scan-page *task-id
+                                 *scan-end-id
+                                 *raw-page
+                                 *filtered-page
+                                 :> *debug-scan-page-log)
         (into *task-page *filtered-page :> *next-task-page)
         (<<if (empty? *raw-page)
           (identity nil :> *next-scan-end-id)
