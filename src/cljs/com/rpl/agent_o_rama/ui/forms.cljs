@@ -344,15 +344,6 @@
                               :valid? (:valid? validation-result)
                               :error nil))])))
 
-(state/reg-event :form/validate
-                 (fn [db form-id]
-                   (let [form-state (get-in db [:forms form-id])
-                         form-spec (@form-specs form-id)
-                         current-step-key (:current-step form-state)
-                         step-spec (get form-spec current-step-key form-spec)
-                         {:keys [valid? errors]} (validate-form-fields form-state (:validators step-spec))]
-                     [:forms form-id (s/terminal #(assoc % :valid? valid? :field-errors errors))])))
-
 (state/reg-event :form/next-step
                  (fn [db form-id]
                    (let [form-state (get-in db [:forms form-id])

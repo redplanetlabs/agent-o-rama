@@ -3,8 +3,7 @@
             [com.rpl.agent-o-rama.ui.state :as state]
             [com.rpl.agent-o-rama.ui.common :as common]
             [com.rpl.specter :as s]
-            [clojure.string :as str]
-            [clojure.walk :as walk]))
+            [clojure.string :as str]))
 
 ;; Orchestration events that perform side-effects using sente helpers,
 ;; keeping React components pure.
@@ -115,9 +114,9 @@
 ;; This is the single entry point to start or restart polling
 (state/reg-event :invocation/start-graph-loading
                  (fn [db {:keys [invoke-id module-id agent-name]}]
-                   (state/dispatch [:invocation/set-current {:invoke-id invoke-id
-                                                             :module-id module-id
-                                                             :agent-name agent-name}])
+                   (state/dispatch [:db/set-value [:current-invocation] {:invoke-id invoke-id
+                                                                        :module-id module-id
+                                                                        :agent-name agent-name}])
 
                    ;; Always fetch data on navigation to ensure fresh data
                    ;; Set status to loading immediately to prevent stale data display
@@ -197,25 +196,6 @@
                         1000))
 
                      nil)))
-
-(state/reg-event :invocation/merge-nodes
-                 (fn [db invoke-id new-nodes-map root-invoke-id-from-payload]
-                   (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
-                         current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
-                         merged-raw-nodes (merge current-raw-nodes new-nodes-map)
-                         ;; Prioritize the ID from the payload, fallback to the one in db.
-                         root-invoke-id (or root-invoke-id-from-payload
-                                            (get-in db [:invocations-data invoke-id :root-invoke-id]))
-
-                         {:keys [nodes edges implicit-edges]}
-                         (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
-
-                     [:invocations-data invoke-id
-                      (s/multi-path
-                       [:graph :raw-nodes (s/terminal-val merged-raw-nodes)]
-                       [:graph :nodes (s/terminal-val nodes)]
-                       [:graph :edges (s/terminal-val edges)]
-                       [:implicit-edges (s/terminal-val implicit-edges)])])))
 
 (state/reg-event :invocation/merge-nodes-and-complete
                  (fn [db invoke-id new-nodes-map root-invoke-id-from-payload is-complete]
@@ -341,16 +321,16 @@
                                                  :output output}]
                         10000
                         (fn [reply]
-                          (state/dispatch [:form/set-submitting form-id false])
+                          (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
                           (if (:success reply)
                             (do
                               (state/dispatch [:modal/hide])
                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                               (state/dispatch [:form/clear form-id]))
-                            (state/dispatch [:form/set-error form-id (or (:error reply) "An unknown server error occurred.")]))))
+                            (state/dispatch [:db/set-value [:forms form-id :error] (or (:error reply) "An unknown server error occurred.")]))))
                        (catch js/Error e
-                         (state/dispatch [:form/set-submitting form-id false])
-                         (state/dispatch [:form/set-error form-id (str "Invalid JSON: " (.-message e))]))))
+                         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                         (state/dispatch [:db/set-value [:forms form-id :error] (str "Invalid JSON: " (.-message e))]))))
                    nil))
 ;; =============================================================================
 ;; BULK OPERATION EVENTS

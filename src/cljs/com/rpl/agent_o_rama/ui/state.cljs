@@ -11,26 +11,6 @@
 ;; APP-DB: The Single Source of Truth
 ;; =============================================================================
 
-;; =============================================================================
-;; FORM VALIDATORS (defined here to avoid circular dependencies)
-;; =============================================================================
-
-(def required
-  "Validator for required fields"
-  (fn [value]
-    (when (str/blank? value)
-      "This field is required")))
-
-(def valid-json
-  "Validator for JSON strings"
-  (fn [value]
-    (when-not (str/blank? value)
-      (try
-        (js/JSON.parse value)
-        nil ; Valid JSON
-        (catch js/Error e
-          (str "Invalid JSON: " (.-message e)))))))
-
 ;; schema defined in schemas.cljs
 (def initial-db
   {:current-invocation {:invoke-id nil
@@ -202,23 +182,6 @@
 ;; (dispatch [:db/set-value [:sente :connection-state] new-state])
 ;; (dispatch [:db/set-value [:sente :connected?] connected?])
 
-;; Current Invocation Events
-(reg-event :invocation/set-current
-           (fn [db {:keys [invoke-id module-id agent-name]}]
-    ;; Simply set the current invocation context
-    ;; Data is stored separately under invocations-data
-             [:current-invocation (s/terminal-val {:invoke-id invoke-id
-                                                   :module-id module-id
-                                                   :agent-name agent-name})]))
-
-(reg-event :invocation/load-graph-success
-           (fn [db invoke-id graph-data]
-             [:invocations-data invoke-id :graph (s/terminal-val graph-data)]))
-
-(reg-event :invocation/load-summary-success
-           (fn [db invoke-id summary-data]
-             [:invocations-data invoke-id :summary (s/terminal-val summary-data)]))
-
 (reg-event :invocation/update-node
            (fn [db invoke-id node-id node-data]
              [:invocations-data invoke-id :graph :nodes
@@ -236,7 +199,7 @@
 ;; Usage: (dispatch [:db/update-value [:some :path] update-fn])
 (reg-event :db/update-value
            (fn [db path update-fn]
-             (into path [(s/terminal update-fn)])))
+             (into (path->specter-path path) [(s/terminal update-fn)])))
 
 ;; Usage: (dispatch [:db/set-values [[:path1] v1] [[:path2 :k] v2] ...])
 (reg-event :db/set-values
@@ -245,28 +208,6 @@
                     (map (fn [[path value]]
                            (into (path->specter-path path) [(s/terminal-val value)]))
                          path-value-pairs))))
-
-;; Specific complex events that do more than just setting a value
-(reg-event :invocations/append
-           (fn [db invokes]
-             [:invocations :all-invokes (s/terminal #(concat % invokes))]))
-
-(reg-event :invocations/set-loading
-           (fn [db loading?]
-             [:invocations :loading? (s/terminal-val loading?)]))
-
-(reg-event :invocations/set-pagination
-           (fn [db {:keys [pagination-params has-more?]}]
-             [:invocations (s/terminal #(assoc %
-                                               :pagination-params pagination-params
-                                               :has-more? has-more?))]))
-
-(reg-event :invocations/reset
-           (fn [db]
-             [:invocations (s/terminal-val {:all-invokes []
-                                            :pagination-params nil
-                                            :has-more? true
-                                            :loading? false})]))
 
 ;; =============================================================================
 ;; GENERIC QUERY HANDLERS - For useSenteQuery hook
@@ -395,21 +336,6 @@
   ([specter-path]
    (js/console.log "Value at path" specter-path ":"
                    (clj->js (s/select-one specter-path @app-db)))))
-
- ;; Dataset selection event handlers
-(reg-event :datasets/toggle-selection
-           (fn [db {:keys [dataset-id example-id]}]
-             (into (path->specter-path [:ui :datasets :selected-examples dataset-id])
-                   [(s/terminal #(if (contains? % example-id)
-                                   (disj % example-id)
-                                   (conj (or % #{}) example-id)))])))
-
-(reg-event :datasets/toggle-all-selection
-           (fn [db {:keys [dataset-id example-ids-on-page select-all?]}]
-             (into (path->specter-path [:ui :datasets :selected-examples dataset-id])
-                   [(s/terminal #(if select-all?
-                                   (into (or % #{}) example-ids-on-page)
-                                   (apply disj (or % #{}) example-ids-on-page)))])))
 
 (reg-event :datasets/clear-selection
            (fn [db {:keys [dataset-id]}]
