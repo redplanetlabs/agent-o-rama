@@ -12,11 +12,13 @@
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-page
   [{:keys [client pagination filters]} uid]
-  (let [pages (if (empty? pagination) nil pagination)]
+  (let [page-size 10
+        scan-page-size 100
+        pages (if (empty? pagination) nil pagination)]
     (when client ; this can be nil on restarts of the backend
       (foreign-invoke-query
        (:invokes-page-query (aor-types/underlying-objects client))
-       10 pages filters))))
+       page-size scan-page-size pages filters))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-filter-options
   [{:keys [client manager agent-name]} uid]

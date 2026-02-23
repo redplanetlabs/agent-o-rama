@@ -90,7 +90,7 @@
                                      count))))
 
      (bind page
-      (:agent-invokes (foreign-invoke-query invokes-page-query 10 nil nil)))
+      (:agent-invokes (foreign-invoke-query invokes-page-query 10 100 nil nil)))
      (is (= 2 (count page)))
      (is (every? :human-request? page))
 
@@ -227,7 +227,7 @@
 
 
      (bind page
-      (:agent-invokes (foreign-invoke-query invokes-page-query 10 nil nil)))
+      (:agent-invokes (foreign-invoke-query invokes-page-query 10 100 nil nil)))
      (is (= 2 (count page)))
      (is (= 1 (count (filter :human-request? page))))
 

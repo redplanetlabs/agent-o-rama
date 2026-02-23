@@ -172,7 +172,7 @@
           (loop [ret    []
                  params nil]
             (let [{:keys [agent-invokes pagination-params]}
-                 (foreign-invoke-query q i params nil)
+                 (foreign-invoke-query q i 100 params nil)
                   ret (conj ret agent-invokes)]
               (if (every? nil? (vals pagination-params))
                 ret
@@ -267,6 +267,7 @@
        (try
          {:data (foreign-invoke-query q
                                       10
+                                      100
                                       nil
                                       {:node-name "start"
                                        :latency-ms {:min 80}
@@ -286,6 +287,7 @@
        (try
          {:data (foreign-invoke-query q
                                       10
+                                      100
                                       nil
                                       {:has-error? true})}
          (catch Throwable t {:error t})))
@@ -313,6 +315,7 @@
        (try
          {:data (foreign-invoke-query q
                                       10
+                                      100
                                       nil
                                       {:feedback-metric {:metric-name "quality"
                                                          :comparator :<=
@@ -330,6 +333,7 @@
        (try
          {:data (foreign-invoke-query q
                                       10
+                                      100
                                       nil
                                       {:source "EXPERIMENT"})}
          (catch Throwable t {:error t})))
@@ -342,6 +346,7 @@
        (try
          {:data (foreign-invoke-query q
                                       20
+                                      100
                                       nil
                                       {:source "EXPERIMENT"
                                        :source-not? true})}
@@ -355,6 +360,7 @@
        (try
          {:data (foreign-invoke-query q
                                       20
+                                      100
                                       nil
                                       {:source "MANUAL"})}
          (catch Throwable t {:error t})))
@@ -367,6 +373,7 @@
        (try
          {:data (foreign-invoke-query q
                                       10
+                                      100
                                       nil
                                       {:has-error? true
                                        :source "EXPERIMENT"})}
@@ -437,6 +444,83 @@
          (let [{:keys [agent-invokes pagination-params]}
                (foreign-invoke-query q
                                     2
+                                    100
+                                    params
+                                    {:has-error? true})
+               ret (conj ret agent-invokes)]
+           (if (every? nil? (vals pagination-params))
+             ret
+             (recur ret pagination-params (inc i))))))
+
+     (bind all (apply concat pages))
+     (bind all-ids (mapv (fn [m] [(:task-id m) (:agent-id m)]) all))
+
+     (is (> (count pages) 1))
+     (is (= (count all-ids) (count (set all-ids))))
+     (is (= expected-failed-invokes (set all-ids)))
+     (is (every? #(= :failure (:status %)) all))
+     )))
+
+(deftest invokes-page-query-small-scan-pagination-test
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node {:keys [route sleep-ms]}]
+               (when sleep-ms
+                 (Thread/sleep ^long sleep-ms))
+               (if (= route :fail)
+                 (throw (ex-info "boom" {:route route}))
+                 (aor/result! agent-node {:ok true :route :fast})))))))
+     (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
+     (bind module-name (get-module-name module))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind q (:invokes-page-query (aor-types/underlying-objects foo)))
+
+     ;; A tiny scan window should still paginate sparse matches correctly.
+     (bind runs
+       (vec
+        (for [i (range 60)]
+          (let [fail? (zero? (mod i 5))]
+            {:fail? fail?
+             :args {:route (if fail? :fail :fast)
+                    :sleep-ms 1}}))))
+
+     (bind created-runs
+       (vec
+        (for [{:keys [fail? args]} runs]
+          {:fail? fail?
+           :invoke (aor/agent-initiate foo args)})))
+
+     (doseq [{:keys [invoke]} created-runs]
+       (try
+         (aor/agent-result foo invoke)
+         (catch Throwable _)))
+
+     (bind expected-failed-invokes
+       (set
+        (for [{:keys [fail? invoke]} created-runs
+              :when fail?]
+          [(:task-id invoke) (:agent-invoke-id invoke)])))
+
+     (bind pages
+       (loop [ret []
+              params nil
+              i 0]
+         (when (> i 300)
+           (throw (ex-info "small-scan filtered pagination did not terminate"
+                           {:iterations i})))
+         (let [{:keys [agent-invokes pagination-params]}
+               (foreign-invoke-query q
+                                    2
+                                    5
                                     params
                                     {:has-error? true})
                ret (conj ret agent-invokes)]

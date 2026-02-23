@@ -638,12 +638,11 @@
   [topologies]
   (<<query-topology topologies
     (agent-get-invokes-page-query-name)
-    [*agent-name *page-size *pagination-params *filters :> *res]
+    [*agent-name *page-size *scan-page-size *pagination-params *filters :> *res]
     (po/agent-root-task-global-name *agent-name :> *pstate-name)
     (|all)
     (ops/current-task-id :> *task-id)
     (identity *page-size :> *result-page-size)
-    (identity 100 :> *scan-page-size)
     (get *pagination-params *task-id ::missing :> *cursor)
     (<<cond
      (case> (= *cursor ::missing))
