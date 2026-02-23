@@ -179,8 +179,8 @@
                 (recur ret pagination-params)
               ))))
 
-        ;; verify multiple pages
-        (is (> (count res) 2))
+        ;; page size is approximate at query level, but should still paginate.
+        (is (> (count res) 1))
         (is (every? #(>= (count %) i) (butlast res)))
         (bind all (apply concat res))
         (is (apply >= (mapv :start-time-millis all)))
@@ -362,6 +362,18 @@
          "invokes-page query should support manual source class")
      (when-let [rows (-> source-manual-res :data :agent-invokes)]
        (is (= 5 (count rows))))
+
+     (bind empty-res
+       (try
+         {:data (foreign-invoke-query q
+                                      10
+                                      nil
+                                      {:has-error? true
+                                       :source "EXPERIMENT"})}
+         (catch Throwable t {:error t})))
+     (is (nil? (:error empty-res))
+         "invokes-page query should handle empty filtered pages")
+     (is (empty? (-> empty-res :data :agent-invokes)))
 
      )))
 

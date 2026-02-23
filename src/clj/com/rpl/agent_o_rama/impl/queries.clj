@@ -567,8 +567,8 @@
             :scan-end-id scan-end-id
             :raw-count (count raw-page)
             :filtered-count (count filtered-page)
-            :raw-first-id (h/first-key raw-page)
-            :raw-last-id (h/last-key raw-page)})
+            :raw-first-id (if (empty? raw-page) nil (h/first-key raw-page))
+            :raw-last-id (if (empty? raw-page) nil (h/last-key raw-page))})
   nil)
 
 (defn debug-invokes-origin
@@ -617,13 +617,6 @@
                          nil))))
             {}
             all-task-ids)))
-
-(defn trim-invokes-task-page
-  [task-page max-size]
-  (if (<= (count task-page) max-size)
-    task-page
-    (into (sorted-map)
-          (take-last max-size task-page))))
 
 (defbasicblocksegmacro get-distributed-page*
   [page-size pagination-params pstate-name res info-transformer page-result-fn max-key-fn initial-path]
@@ -702,7 +695,6 @@
     (ops/current-task-id :> *task-id)
     (identity *page-size :> *result-page-size)
     (identity 100 :> *scan-page-size)
-    (adjust-page-size *page-size :> *task-page-max-size)
     (get *pagination-params *task-id ::missing :> *cursor)
     (<<cond
      (case> (= *cursor ::missing))
@@ -735,11 +727,7 @@
                                  *raw-page
                                  *filtered-page
                                  :> *debug-scan-page-log)
-        (into *task-page *filtered-page :> *unbounded-task-page)
-        (trim-invokes-task-page *unbounded-task-page
-                                *task-page-max-size
-                                :> *next-task-page)
-        (> (count *unbounded-task-page) (count *next-task-page) :> *trimmed?)
+        (into *task-page *filtered-page :> *next-task-page)
         (<<if (empty? *raw-page)
           (identity nil :> *next-scan-end-id)
          (else>)
@@ -750,13 +738,10 @@
                                    *result-page-size
                                    :> *stop?)
         (<<if *stop?
-          (<<if *trimmed?
-            (first (keys *next-task-page) :> *resume-end-id)
+          (<<if (< (count *raw-page) *scan-page-size)
+            (identity nil :> *resume-end-id)
            (else>)
-            (<<if (< (count *raw-page) *scan-page-size)
-              (identity nil :> *resume-end-id)
-             (else>)
-              (identity *next-scan-end-id :> *resume-end-id)))
+            (identity *next-scan-end-id :> *resume-end-id))
           (:> *next-task-page *resume-end-id)
          (else>)
           (continue> *next-scan-end-id *next-task-page))))
