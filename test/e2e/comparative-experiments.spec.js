@@ -9,6 +9,8 @@ import {
   deleteEvaluator,
   addExample,
   addEvaluatorToExperiment,
+  openCommonDropdown,
+  selectCommonDropdownOption,
 } from './helpers.js';
 
 // =============================================================================
@@ -123,22 +125,19 @@ test.describe('Comparative Experiment Flow', () => {
 
     // Configure Target 1
     const target0 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 1' }).first();
-    await target0.getByTestId('agent-name-dropdown').click();
-    await target0.getByText(agentToRun, { exact: true }).click();
+    await selectCommonDropdownOption(page, target0.getByTestId('agent-name-dropdown'), agentToRun);
     await target0.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target1_output"}');
 
     // Configure Target 2
     const target1 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 2' }).first();
-    await target1.getByTestId('agent-name-dropdown').click();
-    await target1.getByText(agentToRun, { exact: true }).click();
+    await selectCommonDropdownOption(page, target1.getByTestId('agent-name-dropdown'), agentToRun);
     await target1.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target2_output"}');
     
     // Add and Configure Target 3
     await expModal.getByRole('button', { name: 'Add Another Target' }).click();
     const target2 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 3' }).first();
     await expect(target2).toBeVisible();
-    await target2.getByTestId('agent-name-dropdown').click();
-    await target2.getByText(agentToRun, { exact: true }).click();
+    await selectCommonDropdownOption(page, target2.getByTestId('agent-name-dropdown'), agentToRun);
     await target2.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target3_output"}');
     console.log('Configured 3 targets for the experiment.');
 
@@ -221,8 +220,7 @@ test.describe('Comparative Experiment Flow', () => {
     console.log('Verified: Selector evaluator dropdown is visible even with only one selector.');
     
     // Verify dropdown only shows one selector evaluator
-    await selectorDropdown.click();
-    let dropdownMenu = page.locator('.origin-top-right');
+    let dropdownMenu = await openCommonDropdown(page, selectorDropdown);
     await expect(dropdownMenu.getByText(selectLongestEvaluator.name, { exact: true })).toBeVisible();
     await expect(dropdownMenu.getByText(selectRandomEvaluator.name, { exact: true })).not.toBeVisible();
     await page.keyboard.press('Escape'); // Close dropdown
@@ -280,20 +278,18 @@ test.describe('Comparative Experiment Flow', () => {
     console.log('Verified: Selector evaluator dropdown is visible with multiple selectors.');
     
     // Test switching between selector evaluators
-    await multiSelectorDropdown.click();
-    const multiDropdownMenu = page.locator('.origin-top-right');
+    const multiDropdownMenu = await openCommonDropdown(page, multiSelectorDropdown);
     await expect(multiDropdownMenu.getByText(selectLongestEvaluator.name, { exact: true })).toBeVisible();
     await expect(multiDropdownMenu.getByText(selectRandomEvaluator.name, { exact: true })).toBeVisible();
     console.log('Verified: Dropdown shows both selector evaluators.');
     
     // Switch to the random selector
-    await multiDropdownMenu.getByText(selectRandomEvaluator.name, { exact: true }).click();
+    await selectCommonDropdownOption(page, multiSelectorDropdown, selectRandomEvaluator.name);
     await expect(multiSelectorDropdown).toContainText(selectRandomEvaluator.name);
     console.log('Verified: Successfully switched to random selector evaluator.');
     
     // Switch back to longest selector
-    await multiSelectorDropdown.click();
-    await multiDropdownMenu.getByText(selectLongestEvaluator.name, { exact: true }).click();
+    await selectCommonDropdownOption(page, multiSelectorDropdown, selectLongestEvaluator.name);
     await expect(multiSelectorDropdown).toContainText(selectLongestEvaluator.name);
     console.log('Verified: Successfully switched back to longest selector evaluator.');
     
@@ -387,14 +383,12 @@ test.describe('Comparative Experiment Flow', () => {
 
     // Configure Target 1
     const target0 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 1' }).first();
-    await target0.getByTestId('agent-name-dropdown').click();
-    await target0.getByText(agentToRun, { exact: true }).click();
+    await selectCommonDropdownOption(page, target0.getByTestId('agent-name-dropdown'), agentToRun);
     await target0.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target1_output"}');
 
     // Configure Target 2
     const target1 = expModal.locator('.bg-gray-50.border.rounded-lg').filter({ hasText: 'Target 2' }).first();
-    await target1.getByTestId('agent-name-dropdown').click();
-    await target1.getByText(agentToRun, { exact: true }).click();
+    await selectCommonDropdownOption(page, target1.getByTestId('agent-name-dropdown'), agentToRun);
     await target1.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('{"output-value": "$.target2_output"}');
     console.log('Configured 2 targets for the experiment.');
 

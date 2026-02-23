@@ -9,6 +9,7 @@ import {
   deleteEvaluator,
   addExample,
   addEvaluatorToExperiment,
+  selectCommonDropdownOption,
 } from './helpers.js';
 
 // =============================================================================
@@ -91,8 +92,7 @@ async function runExperimentFromSelectionBar(page, { experimentName, selectedExa
   console.log(`Verified selector is pre-set to selected examples (${selectedExamples.length} examples)`);
 
   // Configure Target Agent
-  await modal.getByTestId('agent-name-dropdown').click();
-  await modal.getByText(agentToRun, { exact: true }).click();
+  await selectCommonDropdownOption(page, modal.getByTestId('agent-name-dropdown'), agentToRun);
   await modal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
   
   // Select Evaluator
@@ -156,8 +156,7 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
   }
 
   // Configure Target Agent
-  await modal.getByTestId('agent-name-dropdown').click();
-  await modal.getByText(agentToRun, { exact: true }).click();
+  await selectCommonDropdownOption(page, modal.getByTestId('agent-name-dropdown'), agentToRun);
   await modal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
   
   // Select Evaluator

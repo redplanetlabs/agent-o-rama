@@ -8,6 +8,7 @@ import {
   deleteEvaluator,
   addExample,
   addEvaluatorToExperiment,
+  selectCommonDropdownOption,
 } from './helpers.js';
 
 // =============================================================================
@@ -87,8 +88,7 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
     await expModal.getByLabel('Experiment Name').fill(experimentName);
     
     // Select the E2ETestAgent
-    await expModal.getByTestId('agent-name-dropdown').click();
-    await expModal.getByText('E2ETestAgent', { exact: true }).click();
+    await selectCommonDropdownOption(page, expModal.getByTestId('agent-name-dropdown'), 'E2ETestAgent');
     
     // Configure input mappings (E2ETestAgent expects a map, so we use $ to pass the whole input)
     await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');

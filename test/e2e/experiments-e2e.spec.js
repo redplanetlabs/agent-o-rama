@@ -8,6 +8,7 @@ import {
   deleteEvaluator,
   addExample,
   addEvaluatorToExperiment,
+  selectCommonDropdownOption,
 } from './helpers.js';
 
 // =============================================================================
@@ -130,8 +131,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
 
     const expModal = page.locator('[role="dialog"]');
     await expModal.getByLabel('Experiment Name').fill(experimentName);
-    await expModal.getByTestId('agent-name-dropdown').click();
-    await expModal.getByText(agentToRun, { exact: true }).click();
+    await selectCommonDropdownOption(page, expModal.getByTestId('agent-name-dropdown'), agentToRun);
     await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
     await addEvaluatorToExperiment(page, expModal, randomFloatEvaluator.name);
     await addEvaluatorToExperiment(page, expModal, failingEvaluator.name);
@@ -204,8 +204,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
 
     // Open sort dropdown and select "score"
     const sortDropdown = page.getByTestId('sort-by-dropdown');
-    await sortDropdown.click();
-    await page.locator('.origin-top-right').getByText('score', { exact: true }).click();
+    await selectCommonDropdownOption(page, sortDropdown, 'score');
     await page.waitForTimeout(300);
     
     // Verify ascending sort
@@ -223,8 +222,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     console.log('Descending sort by score verified.');
     
     // Test sorting by passed? evaluator
-    await sortDropdown.click();
-    await page.locator('.origin-top-right').getByText('passed?', { exact: true }).click();
+    await selectCommonDropdownOption(page, sortDropdown, 'passed?');
     await page.waitForTimeout(300);
     
     // Uncheck reverse for ascending
@@ -243,8 +241,7 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     console.log('Sort by passed? verified.');
     
     // Reset sort to None
-    await sortDropdown.click();
-    await page.locator('.origin-top-right').getByText('None', { exact: true }).click();
+    await selectCommonDropdownOption(page, sortDropdown, 'None');
     await page.waitForTimeout(300);
     
     // Reverse checkbox should disappear when sort is None

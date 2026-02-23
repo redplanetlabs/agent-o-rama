@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getE2ETestAgentRow, addExample, deleteDataset, createEvaluator, deleteEvaluator, addEvaluatorToExperiment, shouldSkipCleanup} from './helpers.js';
+import { getE2ETestAgentRow, addExample, deleteDataset, createEvaluator, deleteEvaluator, addEvaluatorToExperiment, selectCommonDropdownOption, shouldSkipCleanup} from './helpers.js';
 
 // =============================================================================
 // TEST SUITE
@@ -219,8 +219,7 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
 
     // Fill out the experiment form
     await expModal.getByLabel('Experiment Name').fill(`Regular Exp ${uniqueId}`);
-    await expModal.getByTestId('agent-name-dropdown').click();
-    await expModal.getByText(agentToRun, { exact: true }).click();
+    await selectCommonDropdownOption(page, expModal.getByTestId('agent-name-dropdown'), agentToRun);
     await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
     await addEvaluatorToExperiment(page, expModal, evaluatorName);
     

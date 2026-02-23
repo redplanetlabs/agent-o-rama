@@ -9,6 +9,7 @@ import {
   deleteDataset,
   addExample,
   addEvaluatorToExperiment,
+  selectCommonDropdownOption,
   shouldSkipCleanup,
 } from './helpers.js';
 
@@ -154,10 +155,7 @@ test.describe('Invocations filters', () => {
       await page.getByRole('button', { name: 'Run New Experiment' }).click();
       const expModal = page.locator('[role="dialog"]');
       await expModal.getByLabel('Experiment Name').fill(`e2e-inv-filter-exp-${uniqueId}`);
-      await expModal.getByTestId('agent-name-dropdown').click();
-      const agentDropdownMenu = page.locator('div.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5').last();
-      await expect(agentDropdownMenu).toBeVisible();
-      await agentDropdownMenu.getByText('E2ETestAgent', { exact: true }).click();
+      await selectCommonDropdownOption(page, expModal.getByTestId('agent-name-dropdown'), 'E2ETestAgent');
       await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
       await addEvaluatorToExperiment(page, expModal, 'random-float');
       await expModal.getByRole('button', { name: 'Run Experiment' }).click();
