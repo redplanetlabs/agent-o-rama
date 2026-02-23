@@ -172,7 +172,9 @@
           (loop [ret    []
                  params nil]
             (let [{:keys [agent-invokes pagination-params]}
-                 (foreign-invoke-query q i 100 params nil)
+                 ;; Keep scan-page-size tight so this test exercises true
+                 ;; multi-request pagination instead of draining each task.
+                 (foreign-invoke-query q i 10 params nil)
                   ret (conj ret agent-invokes)]
               (if (every? nil? (vals pagination-params))
                 ret
@@ -259,43 +261,31 @@
            (aor/agent-result foo inv)
            (catch Throwable _))))
 
-     ;; This is the desired API for the new filter-capable query:
-     ;; [page-size pagination-params filters]
-     ;; It should accept filter params and return only matching invokes.
-     ;; This assertion intentionally fails until query topology is upgraded.
      (bind slow-res
-       (try
-         {:data (foreign-invoke-query q
-                                      10
-                                      100
-                                      nil
-                                      {:node-name "start"
-                                       :latency-ms {:min 80}
-                                       :has-error? false})}
-         (catch Throwable t {:error t})))
-     (is (nil? (:error slow-res))
-         "invokes-page query should accept filter params without arity/runtime errors")
-     (when-let [rows (-> slow-res :data :agent-invokes)]
-       (is (seq rows))
-       (is (every? #(= :success (:status %)) rows))
-       (is (every? (fn [m]
-                     (let [lat (- (:finish-time-millis m) (:start-time-millis m))]
-                       (>= lat 80)))
-                   rows)))
+       (foreign-invoke-query q
+                             10
+                             100
+                             nil
+                             {:node-name "start"
+                              :latency-ms {:min 80}
+                              :has-error? false}))
+     (bind slow-rows (:agent-invokes slow-res))
+     (is (seq slow-rows))
+     (is (every? #(= :success (:status %)) slow-rows))
+     (is (every? (fn [m]
+                   (let [lat (- (:finish-time-millis m) (:start-time-millis m))]
+                     (>= lat 80)))
+                 slow-rows))
 
      (bind err-res
-       (try
-         {:data (foreign-invoke-query q
-                                      10
-                                      100
-                                      nil
-                                      {:has-error? true})}
-         (catch Throwable t {:error t})))
-     (is (nil? (:error err-res))
-         "invokes-page query should support has-error filter")
-     (when-let [rows (-> err-res :data :agent-invokes)]
-       (is (seq rows))
-       (is (every? #(= :failure (:status %)) rows)))
+       (foreign-invoke-query q
+                             10
+                             100
+                             nil
+                             {:has-error? true}))
+     (bind err-rows (:agent-invokes err-res))
+     (is (seq err-rows))
+     (is (every? #(= :failure (:status %)) err-rows))
 
      ;; Add human feedback scores for metric-filter testing.
      (bind fast-target
@@ -312,75 +302,55 @@
      (evals/add-human-feedback! global-actions-depot slow-exp-target "reviewer-2" {"quality" 8} "good")
 
      (bind feedback-res
-       (try
-         {:data (foreign-invoke-query q
-                                      10
-                                      100
-                                      nil
-                                      {:feedback-metric {:metric-name "quality"
-                                                         :comparator :<=
-                                                         :value 3
-                                                         :source :human}})}
-         (catch Throwable t {:error t})))
-     (is (nil? (:error feedback-res))
-         "invokes-page query should support feedback metric comparator filter")
-     (when-let [rows (-> feedback-res :data :agent-invokes)]
-      (is (= 1 (count rows)))
-      (is (every? #(contains? % :feedback-metric-value) rows))
-      (is (every? #(number? (:feedback-metric-value %)) rows)))
+       (foreign-invoke-query q
+                             10
+                             100
+                             nil
+                             {:feedback-metric {:metric-name "quality"
+                                                :comparator :<=
+                                                :value 3
+                                                :source :human}}))
+     (bind feedback-rows (:agent-invokes feedback-res))
+     (is (= 1 (count feedback-rows)))
+     (is (every? #(contains? % :feedback-metric-value) feedback-rows))
+     (is (every? #(number? (:feedback-metric-value %)) feedback-rows))
 
      (bind source-res
-       (try
-         {:data (foreign-invoke-query q
-                                      10
-                                      100
-                                      nil
-                                      {:source "EXPERIMENT"})}
-         (catch Throwable t {:error t})))
-     (is (nil? (:error source-res))
-         "invokes-page query should support source string filter")
-     (when-let [rows (-> source-res :data :agent-invokes)]
-       (is (= 1 (count rows))))
+       (foreign-invoke-query q
+                             10
+                             100
+                             nil
+                             {:source "EXPERIMENT"}))
+     (bind source-rows (:agent-invokes source-res))
+     (is (= 1 (count source-rows)))
 
      (bind source-not-res
-       (try
-         {:data (foreign-invoke-query q
-                                      20
-                                      100
-                                      nil
-                                      {:source "EXPERIMENT"
-                                       :source-not? true})}
-         (catch Throwable t {:error t})))
-     (is (nil? (:error source-not-res))
-         "invokes-page query should support source negation filter")
-     (when-let [rows (-> source-not-res :data :agent-invokes)]
-       (is (= 5 (count rows))))
+       (foreign-invoke-query q
+                             20
+                             100
+                             nil
+                             {:source "EXPERIMENT"
+                              :source-not? true}))
+     (bind source-not-rows (:agent-invokes source-not-res))
+     (is (= 5 (count source-not-rows)))
 
      (bind source-manual-res
-       (try
-         {:data (foreign-invoke-query q
-                                      20
-                                      100
-                                      nil
-                                      {:source "MANUAL"})}
-         (catch Throwable t {:error t})))
-     (is (nil? (:error source-manual-res))
-         "invokes-page query should support manual source class")
-     (when-let [rows (-> source-manual-res :data :agent-invokes)]
-       (is (= 5 (count rows))))
+       (foreign-invoke-query q
+                             20
+                             100
+                             nil
+                             {:source "MANUAL"}))
+     (bind source-manual-rows (:agent-invokes source-manual-res))
+     (is (= 5 (count source-manual-rows)))
 
      (bind empty-res
-       (try
-         {:data (foreign-invoke-query q
-                                      10
-                                      100
-                                      nil
-                                      {:has-error? true
-                                       :source "EXPERIMENT"})}
-         (catch Throwable t {:error t})))
-     (is (nil? (:error empty-res))
-         "invokes-page query should handle empty filtered pages")
-     (is (empty? (-> empty-res :data :agent-invokes)))
+       (foreign-invoke-query q
+                             10
+                             100
+                             nil
+                             {:has-error? true
+                              :source "EXPERIMENT"}))
+     (is (empty? (:agent-invokes empty-res)))
 
      )))
 
