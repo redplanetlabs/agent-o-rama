@@ -5,6 +5,8 @@ import {
   invokeAgentManually,
   createHumanMetric,
   deleteHumanMetric,
+  createEvaluator,
+  deleteEvaluator,
   createDataset,
   deleteDataset,
   addExample,
@@ -16,6 +18,7 @@ import {
 const uniqueId = randomUUID().substring(0, 8);
 const metricName = `e2e-inv-filter-metric-${uniqueId}`;
 const datasetName = `e2e-inv-filter-dataset-${uniqueId}`;
+const evaluatorName = `e2e-inv-filter-evaluator-${uniqueId}`;
 
 const runIds = {
   nodeLong: `e2e-node-long-${uniqueId}`,
@@ -86,6 +89,7 @@ test.describe('Invocations filters', () => {
     let agentBaseUrl = '';
     let feedbackThreeUrl = '';
     let feedbackFiveUrl = '';
+    let evaluatorCreated = false;
 
     try {
       await page.goto('/');
@@ -146,6 +150,9 @@ test.describe('Invocations filters', () => {
       await createHumanMetric(page, { name: metricName, type: 'numeric', min: 1, max: 10 });
       await addNumericFeedback(page, feedbackThreeUrl, 'Filter Reviewer 3', metricName, 3);
       await addNumericFeedback(page, feedbackFiveUrl, 'Filter Reviewer 5', metricName, 5);
+      await page.getByRole('link', { name: 'Evaluators' }).click();
+      await createEvaluator(page, { name: evaluatorName, builderName: 'random-float' });
+      evaluatorCreated = true;
 
       // Create one experiment run for source=experiment filter.
       await page.goto(agentBaseUrl);
@@ -165,7 +172,7 @@ test.describe('Invocations filters', () => {
       await expModal.getByLabel('Experiment Name').fill(`e2e-inv-filter-exp-${uniqueId}`);
       await selectCommonDropdownOption(page, expModal.getByTestId('agent-name-dropdown'), 'E2ETestAgent');
       await expModal.locator('div').filter({ hasText: /^Input Arguments/ }).getByRole('textbox').fill('$');
-      await addEvaluatorToExperiment(page, expModal, 'random-float');
+      await addEvaluatorToExperiment(page, expModal, evaluatorName);
       await expModal.getByRole('button', { name: 'Run Experiment' }).click();
       await expect(page).toHaveURL(/experiments\//, { timeout: 30000 });
       await expect(page.getByText('Completed').first()).toBeVisible({ timeout: 120000 });
@@ -271,6 +278,10 @@ test.describe('Invocations filters', () => {
         }
         await page.getByText('Datasets & Experiments').click();
         await deleteDataset(page, datasetName);
+        if (evaluatorCreated) {
+          await page.getByRole('link', { name: 'Evaluators' }).click();
+          await deleteEvaluator(page, evaluatorName);
+        }
         await page.getByRole('link', { name: 'Human Metrics' }).click();
         await deleteHumanMetric(page, metricName);
       }
