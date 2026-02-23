@@ -398,7 +398,9 @@
              (fn [agent-node {:keys [route sleep-ms]}]
                (when sleep-ms
                  (Thread/sleep ^long sleep-ms))
-               (aor/result! agent-node {:ok true :route route}))))))
+               (if (= route :fail)
+                 (throw (ex-info "boom" {:route route}))
+                 (aor/result! agent-node {:ok true :route :fast})))))))
      (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
