@@ -398,9 +398,7 @@
              (fn [agent-node {:keys [route sleep-ms]}]
                (when sleep-ms
                  (Thread/sleep ^long sleep-ms))
-               (if (= route :fail)
-                 (throw (ex-info "boom" {:route route}))
-                 (aor/result! agent-node {:ok true :route :fast})))))))
+               (aor/result! agent-node {:ok true :route route})))))))
      (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
@@ -459,7 +457,7 @@
      (is (= (count all-ids) (count (set all-ids))))
      (is (= expected-failed-invokes (set all-ids)))
      (is (every? #(= :failure (:status %)) all))
-     )))
+     ))
 
 (deftest invokes-page-query-scan-page-size-matrix-test
   (with-open [ipc (rtest/create-ipc)]
@@ -484,30 +482,35 @@
      (bind foo (aor/agent-client agent-manager "foo"))
      (bind q (:invokes-page-query (aor-types/underlying-objects foo)))
 
-     ;; Sparse failures force each request to read through multiple scan windows.
+     ;; Sparse source matches force each request to read through multiple scan windows.
+     (bind experiment-source
+       (aor-types/->valid-ExperimentSourceImpl
+        (java.util.UUID/randomUUID)
+        (java.util.UUID/randomUUID)))
      (bind runs
        (vec
-        (for [i (range 40)]
-          (let [fail? (zero? (mod i 8))]
-            {:fail? fail?
-             :args {:route (if fail? :fail :fast)
+        (for [i (range 120)]
+          (let [experiment? (zero? (mod i 11))]
+            {:experiment? experiment?
+             :args {:route (if experiment? :experiment :manual)
                     :sleep-ms 1}}))))
 
      (bind created-runs
        (vec
-        (for [{:keys [fail? args]} runs]
-          {:fail? fail?
-           :invoke (aor/agent-initiate foo args)})))
+        (for [{:keys [experiment? args]} runs]
+          {:experiment? experiment?
+           :invoke (if experiment?
+                     (binding [aor-types/OPERATION-SOURCE experiment-source]
+                       (aor/agent-initiate foo args))
+                     (aor/agent-initiate foo args))})))
 
      (doseq [{:keys [invoke]} created-runs]
-       (try
-         (aor/agent-result foo invoke)
-         (catch Throwable _)))
+       (aor/agent-result foo invoke))
 
-     (bind expected-failed-invokes
+     (bind expected-experiment-invokes
        (set
-        (for [{:keys [fail? invoke]} created-runs
-              :when fail?]
+        (for [{:keys [experiment? invoke]} created-runs
+              :when experiment?]
           [(:task-id invoke) (:agent-invoke-id invoke)])))
 
      (doseq [scan-page-size [2 3 5 8]]
@@ -524,15 +527,15 @@
                                           4
                                           scan-page-size
                                           params
-                                          {:has-error? true})
+                                          {:source "EXPERIMENT"})
                      ret (conj ret agent-invokes)]
                  (if (every? nil? (vals pagination-params))
                    ret
                    (recur ret pagination-params (inc i)))))
              all (apply concat pages)
              all-ids (mapv (fn [m] [(:task-id m) (:agent-id m)]) all)]
-         (is (> (count pages) 1))
+         (is (> (count pages) 2))
          (is (= (count all-ids) (count (set all-ids))))
-         (is (= expected-failed-invokes (set all-ids)))
-         (is (every? #(= :failure (:status %)) all))))
+         (is (= expected-experiment-invokes (set all-ids)))
+         (is (every? #(= :success (:status %)) all))))
      )))
