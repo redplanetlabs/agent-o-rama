@@ -80,19 +80,27 @@ export function getCommonDropdownMenu(page) {
 
 /**
  * Opens a common/Dropdown trigger and waits for the menu to be visible.
+ * Retries the click if the menu doesn't appear (the dropdown's document click
+ * handler can race with polling re-renders and close the menu immediately).
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @param {import('@playwright/test').Locator} trigger - The dropdown trigger button locator.
  * @returns {Promise<import('@playwright/test').Locator>} The visible menu locator.
  */
 export async function openCommonDropdown(page, trigger) {
-  await trigger.click();
   const menu = getCommonDropdownMenu(page);
-  await expect(menu).toBeVisible({ timeout: 15000 });
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await trigger.click();
+    if (await menu.isVisible().catch(() => false)) return menu;
+    await page.waitForTimeout(200);
+    if (await menu.isVisible().catch(() => false)) return menu;
+  }
+  await expect(menu).toBeVisible({ timeout: 5000 });
   return menu;
 }
 
 /**
  * Selects an option from a common/Dropdown by clicking the trigger then the option.
+ * Retries if the dropdown doesn't stay open (see openCommonDropdown).
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @param {import('@playwright/test').Locator} trigger - The dropdown trigger button locator.
  * @param {string|RegExp} optionText - Option text to click.
