@@ -41,8 +41,7 @@ const comparatorExpectations = {
 };
 
 async function openFilterPanel(page, label) {
-  await page.getByTestId('add-invocations-filter').click();
-  await page.locator('button').filter({ hasText: label }).first().click();
+  await selectCommonDropdownOption(page, page.getByTestId('add-invocations-filter'), label);
 }
 
 async function applyCurrentFilter(page) {
@@ -109,7 +108,7 @@ test.describe('Invocations filters', () => {
 
       await invokeAgentManually(page, [{
         'run-id': runIds.latencySlow,
-        'timeout-ms': 1200,
+        'timeout-ms': 10000,
         'output-value': runIds.latencySlow,
       }]);
       await page.goto(agentBaseUrl);
@@ -186,7 +185,7 @@ test.describe('Invocations filters', () => {
 
       // Latency filter.
       await openFilterPanel(page, 'Latency');
-      await page.getByTestId('invocations-filter-latency-min').fill('900');
+      await page.getByTestId('invocations-filter-latency-min').fill('9000');
       await applyCurrentFilter(page);
       await expect(page.locator('tbody tr').filter({ hasText: runIds.latencySlow }).first()).toBeVisible();
       await expect(page.locator('tbody tr').filter({ hasText: runIds.latencyFast })).toHaveCount(0);
@@ -237,11 +236,18 @@ test.describe('Invocations filters', () => {
       for (const comparator of ['<', '<=', '=', 'not=', '>', '>=']) {
         await page.getByTestId('invocations-filter-feedback-comparator').selectOption(comparator);
         await applyCurrentFilter(page);
-        await expect(page.getByText('Metric value')).toBeVisible();
-        for (const runId of comparatorExpectations[comparator].include) {
+
+        const expected = comparatorExpectations[comparator];
+        if (expected.include.length === 0) {
+          await expect(page.getByText('No invocations found')).toBeVisible();
+        } else {
+          await expect(page.locator('tbody')).toBeVisible();
+        }
+
+        for (const runId of expected.include) {
           await expect(page.locator('tbody tr').filter({ hasText: runId }).first()).toBeVisible();
         }
-        for (const runId of comparatorExpectations[comparator].exclude) {
+        for (const runId of expected.exclude) {
           await expect(page.locator('tbody tr').filter({ hasText: runId })).toHaveCount(0);
         }
       }
