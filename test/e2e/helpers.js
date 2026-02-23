@@ -461,25 +461,23 @@ export async function deleteHumanMetric(page, name) {
 export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   console.log(`Adding evaluator to experiment: ${evaluatorName}`);
   
-  // Find the search input within the modal (has placeholder "Search evaluators by name...")
-  const searchInput = modal.getByPlaceholder(/Search evaluators/);
+  // Prefer stable test id, fallback to placeholder for compatibility.
+  let searchInput = modal.getByTestId('evaluator-selector-input');
+  if (!(await searchInput.isVisible().catch(() => false))) {
+    searchInput = modal.getByPlaceholder(/Search evaluators/i);
+  }
   await expect(searchInput).toBeVisible();
-  
-  // Use a full exact query for deterministic matching in CI.
-  await searchInput.click();
-  await searchInput.fill(evaluatorName);
 
-  // Wait for the dropdown container (listbox) to appear.
-  // The popover is rendered in a portal, so target it globally.
-  const listbox = page.getByRole('listbox', { name: /search results/i });
-  await expect(listbox).toBeVisible({ timeout: 15000 });
+  const evaluatorOption = page.getByRole('option').filter({ hasText: evaluatorName }).first();
 
-  // Wait for the specific evaluator option to appear in the dropdown
-  // The option's accessible name includes both name and description, so use filter
-  const evaluatorOption = listbox
-    .locator('[role="option"]')
-    .filter({ hasText: evaluatorName })
-    .first();
+  // Retry search to handle async indexing / network jitter in CI.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    await searchInput.click();
+    await searchInput.fill('');
+    await searchInput.fill(evaluatorName);
+    if (await evaluatorOption.isVisible().catch(() => false)) break;
+    await page.waitForTimeout(400);
+  }
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
   
   // Click the evaluator in the dropdown
