@@ -398,7 +398,7 @@
              (fn [agent-node {:keys [route sleep-ms]}]
                (when sleep-ms
                  (Thread/sleep ^long sleep-ms))
-               (aor/result! agent-node {:ok true :route route})))))))
+               (aor/result! agent-node {:ok true :route route}))))))
      (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
      (bind module-name (get-module-name module))
      (bind agent-manager (aor/agent-manager ipc module-name))
@@ -457,7 +457,7 @@
      (is (= (count all-ids) (count (set all-ids))))
      (is (= expected-failed-invokes (set all-ids)))
      (is (every? #(= :failure (:status %)) all))
-     ))
+     )))
 
 (deftest invokes-page-query-scan-page-size-matrix-test
   (with-open [ipc (rtest/create-ipc)]
