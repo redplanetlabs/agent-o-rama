@@ -330,22 +330,6 @@
        js/undefined)
      [open?])
 
-    (uix/use-effect
-     (fn []
-       (when open?
-         (let [handle-scroll (fn [_] (close-dropdown))
-               handle-resize (fn [] (close-dropdown))
-               raf-id (js/requestAnimationFrame
-                       (fn []
-                         (.addEventListener js/document "scroll" handle-scroll true)
-                         (.addEventListener js/window "resize" handle-resize)))]
-           (fn []
-             (js/cancelAnimationFrame raf-id)
-             (.removeEventListener js/document "scroll" handle-scroll true)
-             (.removeEventListener js/window "resize" handle-resize))))
-       js/undefined)
-     [open? close-dropdown])
-
     ($ :div {:ref container-ref
              :className (cn "relative inline-block text-left" (when full-width? "w-full"))}
        ($ :button {:className (cn "inline-flex items-center justify-between px-3 py-2 text-xs bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 disabled:bg-gray-100 cursor-pointer"
