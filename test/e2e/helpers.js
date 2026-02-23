@@ -465,19 +465,13 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   const searchInput = modal.getByPlaceholder(/Search evaluators/);
   await expect(searchInput).toBeVisible();
   
-  // Click the search input to focus it
+  // Use a full exact query for deterministic matching in CI.
   await searchInput.click();
-  
-  // Type first 10 chars to trigger search (faster than full name)
-  const searchText = evaluatorName.substring(0, Math.min(10, evaluatorName.length));
-  await searchInput.pressSequentially(searchText, { delay: 50 });
-  
-  // Wait for search debounce (300ms) + buffer
-  await page.waitForTimeout(600);
+  await searchInput.fill(evaluatorName);
 
   // Wait for the dropdown container (listbox) to appear.
   // The popover is rendered in a portal, so target it globally.
-  const listbox = page.getByRole('listbox', { name: 'Evaluator search results' });
+  const listbox = page.getByRole('listbox', { name: /search results/i });
   await expect(listbox).toBeVisible({ timeout: 15000 });
 
   // Wait for the specific evaluator option to appear in the dropdown
