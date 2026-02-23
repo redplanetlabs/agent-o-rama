@@ -461,7 +461,7 @@
      (is (every? #(= :failure (:status %)) all))
      )))
 
-(deftest invokes-page-query-small-scan-pagination-test
+(deftest invokes-page-query-scan-page-size-matrix-test
   (with-open [ipc (rtest/create-ipc)]
     (letlocals
      (bind module
@@ -484,11 +484,11 @@
      (bind foo (aor/agent-client agent-manager "foo"))
      (bind q (:invokes-page-query (aor-types/underlying-objects foo)))
 
-     ;; A tiny scan window should still paginate sparse matches correctly.
+     ;; Sparse failures force each request to read through multiple scan windows.
      (bind runs
        (vec
-        (for [i (range 60)]
-          (let [fail? (zero? (mod i 5))]
+        (for [i (range 40)]
+          (let [fail? (zero? (mod i 8))]
             {:fail? fail?
              :args {:route (if fail? :fail :fast)
                     :sleep-ms 1}}))))
@@ -510,29 +510,29 @@
               :when fail?]
           [(:task-id invoke) (:agent-invoke-id invoke)])))
 
-     (bind pages
-       (loop [ret []
-              params nil
-              i 0]
-         (when (> i 300)
-           (throw (ex-info "small-scan filtered pagination did not terminate"
-                           {:iterations i})))
-         (let [{:keys [agent-invokes pagination-params]}
-               (foreign-invoke-query q
-                                    2
-                                    5
-                                    params
-                                    {:has-error? true})
-               ret (conj ret agent-invokes)]
-           (if (every? nil? (vals pagination-params))
-             ret
-             (recur ret pagination-params (inc i))))))
-
-     (bind all (apply concat pages))
-     (bind all-ids (mapv (fn [m] [(:task-id m) (:agent-id m)]) all))
-
-     (is (> (count pages) 1))
-     (is (= (count all-ids) (count (set all-ids))))
-     (is (= expected-failed-invokes (set all-ids)))
-     (is (every? #(= :failure (:status %)) all))
+     (doseq [scan-page-size [2 3 5 8]]
+       (let [pages
+             (loop [ret []
+                    params nil
+                    i 0]
+               (when (> i 250)
+                 (throw (ex-info "scan-size matrix pagination did not terminate"
+                                 {:scan-page-size scan-page-size
+                                  :iterations i})))
+               (let [{:keys [agent-invokes pagination-params]}
+                     (foreign-invoke-query q
+                                          4
+                                          scan-page-size
+                                          params
+                                          {:has-error? true})
+                     ret (conj ret agent-invokes)]
+                 (if (every? nil? (vals pagination-params))
+                   ret
+                   (recur ret pagination-params (inc i)))))
+             all (apply concat pages)
+             all-ids (mapv (fn [m] [(:task-id m) (:agent-id m)]) all)]
+         (is (> (count pages) 1))
+         (is (= (count all-ids) (count (set all-ids))))
+         (is (= expected-failed-invokes (set all-ids)))
+         (is (every? #(= :failure (:status %)) all))))
      )))
