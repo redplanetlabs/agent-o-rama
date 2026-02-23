@@ -49,6 +49,15 @@ async function applyCurrentFilter(page) {
   await page.waitForTimeout(400);
 }
 
+async function ensureFeedbackFilterOpen(page) {
+  const comparatorSelect = page.getByTestId('invocations-filter-feedback-comparator');
+  if (!(await comparatorSelect.isVisible().catch(() => false))) {
+    await page.getByRole('button', { name: /^Feedback\b/ }).click();
+    await expect(comparatorSelect).toBeVisible();
+  }
+  return comparatorSelect;
+}
+
 async function addNumericFeedback(page, invokeUrl, reviewerName, metric, value) {
   await page.goto(invokeUrl);
   await page.locator('[data-id="feedback-tab"]').click();
@@ -234,7 +243,8 @@ test.describe('Invocations filters', () => {
       await page.getByTestId('invocations-filter-feedback-value').fill('3');
 
       for (const comparator of ['<', '<=', '=', 'not=', '>', '>=']) {
-        await page.getByTestId('invocations-filter-feedback-comparator').selectOption(comparator);
+        const comparatorSelect = await ensureFeedbackFilterOpen(page);
+        await comparatorSelect.selectOption(comparator);
         await applyCurrentFilter(page);
 
         const expected = comparatorExpectations[comparator];
