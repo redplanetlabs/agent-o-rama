@@ -275,6 +275,9 @@
                       (.stopPropagation e)
                       (when (and (not disabled?) on-select)
                         (on-select)))
+           :role "option"
+           :aria-selected (boolean selected?)
+           :aria-disabled (boolean disabled?)
            :className row-classes
            :data-testid data-testid}
           ($ :div.flex.items-center.flex-1
@@ -331,10 +334,13 @@
      (fn []
        (when open?
          (let [handle-scroll (fn [_] (close-dropdown))
-               handle-resize (fn [] (close-dropdown))]
-           (.addEventListener js/document "scroll" handle-scroll true)
-           (.addEventListener js/window "resize" handle-resize)
+               handle-resize (fn [] (close-dropdown))
+               raf-id (js/requestAnimationFrame
+                       (fn []
+                         (.addEventListener js/document "scroll" handle-scroll true)
+                         (.addEventListener js/window "resize" handle-resize)))]
            (fn []
+             (js/cancelAnimationFrame raf-id)
              (.removeEventListener js/document "scroll" handle-scroll true)
              (.removeEventListener js/window "resize" handle-resize))))
        js/undefined)
@@ -368,7 +374,9 @@
                              :max-width "calc(100vw - 16px)"
                              :z-index 999999})
                    :onClick #(.stopPropagation %)}
-             ($ :div.py-1.max-h-60.overflow-y-auto
+            ($ :div.py-1.max-h-60.overflow-y-auto
+               {:role "listbox"
+                :aria-label (str (or label "Dropdown") " options")}
                 (cond
                   loading? ($ :div.px-4.py-2.text-xs.text-gray-500 "Loading...")
                   error? ($ :div.px-4.py-2.text-xs.text-red-500 "Error")

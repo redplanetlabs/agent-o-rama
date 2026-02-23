@@ -1,8 +1,5 @@
 import { expect } from '@playwright/test';
 
-const COMMON_DROPDOWN_MENU_SELECTOR =
-  'div.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5';
-
 /**
  * Gets the agent row for the BasicAgentModule.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
@@ -72,7 +69,7 @@ export async function getE2ETestAgentRow(page) {
  * @returns {import('@playwright/test').Locator} The menu locator.
  */
 export function getCommonDropdownMenu(page) {
-  return page.locator(COMMON_DROPDOWN_MENU_SELECTOR).last();
+  return page.getByRole('listbox').last();
 }
 
 /**
@@ -82,6 +79,8 @@ export function getCommonDropdownMenu(page) {
  * @returns {Promise<import('@playwright/test').Locator>} The visible menu locator.
  */
 export async function openCommonDropdown(page, trigger) {
+  await expect(trigger).toBeVisible();
+  await expect(trigger).toBeEnabled();
   await trigger.click();
   const menu = getCommonDropdownMenu(page);
   await expect(menu).toBeVisible({ timeout: 15000 });
@@ -100,8 +99,8 @@ export async function selectCommonDropdownOption(page, trigger, optionText, opti
   const { exact = true } = options;
   const menu = await openCommonDropdown(page, trigger);
   const option = typeof optionText === 'string'
-    ? menu.getByText(optionText, { exact }).first()
-    : menu.getByText(optionText).first();
+    ? menu.getByRole('option', { name: optionText, exact }).first()
+    : menu.getByRole('option', { name: optionText }).first();
   await expect(option).toBeVisible({ timeout: 15000 });
   await option.click();
 }
