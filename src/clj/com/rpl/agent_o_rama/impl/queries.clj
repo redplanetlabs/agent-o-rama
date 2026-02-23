@@ -545,57 +545,6 @@
   (or (< (count raw-page) scan-amt)
       (>= (count aggregated-filtered-page) result-page-size)))
 
-(defn debug-invokes-page-cursor
-  [task-id cursor end-id]
-  (println "invokes-page cursor"
-           {:task-id task-id
-            :cursor cursor
-            :end-id end-id})
-  nil)
-
-(defn debug-invokes-scan-end-id
-  [task-id scan-end-id]
-  (println "invokes-page scan-end-id"
-           {:task-id task-id
-            :scan-end-id scan-end-id})
-  nil)
-
-(defn debug-invokes-scan-page
-  [task-id scan-end-id raw-page filtered-page]
-  (println "invokes-page scan-page"
-           {:task-id task-id
-            :scan-end-id scan-end-id
-            :raw-count (count raw-page)
-            :filtered-count (count filtered-page)
-            :raw-first-id (if (empty? raw-page) nil (h/first-key raw-page))
-            :raw-last-id (if (empty? raw-page) nil (h/last-key raw-page))})
-  nil)
-
-(defn debug-invokes-origin
-  [pages-map tmp-res pagination-params combined-pagination-params]
-  (println "invokes-page origin"
-           {:task-page-counts (into {}
-                                   (map (fn [[task-id page]]
-                                          [task-id (count page)]))
-                                   pages-map)
-            :result-count (count (:agent-invokes tmp-res))
-            :result-first (first (:agent-invokes tmp-res))
-            :result-last (last (:agent-invokes tmp-res))
-            :pagination-params pagination-params
-            :combined-pagination-params combined-pagination-params
-            :tmp-pagination-params (:pagination-params tmp-res)})
-  nil)
-
-(defn debug-invokes-task-result
-  [task-id task-page resume-end-id]
-  (println "invokes-page task-result"
-           {:task-id task-id
-            :task-page-count (count task-page)
-            :resume-end-id resume-end-id
-            :task-page-first-id (first (keys task-page))
-            :task-page-last-id (last (keys task-page))})
-  nil)
-
 (defn merge-invokes-pagination-params
   [scan-pagination-params merge-pagination-params]
   (let [all-task-ids (into #{}
@@ -705,7 +654,6 @@
 
      (default>)
       (identity *cursor :> *end-id))
-    (debug-invokes-page-cursor *task-id *cursor *end-id :> *debug-cursor-log)
     (<<if (nil? *end-id)
       (sorted-map :> *task-page)
       (identity nil :> *resume-end-id)
@@ -714,7 +662,6 @@
                *task-page (sorted-map)
                :> *task-page *resume-end-id]
         (yield-if-overtime)
-        (debug-invokes-scan-end-id *task-id *scan-end-id :> *debug-scan-end-id-log)
         (local-select>
          [(sorted-map-range-to *scan-end-id
                                {:inclusive? false
@@ -722,11 +669,6 @@
          (this-module-pobject-task-global *pstate-name)
          :> *raw-page)
         (filter-invokes-task-page *raw-page *filters :> *filtered-page)
-        (debug-invokes-scan-page *task-id
-                                 *scan-end-id
-                                 *raw-page
-                                 *filtered-page
-                                 :> *debug-scan-page-log)
         (into *task-page *filtered-page :> *next-task-page)
         (<<if (empty? *raw-page)
           (identity nil :> *next-scan-end-id)
@@ -745,10 +687,6 @@
           (:> *next-task-page *resume-end-id)
          (else>)
           (continue> *next-scan-end-id *next-task-page))))
-    (debug-invokes-task-result *task-id
-                               *task-page
-                               *resume-end-id
-                               :> *debug-task-result-log)
     (|origin)
     (aggs/+map-agg *task-id *task-page :> *pages-map)
     (aggs/+map-agg *task-id *resume-end-id :> *pagination-params)
@@ -760,11 +698,6 @@
     (merge-invokes-pagination-params *pagination-params
                                      *merge-pagination-params
                                      :> *combined-pagination-params)
-    (debug-invokes-origin *pages-map
-                          *tmp-res
-                          *pagination-params
-                          *combined-pagination-params
-                          :> *debug-origin-log)
     (hash-map :agent-invokes *agent-invokes
               :pagination-params *combined-pagination-params
               :> *res)))
