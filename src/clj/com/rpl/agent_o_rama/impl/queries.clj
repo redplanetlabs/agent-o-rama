@@ -571,6 +571,60 @@
             :raw-last-id (h/last-key raw-page)})
   nil)
 
+(defn debug-invokes-origin
+  [pages-map tmp-res pagination-params combined-pagination-params]
+  (println "invokes-page origin"
+           {:task-page-counts (into {}
+                                   (map (fn [[task-id page]]
+                                          [task-id (count page)]))
+                                   pages-map)
+            :result-count (count (:agent-invokes tmp-res))
+            :result-first (first (:agent-invokes tmp-res))
+            :result-last (last (:agent-invokes tmp-res))
+            :pagination-params pagination-params
+            :combined-pagination-params combined-pagination-params
+            :tmp-pagination-params (:pagination-params tmp-res)})
+  nil)
+
+(defn debug-invokes-task-result
+  [task-id task-page resume-end-id]
+  (println "invokes-page task-result"
+           {:task-id task-id
+            :task-page-count (count task-page)
+            :resume-end-id resume-end-id
+            :task-page-first-id (first (keys task-page))
+            :task-page-last-id (last (keys task-page))})
+  nil)
+
+(defn merge-invokes-pagination-params
+  [scan-pagination-params merge-pagination-params]
+  (let [all-task-ids (into #{}
+                           (concat (keys scan-pagination-params)
+                                   (keys merge-pagination-params)))]
+    (reduce (fn [ret task-id]
+              (let [scan-cursor (get scan-pagination-params task-id)
+                    merge-cursor (get merge-pagination-params task-id)]
+                (assoc ret
+                       task-id
+                       (cond
+                         (some? merge-cursor)
+                         (h/uuid-inc merge-cursor)
+
+                         (some? scan-cursor)
+                         scan-cursor
+
+                         :else
+                         nil))))
+            {}
+            all-task-ids)))
+
+(defn trim-invokes-task-page
+  [task-page max-size]
+  (if (<= (count task-page) max-size)
+    task-page
+    (into (sorted-map)
+          (take-last max-size task-page))))
+
 (defbasicblocksegmacro get-distributed-page*
   [page-size pagination-params pstate-name res info-transformer page-result-fn max-key-fn initial-path]
   (let [task-id-sym (gen-anyvar "task-id")
@@ -648,6 +702,7 @@
     (ops/current-task-id :> *task-id)
     (identity *page-size :> *result-page-size)
     (identity 100 :> *scan-page-size)
+    (adjust-page-size *page-size :> *task-page-max-size)
     (get *pagination-params *task-id ::missing :> *cursor)
     (<<cond
      (case> (= *cursor ::missing))
@@ -660,13 +715,12 @@
       (identity *cursor :> *end-id))
     (debug-invokes-page-cursor *task-id *cursor *end-id :> *debug-cursor-log)
     (<<if (nil? *end-id)
-      (hash-map :task-page (sorted-map)
-                :resume-end-id nil
-                :> *task-page-result)
+      (sorted-map :> *task-page)
+      (identity nil :> *resume-end-id)
      (else>)
       (loop<- [*scan-end-id *end-id
                *task-page (sorted-map)
-               :> *task-page-result]
+               :> *task-page *resume-end-id]
         (yield-if-overtime)
         (debug-invokes-scan-end-id *task-id *scan-end-id :> *debug-scan-end-id-log)
         (local-select>
@@ -681,7 +735,11 @@
                                  *raw-page
                                  *filtered-page
                                  :> *debug-scan-page-log)
-        (into *task-page *filtered-page :> *next-task-page)
+        (into *task-page *filtered-page :> *unbounded-task-page)
+        (trim-invokes-task-page *unbounded-task-page
+                                *task-page-max-size
+                                :> *next-task-page)
+        (> (count *unbounded-task-page) (count *next-task-page) :> *trimmed?)
         (<<if (empty? *raw-page)
           (identity nil :> *next-scan-end-id)
          (else>)
@@ -692,17 +750,20 @@
                                    *result-page-size
                                    :> *stop?)
         (<<if *stop?
-          (<<if (< (count *raw-page) *scan-page-size)
-            (identity nil :> *resume-end-id)
+          (<<if *trimmed?
+            (first (keys *next-task-page) :> *resume-end-id)
            (else>)
-            (identity *next-scan-end-id :> *resume-end-id))
-          (hash-map :task-page *next-task-page
-                    :resume-end-id *resume-end-id
-                    :> *task-page-result)
+            (<<if (< (count *raw-page) *scan-page-size)
+              (identity nil :> *resume-end-id)
+             (else>)
+              (identity *next-scan-end-id :> *resume-end-id)))
+          (:> *next-task-page *resume-end-id)
          (else>)
           (continue> *next-scan-end-id *next-task-page))))
-    (get *task-page-result :task-page :> *task-page)
-    (get *task-page-result :resume-end-id :> *resume-end-id)
+    (debug-invokes-task-result *task-id
+                               *task-page
+                               *resume-end-id
+                               :> *debug-task-result-log)
     (|origin)
     (aggs/+map-agg *task-id *task-page :> *pages-map)
     (aggs/+map-agg *task-id *resume-end-id :> *pagination-params)
@@ -710,8 +771,17 @@
                             *page-size
                             :> *tmp-res)
     (get *tmp-res :agent-invokes :> *agent-invokes)
+    (get *tmp-res :pagination-params :> *merge-pagination-params)
+    (merge-invokes-pagination-params *pagination-params
+                                     *merge-pagination-params
+                                     :> *combined-pagination-params)
+    (debug-invokes-origin *pages-map
+                          *tmp-res
+                          *pagination-params
+                          *combined-pagination-params
+                          :> *debug-origin-log)
     (hash-map :agent-invokes *agent-invokes
-              :pagination-params *pagination-params
+              :pagination-params *combined-pagination-params
               :> *res)))
 
 (defn declare-agent-get-names-query-topology
