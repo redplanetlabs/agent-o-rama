@@ -1,6 +1,12 @@
 import { expect } from '@playwright/test';
 
 /**
+ * CSS selector for the inline dropdown menu rendered by common/Dropdown.
+ * The menu is positioned absolute within the trigger's parent container.
+ */
+const DROPDOWN_MENU_SELECTOR = '.origin-top-right';
+
+/**
  * Gets the agent row for the BasicAgentModule.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @returns {Promise<import('@playwright/test').Locator>} The agent row locator.
@@ -63,24 +69,22 @@ export async function getE2ETestAgentRow(page) {
 }
 
 /**
- * Gets the currently open common/Dropdown portal menu.
- * common/Dropdown renders to document.body via portal, so this must be page-scoped.
+ * Gets the currently open common/Dropdown menu.
+ * The menu is rendered inline (absolute-positioned) as a sibling of the trigger button.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @returns {import('@playwright/test').Locator} The menu locator.
  */
 export function getCommonDropdownMenu(page) {
-  return page.getByRole('listbox').last();
+  return page.locator(DROPDOWN_MENU_SELECTOR).last();
 }
 
 /**
- * Opens a common/Dropdown trigger and waits for the portaled menu to be visible.
+ * Opens a common/Dropdown trigger and waits for the menu to be visible.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
- * @param {import('@playwright/test').Locator} trigger - The dropdown trigger locator.
+ * @param {import('@playwright/test').Locator} trigger - The dropdown trigger button locator.
  * @returns {Promise<import('@playwright/test').Locator>} The visible menu locator.
  */
 export async function openCommonDropdown(page, trigger) {
-  await expect(trigger).toBeVisible();
-  await expect(trigger).toBeEnabled();
   await trigger.click();
   const menu = getCommonDropdownMenu(page);
   await expect(menu).toBeVisible({ timeout: 15000 });
@@ -88,9 +92,9 @@ export async function openCommonDropdown(page, trigger) {
 }
 
 /**
- * Selects an option from a common/Dropdown menu.
+ * Selects an option from a common/Dropdown by clicking the trigger then the option.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
- * @param {import('@playwright/test').Locator} trigger - The dropdown trigger locator.
+ * @param {import('@playwright/test').Locator} trigger - The dropdown trigger button locator.
  * @param {string|RegExp} optionText - Option text to click.
  * @param {{ exact?: boolean }} [options] - Matching options.
  * @returns {Promise<void>}
@@ -99,8 +103,8 @@ export async function selectCommonDropdownOption(page, trigger, optionText, opti
   const { exact = true } = options;
   const menu = await openCommonDropdown(page, trigger);
   const option = typeof optionText === 'string'
-    ? menu.getByRole('option', { name: optionText, exact }).first()
-    : menu.getByRole('option', { name: optionText }).first();
+    ? menu.getByText(optionText, { exact }).first()
+    : menu.getByText(optionText).first();
   await expect(option).toBeVisible({ timeout: 15000 });
   await option.click();
 }
