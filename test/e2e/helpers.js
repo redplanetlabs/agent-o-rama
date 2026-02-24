@@ -468,15 +468,27 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   }
   await expect(searchInput).toBeVisible();
 
-  const evaluatorOption = page.getByRole('option').filter({ hasText: evaluatorName }).first();
+  const dropdown = page.getByTestId('evaluator-selector-dropdown');
+  const evaluatorOption = page.getByTestId(`evaluator-selector-option-${evaluatorName}`);
 
   // Retry search to handle async indexing / network jitter in CI.
-  for (let attempt = 0; attempt < 4; attempt++) {
-    await searchInput.click();
-    await searchInput.fill('');
-    await searchInput.fill(evaluatorName);
+  // Some backends match prefixes more reliably than full exact strings.
+  const searchTerms = Array.from(new Set([
+    evaluatorName,
+    evaluatorName.substring(0, Math.min(12, evaluatorName.length)),
+    evaluatorName.substring(0, Math.min(8, evaluatorName.length)),
+  ])).filter(Boolean);
+
+  for (const term of searchTerms) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await searchInput.click();
+      await searchInput.fill('');
+      await searchInput.fill(term);
+      await expect(dropdown).toBeVisible({ timeout: 5000 });
+      if (await evaluatorOption.isVisible().catch(() => false)) break;
+      await page.waitForTimeout(700);
+    }
     if (await evaluatorOption.isVisible().catch(() => false)) break;
-    await page.waitForTimeout(400);
   }
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
   
