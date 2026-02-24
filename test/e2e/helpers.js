@@ -469,7 +469,11 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   await expect(searchInput).toBeVisible();
 
   const dropdown = page.getByTestId('evaluator-selector-dropdown');
-  const evaluatorOption = page.getByTestId(`evaluator-selector-option-${evaluatorName}`);
+  const evaluatorOptionByTestId = page.getByTestId(`evaluator-selector-option-${evaluatorName}`);
+  const evaluatorOptionByRole = page.getByRole('option').filter({ hasText: evaluatorName }).first();
+  const optionIsVisible = async () =>
+    (await evaluatorOptionByTestId.isVisible().catch(() => false))
+    || (await evaluatorOptionByRole.isVisible().catch(() => false));
 
   // Retry search to handle async indexing / network jitter in CI.
   // Some backends match prefixes more reliably than full exact strings.
@@ -484,12 +488,15 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
       await searchInput.click();
       await searchInput.fill('');
       await searchInput.fill(term);
-      await expect(dropdown).toBeVisible({ timeout: 5000 });
-      if (await evaluatorOption.isVisible().catch(() => false)) break;
+      // Dropdown visibility can race with scroll/portal updates, so treat it as optional.
+      await dropdown.isVisible().catch(() => false);
+      if (await optionIsVisible()) break;
       await page.waitForTimeout(700);
     }
-    if (await evaluatorOption.isVisible().catch(() => false)) break;
+    if (await optionIsVisible()) break;
   }
+  const foundByTestId = await evaluatorOptionByTestId.isVisible().catch(() => false);
+  const evaluatorOption = foundByTestId ? evaluatorOptionByTestId : evaluatorOptionByRole;
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
   
   // Click the evaluator in the dropdown

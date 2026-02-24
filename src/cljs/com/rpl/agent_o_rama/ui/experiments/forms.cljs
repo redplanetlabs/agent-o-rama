@@ -205,7 +205,8 @@
                                   (on-change (conj selected-evaluators {:name selected-name :remote? false}))))
                    :allowed-types allowed-types
                    :placeholder "Search evaluators by name..."
-                   :disabled? false})))))))
+                   :disabled? false
+                   :data-testid "evaluator-selector"})))))))
 
 ;; =============================================================================
 ;; MAIN EXPERIMENT FORM COMPONENTS
