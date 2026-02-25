@@ -520,17 +520,16 @@
                   :name name
                   :description description
                   :rubrics clean-rubrics}])))
-   
+
    :on-success-invalidate
    (fn [db {:keys [module-id]} _reply]
      ;; Invalidate the queue list to show the newly created queue
      {:query-key-pattern [:human-feedback-queues module-id]})
-   
+
    :on-success
    (fn [db {:keys [module-id name]} _reply]
      ;; Also invalidate the specific queue info (useful for edit mode)
      (state/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queue-info module-id name]}]))}})
-
 
 ;; =============================================================================
 ;; QUEUE LIST PAGE
@@ -652,7 +651,7 @@
 (defui queue-info-header [{:keys [queue-info queue-id module-id]}]
   (let [rubrics (:rubrics queue-info)
         decoded-module-id (common/url-decode module-id)
-        
+
         handle-edit (fn []
                       ;; Transform rubrics: queue-info has {:name ... :required ...}
                       ;; but form expects {:metric ... :required ... :id ...}
@@ -857,11 +856,11 @@
        (fn []
          (when (and connected? enabled?
                     (or (empty? data) initial-needed?))
-          (if (and initial-needed? initial-cursor include-initial-cursor?)
-            (do
-              (fetch-page initial-cursor false true true false)
-              (fetch-page initial-cursor false true true true))
-            (fetch-page initial-cursor false include-initial-cursor? false false)))
+           (if (and initial-needed? initial-cursor include-initial-cursor?)
+             (do
+               (fetch-page initial-cursor false true true false)
+               (fetch-page initial-cursor false true true true))
+             (fetch-page initial-cursor false include-initial-cursor? false false)))
          js/undefined)
        [connected? enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
 
@@ -1011,18 +1010,18 @@
 (defui ExpandableJsonContent [{:keys [content title max-lines]
                                :or {max-lines 30}}]
   (let [;; If content is a string, try to parse it first, otherwise use as-is
-        parsed-content content 
+        parsed-content content
         ;; Use with-out-str and pprint to ensure proper formatting
         pretty-str (if (string? parsed-content)
-                     parsed-content  ; Already a string, use as-is
+                     parsed-content ; Already a string, use as-is
                      (with-out-str (cljs.pprint/pprint parsed-content)))
         {:keys [text truncated? line-count]} (truncate-to-lines pretty-str max-lines)
         handle-expand (fn [e]
                         (.stopPropagation e)
                         (state/dispatch [:modal/show :content-detail
                                          {:title title
-                                          :component ($ common/ContentDetailModal 
-                                                        {:title title 
+                                          :component ($ common/ContentDetailModal
+                                                        {:title title
                                                          :content pretty-str})}]))]
     ($ :div
        ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64.font-mono.whitespace-pre
@@ -1079,12 +1078,12 @@
         current-idx (some (fn [[idx item]] (when (= (str (:id item)) item-id-str) idx))
                           (map-indexed vector items))
         current-item (when current-idx (nth items current-idx nil))
-        
+
         ;; Navigation: 
         ;; - Previous disabled if we're at index 0 (started from URL cursor)
         ;; - Next enabled if there are more items in array OR hasMore on backend
         has-prev? (and current-idx (or (> current-idx 0) hasMoreBefore))
-        has-next? (and current-idx 
+        has-next? (and current-idx
                        (or (< current-idx (dec (count items)))
                            hasMore))
         prev-item-id (when (and current-idx (> current-idx 0))
@@ -1124,8 +1123,7 @@
                         :else
                         nil))
 
-
-        ;; Form state
+;; Form state
         [scores set-scores] (uix/use-state {})
         [comment set-comment] (uix/use-state "")
         [reviewer-name set-reviewer-name] (uix/use-state (hf-common/get-reviewer-name))
@@ -1136,7 +1134,7 @@
                           (let [metric (:metric rubric)]
                             (cond
                               (or (nil? value) (= value ""))
-                              nil  ;; Don't show error for empty (will catch on submit if required)
+                              nil ;; Don't show error for empty (will catch on submit if required)
 
                               (numeric-metric? metric)
                               (let [int-val (js/parseInt value 10)]
@@ -1211,11 +1209,11 @@
                                      (set-comment "")
                                      (set-errors {})
                                     ;; Auto-advance to next item
-                                    (if has-next?
-                                      (handle-next)
-                                      (rfe/push-state :module/human-feedback-queue-end
-                                                      {:module-id module-id
-                                                       :queue-id queue-id})))
+                                     (if has-next?
+                                       (handle-next)
+                                       (rfe/push-state :module/human-feedback-queue-end
+                                                       {:module-id module-id
+                                                        :queue-id queue-id})))
                                    (js/alert (str "Error submitting: " (:error reply)))))))
                             (set-errors validation-errors))))
 
@@ -1231,10 +1229,14 @@
                             (fn [reply]
                               (if (:success reply)
                                 (do
-                                  ;; Invalidate the queue items cache
+                          ;; Invalidate the queue items cache
                                   (state/dispatch [:query/invalidate
                                                    {:query-key-pattern [:human-feedback-queue-items module-id queue-id]}])
-                                  ;; Navigate to next item or back to queue
+                          ;; Clear form state before navigating
+                                  (set-scores {})
+                                  (set-comment "")
+                                  (set-errors {})
+                          ;; Navigate to next item or back to queue
                                   (if has-next?
                                     (rfe/push-state :module/human-feedback-queue-item
                                                     {:module-id module-id
@@ -1244,7 +1246,7 @@
                                                     {:module-id module-id
                                                      :queue-id queue-id})))
                                 (js/alert (str "Error dismissing: " (:error reply))))))))]
-                              
+
     (uix/use-effect
      (fn []
        (when (and pending-next? next-item-id)
@@ -1349,10 +1351,9 @@
                       ($ :div.flex.items-start.gap-2
                          ($ :span.text-xs.text-gray-500.w-20 "Node Invoke:")
                          ($ :span.text-xs.font-mono.text-gray-700
-                            (str (:task-id node-invoke) "-" (:node-invoke-id node-invoke))))))))
-           )
+                            (str (:task-id node-invoke) "-" (:node-invoke-id node-invoke)))))))))
 
-         ;; Comment
+;; Comment
          (when (not (str/blank? (:comment current-item)))
            ($ :div.bg-blue-50.border.border-blue-200.rounded-md.p-4.mb-6
               ($ :div.text-sm.text-blue-800 (:comment current-item))))
@@ -1427,7 +1428,7 @@
                {:onClick handle-dismiss}
                ($ XMarkIcon {:className "h-5 w-5 mr-2"})
                "Dismiss")
-            (let [has-errors? (or (seq errors) 
+            (let [has-errors? (or (seq errors)
                                   (str/blank? reviewer-name))
                   has-required-empty? (some (fn [rubric]
                                               (and (:required rubric)
