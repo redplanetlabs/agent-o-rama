@@ -82,10 +82,10 @@
   [driver]
   (e/wait-visible driver {:data-id "form-submit" :tag :button :fn/has-text "Add Rule"} {:timeout 5})
   (do #_#_let [container (e/query {:data-id "form-container"})]
-      (e/scroll-query
-       driver
-       {:tag :button :fn/has-text "Add Rule"}
-       {"behavior" "instant"}))
+   (e/scroll-query
+    driver
+    {:tag :button :fn/has-text "Add Rule"}
+    {"behavior" "instant"}))
   (e/click driver {:data-id "form-submit" :tag :button :fn/has-text "Add Rule"}))
 
 (defn- click-delete-rule
@@ -275,7 +275,7 @@
 (deftest token-count-filter-test
   ;; Test token-count filter with actual model calls
   (testing "Token count filter with chat model"
-    (when (System/getenv "OPENAI_API_KEY")
+    (if (System/getenv "OPENAI_API_KEY")
       (eth/with-system
         [system RulesTestAgentModule {:post-deploy-hook (post-deploy-hook {})}]
         (eth/with-webdriver [system driver]
@@ -295,4 +295,5 @@
                 (navigate-to-rules-page driver env)
                 (click-view-log driver "token-count-rule")
                 (wait-for-action-log-entries driver)
-                (is (>= (count-action-log-entries driver) 1))))))))))
+                (is (>= (count-action-log-entries driver) 1)))))))
+      (is true "Skipping token-count-filter-test: OPENAI_API_KEY not set"))))

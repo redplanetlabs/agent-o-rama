@@ -252,7 +252,7 @@
 (deftest trace-analytics-with-model-calls-test
   ;; Test trace analytics with model calls and token tracking
   (testing "Trace analytics with chat model mode"
-    (when (System/getenv "OPENAI_API_KEY")
+    (if (System/getenv "OPENAI_API_KEY")
       (eth/with-system [system TraceAnalyticsTestAgentModule]
         (eth/with-webdriver [system driver]
           (testing "chat mode shows model-calls and tokens sections"
@@ -285,4 +285,5 @@
                     (is (e/has-text? driver {:data-id "tokens"} "Tokens"))
                     (is (e/has-text? driver {:data-id "tokens"} "Input"))
                     (is (e/has-text? driver {:data-id "tokens"} "Output"))
-                    (is (e/has-text? driver {:data-id "tokens"} "Total"))))))))))))
+                    (is (e/has-text? driver {:data-id "tokens"} "Total")))))))))
+      (is true "Skipping trace-analytics-with-model-calls-test: OPENAI_API_KEY not set"))))
