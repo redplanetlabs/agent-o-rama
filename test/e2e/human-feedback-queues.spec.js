@@ -824,5 +824,114 @@ test.describe('Human Feedback Queues', () => {
     }
   });
 
+  test('should clear form when dismissing a queue item', async ({ page }) => {
+    const uniqueId = randomUUID().substring(0, 8);
+    const queueName = `e2e-dismiss-clear-${uniqueId}`;
+    const metricName = `e2e-dismiss-metric-${uniqueId}`;
+
+    // =============================================================================
+    // SETUP: Create metric, queue, and add 2 items
+    // =============================================================================
+    console.log('--- Setup: Creating metric and queue ---');
+    await page.goto('/');
+    const agentRow = await getE2ETestAgentRow(page);
+    await agentRow.click();
+
+    await page.getByText('Human Metrics').click();
+    await createHumanMetric(page, {
+      name: metricName,
+      type: 'categorical',
+      categories: ['Good', 'Bad']
+    });
+
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByTestId('create-queue-button').click();
+    const modal = page.locator('[role="dialog"]');
+    await modal.getByTestId('queue-name-input').fill(queueName);
+    await modal.getByTestId('queue-description-input').fill('Dismiss clear test queue');
+    await modal.getByTestId('add-rubric-button').click();
+    const metricInput = modal.getByTestId('rubric-0').getByTestId('metric-selector-input');
+    await metricInput.click();
+    await metricInput.fill(metricName);
+    await page.locator('[role="option"]').filter({ hasText: metricName }).waitFor({ timeout: 10000 });
+    await page.locator('[role="option"]').filter({ hasText: metricName }).click();
+    await modal.getByRole('button', { name: 'Create' }).click();
+    await expect(modal).not.toBeVisible({ timeout: 10000 });
+
+    // Add 2 items to the queue
+    console.log('Adding 2 items to queue');
+    await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+    for (let i = 0; i < 2; i++) {
+      await invokeAgentManually(page, [{ query: `dismiss test ${i}`, 'output-value': `output ${i}` }]);
+      await page.locator('[data-id="feedback-tab"]').click();
+      await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
+      await expect(modal).toBeVisible();
+      await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
+      await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
+      await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+      await modal.getByRole('button', { name: 'Add to Queue' }).click();
+      await expect(modal).not.toBeVisible({ timeout: 5000 });
+      if (i < 1) {
+        await page.getByRole('navigation').getByRole('link', { name: 'E2ETestAgent' }).click();
+      }
+    }
+    console.log('✓ Added 2 items to queue');
+
+    // =============================================================================
+    // TEST: Fill out form on first item, dismiss, verify form is cleared on next item
+    // =============================================================================
+    console.log('Test: Fill form, dismiss, verify form cleared');
+    await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+    await page.waitForTimeout(500);
+    const queueRow = page.getByTestId(`queue-row-${queueName}`);
+    await queueRow.getByTestId('queue-name-link').click();
+
+    // Click first item
+    await page.locator('tbody').getByRole('row').first().click();
+    await expect(page).toHaveURL(/item/);
+
+    // Fill in the metric and comment fields
+    const metricDropdown = page.getByTestId('metric-value-0');
+    await metricDropdown.click();
+    await page.getByText('Good').click();
+    // Verify "Good" is now selected
+    await expect(metricDropdown).toContainText('Good');
+
+    const commentField = page.getByPlaceholder(/Add any additional notes/);
+    await commentField.fill('some review notes');
+    await expect(commentField).toHaveValue('some review notes');
+    console.log('✓ Filled in metric and comment');
+
+    // Dismiss the item — this should navigate to item 2 and clear the form
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Dismiss' }).click();
+    await expect(page).toHaveURL(/item/, { timeout: 10000 });
+    console.log('✓ Dismissed item, now on next item page');
+
+    // Verify the form is cleared
+    await expect(metricDropdown).toContainText('-- Select --');
+    await expect(commentField).toHaveValue('');
+    console.log('✓ Form is cleared after dismiss');
+
+    // =============================================================================
+    // CLEANUP
+    // =============================================================================
+    if (!shouldSkipCleanup()) {
+      console.log('--- Cleanup ---');
+      await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+      await page.getByRole('textbox', { name: /Search queues/ }).fill(queueName);
+      await page.waitForTimeout(500);
+      const queueRowForDelete = page.getByTestId(`queue-row-${queueName}`);
+      await expect(queueRowForDelete).toBeVisible({ timeout: 5000 });
+      page.once('dialog', dialog => dialog.accept());
+      await queueRowForDelete.getByTestId('delete-queue-button').click();
+      await expect(queueRowForDelete).not.toBeVisible({ timeout: 5000 });
+      await page.getByText('Human Metrics').click();
+      await deleteHumanMetric(page, metricName);
+      console.log('✓ Cleanup complete');
+    }
+  });
+
 });
 
