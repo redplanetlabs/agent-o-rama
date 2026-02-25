@@ -8,14 +8,23 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [clojure.string :as str]
    [jsonista.core :as j])
-  (:import [java.util UUID])
+  (:import [java.util UUID]
+           [com.rpl.agentorama.source AgentRunSource])
   (:use [com.rpl.rama]))
 
 (defn- process-example-source
-  "Add source-string to example by calling getSourceString() on the source object"
+  "Add source-string to example. For AgentRunSource, also adds :trace-link for UI navigation."
   [example]
   (if-let [source (:source example)]
-    (assoc example :source-string (aor-types/source-string source))
+    (let [base (assoc example :source-string (aor-types/source-string source))]
+      (if (instance? AgentRunSource source)
+        (let [agent-invoke (.getAgentInvoke source)
+              task-id (.getTaskId agent-invoke)
+              invoke-id (str task-id "-" (.getAgentInvokeId agent-invoke))]
+          (assoc base :trace-link {:module-id (.getModuleName source)
+                                   :agent-name (.getAgentName source)
+                                   :invoke-id invoke-id}))
+        base))
     example))
 
 (defn- process-examples
@@ -117,7 +126,7 @@
                               input
                               {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
                                :reference-output output
-                               :tags     (set tags)}))
+                               :tags (set tags)}))
   {:status :ok})
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
@@ -261,22 +270,29 @@
                   :validation-error output-validation}}))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/add-direct-data
-  [{:keys [manager dataset-id input output]} uid]
+  [{:keys [manager dataset-id input output agent-name invoke-pair decoded-module-id]} uid]
   (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
-        schemas         (queries/get-dataset-properties datasets-pstate dataset-id)
-        input-schema    (:input-json-schema schemas)
-        output-schema   (:output-json-schema schemas)]
+        schemas (queries/get-dataset-properties datasets-pstate dataset-id)
+        input-schema (:input-json-schema schemas)
+        output-schema (:output-json-schema schemas)]
     (if-not schemas
       (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
-      (let [input-validation  (when input-schema
-                                (datasets/validate-with-schema* input-schema input))
+      (let [input-validation (when input-schema
+                               (datasets/validate-with-schema* input-schema input))
             output-validation (when output-schema
-                                (datasets/validate-with-schema* output-schema output))]
+                                (datasets/validate-with-schema* output-schema output))
+            source (if (and agent-name invoke-pair decoded-module-id)
+                     (let [[task-id agent-invoke-id] invoke-pair]
+                       (aor-types/->AgentRunSourceImpl
+                        decoded-module-id
+                        agent-name
+                        (aor-types/->AgentInvokeImpl task-id agent-invoke-id)))
+                     (aor-types/->HumanSourceImpl "user" nil))]
         (cond
           input-validation (throw (ex-info (str "Input schema validation failed: " input-validation) {}))
           output-validation (throw (ex-info (str "Output schema validation failed: " output-validation) {}))
           :else (do
-                  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user" nil)]
+                  (binding [aor-types/OPERATION-SOURCE source]
                     (aor/add-dataset-example! manager dataset-id input
                                               {:reference-output output}))
                   {:status :ok}))))))
@@ -296,7 +312,7 @@
                                             dataset-id
                                             (when-not (str/blank? snapshot-name) snapshot-name)
                                             {} ; no filters
-                                            1  ; limit 1
+                                            1 ; limit 1
                                             nil)
         example-summary (first (:examples search-result))]
 

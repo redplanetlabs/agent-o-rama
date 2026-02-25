@@ -48,7 +48,6 @@
 (defn rama-clients ^RamaClientsTaskGlobal [] (:rama-clients ACTION-HELPERS))
 (defn random-task-id [] (long (rand-int (:num-tasks ACTION-HELPERS))))
 
-
 (defn get-num-tasks
   []
   (.getNumTasks ^com.rpl.rama.ModuleInstanceInfo (ops/module-instance-info)))
@@ -67,8 +66,7 @@
    nil
    pstate-name
    path
-   k
-  ))
+   k))
 
 (defn get-agent-client
   [name]
@@ -81,8 +79,8 @@
 (defn eval-action-builder-fn
   [{:strs [name]}]
   (let [evals-pstate (retrieve-pstate (po/evaluators-task-global-name))
-        eval-info    (foreign-select-one (keypath name) evals-pstate)
-        eval-client  (get-agent-client aor-types/EVALUATOR-AGENT-NAME)]
+        eval-info (foreign-select-one (keypath name) evals-pstate)
+        eval-client (get-agent-client aor-types/EVALUATOR-AGENT-NAME)]
     (when (nil? eval-info)
       (throw (h/ex-info "Evaluator doesn't exist" {:name name})))
     (fn [fetcher input output {:keys [rule-name agent-name] :as run-info}]
@@ -110,7 +108,7 @@
                                (fb/set-action-state-path rule-name eval-agent-invoke))
                          (aor-types/->DirectTaskId target-task-id)))
         (binding [aor-types/FORCED-AGENT-INVOKE-ID (:agent-invoke-id eval-agent-invoke)
-                  aor-types/FORCED-AGENT-TASK-ID   (:task-id eval-agent-invoke)]
+                  aor-types/FORCED-AGENT-TASK-ID (:task-id eval-agent-invoke)]
           ;; this is a no-op if it was already initiated
           (exp/initiate-eval eval-client
                              eval-info
@@ -135,27 +133,28 @@
           (merge {"invoke" eval-agent-invoke}
                  (if (instance? Throwable result)
                    {"success?" false "failure" (h/throwable->str result)}
-                   {"success?" true "stats" stats})))
-      ))))
+                   {"success?" true "stats" stats})))))))
 
 (defn add-to-dataset-action-builder-fn
   [{:strs [datasetId inputJsonPathTemplate outputJsonPathTemplate]}]
-  (let [input-template  (h/parse-json-path-template (or inputJsonPathTemplate "$"))
+  (let [input-template (h/parse-json-path-template (or inputJsonPathTemplate "$"))
         output-template (h/parse-json-path-template (or outputJsonPathTemplate "$"))
-        dataset-id      (java.util.UUID/fromString datasetId)
-        manager         (get-agent-manager)]
+        dataset-id (java.util.UUID/fromString datasetId)
+        manager (get-agent-manager)
+        module-name (.getThisModuleName (declared-objects))]
     (fn [fetcher input output run-info]
-      (let [input      (h/resolve-json-path-template input-template input)
-            output     (h/resolve-json-path-template output-template output)
+      (let [input (h/resolve-json-path-template input-template input)
+            output (h/resolve-json-path-template output-template output)
+            agent-invoke (:agent-invoke run-info)
             example-id (binding [aor-types/OPERATION-SOURCE
-                                 (aor-types/->valid-ActionSourceImpl (:agent-name run-info)
-                                                                     (:rule-name run-info))]
+                                 (aor-types/->AgentRunSourceImpl module-name
+                                                                 (:agent-name run-info)
+                                                                 agent-invoke)]
                          (c/add-dataset-example! manager
                                                  dataset-id
                                                  input
                                                  {:reference-output output}))]
-        {"exampleId" (str example-id)}
-      ))))
+        {"exampleId" (str example-id)}))))
 
 (def DEFAULT-WEBHOOK-PAYLOAD
   "{\"input\": %input,
@@ -176,43 +175,42 @@
            feedback]}]
   (setval [MAP-VALS nil?]
           NONE
-          {"ruleName"        rule-name
-           "actionName"      action-name
-           "agentName"       agent-name
-           "nodeName"        node-name
-           "type"            (if (= type :agent) "agent" "node")
+          {"ruleName" rule-name
+           "actionName" action-name
+           "agentName" agent-name
+           "nodeName" node-name
+           "type" (if (= type :agent) "agent" "node")
            "startTimeMillis" start-time-millis
-           "latencyMillis"   latency-millis
-           "feedback"        (mapv (fn [{:keys [scores source]}]
+           "latencyMillis" latency-millis
+           "feedback" (mapv (fn [{:keys [scores source]}]
                                      ;; scores are mandated by AOR to be numbers, strings, or
                                      ;; booleans, so don't need any special handling here
-                                     {"scores" scores
-                                      "source" (aor-types/source-string source)})
-                                   feedback)}))
+                              {"scores" scores
+                               "source" (aor-types/source-string source)})
+                            feedback)}))
 
 (defn webhook-action-builder-fn
   [{:strs [url payloadTemplate headers timeoutMillis]}]
   (let [timeout-millis (Long/parseLong timeoutMillis)
-        headers        (j/read-value headers STR-MAPPER)]
+        headers (j/read-value headers STR-MAPPER)]
     (fn [fetcher input output run-info]
       (let [payload (-> payloadTemplate
                         (str/replace "%input" (best-effort-json input))
                         (str/replace "%output" (best-effort-json output))
                         (str/replace "%runInfo" (j/write-value-as-string (run-info->map run-info))))
-            res     (deref
-                     (http/post url
-                                {:headers      headers
-                                 :body         payload
-                                 :content-type :json})
-                     timeout-millis
-                     ::timeout)]
+            res (deref
+                 (http/post url
+                            {:headers headers
+                             :body payload
+                             :content-type :json})
+                 timeout-millis
+                 ::timeout)]
         (when (= res ::timeout)
           (throw (h/ex-info "Timeout on HTTP request" {:url url :payload payload})))
         (let [{:keys [status body error]} res]
           (when (or (not= status 200) error)
             (throw (h/ex-info "Error on HTTP request" {:status status :error error :body body})))
-          {"response" body}
-        )))))
+          {"response" body})))))
 
 (defn add-to-human-feedback-queue-action-builder-fn
   [{:strs [queueName]}]
@@ -232,13 +230,13 @@
 
 (def BUILT-IN-ACTIONS
   {EVAL-ACTION-NAME
-   {:builder-fn  eval-action-builder-fn
+   {:builder-fn eval-action-builder-fn
     :description "Run an evaluator to add feedback to a node or agent"
-    :options     {:params
-                  {"name" {:description "Evaluator to use"}}
-                  :limit-concurrency? true}}
+    :options {:params
+              {"name" {:description "Evaluator to use"}}
+              :limit-concurrency? true}}
    "aor/add-to-dataset"
-   {:builder-fn  add-to-dataset-action-builder-fn
+   {:builder-fn add-to-dataset-action-builder-fn
     :description "Add a run to a dataset"
     :options
     {:params
@@ -246,40 +244,35 @@
       "inputJsonPathTemplate"
       {:description
        "<a class=\"text-blue-600 hover:underline\" href=\"https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates\"> JSON path template </a> to translate input of a run to dataset example input "
-       :default     "$"}
+       :default "$"}
       "outputJsonPathTemplate"
       {:description
        "<a class=\"text-blue-600 hover:underline\" href=\"https://github.com/redplanetlabs/agent-o-rama/wiki/Datasets,-evaluators,-and-experiments#json-path-templates\"> JSON path template </a> to translate output of a run to dataset example output"
-       :default     "$"}}
-    }}
+       :default "$"}}}}
    "aor/webhook"
-   {:builder-fn  webhook-action-builder-fn
+   {:builder-fn webhook-action-builder-fn
     :description "Post a JSON payload to a URL"
     :options
     {:params
-     {"url"           {:description "URL"}
+     {"url" {:description "URL"}
       "payloadTemplate"
       {:description
        "JSON payload for the POST request. %input, %output, and %runInfo can be used as variables in the payload."
-       :default     DEFAULT-WEBHOOK-PAYLOAD}
+       :default DEFAULT-WEBHOOK-PAYLOAD}
       "headers"
       {:description
        "Map from header name to header string specified as JSON"
-       :default     "{}"}
+       :default "{}"}
       "timeoutMillis"
       {:description
        "Timeout for the POST request"
-       :default     "60000"}}
-    }}
+       :default "60000"}}}}
    "aor/add-to-human-feedback-queue"
-   {:builder-fn  add-to-human-feedback-queue-action-builder-fn
+   {:builder-fn add-to-human-feedback-queue-action-builder-fn
     :description "Add a run to a human feedback queue"
     :options
     {:params
-     {"queueName" {:description "Human feedback queue name"}}
-    }}
-  })
-
+     {"queueName" {:description "Human feedback queue name"}}}}})
 
 (defn all-action-builders
   []
@@ -301,10 +294,10 @@
 (defn declare-all-action-builders-query-topology
   [topologies]
   (<<query-topology topologies
-    (all-action-builders-name)
-    [:> *res]
-    (|origin)
-    (all-action-builders-without-builder-fns :> *res)))
+                    (all-action-builders-name)
+                    [:> *res]
+                    (|origin)
+                    (all-action-builders-without-builder-fns :> *res)))
 
 (defn- agent-run-type?
   [info]
@@ -320,8 +313,7 @@
     (some? (re-find regex (h/read-json-path o json-path)))
     (catch Throwable t
       (log-regex-error t)
-      false
-    )))
+      false)))
 
 (extend-protocol aor-types/RuleFilter
   FeedbackFilter
@@ -355,8 +347,7 @@
   (rule-filter-matches? [this info]
     (if (agent-run-type? info)
       (not (empty? (:exception-summaries info)))
-      (not (empty? (:exceptions info)))
-    ))
+      (not (empty? (:exceptions info)))))
 
   InputMatchFilter
   (dependency-rule-names [this] #{})
@@ -380,24 +371,22 @@
     (let [token-counts
           (if (agent-run-type? info)
             (let [combined (stats/aggregated-basic-stats (:stats info))]
-              {:input  (:input-token-count combined)
+              {:input (:input-token-count combined)
                :output (:output-token-count combined)
-               :total  (:total-token-count combined)})
+               :total (:total-token-count combined)})
             (-> info
                 :nested-ops
                 stats/nested-op-stats
                 :token-counts))]
       (aor-types/comparator-spec-matches?
        (:comparator-spec this)
-       (get token-counts (:type this)))
-    ))
+       (get token-counts (:type this)))))
 
   AndFilter
   (dependency-rule-names [this]
     (apply set/union (mapv aor-types/dependency-rule-names (:filters this))))
   (rule-filter-matches? [this info]
     (every? #(aor-types/rule-filter-matches? % info) (:filters this)))
-
 
   OrFilter
   (dependency-rule-names [this]
@@ -410,8 +399,7 @@
   NotFilter
   (dependency-rule-names [this] (aor-types/dependency-rule-names (:filter this)))
   (rule-filter-matches? [this info]
-    (not (aor-types/rule-filter-matches? (:filter this) info)))
-)
+    (not (aor-types/rule-filter-matches? (:filter this) info))))
 
 (defn check-rule-dependency-conflict
   [rules name]
@@ -432,65 +420,62 @@
   (<<with-substitutions
    [$$rules (po/agent-rules-task-global *agent-name)]
    (<<subsource *data
-    (case> AddRule :> {:keys [*name *id *action-name *start-time-millis]})
-     (local-select> [(keypath *name) :definition :id] $$rules :> *curr-id)
-     (<<cond
-      (case> (and> (some? *curr-id) (not= *curr-id *id)))
-       (ack-return> (format "Rule '%s' already exists" *name))
+                (case> AddRule :> {:keys [*name *id *action-name *start-time-millis]})
+                (local-select> [(keypath *name) :definition :id] $$rules :> *curr-id)
+                (<<cond
+                 (case> (and> (some? *curr-id) (not= *curr-id *id)))
+                 (ack-return> (format "Rule '%s' already exists" *name))
 
-      (case> (not (contains? *action-names *action-name)))
-       (ack-return> (format "Action '%s' doesn't exist" *action-name))
+                 (case> (not (contains? *action-names *action-name)))
+                 (ack-return> (format "Action '%s' doesn't exist" *action-name))
 
-      (default>)
-       (local-transform> [(keypath *name) :definition (termval *data)]
-                         $$rules))
+                 (default>)
+                 (local-transform> [(keypath *name) :definition (termval *data)]
+                                   $$rules))
 
-    (case> DeleteRule :> {:keys [*name]})
-     (local-select> (subselect MAP-VALS :definition) $$rules :> *rules)
-     (check-rule-dependency-conflict *rules *name :> *error-str)
-     (<<if (some? *error-str)
-       (ack-return> *error-str)
-      (else>)
-       (local-transform> [(keypath *name) NONE>] $$rules))
-   )))
+                (case> DeleteRule :> {:keys [*name]})
+                (local-select> (subselect MAP-VALS :definition) $$rules :> *rules)
+                (check-rule-dependency-conflict *rules *name :> *error-str)
+                (<<if (some? *error-str)
+                      (ack-return> *error-str)
+                      (else>)
+                      (local-transform> [(keypath *name) NONE>] $$rules)))))
 
 (defn mk-cursor-map
   [start-time-millis]
   (let [^com.rpl.rama.ModuleInstanceInfo module-instance-info (ops/module-instance-info)
         num-tasks (.getNumTasks module-instance-info)
-        uuid      (h/min-uuid7-at-timestamp start-time-millis)]
+        uuid (h/min-uuid7-at-timestamp start-time-millis)]
     (into {}
           (for [i (range 0 num-tasks)]
-            [i uuid]
-          ))))
+            [i uuid]))))
 
 (deframafn read-rules
   []
   (<<batch
-    (ops/explode (po/agent-names-set) :> *agent-name)
-    (po/agent-rules-task-global *agent-name :> $$rules)
-    (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
-    (local-select> STAY $$rules :> *rules)
-    (local-select> STAY $$rule-cursors :> *all-rule-cursors)
-    (ops/explode-map *rules :> *rule-name *rule-info)
-    (get *all-rule-cursors *rule-name :> *curr-rule-cursors)
-    (get *rule-info :definition :> {:keys [*start-time-millis]})
-    (ifexpr (empty? *curr-rule-cursors)
-      (mk-cursor-map *start-time-millis :> *cursor-map)
-      *curr-rule-cursors
-      :> *rule-cursors)
-    (assoc *rule-info
-     :cursors *rule-cursors
-     :> *all-rule-info)
-    (+compound {*agent-name {*rule-name (aggs/+last *all-rule-info)}} :> *ret))
+   (ops/explode (po/agent-names-set) :> *agent-name)
+   (po/agent-rules-task-global *agent-name :> $$rules)
+   (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
+   (local-select> STAY $$rules :> *rules)
+   (local-select> STAY $$rule-cursors :> *all-rule-cursors)
+   (ops/explode-map *rules :> *rule-name *rule-info)
+   (get *all-rule-cursors *rule-name :> *curr-rule-cursors)
+   (get *rule-info :definition :> {:keys [*start-time-millis]})
+   (ifexpr (empty? *curr-rule-cursors)
+           (mk-cursor-map *start-time-millis :> *cursor-map)
+           *curr-rule-cursors
+           :> *rule-cursors)
+   (assoc *rule-info
+          :cursors *rule-cursors
+          :> *all-rule-info)
+   (+compound {*agent-name {*rule-name (aggs/+last *all-rule-info)}} :> *ret))
   (:> *ret))
 
 (defn compute-end-scan-offset
   [m start-offset]
   (if (empty? m)
     start-offset
-    (h/uuid-inc (h/last-key m))
-  ))
+    (h/uuid-inc (h/last-key m))))
 
 (defn action-target-pstate
   [agent-name node?]
@@ -532,8 +517,7 @@
     :else
     (if (< (compare dep-offset max-scan-offset) 0)
       dep-offset
-      max-scan-offset
-    )))
+      max-scan-offset)))
 
 (aor-types/defaorrecord AnaNodeTarget [node-name :- String])
 (aor-types/defaorrecord AnaRootTarget [])
@@ -543,8 +527,8 @@
   [m target node-exec]
   (if (AnaRootTarget? target)
     m
-    (let [stall-time      (node-stall-time)
-          max-time        (max-node-scan-time)
+    (let [stall-time (node-stall-time)
+          max-time (max-node-scan-time)
           invalid-offset?
           (fn [[k data]]
             (or (and (contains? data :start-time-millis)
@@ -563,22 +547,20 @@
 
 (defn run-virtual-with-action-helpers!
   [afn]
-  (let [cf           (CompletableFuture.)
+  (let [cf (CompletableFuture.)
         declared-objects-tg (po/agent-declared-objects-task-global)
         rama-clients (po/agents-clients-task-global)
-        num-tasks    (.getNumTasks ^com.rpl.rama.ModuleInstanceInfo (ops/module-instance-info))]
+        num-tasks (.getNumTasks ^com.rpl.rama.ModuleInstanceInfo (ops/module-instance-info))]
     (anode/submit-virtual-task!
      nil
      (fn []
        (try
          (binding [ACTION-HELPERS
-                   {:num-tasks        num-tasks
+                   {:num-tasks num-tasks
                     :declared-objects declared-objects-tg
-                    :rama-clients     rama-clients}]
-           (afn cf)
-         ))))
+                    :rama-clients rama-clients}]
+           (afn cf)))))
     cf))
-
 
 (defn build-action-fn
   [builder-fn params]
@@ -592,10 +574,8 @@
           (builder-fn params)
           (catch Throwable t
             (tl/error ::build-action t "Action builder exception")
-            {BUILD-ERROR {"error"     "Action failed to build"
-                          "exception" (h/throwable->str t)}}
-
-          )))))))
+            {BUILD-ERROR {"error" "Action failed to build"
+                          "exception" (h/throwable->str t)}})))))))
 
 (defn hook:run-action [run-info])
 (defn enable-action-error-logs? [] true)
@@ -614,8 +594,7 @@
          (catch Throwable t
            (when (enable-action-error-logs?)
              (tl/error ::run-action t "Action exception"))
-           (.complete cf {:success? false :info-map {"exception" (h/throwable->str t)}}))
-       )))))
+           (.complete cf {:success? false :info-map {"exception" (h/throwable->str t)}})))))))
 
 (defn sample?
   [sampling-rate]
@@ -651,43 +630,43 @@
    (h/current-time-millis :> *action-start-time-millis)
    (local-select> (keypath *agent-name *rule-name :data *offset) $$cache :> *data)
    (<<if (some? *node-name)
-     (identity :node :> *type)
-     (identity nil :> *agent-stats)
-     (get *data :nested-ops :> *nested-ops)
-     (aor-types/->AgentInvokeImpl (get *data :agent-task-id)
-                                  (get *data :agent-id)
-                                  :> *agent-invoke)
-     (aor-types/->NodeInvokeImpl *task-id *offset :> *node-invoke)
-     (get *data :input :> *input)
-     (h/node->output (get *data :result) (get *data :emits) :> *output)
-    (else>)
-     (identity :agent :> *type)
-     (get *data :stats :> *agent-stats)
-     (identity nil :> *nested-ops)
-     (aor-types/->AgentInvokeImpl *task-id *offset :> *agent-invoke)
-     (identity nil :> *node-invoke)
-     (get *data :invoke-args :> *input)
-     (h/result->output (get *data :result) :> *output))
+         (identity :node :> *type)
+         (identity nil :> *agent-stats)
+         (get *data :nested-ops :> *nested-ops)
+         (aor-types/->AgentInvokeImpl (get *data :agent-task-id)
+                                      (get *data :agent-id)
+                                      :> *agent-invoke)
+         (aor-types/->NodeInvokeImpl *task-id *offset :> *node-invoke)
+         (get *data :input :> *input)
+         (h/node->output (get *data :result) (get *data :emits) :> *output)
+         (else>)
+         (identity :agent :> *type)
+         (get *data :stats :> *agent-stats)
+         (identity nil :> *nested-ops)
+         (aor-types/->AgentInvokeImpl *task-id *offset :> *agent-invoke)
+         (identity nil :> *node-invoke)
+         (get *data :invoke-args :> *input)
+         (h/result->output (get *data :result) :> *output))
    (<<if (and> (map? *action-fn) (contains? *action-fn BUILD-ERROR))
-     (get *action-fn BUILD-ERROR :> *info-map)
-     (identity false :> *success?)
-    (else>)
-     (select> [:feedback :results NIL->VECTOR] *data :> *feedback)
-     (aor-types/->valid-RunInfoImpl *rule-name
-                                    *action-name
-                                    *agent-name
-                                    *node-name
-                                    *agent-invoke
-                                    *node-invoke
-                                    *type
-                                    (get *data :start-time-millis)
-                                    (data->latency-millis *data)
-                                    *feedback
-                                    *agent-stats
-                                    *nested-ops
-                                    :> *run-info)
-     (run-action! *action-fn *input *output *run-info :> *cf)
-     (completable-future> *cf :> {:keys [*success? *info-map]}))
+         (get *action-fn BUILD-ERROR :> *info-map)
+         (identity false :> *success?)
+         (else>)
+         (select> [:feedback :results NIL->VECTOR] *data :> *feedback)
+         (aor-types/->valid-RunInfoImpl *rule-name
+                                        *action-name
+                                        *agent-name
+                                        *node-name
+                                        *agent-invoke
+                                        *node-invoke
+                                        *type
+                                        (get *data :start-time-millis)
+                                        (data->latency-millis *data)
+                                        *feedback
+                                        *agent-stats
+                                        *nested-ops
+                                        :> *run-info)
+         (run-action! *action-fn *input *output *run-info :> *cf)
+         (completable-future> *cf :> {:keys [*success? *info-map]}))
    (h/current-time-millis :> *action-finish-time-millis)
    (aor-types/->valid-ActionLog *action-start-time-millis
                                 *action-finish-time-millis
@@ -699,8 +678,7 @@
    (h/random-uuid7 :> *action-log-id)
    (local-transform> [(keypath *agent-name *rule-name *action-log-id) (termval *action-log)]
                      $$action-log)
-   (:>)
-  ))
+   (:>)))
 
 (defn include-result-from-status?
   [status-filter data-map]
@@ -718,57 +696,57 @@
 (deframafn fetch-data
   [*agent-name *target *offset *dep-end-offset]
   (<<if (AnaRootTarget? *target)
-    (po/agent-stream-shared-task-global *agent-name :> $$stream-shared)
-    (local-select> [:active-invokes (subselect FIRST) (view first)]
-                   $$stream-shared
-                   :> *max-scan-offset)
-   (else>)
-    (identity nil :> *max-scan-offset))
+        (po/agent-stream-shared-task-global *agent-name :> $$stream-shared)
+        (local-select> [:active-invokes (subselect FIRST) (view first)]
+                       $$stream-shared
+                       :> *max-scan-offset)
+        (else>)
+        (identity nil :> *max-scan-offset))
   (action-target-pstate *agent-name (not (AnaRootTarget? *target)) :> $$p)
   (compute-end-offset *dep-end-offset *max-scan-offset :> *end-offset)
   (anode/read-global-config aor-types/ANALYTICS-SCAN-AMOUNT-PER-TARGET-PER-TASK-CONFIG
                             :> *scan-amt)
   (<<ramafn %add-run-type
-    [*m]
-    (:> (expand-data-map *m (AnaRootTarget? *target))))
+            [*m]
+            (:> (expand-data-map *m (AnaRootTarget? *target))))
   (po/agent-node-executor-task-global :> *node-exec)
   (<<if (>= (compare *offset *end-offset) 0)
-    (sorted-map :> *m)
-   (else>)
-    (local-select> [(sorted-map-range-from *offset *scan-amt)
-                    (sorted-map-range *offset *end-offset)
-                    (view complete-node-map *target *node-exec)
-                    (transformed MAP-VALS %add-run-type)]
-                   $$p
-                   :> *m))
+        (sorted-map :> *m)
+        (else>)
+        (local-select> [(sorted-map-range-from *offset *scan-amt)
+                        (sorted-map-range *offset *end-offset)
+                        (view complete-node-map *target *node-exec)
+                        (transformed MAP-VALS %add-run-type)]
+                       $$p
+                       :> *m))
   (compute-end-scan-offset *m *offset :> *end-scan-offset)
   (:> *m *end-scan-offset))
 
 (deframafn get-matching-offsets
   [*m *target *status-filter *filter *sampling-rate]
   (<<ramafn %match?
-    [*data]
-    (:> (and> (not (experiment-source? *data))
-              (not (contains? *data :invoked-agg-invoke-id))
-              (contains? *data :start-time-millis) ; not stricly necessary
-              (include-result-from-status? *status-filter *data)
-              (or> (not (AnaNodeTarget? *target))
-                   (= (get *target :node-name) (get *data :node)))
-              (aor-types/rule-filter-matches? *filter *data)
-              (sample? *sampling-rate))))
+            [*data]
+            (:> (and> (not (experiment-source? *data))
+                      (not (contains? *data :invoked-agg-invoke-id))
+                      (contains? *data :start-time-millis) ; not stricly necessary
+                      (include-result-from-status? *status-filter *data)
+                      (or> (not (AnaNodeTarget? *target))
+                           (= (get *target :node-name) (get *data :node)))
+                      (aor-types/rule-filter-matches? *filter *data)
+                      (sample? *sampling-rate))))
   (select> (subselect ALL
                       (selected? LAST (pred %match?))
                       FIRST)
-    *m
-    :> *matching-offsets)
+           *m
+           :> *matching-offsets)
   (:> *matching-offsets))
 
 (deframafn compute-dep-end-offset
   [*rule->info *task-id *dependency-names]
   (<<batch
-    (ops/explode *dependency-names :> *dname)
-    (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
-    (+min-uuid *other-offset :> *dep-end-offset))
+   (ops/explode *dependency-names :> *dname)
+   (select> [(keypath *dname) :cursors (keypath *task-id)] *rule->info :> *other-offset)
+   (+min-uuid *other-offset :> *dep-end-offset))
   (:> *dep-end-offset))
 
 (deframaop find-qualified-offsets-and-run-unlimited
@@ -784,8 +762,8 @@
                    *status-filter]})
    (aor-types/dependency-rule-names *filter :> *dependency-names)
    (select> [:cursors ALL (collect-one FIRST) LAST]
-     *rule-info
-     :> [*task-id *offset])
+            *rule-info
+            :> [*task-id *offset])
    (compute-dep-end-offset *rule->info *task-id *dependency-names :> *dep-end-offset)
    (|direct *task-id)
    (all-action-builders :> *action-builders)
@@ -807,14 +785,13 @@
                                   [:matching-offsets (termval *matching-offsets)])]
                      $$cache)
    (<<if *limit-concurrency?
-     (or> (first *matching-offsets) *end-scan-offset :> *next-offset)
-     (local-transform> [(keypath *agent-name *rule-name) (termval *next-offset)] $$processed)
-     (:> *agent-name *rule-name *task-id (count *matching-offsets))
-    (else>)
-     (local-transform> [(keypath *agent-name *rule-name) (termval *end-scan-offset)] $$processed)
-     (ops/explode *matching-offsets :> *offset)
-     (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name)
-   )))
+         (or> (first *matching-offsets) *end-scan-offset :> *next-offset)
+         (local-transform> [(keypath *agent-name *rule-name) (termval *next-offset)] $$processed)
+         (:> *agent-name *rule-name *task-id (count *matching-offsets))
+         (else>)
+         (local-transform> [(keypath *agent-name *rule-name) (termval *end-scan-offset)] $$processed)
+         (ops/explode *matching-offsets :> *offset)
+         (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name))))
 
 (defn rule-source?-pred
   [rule-name]
@@ -849,38 +826,36 @@
                     (string? v) {:type :categorical :values {v 1}}
                     (boolean? v) {:type :numeric :values [(if v 1 0)]}
                     (number? v) {:type :numeric :values [v]}
-                    :else (throw (h/ex-info "Unexpected eval value" {:value v :type (class v)}))
-                  )])))
-       )))))
+                    :else (throw (h/ex-info "Unexpected eval value" {:value v :type (class v)})))]))))))))
 
 (deframaop explode-metrics
   [*rule->info]
   (vals (metrics/all-metrics) :> *built-in-metrics)
   (anchor> <root>)
   (ops/explode-map (group-by :target *built-in-metrics) :> *target *metrics)
-  (:> {:target            *target
-       :query-id          [*target]
-       :metrics           *metrics
+  (:> {:target *target
+       :query-id [*target]
+       :metrics *metrics
        :dependency-rule-names []
        :start-time-millis 0})
 
   (hook> <root>)
   (select> [ALL (collect-one FIRST) LAST :definition
             (selected? :action-name (pred= EVAL-ACTION-NAME))]
-    *rule->info
-    :> [*rule-name {:keys [*node-name *start-time-millis]}])
+           *rule->info
+           :> [*rule-name {:keys [*node-name *start-time-millis]}])
   (ifexpr (nil? *node-name) :root :nodes :> *target)
-  (:> {:target            *target
-       :query-id          [:eval *rule-name]
-       :metrics           [(to-eval-metric *rule-name *target)]
+  (:> {:target *target
+       :query-id [:eval *rule-name]
+       :metrics [(to-eval-metric *rule-name *target)]
        :dependency-rule-names [*rule-name]
        :start-time-millis *start-time-millis}))
 
 (deframafn get-all-metrics
   [*rule->info]
   (<<batch
-    (explode-metrics *rule->info :> *m)
-    (aggs/+vec-agg *m :> *res))
+   (explode-metrics *rule->info :> *m)
+   (aggs/+vec-agg *m :> *res))
   (:> *res))
 
 (defn metrics-target
@@ -957,14 +932,13 @@
       ;; - this is defensive, as all metrics fns are defined in AOR and should handle all cases
       ;; - don't want analytics topology to come to a halt in case of a bug
       (tl/error ::invoke-metrics-fn t "Metrics function invoke error")
-      {}
-    )))
+      {})))
 
 (defn enriched-metadata
   [{:keys [metadata] :as data-map}]
   (assoc metadata
-   "aor/status"
-   (if (metrics/run-success? data-map) "run-success" "run-failure")))
+         "aor/status"
+         (if (metrics/run-success? data-map) "run-success" "run-failure")))
 
 (deframaop update-telemetry!
   [*agent-name *metric-id *metric-point *start-time-millis *metadata]
@@ -989,11 +963,11 @@
   (get-all-metrics *rule->info :> *maps)
   (ops/range> 0 (get-num-tasks) :> *task-id)
   (<<ramafn %update-dep-end-offset
-    [{:keys [*dependency-rule-names] :as *m}]
-    (dissoc *m :dependency-rule-names :> *m)
-    (:> (assoc *m
-         :dep-end-offset
-         (compute-dep-end-offset *rule->info *task-id *dependency-rule-names))))
+            [{:keys [*dependency-rule-names] :as *m}]
+            (dissoc *m :dependency-rule-names :> *m)
+            (:> (assoc *m
+                       :dep-end-offset
+                       (compute-dep-end-offset *rule->info *task-id *dependency-rule-names))))
   (mapv %update-dep-end-offset *maps :> *maps)
   (|direct *task-id)
   (po/agent-metric-cursors-task-global *agent-name :> $$metric-cursors)
@@ -1004,8 +978,8 @@
   (local-transform> (termval {}) $$metric-cursors)
   (ops/explode *maps :> {:keys [*target *query-id *metrics *dep-end-offset *start-time-millis]})
   (select> [(keypath *query-id) (nil->val (h/min-uuid7-at-timestamp *start-time-millis))]
-    *metric-cursors
-    :> *offset)
+           *metric-cursors
+           :> *offset)
   (fetch-data
    *agent-name
    (metrics-target *target)
@@ -1022,18 +996,17 @@
   (invoke-metrics-fn *metrics-fn *data-map :> *metrics-map)
   (ops/explode-map *metrics-map :> *metric-id *metric-points)
   (ops/explode *metric-points :> *metric-point)
-  (update-telemetry! *agent-name *metric-id *metric-point *start-time-millis *metadata)
-)
+  (update-telemetry! *agent-name *metric-id *metric-point *start-time-millis *metadata))
 
 (defn to-action-queue
   [task->agent->rule->info]
   (letfn [(rr [colls]
-              (lazy-seq
-               (let [active (seq (filter seq colls))]
-                 (when active
-                   (concat (map first active)
-                           (rr (map rest active)))))))]
-    (let [tasks     (shuffle (or (keys task->agent->rule->info) []))
+            (lazy-seq
+             (let [active (seq (filter seq colls))]
+               (when active
+                 (concat (map first active)
+                         (rr (map rest active)))))))]
+    (let [tasks (shuffle (or (keys task->agent->rule->info) []))
           task-seqs (for [t tasks]
                       (rr
                        (for [a (shuffle (keys (get task->agent->rule->info t)))]
@@ -1042,16 +1015,16 @@
                                                              task->agent->rule->info)))]
                             (let [match-count (select-any (keypath t a r) task->agent->rule->info)]
                               (repeat match-count
-                                      {:task-id    t
+                                      {:task-id t
                                        :agent-name a
-                                       :rule-name  r})))))))]
+                                       :rule-name r})))))))]
       (rr task-seqs))))
 
 (deframafn agg-items
   [*items]
   (<<batch
-    (ops/explode *items :> {:keys [*task-id *agent-name *rule-name]})
-    (+compound {*task-id {*agent-name {*rule-name (aggs/+count)}}} :> *res))
+   (ops/explode *items :> {:keys [*task-id *agent-name *rule-name]})
+   (+compound {*task-id {*agent-name {*rule-name (aggs/+count)}}} :> *res))
   (:> *res))
 
 (deframaop run-limited-concurrency-actions!
@@ -1063,8 +1036,8 @@
    (ops/explode-map *agent->rule->count :> *agent-name *rule->count)
    (ops/explode-map *rule->count :> *rule-name *count)
    (select> (keypath *agent-name *rule-name :definition)
-     *agent->rule->info
-     :> {:keys [*action-name *node-name]})
+            *agent->rule->info
+            :> {:keys [*action-name *node-name]})
    (|direct *task-id)
    (local-select> (keypath *agent-name *rule-name :matching-offsets) $$cache :> *matching-offsets)
    (local-select> (keypath *agent-name *rule-name :end-scan-offset) $$cache :> *end-scan-offset)
@@ -1076,8 +1049,7 @@
    (or> (first *next-matching-offsets) *end-scan-offset :> *next-offset)
    (local-transform> [(keypath *agent-name *rule-name) (termval *next-offset)] $$processed)
    (ops/explode *offsets :> *offset)
-   (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name)
-  ))
+   (run-one-action! *cache-pstate-name *agent-name *rule-name *offset *action-name *node-name)))
 
 (defn action-iter-complete?
   [first-iter? queue start-time-millis target-millis]
@@ -1086,15 +1058,13 @@
         (and (not first-iter?)
              (> time-delta target-millis)))))
 
-
-
 (deframafn update-rule-offsets!
   [*agent->rule->cursors]
   (<<atomic
-    (ops/explode (po/agent-names-set) :> *agent-name)
-    (get *agent->rule->cursors *agent-name :> *rule->cursors)
-    (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
-    (local-transform> (termval *rule->cursors) $$rule-cursors))
+   (ops/explode (po/agent-names-set) :> *agent-name)
+   (get *agent->rule->cursors *agent-name :> *rule->cursors)
+   (po/agent-rule-cursors-task-global *agent-name :> $$rule-cursors)
+   (local-transform> (termval *rule->cursors) $$rule-cursors))
   (:>))
 
 (defn hook:analytics-loop-iter* [])
@@ -1126,40 +1096,38 @@
       [materialize> :> processed-pstate]]
      [<<batch
       [find-qualified-offsets-and-run-unlimited '*agent->rule->info cache-pstate-name processed-pstate-name
-        :> '*agent-name '*rule-name '*task-id '*match-count]
+       :> '*agent-name '*rule-name '*task-id '*match-count]
       [|global]
       [+compound
-        {'*task-id
-          {'*agent-name
-            {'*rule-name
-              (seg# aggs/+last '*match-count)}}}
-        :> match-info-pstate]]
+       {'*task-id
+        {'*agent-name
+         {'*rule-name
+          (seg# aggs/+last '*match-count)}}}
+       :> match-info-pstate]]
      [ops/vget match-info-pstate :> '*match-info]
      [to-action-queue '*match-info :> '*queue]
      [loop<-
-       ['*queue '*queue
-        '*first-iter? true]
-       [hook:analytics-loop-iter]
-       [<<if (seg# action-iter-complete? '*first-iter? '*queue '*actions-start-time-millis '*target-millis)
-         [:>]
-        [else>]
-         [split-at '*max-concurrency '*queue :> ['*items '*rest-queue]]
-         [agg-items '*items :> '*plan]
-         [<<batch
-           [run-limited-concurrency-actions! '*plan '*agent->rule->info cache-pstate-name processed-pstate-name]]
-         [continue> '*rest-queue false]
-         ]]
+      ['*queue '*queue
+       '*first-iter? true]
+      [hook:analytics-loop-iter]
+      [<<if (seg# action-iter-complete? '*first-iter? '*queue '*actions-start-time-millis '*target-millis)
+       [:>]
+       [else>]
+       [split-at '*max-concurrency '*queue :> ['*items '*rest-queue]]
+       [agg-items '*items :> '*plan]
+       [<<batch
+        [run-limited-concurrency-actions! '*plan '*agent->rule->info cache-pstate-name processed-pstate-name]]
+       [continue> '*rest-queue false]]]
      [<<batch
-       [|all]
-       [ops/current-task-id :> '*task-id]
-       [local-select> STAY processed-pstate :> '*agent->rule->offset]
-       [ops/explode-map '*agent->rule->offset :> '*agent-name '*rule->offset]
-       [ops/explode-map '*rule->offset :> '*rule-name '*offset]
-       [|global]
-       [+compound {'*agent-name {'*rule-name {'*task-id (seg# aggs/+last '*offset)}}} :> processed-agg-pstate]]
+      [|all]
+      [ops/current-task-id :> '*task-id]
+      [local-select> STAY processed-pstate :> '*agent->rule->offset]
+      [ops/explode-map '*agent->rule->offset :> '*agent-name '*rule->offset]
+      [ops/explode-map '*rule->offset :> '*rule-name '*offset]
+      [|global]
+      [+compound {'*agent-name {'*rule-name {'*task-id (seg# aggs/+last '*offset)}}} :> processed-agg-pstate]]
      [local-select> STAY processed-agg-pstate :> '*new-cursors]
-     [update-rule-offsets! '*new-cursors]
-    ]))
+     [update-rule-offsets! '*new-cursors]]))
 
 (defn log-unexpected-human-metric
   [msg data]
@@ -1175,21 +1143,21 @@
   (this-module-pobject-task-global *pstate-name :> $$p)
   (local-select> (keypath *root-id) $$p :> *data-map)
   (<<if (nil? *data-map)
-    (identity nil :> *metadata)
-   (else>)
-    (enriched-metadata (expand-data-map *data-map (nil? *node-invoke))
-                       :> *metadata))
+        (identity nil :> *metadata)
+        (else>)
+        (enriched-metadata (expand-data-map *data-map (nil? *node-invoke))
+                           :> *metadata))
   (ops/explode-map *scores :> *name *value)
   (<<cond
    (case> (string? *value))
-    (hash-map :type :categorical :values {*value 1} :> *metric-point)
+   (hash-map :type :categorical :values {*value 1} :> *metric-point)
 
    (case> (number? *value))
-    (hash-map :type :numeric :values [*value] :> *metric-point)
+   (hash-map :type :numeric :values [*value] :> *metric-point)
 
    (default> :unify false)
-    (log-unexpected-human-metric "Unexpected human metric for analytics"
-                                 {:name *name :value *value :value-class (class *value)}))
+   (log-unexpected-human-metric "Unexpected human metric for analytics"
+                                {:name *name :value *value :value-class (class *value)}))
   (update-telemetry! *agent-name [:human *name] *metric-point *scores-millis *metadata))
 
 (defn add-rule!
@@ -1230,23 +1198,21 @@
 
 (def METRIC-QUERIES
   {:rest-sum number-stats/get-rest-sum
-   :mean     number-stats/get-mean
-   :count    number-stats/get-count
-   :min      number-stats/get-min
-   :max      number-stats/get-max
-   :latest   number-stats/get-latest
-  })
+   :mean number-stats/get-mean
+   :count number-stats/get-count
+   :min number-stats/get-min
+   :max number-stats/get-max
+   :latest number-stats/get-latest})
 
 (defn metrics-extract
   [metrics-set number-stats]
   (reduce
    (fn [m metric]
      (assoc m
-      metric
-      (if (number? metric)
-        (number-stats/get-quantile! number-stats metric)
-        ((get METRIC-QUERIES metric) number-stats)
-      )))
+            metric
+            (if (number? metric)
+              (number-stats/get-quantile! number-stats metric)
+              ((get METRIC-QUERIES metric) number-stats))))
    {}
    metrics-set))
 
@@ -1271,10 +1237,10 @@
   [telemetry-pstate agent-name granularity metric-id start-time-millis end-time-millis metrics-set
    metadata-key]
   (let [start-bucket (to-bucket granularity start-time-millis)
-        end-bucket   (to-bucket granularity end-time-millis)
-        end-path     (if metadata-key
-                       (path MAP-VALS MAP-VALS)
-                       (path MAP-VALS))]
+        end-bucket (to-bucket granularity end-time-millis)
+        end-path (if metadata-key
+                   (path MAP-VALS MAP-VALS)
+                   (path MAP-VALS))]
     (foreign-select-one
      [(keypath granularity metric-id)
       (sorted-map-range start-bucket end-bucket)
@@ -1289,5 +1255,4 @@
    #(vector :human %)
    (foreign-select
     [:metrics MAP-KEYS]
-    human-feedback-pstate
-   )))
+    human-feedback-pstate)))

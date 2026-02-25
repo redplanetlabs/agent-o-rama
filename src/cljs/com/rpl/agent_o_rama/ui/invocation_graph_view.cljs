@@ -509,6 +509,8 @@
                                          {:module-id module-id
                                           :title (str "Add Node '" node-name "' to Dataset")
                                           :source-type :node
+                                          :agent-name agent-name
+                                          :invoke-id invoke-id
                                           :source-args input-data
                                           :source-emits output-data}])))}
           "Add to Dataset")
@@ -535,7 +537,7 @@
                                   :agent-name agent-name
                                   :invoke-id agent-invoke-id
                                   :node-name node-name
-                                  :node-invoke-id node-id  ;; Specific node invocation ID
+                                  :node-invoke-id node-id ;; Specific node invocation ID
                                   :is-streaming? is-node-in-progress?}))
 
        ($ node-exceptions-panel {:exceptions exceptions})
@@ -624,7 +626,7 @@
                   :module-id module-id
                   :agent-name agent-name
                   :invoke-id invoke-id
-                  :agent-invoke-id invoke-id  ;; Pass invoke-id for streaming
+                  :agent-invoke-id invoke-id ;; Pass invoke-id for streaming
                   :node-id node-id
                   :node-name node-name
                   :result result
@@ -953,6 +955,8 @@
                                          {:module-id module-id
                                           :title "Add Agent Invocation to Dataset"
                                           :source-type :agent
+                                          :agent-name agent-name
+                                          :invoke-id invoke-id
                                           :source-args input-data
                                           :source-result output-data}])))}
           "Add to Dataset")
@@ -1057,7 +1061,7 @@
         active-tab (case tab-param
                      "feedback" :feedback
                      "fork" :fork
-                     :info)  ; default
+                     :info) ; default
 
         ;; Helper to update tab via URL
         set-tab! (fn [tab-name]

@@ -18,10 +18,19 @@
    [com.rpl.specter :as s]))
 
 (defui SourceDisplay [{:keys [example]}]
-  (let [source-string (:source-string example)]
+  (let [source-string (:source-string example)
+        trace-link (:trace-link example)]
     ($ :div.flex.flex-col.gap-1
        ($ :div.flex.items-center
-          source-string))))
+          (if trace-link
+            ($ :a {:href (rfe/href :agent/invocation-detail
+                                   {:module-id (:module-id trace-link)
+                                    :agent-name (:agent-name trace-link)
+                                    :invoke-id (:invoke-id trace-link)})
+                   :className "text-blue-600 hover:underline cursor-pointer"
+                   :onClick #(.stopPropagation %)}
+               source-string)
+            source-string)))))
 
 ;; =============================================================================
 ;; EXAMPLE ACTIONS AND EDITING

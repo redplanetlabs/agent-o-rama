@@ -213,9 +213,11 @@
 
          :else
          [:datasets/add-direct-data
-          {:module-id module-id
-           :dataset-id dataset-id
-           :input parsed-input
-           :output parsed-output}])))
+          (cond-> {:module-id module-id
+                   :dataset-id dataset-id
+                   :input parsed-input
+                   :output parsed-output}
+            (:agent-name form-state) (assoc :agent-name (:agent-name form-state))
+            (:invoke-id form-state) (assoc :invoke-id (:invoke-id form-state)))])))
    :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
