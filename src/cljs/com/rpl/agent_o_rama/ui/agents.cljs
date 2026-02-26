@@ -275,8 +275,8 @@
         (fn [filter-type f]
           (case filter-type
             :node (if (str/blank? (:node-name f))
-                    "Any node"
-                    (str "Node: " (:node-name f)))
+                    "Any"
+                    (:node-name f))
             :latency (let [mn (str/trim (:latency-min f))
                            mx (str/trim (:latency-max f))]
                        (cond
@@ -289,9 +289,8 @@
                      "no-errors" "No errors"
                      "Any result")
             :source (if (= "all" (:source f))
-                      "Any source"
-                      (str "Source "
-                           (if (:source-not? f) "!=" "=")
+                      "Any"
+                      (str (if (:source-not? f) "!=" "=")
                            " "
                            (:source f)))
             :feedback (let [metric (str/trim (:feedback-metric-name f))
