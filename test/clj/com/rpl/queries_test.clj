@@ -266,7 +266,7 @@
                              10
                              100
                              nil
-                             {:node-name "start"
+                             {:node-names ["start"]
                               :latency-ms {:min 80}
                               :has-error? false}))
      (bind slow-rows (:agent-invokes slow-res))
@@ -306,14 +306,14 @@
                              10
                              100
                              nil
-                             {:feedback-metric {:metric-name "quality"
-                                                :comparator :<=
-                                                :value 3
-                                                :source :human}}))
+                             {:feedback-metrics [{:metric-name "quality"
+                                                  :comparator :<=
+                                                  :value 3
+                                                  :source :human}]}))
      (bind feedback-rows (:agent-invokes feedback-res))
      (is (= 1 (count feedback-rows)))
-     (is (every? #(contains? % :feedback-metric-value) feedback-rows))
-     (is (every? #(number? (:feedback-metric-value %)) feedback-rows))
+     (is (every? #(contains? % :feedback-metric-values) feedback-rows))
+     (is (every? #(number? (get-in % [:feedback-metric-values "quality"])) feedback-rows))
 
      (bind source-res
        (foreign-invoke-query q

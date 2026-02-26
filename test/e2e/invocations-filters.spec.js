@@ -182,21 +182,22 @@ test.describe('Invocations filters', () => {
 
       // Node filter: long node.
       await openFilterPanel(page, 'Node');
-      await page.getByTestId('invocations-filter-node-select').selectOption(longNodeName);
+      await page.locator('label', { hasText: longNodeName }).locator('input[type="checkbox"]').check();
       await applyCurrentFilter(page);
       await expect(page.locator('tbody tr').filter({ hasText: runIds.nodeLong }).first()).toBeVisible();
       await expect(page.locator('tbody tr').filter({ hasText: runIds.nodeShort })).toHaveCount(0);
 
       // Node filter: short node.
       await page.locator('button').filter({ hasText: 'Node' }).first().click();
-      await page.getByTestId('invocations-filter-node-select').selectOption('short_path_node');
+      await page.getByRole('button', { name: 'Clear' }).click();
+      await page.locator('label', { hasText: 'short_path_node' }).locator('input[type="checkbox"]').check();
       await applyCurrentFilter(page);
       await expect(page.locator('tbody tr').filter({ hasText: runIds.nodeShort }).first()).toBeVisible();
       await expect(page.locator('tbody tr').filter({ hasText: runIds.nodeLong })).toHaveCount(0);
 
       // Reset node filter to Any node.
       await page.locator('button').filter({ hasText: 'Node' }).first().click();
-      await page.getByTestId('invocations-filter-node-select').selectOption('');
+      await page.getByRole('button', { name: 'Clear' }).click();
       await applyCurrentFilter(page);
 
       // Latency filter.

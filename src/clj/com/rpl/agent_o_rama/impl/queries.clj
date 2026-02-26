@@ -482,22 +482,38 @@
         (some #(feedback-entry-matched-score % feedback-metric)
               results)))))
 
+(defn invoke-feedback-metric-values
+  [m feedback-metrics]
+  (let [metrics (or feedback-metrics [])]
+    (when (seq metrics)
+      (reduce
+       (fn [acc metric]
+         (let [metric-name (:metric-name metric)
+               matched-score (invoke-feedback-metric-value m metric)]
+           (assoc acc metric-name matched-score)))
+       {}
+       metrics))))
+
 (defn invoke-feedback-matches?
-  [m feedback-metric]
-  (if (nil? feedback-metric)
-    true
-    (some? (invoke-feedback-metric-value m feedback-metric))))
+  [m feedback-metrics]
+  (let [metrics (or feedback-metrics [])]
+    (if (empty? metrics)
+      true
+      (let [metric-values (invoke-feedback-metric-values m metrics)]
+        (every? (fn [metric]
+                  (some? (get metric-values (:metric-name metric))))
+                metrics)))))
 
 (defn invoke-matches-filters?
   [m filters]
-  (let [{:keys [node-name has-error? latency-ms source source-not? feedback-metric]} filters
+  (let [{:keys [node-names has-error? latency-ms source source-not? feedback-metrics]} filters
         status (invoke-status m)
         latency (invoke-latency-millis m)
         {:keys [min max]} latency-ms
         node-stats (get-in m [:stats :basic-stats :node-stats])]
     (and
-     (if (some? node-name)
-       (contains? node-stats node-name)
+     (if (seq node-names)
+       (every? #(contains? node-stats %) node-names)
        true)
      (if (some? has-error?)
        (= has-error? (= status :failure))
@@ -509,7 +525,7 @@
        (and (some? latency) (<= latency max))
        true)
      (invoke-source-matches? m source source-not?)
-     (invoke-feedback-matches? m feedback-metric))))
+     (invoke-feedback-matches? m feedback-metrics))))
 
 (defn relevant-invoke-submap
   ([m]
@@ -519,8 +535,8 @@
      (let [ret (select-keys m
                             [:start-time-millis :finish-time-millis
                              :invoke-args :graph-version])
-           feedback-metric (:feedback-metric filters)
-           feedback-metric-value (invoke-feedback-metric-value m feedback-metric)]
+           feedback-metrics (:feedback-metrics filters)
+           feedback-metric-values (invoke-feedback-metric-values m feedback-metrics)]
        (cond-> (assoc ret
                  :human-request?
                  (-> m
@@ -529,8 +545,8 @@
                      not)
                  :status
                  (invoke-status m))
-         (some? feedback-metric)
-         (assoc :feedback-metric-value feedback-metric-value))))))
+         (seq feedback-metrics)
+         (assoc :feedback-metric-values feedback-metric-values))))))
 
 (defn filter-invokes-task-page
   [m filters]
