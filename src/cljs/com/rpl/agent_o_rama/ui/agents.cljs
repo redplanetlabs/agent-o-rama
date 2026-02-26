@@ -165,6 +165,8 @@
 
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+        query-params (state/use-sub [:route :query-params])
+        filters-query-param (:filters query-params)
         default-draft-filters {:node-names []
                                :latency-min ""
                                :latency-max ""
@@ -177,15 +179,122 @@
                                                    :source "any"}]}
         default-applied-filters {:source "EXPERIMENT"
                                  :source-not? true}
+        encode-filters-param
+        (fn [filters]
+          (try
+            (-> filters
+                clj->js
+                js/JSON.stringify
+                js/btoa)
+            (catch js/Error _
+              nil)))
+        decode-filters-param
+        (fn [encoded]
+          (try
+            (-> encoded
+                js/atob
+                js/JSON.parse
+                (js->clj :keywordize-keys true))
+            (catch js/Error _
+              nil)))
+        normalize-applied-filters
+        (fn [filters]
+          (let [raw-filters (or filters {})
+                feedback-metrics
+                (->> (or (:feedback-metrics raw-filters) [])
+                     (keep (fn [{:keys [metric-name comparator value source]}]
+                             (let [metric-name (str/trim (str (or metric-name "")))
+                                   value (str/trim (str (or value "")))]
+                               (when (and (not (str/blank? metric-name))
+                                          (not (str/blank? value)))
+                                 (cond-> {:metric-name metric-name
+                                          :comparator (keyword (name (or comparator :<=)))
+                                          :value value}
+                                   (some? source)
+                                   (assoc :source (keyword (name source))))))))
+                     vec)
+                node-names
+                (->> (or (:node-names raw-filters) [])
+                     (map str)
+                     (map str/trim)
+                     (remove str/blank?)
+                     vec)]
+            (cond-> {}
+              (seq node-names)
+              (assoc :node-names node-names)
+
+              (some? (get-in raw-filters [:latency-ms :min]))
+              (assoc-in [:latency-ms :min] (get-in raw-filters [:latency-ms :min]))
+
+              (some? (get-in raw-filters [:latency-ms :max]))
+              (assoc-in [:latency-ms :max] (get-in raw-filters [:latency-ms :max]))
+
+              (contains? raw-filters :has-error?)
+              (assoc :has-error? (:has-error? raw-filters))
+
+              (some? (:source raw-filters))
+              (assoc :source (str (:source raw-filters)))
+
+              (:source-not? raw-filters)
+              (assoc :source-not? true)
+
+              (seq feedback-metrics)
+              (assoc :feedback-metrics feedback-metrics))))
+        applied->draft-filters
+        (fn [applied]
+          (let [filters (or applied {})]
+            (assoc default-draft-filters
+                   :node-names (vec (or (:node-names filters) []))
+                   :latency-min (let [v (get-in filters [:latency-ms :min])]
+                                  (if (some? v) (str v) ""))
+                   :latency-max (let [v (get-in filters [:latency-ms :max])]
+                                  (if (some? v) (str v) ""))
+                   :error-filter (cond
+                                   (true? (:has-error? filters)) "errors-only"
+                                   (false? (:has-error? filters)) "no-errors"
+                                   :else "all")
+                   :source (or (:source filters) "all")
+                   :source-not? (boolean (:source-not? filters))
+                   :feedback-metrics
+                   (if (seq (:feedback-metrics filters))
+                     (mapv (fn [{:keys [metric-name comparator value source]}]
+                             {:metric-name (or metric-name "")
+                              :comparator (name (or comparator :<=))
+                              :value (str value)
+                              :source (if (some? source) (name source) "any")})
+                           (:feedback-metrics filters))
+                     [{:metric-name "" :comparator "<=" :value "" :source "any"}]))))
+        derive-active-filter-types
+        (fn [applied]
+          (let [filters (or applied {})]
+            (vec
+             (remove nil?
+                     [(when (seq (:node-names filters)) :node)
+                      (when (or (some? (get-in filters [:latency-ms :min]))
+                                (some? (get-in filters [:latency-ms :max])))
+                        :latency)
+                      (when (contains? filters :has-error?) :error)
+                      (when (or (some? (:source filters))
+                                (:source-not? filters))
+                        :source)
+                      (when (seq (:feedback-metrics filters)) :feedback)]))))
+        applied-filters-from-url
+        (fn [encoded]
+          (if (nil? encoded)
+            default-applied-filters
+            (or (some-> encoded decode-filters-param normalize-applied-filters)
+                default-applied-filters)))
+        initial-applied-filters
+        (applied-filters-from-url filters-query-param)
         filter-type-order [:node :latency :error :source :feedback]
         filter-type-labels {:node "Node"
                             :latency "Latency"
                             :error "Error"
                             :source "Source"
                             :feedback "Feedback"}
-        [draft-filters set-draft-filters!] (uix/use-state default-draft-filters)
-        [applied-filters set-applied-filters!] (uix/use-state default-applied-filters)
-        [active-filter-types set-active-filter-types!] (uix/use-state [:source])
+        [draft-filters set-draft-filters!] (uix/use-state (applied->draft-filters initial-applied-filters))
+        [applied-filters set-applied-filters!] (uix/use-state initial-applied-filters)
+        [active-filter-types set-active-filter-types!] (uix/use-state (derive-active-filter-types initial-applied-filters))
         [open-filter-type set-open-filter-type!] (uix/use-state nil)
         filter-key (common/to-json applied-filters)
         filter-options-query
@@ -334,6 +443,31 @@
         apply-open-filter! (fn []
                              (set-applied-filters! (build-filter-map draft-filters))
                              (set-open-filter-type! nil))
+        _sync-filters-from-url
+        (uix/use-effect
+         (fn []
+           (let [next-applied (applied-filters-from-url filters-query-param)]
+             (when (not= next-applied applied-filters)
+               (set-applied-filters! next-applied)
+               (set-draft-filters! (applied->draft-filters next-applied))
+               (set-active-filter-types! (derive-active-filter-types next-applied))))
+           js/undefined)
+         [filters-query-param])
+        _sync-filters-to-url
+        (uix/use-effect
+         (fn []
+           (when (and module-id agent-name)
+             (let [encoded (encode-filters-param applied-filters)
+                   current-encoded filters-query-param]
+               (when (not= encoded current-encoded)
+                 (rfe/replace-state :agent/invocations
+                                    {:module-id module-id
+                                     :agent-name agent-name}
+                                    (if encoded
+                                      {:filters encoded}
+                                      {})))))
+           js/undefined)
+         [module-id agent-name applied-filters filters-query-param])
 
         ;; Use the new paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
