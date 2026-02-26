@@ -1146,6 +1146,10 @@ Example:\n
     `(def ~sym
        (agentmodule ~(merge {:module-name name-default} options) ~@args))))
 
+(defn- get-op-source
+  []
+  (or aor-types/OPERATION-SOURCE (aor-types/->ApiSourceImpl)))
+
 (defn agent-manager
   "Creates an agent manager for managing and interacting with deployed agents on a Rama cluster.\n
 \n
@@ -1540,7 +1544,7 @@ Example:\n
                  aor-types/FORCED-AGENT-TASK-ID
                  aor-types/FORCED-AGENT-INVOKE-ID
                  metadata
-                 aor-types/OPERATION-SOURCE))
+                 (get-op-source)))
                (h/cf-function [{[agent-task-id agent-id]
                                 aor-types/AGENT-TOPOLOGY-NAME}]
                  (aor-types/->AgentInvokeImpl agent-task-id agent-id)
@@ -1641,7 +1645,7 @@ Example:\n
                input
                (.referenceOutput options)
                (into #{} (.tags options))
-               (or aor-types/OPERATION-SOURCE (aor-types/->ApiSourceImpl))
+               (get-op-source)
               ))
              (.thenApply
               (h/cf-function [{error aor-types/AGENT-TOPOLOGY-NAME}]

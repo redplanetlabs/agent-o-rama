@@ -282,8 +282,9 @@
         (fn [encoded]
           (if (nil? encoded)
             default-applied-filters
-            (or (some-> encoded decode-filters-param normalize-applied-filters)
-                default-applied-filters)))
+            (if-let [decoded (decode-filters-param encoded)]
+              (normalize-applied-filters decoded)
+              default-applied-filters)))
         initial-applied-filters
         (applied-filters-from-url filters-query-param)
         filter-type-order [:node :latency :error :source :feedback]
@@ -307,6 +308,7 @@
         filter-options-data (:data filter-options-query)
         node-options (or (:nodes filter-options-data) [])
         feedback-metric-options (or (:feedback-metrics filter-options-data) [])
+        applied-node-names (or (:node-names applied-filters) [])
         applied-feedback-metrics (or (:feedback-metrics applied-filters) [])
         selected-feedback-metric-name (when (= 1 (count applied-feedback-metrics))
                                         (:metric-name (first applied-feedback-metrics)))
@@ -395,49 +397,77 @@
                types
                (conj (vec types) filter-type))))
           (set-open-filter-type! filter-type))
-        chip-description
-        (fn [filter-type f]
+        active-filter-chips
+        (vec
+         (concat
+          (map-indexed
+           (fn [idx node-name]
+             {:chip-id (str "node-" idx "-" node-name)
+              :filter-type :node
+              :description node-name
+              :node-name node-name})
+           applied-node-names)
+          (when (contains? applied-filters :latency-ms)
+            [{:chip-id "latency"
+              :filter-type :latency
+              :description (let [mn (get-in applied-filters [:latency-ms :min])
+                                 mx (get-in applied-filters [:latency-ms :max])]
+                             (cond
+                               (and (some? mn) (some? mx)) (str mn "ms-" mx "ms")
+                               (some? mn) (str ">= " mn "ms")
+                               (some? mx) (str "<= " mx "ms")
+                               :else "Any latency"))}])
+          (when (contains? applied-filters :has-error?)
+            [{:chip-id "error"
+              :filter-type :error
+              :description (if (:has-error? applied-filters) "Errors only" "No errors")}])
+          (when (contains? applied-filters :source)
+            [{:chip-id "source"
+              :filter-type :source
+              :description (str (if (:source-not? applied-filters) "!=" "=")
+                                " "
+                                (:source applied-filters))}])
+          (map-indexed
+           (fn [idx {:keys [metric-name comparator value source]}]
+             {:chip-id (str "feedback-" idx "-" metric-name "-" comparator "-" value "-" source)
+              :filter-type :feedback
+              :feedback-idx idx
+              :description (str metric-name " " (name comparator) " " value
+                                (when-not (= :any source)
+                                  (str " (" (name source) ")")))})
+           applied-feedback-metrics)))
+        remove-filter-chip!
+        (fn [{:keys [filter-type node-name feedback-idx]}]
           (case filter-type
-            :node (let [selected (or (:node-names f) [])]
-                    (if (empty? selected)
-                    "Any"
-                    (str/join " & " selected)))
-            :latency (let [mn (str/trim (:latency-min f))
-                           mx (str/trim (:latency-max f))]
-                       (cond
-                         (and (str/blank? mn) (str/blank? mx)) "Any latency"
-                         (and (not (str/blank? mn)) (not (str/blank? mx))) (str mn "ms-" mx "ms")
-                         (not (str/blank? mn)) (str ">= " mn "ms")
-                         :else (str "<= " mx "ms")))
-            :error (case (:error-filter f)
-                     "errors-only" "Errors only"
-                     "no-errors" "No errors"
-                     "Any result")
-            :source (if (= "all" (:source f))
-                      "Any"
-                      (str (if (:source-not? f) "!=" "=")
-                           " "
-                           (:source f)))
-            :feedback (let [metrics
-                            (->> (or (:feedback-metrics f) [])
-                                 (keep (fn [{:keys [metric-name comparator value source]}]
-                                         (let [metric-name (str/trim (or metric-name ""))
-                                               value (str/trim (or value ""))]
-                                           (when (and (not (str/blank? metric-name))
-                                                      (not (str/blank? value)))
-                                             (str metric-name " " comparator " " value
-                                                  (when-not (= "any" source)
-                                                    (str " (" source ")")))))))
-                                 vec)]
-                        (if (empty? metrics)
-                          "Metric unset"
-                          (str/join " & " metrics)))
-            ""))
+            :node
+            (let [remove-node (fn [f]
+                                (update f :node-names
+                                        (fn [names]
+                                          (->> (or names [])
+                                               (remove #(= % node-name))
+                                               vec))))]
+              (set-draft-filters! remove-node)
+              (set-applied-filters! (fn [prev]
+                                      (build-filter-map (remove-node (applied->draft-filters prev))))))
+
+            :feedback
+            (let [remove-feedback (fn [f]
+                                    (update f :feedback-metrics
+                                            (fn [rows]
+                                              (->> (map-indexed vector (or rows []))
+                                                   (remove (fn [[idx _]] (= idx feedback-idx)))
+                                                   (mapv second)))))]
+              (set-draft-filters! remove-feedback)
+              (set-applied-filters! (fn [prev]
+                                      (build-filter-map (remove-feedback (applied->draft-filters prev))))))
+
+            (clear-filter-type! filter-type)))
         add-filter-items
         (map (fn [filter-type]
                {:key (name filter-type)
                 :label (get filter-type-labels filter-type)
-                :disabled? (boolean (some #(= % filter-type) active-filter-types))
+                :disabled? (and (not (#{:node :feedback} filter-type))
+                                (boolean (some #(= % filter-type) active-filter-types)))
                 :on-select #(add-filter-type! filter-type)})
              filter-type-order)
         apply-open-filter! (fn []
@@ -488,21 +518,21 @@
                  :items add-filter-items
                  :full-width? false
                  :data-testid "add-invocations-filter"})
-             (if (seq active-filter-types)
-               (for [filter-type active-filter-types]
+            (if (seq active-filter-chips)
+              (for [{:keys [chip-id filter-type description] :as chip} active-filter-chips]
                  ($ :button.inline-flex.items-center.gap-2.px-3.py-1.5.rounded-full.bg-blue-50.text-blue-700.text-xs.font-medium.border.border-blue-200.cursor-pointer.hover:bg-blue-100.transition-colors.duration-150
-                    {:key (name filter-type)
+                    {:key chip-id
                      :type "button"
                      :onClick #(set-open-filter-type!
                                 (if (= open-filter-type filter-type)
                                   nil
                                   filter-type))}
                     ($ :span (get filter-type-labels filter-type))
-                    ($ :span.text-blue-500 (chip-description filter-type draft-filters))
+                    ($ :span.text-blue-500 description)
                     ($ :span.text-blue-400.hover:text-blue-700.cursor-pointer
                        {:onClick (fn [e]
                                    (.stopPropagation e)
-                                   (clear-filter-type! filter-type))}
+                                   (remove-filter-chip! chip))}
                        "x")))
                ($ :div.text-xs.text-gray-500 "No filters added")))
           (when open-filter-type
