@@ -167,12 +167,14 @@
                                :latency-min ""
                                :latency-max ""
                                :error-filter "all"
-                               :source "all"
-                               :source-not? false
+                               :source "EXPERIMENT"
+                               :source-not? true
                                :feedback-metric-name ""
                                :feedback-comparator "<="
                                :feedback-value ""
                                :feedback-source "any"}
+        default-applied-filters {:source "EXPERIMENT"
+                                 :source-not? true}
         filter-type-order [:node :latency :error :source :feedback]
         filter-type-labels {:node "Node"
                             :latency "Latency"
@@ -180,8 +182,8 @@
                             :source "Source"
                             :feedback "Feedback"}
         [draft-filters set-draft-filters!] (uix/use-state default-draft-filters)
-        [applied-filters set-applied-filters!] (uix/use-state {})
-        [active-filter-types set-active-filter-types!] (uix/use-state [])
+        [applied-filters set-applied-filters!] (uix/use-state default-applied-filters)
+        [active-filter-types set-active-filter-types!] (uix/use-state [:source])
         [open-filter-type set-open-filter-type!] (uix/use-state nil)
         filter-key (common/to-json applied-filters)
         filter-options-query
@@ -516,6 +518,8 @@
         (queries/use-sente-query {:query-key [:mini-invocations module-id agent-name]
                                   :sente-event [:invocations/get-page {:module-id module-id
                                                                        :agent-name agent-name
+                                                                       :filters {:source "EXPERIMENT"
+                                                                                 :source-not? true}
                                                                        :pagination {}}]
                                   :refetch-interval-ms 2000})]
     (cond
