@@ -168,11 +168,16 @@
         query-params (state/use-sub [:route :query-params])
         filters-query-param (:filters query-params)
         default-draft-filters {:node-names []
+                               :node-current ""
                                :latency-min ""
                                :latency-max ""
                                :error-filter "all"
                                :source "EXPERIMENT"
                                :source-not? true
+                               :feedback-current {:metric-name ""
+                                                  :comparator "<="
+                                                  :value ""
+                                                  :source "any"}
                                :feedback-metrics [{:metric-name ""
                                                    :comparator "<="
                                                    :value ""
@@ -245,6 +250,7 @@
           (let [filters (or applied {})]
             (assoc default-draft-filters
                    :node-names (vec (or (:node-names filters) []))
+                   :node-current ""
                    :latency-min (let [v (get-in filters [:latency-ms :min])]
                                   (if (some? v) (str v) ""))
                    :latency-max (let [v (get-in filters [:latency-ms :max])]
@@ -255,6 +261,10 @@
                                    :else "all")
                    :source (or (:source filters) "all")
                    :source-not? (boolean (:source-not? filters))
+                   :feedback-current {:metric-name ""
+                                      :comparator "<="
+                                      :value ""
+                                      :source "any"}
                    :feedback-metrics
                    (if (seq (:feedback-metrics filters))
                      (mapv (fn [{:keys [metric-name comparator value source]}]
@@ -296,7 +306,7 @@
         [draft-filters set-draft-filters!] (uix/use-state (applied->draft-filters initial-applied-filters))
         [applied-filters set-applied-filters!] (uix/use-state initial-applied-filters)
         [active-filter-types set-active-filter-types!] (uix/use-state (derive-active-filter-types initial-applied-filters))
-        [open-filter-type set-open-filter-type!] (uix/use-state nil)
+        [open-filter-editor set-open-filter-editor!] (uix/use-state nil)
         filter-key (common/to-json applied-filters)
         filter-options-query
         (queries/use-sente-query
@@ -372,11 +382,15 @@
           (set-draft-filters!
            (fn [prev]
              (let [next-draft (case filter-type
-                                :node (assoc prev :node-names [])
+                                :node (assoc prev :node-names [] :node-current "")
                                 :latency (assoc prev :latency-min "" :latency-max "")
                                 :error (assoc prev :error-filter "all")
                                 :source (assoc prev :source "all" :source-not? false)
                                 :feedback (assoc prev
+                                                 :feedback-current {:metric-name ""
+                                                                    :comparator "<="
+                                                                    :value ""
+                                                                    :source "any"}
                                                  :feedback-metrics [{:metric-name ""
                                                                      :comparator "<="
                                                                      :value ""
@@ -387,8 +401,8 @@
           (set-active-filter-types!
            (fn [types]
              (vec (remove #(= % filter-type) types))))
-          (when (= open-filter-type filter-type)
-            (set-open-filter-type! nil)))
+          (when (= filter-type (:filter-type open-filter-editor))
+            (set-open-filter-editor! nil)))
         add-filter-type!
         (fn [filter-type]
           (set-active-filter-types!
@@ -396,7 +410,29 @@
              (if (some #(= % filter-type) types)
                types
                (conj (vec types) filter-type))))
-          (set-open-filter-type! filter-type))
+          (case filter-type
+            :node
+            (do
+              (set-draft-filters! (fn [prev] (assoc prev :node-current "")))
+              (set-open-filter-editor! {:chip-id "new-node"
+                                        :filter-type :node
+                                        :mode :new}))
+
+            :feedback
+            (do
+              (set-draft-filters! (fn [prev]
+                                    (assoc prev
+                                           :feedback-current {:metric-name ""
+                                                              :comparator "<="
+                                                              :value ""
+                                                              :source "any"})))
+              (set-open-filter-editor! {:chip-id "new-feedback"
+                                        :filter-type :feedback
+                                        :mode :new}))
+
+            (set-open-filter-editor! {:chip-id (str "singleton-" (name filter-type))
+                                      :filter-type filter-type
+                                      :mode :edit})))
         active-filter-chips
         (vec
          (concat
@@ -470,6 +506,32 @@
                    next-draft))))
 
             (clear-filter-type! filter-type))))
+        open-filter-chip!
+        (fn [{:keys [chip-id filter-type node-name feedback-idx]}]
+          (if (= chip-id (:chip-id open-filter-editor))
+            (set-open-filter-editor! nil)
+            (do
+              (case filter-type
+                :node
+                (set-draft-filters! (fn [prev] (assoc prev :node-current node-name)))
+
+                :feedback
+                (let [metric (or (get applied-feedback-metrics feedback-idx)
+                                 {:metric-name "" :comparator :<= :value "" :source :any})]
+                  (set-draft-filters!
+                   (fn [prev]
+                     (assoc prev
+                            :feedback-current {:metric-name (or (:metric-name metric) "")
+                                               :comparator (name (or (:comparator metric) :<=))
+                                               :value (str (or (:value metric) ""))
+                                               :source (name (or (:source metric) :any))}))))
+
+                nil)
+              (set-open-filter-editor! {:chip-id chip-id
+                                        :filter-type filter-type
+                                        :mode :edit
+                                        :node-name node-name
+                                        :feedback-idx feedback-idx}))))
         add-filter-items
         (map (fn [filter-type]
                {:key (name filter-type)
@@ -479,10 +541,49 @@
                 :on-select #(add-filter-type! filter-type)})
              filter-type-order)
         apply-open-filter! (fn []
-                             (let [next-applied (build-filter-map draft-filters)]
+                             (let [{:keys [filter-type mode node-name feedback-idx]} open-filter-editor
+                                   next-draft
+                                   (case filter-type
+                                     :node
+                                     (let [selected (str/trim (or (:node-current draft-filters) ""))]
+                                       (if (str/blank? selected)
+                                         draft-filters
+                                         (update draft-filters
+                                                 :node-names
+                                                 (fn [names]
+                                                   (let [base (vec (or names []))
+                                                         no-old (if (= mode :edit)
+                                                                  (vec (remove #(= % node-name) base))
+                                                                  base)]
+                                                     (vec (distinct (conj no-old selected))))))))
+
+                                     :feedback
+                                     (let [{:keys [metric-name comparator value source]} (:feedback-current draft-filters)
+                                           metric-name (str/trim (or metric-name ""))
+                                           value (str/trim (or value ""))]
+                                       (if (or (str/blank? metric-name) (str/blank? value))
+                                         draft-filters
+                                         (let [new-row {:metric-name metric-name
+                                                        :comparator (or comparator "<=")
+                                                        :value value
+                                                        :source (or source "any")}]
+                                           (update draft-filters
+                                                   :feedback-metrics
+                                                   (fn [rows]
+                                                     (let [base (vec (or rows []))]
+                                                       (if (= mode :edit)
+                                                         (mapv (fn [idx m]
+                                                                 (if (= idx feedback-idx) new-row m))
+                                                               (range)
+                                                               base)
+                                                         (conj base new-row))))))))
+
+                                     draft-filters)
+                                   next-applied (build-filter-map next-draft)]
+                               (set-draft-filters! next-draft)
                                (set-applied-filters! next-applied)
                                (set-active-filter-types! (derive-active-filter-types next-applied))
-                               (set-open-filter-type! nil)))
+                               (set-open-filter-editor! nil)))
         _sync-filters-from-url
         (uix/use-effect
          (fn []
@@ -533,10 +634,7 @@
                  ($ :button.inline-flex.items-center.gap-2.px-3.py-1.5.rounded-full.bg-blue-50.text-blue-700.text-xs.font-medium.border.border-blue-200.cursor-pointer.hover:bg-blue-100.transition-colors.duration-150
                     {:key chip-id
                      :type "button"
-                     :onClick #(set-open-filter-type!
-                                (if (= open-filter-type filter-type)
-                                  nil
-                                  filter-type))}
+                     :onClick #(open-filter-chip! chip)}
                     ($ :span (get filter-type-labels filter-type))
                     ($ :span.text-blue-500 description)
                     ($ :span.text-blue-400.hover:text-blue-700.cursor-pointer
@@ -545,47 +643,33 @@
                                    (remove-filter-chip! chip))}
                        "x")))
                ($ :div.text-xs.text-gray-500 "No filters added")))
-          (when open-filter-type
+          (when open-filter-editor
             ($ :div.mt-3.p-3.border.border-gray-200.rounded-md.bg-gray-50.max-w-2xl
                ($ :div.flex.items-center.justify-between.mb-3
                   ($ :div.text-sm.font-medium.text-gray-800
-                     (str "Edit " (get filter-type-labels open-filter-type) " filter"))
+                     (str (if (= :new (:mode open-filter-editor)) "Add " "Edit ")
+                          (get filter-type-labels (:filter-type open-filter-editor))
+                          " filter"))
                   ($ :button.text-xs.px-2.py-1.bg-blue-600.text-white.rounded.hover:bg-blue-700.cursor-pointer
                     {:type "button"
                      :data-testid "invocations-filter-apply"
                       :onClick apply-open-filter!}
                      "Apply"))
-               (case open-filter-type
+               (case (:filter-type open-filter-editor)
                  :node
                  ($ :div.space-y-2
                     (if (seq node-options)
-                      ($ :div.max-h-56.overflow-auto.border.border-gray-200.rounded-md.bg-white.p-2.space-y-1
+                      ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                         {:value (:node-current draft-filters)
+                          :data-testid "invocations-filter-node-select"
+                          :onChange #(set-draft-filters! (fn [prev]
+                                                           (assoc prev :node-current (.. % -target -value))))}
+                         ($ :option {:value ""} "Select node")
                          (for [node-name node-options]
-                           ($ :label.flex.items-center.gap-2.text-sm.text-gray-700.cursor-pointer
-                              {:key node-name}
-                              ($ :input.h-4.w-4.border.border-gray-300.rounded
-                                 {:type "checkbox"
-                                  :data-testid "invocations-filter-node-select"
-                                  :checked (boolean (some #(= % node-name) (:node-names draft-filters)))
-                                  :onChange #(set-draft-filters!
-                                              (fn [prev]
-                                                (let [selected (set (or (:node-names prev) []))]
-                                                  (assoc prev
-                                                         :node-names
-                                                         (vec
-                                                          (sort
-                                                           (if (.. % -target -checked)
-                                                             (conj selected node-name)
-                                                             (disj selected node-name))))))) )})
-                              ($ :span node-name))))
+                           ($ :option {:key node-name :value node-name} node-name)))
                       ($ :div.text-xs.text-gray-500 "No nodes available"))
-                    ($ :div.flex.items-center.justify-between
-                       ($ :div.text-xs.text-gray-500
-                          "All selected nodes must be present in an invocation.")
-                       ($ :button.text-xs.px-2.py-1.bg-gray-200.text-gray-700.rounded.hover:bg-gray-300.cursor-pointer
-                          {:type "button"
-                           :onClick #(set-draft-filters! (fn [prev] (assoc prev :node-names [])))}
-                          "Clear")))
+                    ($ :div.text-xs.text-gray-500
+                       "This filter adds one required node condition."))
 
                  :latency
                  ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
@@ -639,112 +723,47 @@
 
                  :feedback
                  ($ :div.space-y-2
-                    (for [[idx metric-filter] (map-indexed vector (or (:feedback-metrics draft-filters) []))]
-                      ($ :div.border.border-gray-200.rounded-md.bg-white.p-2.space-y-2
-                         {:key (str "feedback-filter-" idx)}
-                         ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
-                            ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                               {:value (:metric-name metric-filter)
-                                :data-testid (if (zero? idx)
-                                               "invocations-filter-feedback-metric"
-                                               (str "invocations-filter-feedback-metric-" idx))
-                                :onChange #(set-draft-filters!
-                                            (fn [prev]
-                                              (assoc prev
-                                                     :feedback-metrics
-                                                     (mapv (fn [i m]
-                                                             (if (= i idx)
-                                                               (assoc m :metric-name (.. % -target -value))
-                                                               m))
-                                                           (range)
-                                                           (:feedback-metrics prev)))))}
-                               ($ :option {:value ""} "Select metric")
-                               (for [metric-name feedback-metric-options]
-                                 ($ :option {:key metric-name :value metric-name} metric-name)))
-                            ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                               {:value (:source metric-filter)
-                                :data-testid (if (zero? idx)
-                                               "invocations-filter-feedback-source"
-                                               (str "invocations-filter-feedback-source-" idx))
-                                :onChange #(set-draft-filters!
-                                            (fn [prev]
-                                              (assoc prev
-                                                     :feedback-metrics
-                                                     (mapv (fn [i m]
-                                                             (if (= i idx)
-                                                               (assoc m :source (.. % -target -value))
-                                                               m))
-                                                           (range)
-                                                           (:feedback-metrics prev)))))}
-                               ($ :option {:value "any"} "Any source")
-                               ($ :option {:value "human"} "Human")
-                               ($ :option {:value "non-human"} "Non-human")))
-                         ($ :div.grid.grid-cols-1.md:grid-cols-3.gap-2
-                            ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                               {:value (:comparator metric-filter)
-                                :data-testid (if (zero? idx)
-                                               "invocations-filter-feedback-comparator"
-                                               (str "invocations-filter-feedback-comparator-" idx))
-                                :onChange #(set-draft-filters!
-                                            (fn [prev]
-                                              (assoc prev
-                                                     :feedback-metrics
-                                                     (mapv (fn [i m]
-                                                             (if (= i idx)
-                                                               (assoc m :comparator (.. % -target -value))
-                                                               m))
-                                                           (range)
-                                                           (:feedback-metrics prev)))))}
-                               ($ :option {:value "<="} "<=")
-                               ($ :option {:value "<"} "<")
-                               ($ :option {:value "="} "=")
-                               ($ :option {:value "not="} "!=")
-                               ($ :option {:value ">"} ">")
-                               ($ :option {:value ">="} ">="))
-                            ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                               {:placeholder "Feedback value"
-                                :data-testid (if (zero? idx)
-                                               "invocations-filter-feedback-value"
-                                               (str "invocations-filter-feedback-value-" idx))
-                                :value (:value metric-filter)
-                                :onChange #(set-draft-filters!
-                                            (fn [prev]
-                                              (assoc prev
-                                                     :feedback-metrics
-                                                     (mapv (fn [i m]
-                                                             (if (= i idx)
-                                                               (assoc m :value (.. % -target -value))
-                                                               m))
-                                                           (range)
-                                                           (:feedback-metrics prev)))))})
-                            ($ :button.px-3.py-2.bg-red-100.text-red-700.rounded-md.text-sm.hover:bg-red-200.cursor-pointer
-                               {:type "button"
-                                :disabled (= 1 (count (:feedback-metrics draft-filters)))
-                                :onClick #(set-draft-filters!
-                                           (fn [prev]
-                                             (let [rows (vec (:feedback-metrics prev))]
-                                               (assoc prev
-                                                      :feedback-metrics
-                                                      (if (= 1 (count rows))
-                                                        rows
-                                                        (vec (concat (subvec rows 0 idx)
-                                                                     (subvec rows (inc idx)))))))))}
-                               "Remove condition"))))
-                    ($ :button.px-2.py-1.bg-blue-600.text-white.rounded.text-xs.hover:bg-blue-700.cursor-pointer
-                       {:type "button"
-                        :onClick #(set-draft-filters!
-                                   (fn [prev]
-                                     (update prev
-                                             :feedback-metrics
-                                             (fn [rows]
-                                               (conj (vec (or rows []))
-                                                     {:metric-name ""
-                                                      :comparator "<="
-                                                      :value ""
-                                                      :source "any"})))))}
-                       "Add feedback condition")
+                    ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
+                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                          {:value (get-in draft-filters [:feedback-current :metric-name])
+                           :data-testid "invocations-filter-feedback-metric"
+                           :onChange #(set-draft-filters!
+                                       (fn [prev]
+                                         (assoc-in prev [:feedback-current :metric-name] (.. % -target -value))))}
+                          ($ :option {:value ""} "Select metric")
+                          (for [metric-name feedback-metric-options]
+                            ($ :option {:key metric-name :value metric-name} metric-name)))
+                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                          {:value (get-in draft-filters [:feedback-current :source])
+                           :data-testid "invocations-filter-feedback-source"
+                           :onChange #(set-draft-filters!
+                                       (fn [prev]
+                                         (assoc-in prev [:feedback-current :source] (.. % -target -value))))}
+                          ($ :option {:value "any"} "Any source")
+                          ($ :option {:value "human"} "Human")
+                          ($ :option {:value "non-human"} "Non-human")))
+                    ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
+                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                          {:value (get-in draft-filters [:feedback-current :comparator])
+                           :data-testid "invocations-filter-feedback-comparator"
+                           :onChange #(set-draft-filters!
+                                       (fn [prev]
+                                         (assoc-in prev [:feedback-current :comparator] (.. % -target -value))))}
+                          ($ :option {:value "<="} "<=")
+                          ($ :option {:value "<"} "<")
+                          ($ :option {:value "="} "=")
+                          ($ :option {:value "not="} "!=")
+                          ($ :option {:value ">"} ">")
+                          ($ :option {:value ">="} ">="))
+                       ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                          {:placeholder "Feedback value"
+                           :data-testid "invocations-filter-feedback-value"
+                           :value (get-in draft-filters [:feedback-current :value])
+                           :onChange #(set-draft-filters!
+                                       (fn [prev]
+                                         (assoc-in prev [:feedback-current :value] (.. % -target -value))))}))
                     ($ :div.text-xs.text-gray-500
-                       "All feedback conditions must match for an invocation."))
+                       "This filter adds one feedback condition."))
 
                  ($ :div.text-sm.text-gray-500 "Unknown filter")))))
        (cond
