@@ -437,41 +437,53 @@
         [normalized-score normalized-value])
       [normalized-score normalized-value])))
 
+(defn normalized-allowed-values
+  [allowed-values]
+  (->> (or allowed-values [])
+       (map str)
+       (map str/trim)
+       (remove str/blank?)
+       set))
+
 (defn feedback-entry-matches?
-  [feedback {:keys [metric-name comparator value source]}]
+  [feedback {:keys [metric-name comparator value source allowed-values]}]
   (let [score-value (get (:scores feedback) metric-name ::missing)]
     (and (feedback-source-matches? feedback source)
          (not= ::missing score-value)
-         (if-let [[compare-score compare-value]
-                  (normalized-feedback-compare-values
-                   {:comparator comparator :value value}
-                   score-value)]
-           (try
-             (aor-types/comparator-spec-matches?
-              {:comparator comparator
-               :value      compare-value}
-              compare-score)
-             (catch Throwable _
-               false))
-           false))))
+         (if-let [allowed (seq (normalized-allowed-values allowed-values))]
+           (contains? allowed (str score-value))
+           (if-let [[compare-score compare-value]
+                    (normalized-feedback-compare-values
+                     {:comparator comparator :value value}
+                     score-value)]
+             (try
+               (aor-types/comparator-spec-matches?
+                {:comparator comparator
+                 :value      compare-value}
+                compare-score)
+               (catch Throwable _
+                 false))
+             false)))))
 
 (defn feedback-entry-matched-score
   [feedback feedback-metric]
-  (let [{:keys [metric-name]} feedback-metric
+  (let [{:keys [metric-name allowed-values]} feedback-metric
         score-value (get (:scores feedback) metric-name ::missing)]
     (when (and (feedback-source-matches? feedback (:source feedback-metric))
                (not= ::missing score-value)
-               (if-let [[compare-score compare-value]
-                        (normalized-feedback-compare-values feedback-metric
-                                                           score-value)]
-                 (try
-                   (aor-types/comparator-spec-matches?
-                    {:comparator (:comparator feedback-metric)
-                     :value      compare-value}
-                    compare-score)
-                   (catch Throwable _
-                     false))
-                 false))
+               (if-let [allowed (seq (normalized-allowed-values allowed-values))]
+                 (contains? allowed (str score-value))
+                 (if-let [[compare-score compare-value]
+                          (normalized-feedback-compare-values feedback-metric
+                                                             score-value)]
+                   (try
+                     (aor-types/comparator-spec-matches?
+                      {:comparator (:comparator feedback-metric)
+                       :value      compare-value}
+                      compare-score)
+                     (catch Throwable _
+                       false))
+                   false)))
       (parse-number-like-value score-value))))
 
 (defn invoke-feedback-metric-value
@@ -499,10 +511,9 @@
   (let [metrics (or feedback-metrics [])]
     (if (empty? metrics)
       true
-      (let [metric-values (invoke-feedback-metric-values m metrics)]
-        (every? (fn [metric]
-                  (some? (get metric-values (:metric-name metric))))
-                metrics)))))
+      (every? (fn [metric]
+                (some? (invoke-feedback-metric-value m metric)))
+              metrics))))
 
 (defn invoke-matches-filters?
   [m filters]

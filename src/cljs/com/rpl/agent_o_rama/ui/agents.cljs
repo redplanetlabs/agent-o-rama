@@ -175,10 +175,14 @@
                                :source "EXPERIMENT"
                                :source-not? true
                                :feedback-current {:metric-name ""
+                                                  :metric-type "numeric"
+                                                  :allowed-values []
                                                   :comparator "<="
                                                   :value ""
                                                   :source "any"}
                                :feedback-metrics [{:metric-name ""
+                                                   :metric-type "numeric"
+                                                   :allowed-values []
                                                    :comparator "<="
                                                    :value ""
                                                    :source "any"}]}
@@ -207,16 +211,30 @@
           (let [raw-filters (or filters {})
                 feedback-metrics
                 (->> (or (:feedback-metrics raw-filters) [])
-                     (keep (fn [{:keys [metric-name comparator value source]}]
+                     (keep (fn [{:keys [metric-name metric-type comparator value source allowed-values]}]
                              (let [metric-name (str/trim (str (or metric-name "")))
-                                   value (str/trim (str (or value "")))]
-                               (when (and (not (str/blank? metric-name))
-                                          (not (str/blank? value)))
-                                 (cond-> {:metric-name metric-name
-                                          :comparator (keyword (name (or comparator :<=)))
-                                          :value value}
-                                   (some? source)
-                                   (assoc :source (keyword (name source))))))))
+                                   normalized-type (keyword (name (or metric-type :numeric)))
+                                   value (str/trim (str (or value "")))
+                                   normalized-allowed-values (->> (or allowed-values [])
+                                                                  (map str)
+                                                                  (map str/trim)
+                                                                  (remove str/blank?)
+                                                                  vec)]
+                               (when (not (str/blank? metric-name))
+                                 (if (= normalized-type :categorical)
+                                   (when (seq normalized-allowed-values)
+                                     (cond-> {:metric-name metric-name
+                                              :metric-type :categorical
+                                              :allowed-values normalized-allowed-values}
+                                       (some? source)
+                                       (assoc :source (keyword (name source)))))
+                                   (when (not (str/blank? value))
+                                     (cond-> {:metric-name metric-name
+                                              :metric-type :numeric
+                                              :comparator (keyword (name (or comparator :<=)))
+                                              :value value}
+                                       (some? source)
+                                       (assoc :source (keyword (name source))))))))))
                      vec)
                 node-names
                 (->> (or (:node-names raw-filters) [])
@@ -262,18 +280,27 @@
                    :source (or (:source filters) "all")
                    :source-not? (boolean (:source-not? filters))
                    :feedback-current {:metric-name ""
+                                      :metric-type "numeric"
+                                      :allowed-values []
                                       :comparator "<="
                                       :value ""
                                       :source "any"}
                    :feedback-metrics
                    (if (seq (:feedback-metrics filters))
-                     (mapv (fn [{:keys [metric-name comparator value source]}]
+                     (mapv (fn [{:keys [metric-name metric-type comparator value source allowed-values]}]
                              {:metric-name (or metric-name "")
+                              :metric-type (name (or metric-type :numeric))
+                              :allowed-values (vec (or allowed-values []))
                               :comparator (name (or comparator :<=))
-                              :value (str value)
+                              :value (if (nil? value) "" (str value))
                               :source (if (some? source) (name source) "any")})
                            (:feedback-metrics filters))
-                     [{:metric-name "" :comparator "<=" :value "" :source "any"}]))))
+                     [{:metric-name ""
+                       :metric-type "numeric"
+                       :allowed-values []
+                       :comparator "<="
+                       :value ""
+                       :source "any"}]))))
         derive-active-filter-types
         (fn [applied]
           (let [filters (or applied {})]
@@ -317,7 +344,41 @@
           :refetch-interval-ms 30000})
         filter-options-data (:data filter-options-query)
         node-options (or (:nodes filter-options-data) [])
-        feedback-metric-options (or (:feedback-metrics filter-options-data) [])
+        raw-feedback-metric-options (or (:feedback-metrics filter-options-data) [])
+        feedback-metric-options
+        (->> raw-feedback-metric-options
+             (keep (fn [item]
+                     (let [name-value (or (:name item)
+                                          (get item "name")
+                                          (:metric-name item)
+                                          (get item "metric-name"))
+                           metric-value (or (:metric item)
+                                            (get item "metric"))
+                           normalized-name (some-> name-value str str/trim)]
+                       (when (and normalized-name (not (str/blank? normalized-name)))
+                         {:name normalized-name
+                          :metric metric-value}))))
+             vec)
+        metric-item->type
+        (fn [metric-item]
+          (let [metric (:metric metric-item)]
+            (if (or (contains? metric :categories)
+                    (some? (get metric "categories")))
+              "categorical"
+              "numeric")))
+        metric-item->categories
+        (fn [metric-item]
+          (let [metric (:metric metric-item)]
+            (->> (or (:categories metric)
+                     (get metric "categories")
+                     [])
+                 (map str)
+                 sort
+                 vec)))
+        feedback-metric-options-by-name (into {}
+                                              (map (fn [metric] [(:name metric) metric]))
+                                              feedback-metric-options)
+        feedback-metric-option-names (mapv :name feedback-metric-options)
         applied-node-names (or (:node-names applied-filters) [])
         applied-feedback-metrics (or (:feedback-metrics applied-filters) [])
         selected-feedback-metric-name (when (= 1 (count applied-feedback-metrics))
@@ -341,16 +402,30 @@
                                 vec)
                 feedback-metrics
                 (->> (or (:feedback-metrics f) [])
-                     (keep (fn [{:keys [metric-name comparator value source]}]
+                     (keep (fn [{:keys [metric-name metric-type comparator value source allowed-values]}]
                              (let [metric-name (str/trim (or metric-name ""))
-                                   value (str/trim (or value ""))]
-                               (when (and (not (str/blank? metric-name))
-                                          (not (str/blank? value)))
-                                 (cond-> {:metric-name metric-name
-                                          :comparator (keyword comparator)
-                                          :value value}
-                                   (not= "any" source)
-                                   (assoc :source (keyword source)))))))
+                                   feedback-type (keyword (or metric-type "numeric"))
+                                   value (str/trim (or value ""))
+                                   allowed-values (->> (or allowed-values [])
+                                                       (map str)
+                                                       (map str/trim)
+                                                       (remove str/blank?)
+                                                       vec)]
+                               (when (not (str/blank? metric-name))
+                                 (if (= feedback-type :categorical)
+                                   (when (seq allowed-values)
+                                     (cond-> {:metric-name metric-name
+                                              :metric-type :categorical
+                                              :allowed-values allowed-values}
+                                       (not= "any" source)
+                                       (assoc :source (keyword source))))
+                                   (when (not (str/blank? value))
+                                     (cond-> {:metric-name metric-name
+                                              :metric-type :numeric
+                                              :comparator (keyword comparator)
+                                              :value value}
+                                       (not= "any" source)
+                                       (assoc :source (keyword source)))))))))
                      vec)]
             (cond-> {}
               (seq node-names)
@@ -388,10 +463,14 @@
                                 :source (assoc prev :source "all" :source-not? false)
                                 :feedback (assoc prev
                                                  :feedback-current {:metric-name ""
+                                                                    :metric-type "numeric"
+                                                                    :allowed-values []
                                                                     :comparator "<="
                                                                     :value ""
                                                                     :source "any"}
                                                  :feedback-metrics [{:metric-name ""
+                                                                     :metric-type "numeric"
+                                                                     :allowed-values []
                                                                      :comparator "<="
                                                                      :value ""
                                                                      :source "any"}])
@@ -414,6 +493,7 @@
             :node
             (do
               (set-draft-filters! (fn [prev] (assoc prev :node-current "")))
+
               (set-open-filter-editor! {:chip-id "new-node"
                                         :filter-type :node
                                         :mode :new}))
@@ -423,6 +503,8 @@
               (set-draft-filters! (fn [prev]
                                     (assoc prev
                                            :feedback-current {:metric-name ""
+                                                              :metric-type "numeric"
+                                                              :allowed-values []
                                                               :comparator "<="
                                                               :value ""
                                                               :source "any"})))
@@ -470,17 +552,22 @@
                                      source))
                                  (:source applied-filters)))}])
           (map-indexed
-           (fn [idx {:keys [metric-name comparator value source]}]
+           (fn [idx {:keys [metric-name metric-type comparator value source allowed-values]}]
              (let [comparator-label (name (or comparator :<=))
                    source-label (when (some? source)
-                                  (name source))]
-             {:chip-id (str "feedback-" idx "-" metric-name "-" comparator "-" value "-" source)
-              :filter-type :feedback
-              :feedback-idx idx
-              :description (str metric-name " " comparator-label " " value
-                                (when (and source-label
-                                           (not= source-label "any"))
-                                  (str " (" source-label ")")))}))
+                                  (name source))
+                   display-source (when (and source-label
+                                            (not= source-label "any"))
+                                    (str " (" source-label ")"))]
+               {:chip-id (str "feedback-" idx "-" metric-name "-" metric-type "-" comparator "-" value "-" source "-" (common/to-json allowed-values))
+                :filter-type :feedback
+                :feedback-idx idx
+                :description (if (= metric-type :categorical)
+                               (str metric-name " in ["
+                                    (str/join ", " (or allowed-values []))
+                                    "]"
+                                    display-source)
+                               (str metric-name " " comparator-label " " value display-source))}))
            applied-feedback-metrics)))
         remove-filter-chip!
         (fn [{:keys [filter-type node-idx feedback-idx]}]
@@ -537,11 +624,26 @@
 
                 :feedback
                 (let [metric (or (get applied-feedback-metrics feedback-idx)
-                                 {:metric-name "" :comparator :<= :value "" :source :any})]
+                                 {:metric-name ""
+                                  :metric-type :numeric
+                                  :allowed-values []
+                                  :comparator :<=
+                                  :value ""
+                                  :source :any})
+                      metric-name (:metric-name metric)
+                      metric-option (get feedback-metric-options-by-name metric-name)
+                      metric-type (keyword (name (or (:metric-type metric)
+                                                     (some-> metric-option metric-item->type keyword)
+                                                     :numeric)))
+                      metric-categories (or (some-> metric-option metric-item->categories)
+                                            [])]
                   (set-draft-filters!
                    (fn [prev]
                      (assoc prev
-                            :feedback-current {:metric-name (or (:metric-name metric) "")
+                            :feedback-current {:metric-name (or metric-name "")
+                                               :metric-type (name metric-type)
+                                               :allowed-values (vec (or (:allowed-values metric) []))
+                                               :categories metric-categories
                                                :comparator (name (or (:comparator metric) :<=))
                                                :value (str (or (:value metric) ""))
                                                :source (name (or (:source metric) :any))}))))
@@ -583,25 +685,43 @@
                                                      (conj (vec (or names [])) selected))))))
 
                                      :feedback
-                                     (let [{:keys [metric-name comparator value source]} (:feedback-current draft-filters)
+                                     (let [{:keys [metric-name metric-type comparator value source allowed-values]} (:feedback-current draft-filters)
                                            metric-name (str/trim (or metric-name ""))
-                                           value (str/trim (or value ""))]
-                                       (if (or (str/blank? metric-name) (str/blank? value))
+                                           feedback-type (keyword (or metric-type "numeric"))
+                                           value (str/trim (or value ""))
+                                           allowed-values (->> (or allowed-values [])
+                                                               (map str)
+                                                               (map str/trim)
+                                                               (remove str/blank?)
+                                                               vec)]
+                                       (if (str/blank? metric-name)
                                          draft-filters
-                                         (let [new-row {:metric-name metric-name
-                                                        :comparator (or comparator "<=")
-                                                        :value value
-                                                        :source (or source "any")}]
-                                           (update draft-filters
-                                                   :feedback-metrics
-                                                   (fn [rows]
-                                                     (let [base (vec (or rows []))]
-                                                       (if (= mode :edit)
-                                                         (mapv (fn [idx m]
-                                                                 (if (= idx feedback-idx) new-row m))
-                                                               (range)
-                                                               base)
-                                                         (conj base new-row))))))))
+                                         (let [new-row (if (= feedback-type :categorical)
+                                                         {:metric-name metric-name
+                                                          :metric-type :categorical
+                                                          :allowed-values allowed-values
+                                                          :source (or source "any")}
+                                                         {:metric-name metric-name
+                                                          :metric-type :numeric
+                                                          :comparator (or comparator "<=")
+                                                          :value value
+                                                          :source (or source "any")})]
+                                           (if (and (= feedback-type :categorical)
+                                                    (empty? allowed-values))
+                                             draft-filters
+                                             (if (and (= feedback-type :numeric)
+                                                      (str/blank? value))
+                                               draft-filters
+                                               (update draft-filters
+                                                       :feedback-metrics
+                                                       (fn [rows]
+                                                         (let [base (vec (or rows []))]
+                                                           (if (= mode :edit)
+                                                             (mapv (fn [idx m]
+                                                                     (if (= idx feedback-idx) new-row m))
+                                                                   (range)
+                                                                   base)
+                                                             (conj base new-row))))))))))
 
                                      draft-filters)
                                    next-applied (build-filter-map next-draft)]
@@ -754,10 +874,27 @@
                            :data-testid "invocations-filter-feedback-metric"
                            :onChange #(set-draft-filters!
                                        (fn [prev]
-                                         (assoc-in prev [:feedback-current :metric-name] (.. % -target -value))))}
+                                         (let [selected-name (.. % -target -value)
+                                               metric-option (get feedback-metric-options-by-name selected-name)
+                                               next-type (if metric-option
+                                                           (metric-item->type metric-option)
+                                                           "numeric")
+                                               next-categories (if metric-option
+                                                                 (metric-item->categories metric-option)
+                                                                 [])]
+                                           (assoc prev
+                                                  :feedback-current {:metric-name selected-name
+                                                                     :metric-type next-type
+                                                                     :allowed-values []
+                                                                     :categories next-categories
+                                                                     :comparator "<="
+                                                                     :value ""
+                                                                     :source (get-in prev [:feedback-current :source] "any")}))))}
                           ($ :option {:value ""} "Select metric")
-                          (for [metric-name feedback-metric-options]
-                            ($ :option {:key metric-name :value metric-name} metric-name)))
+                          (for [[idx metric-name] (map-indexed vector feedback-metric-option-names)]
+                            ($ :option {:key (str "feedback-metric-option-" idx "-" metric-name)
+                                        :value metric-name}
+                               metric-name)))
                        ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                           {:value (get-in draft-filters [:feedback-current :source])
                            :data-testid "invocations-filter-feedback-source"
@@ -767,26 +904,51 @@
                           ($ :option {:value "any"} "Any source")
                           ($ :option {:value "human"} "Human")
                           ($ :option {:value "non-human"} "Non-human")))
-                    ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
-                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                          {:value (get-in draft-filters [:feedback-current :comparator])
-                           :data-testid "invocations-filter-feedback-comparator"
-                           :onChange #(set-draft-filters!
-                                       (fn [prev]
-                                         (assoc-in prev [:feedback-current :comparator] (.. % -target -value))))}
-                          ($ :option {:value "<="} "<=")
-                          ($ :option {:value "<"} "<")
-                          ($ :option {:value "="} "=")
-                          ($ :option {:value "not="} "!=")
-                          ($ :option {:value ">"} ">")
-                          ($ :option {:value ">="} ">="))
-                       ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                          {:placeholder "Feedback value"
-                           :data-testid "invocations-filter-feedback-value"
-                           :value (get-in draft-filters [:feedback-current :value])
-                           :onChange #(set-draft-filters!
-                                       (fn [prev]
-                                         (assoc-in prev [:feedback-current :value] (.. % -target -value))))}))
+                    (if (= "categorical" (get-in draft-filters [:feedback-current :metric-type]))
+                      ($ :div.space-y-2
+                         ($ :div.text-xs.text-gray-600 "Select one or more categorical values:")
+                         (if (seq (get-in draft-filters [:feedback-current :categories]))
+                           ($ :div.max-h-56.overflow-auto.border.border-gray-200.rounded-md.bg-white.p-2.space-y-1
+                              (for [cat-value (get-in draft-filters [:feedback-current :categories])]
+                                ($ :label.flex.items-center.gap-2.text-sm.text-gray-700.cursor-pointer
+                                   {:key cat-value}
+                                   ($ :input.h-4.w-4.border.border-gray-300.rounded
+                                      {:type "checkbox"
+                                       :data-testid "invocations-filter-feedback-category-select"
+                                       :checked (boolean (some (fn [v] (= v cat-value))
+                                                               (get-in draft-filters [:feedback-current :allowed-values])))
+                                       :onChange (fn [e]
+                                                   (let [checked? (.. e -target -checked)]
+                                                     (set-draft-filters!
+                                                      (fn [prev]
+                                                        (update-in prev [:feedback-current :allowed-values]
+                                                                   (fn [vals]
+                                                                     (let [curr (vec (or vals []))]
+                                                                       (if checked?
+                                                                         (vec (distinct (conj curr cat-value)))
+                                                                         (vec (remove (fn [v] (= v cat-value)) curr))))))))))})
+                                   ($ :span cat-value))))
+                           ($ :div.text-xs.text-gray-500 "No categories available for this metric.")))
+                      ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
+                         ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                            {:value (get-in draft-filters [:feedback-current :comparator])
+                             :data-testid "invocations-filter-feedback-comparator"
+                             :onChange #(set-draft-filters!
+                                         (fn [prev]
+                                           (assoc-in prev [:feedback-current :comparator] (.. % -target -value))))}
+                            ($ :option {:value "<="} "<=")
+                            ($ :option {:value "<"} "<")
+                            ($ :option {:value "="} "=")
+                            ($ :option {:value "not="} "!=")
+                            ($ :option {:value ">"} ">")
+                            ($ :option {:value ">="} ">="))
+                         ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                            {:placeholder "Feedback value"
+                             :data-testid "invocations-filter-feedback-value"
+                             :value (get-in draft-filters [:feedback-current :value])
+                             :onChange #(set-draft-filters!
+                                         (fn [prev]
+                                           (assoc-in prev [:feedback-current :value] (.. % -target -value))))})))
                     ($ :div.text-xs.text-gray-500
                        "This filter adds one feedback condition."))
 

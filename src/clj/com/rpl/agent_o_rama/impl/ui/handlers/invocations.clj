@@ -32,10 +32,7 @@
         human-metrics (let [search-human-metrics-query (:search-human-metrics-query
                                                         (aor-types/underlying-objects manager))
                             metric-res (foreign-invoke-query search-human-metrics-query {} 1000 nil)]
-                        (->> (:items metric-res)
-                             (map :name)
-                             sort
-                             vec))]
+                        (:items metric-res))]
     {:nodes graph-nodes
      :feedback-metrics human-metrics}))
 
