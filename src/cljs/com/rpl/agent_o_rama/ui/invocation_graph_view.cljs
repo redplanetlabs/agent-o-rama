@@ -347,6 +347,7 @@
              ($ :span {:className "text-xs font-mono text-indigo-600"}
                 (format-ms finish-time)))))))
 
+
 (defui node-input-panel [{:keys [input]}]
   (when input
     ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}

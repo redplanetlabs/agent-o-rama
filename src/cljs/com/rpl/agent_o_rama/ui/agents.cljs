@@ -446,9 +446,13 @@
                                           (->> (or names [])
                                                (remove #(= % node-name))
                                                vec))))]
-              (set-draft-filters! remove-node)
-              (set-applied-filters! (fn [prev]
-                                      (build-filter-map (remove-node (applied->draft-filters prev))))))
+              (set-draft-filters!
+               (fn [prev]
+                 (let [next-draft (remove-node prev)
+                       next-applied (build-filter-map next-draft)]
+                   (set-applied-filters! next-applied)
+                   (set-active-filter-types! (derive-active-filter-types next-applied))
+                   next-draft)))
 
             :feedback
             (let [remove-feedback (fn [f]
@@ -457,11 +461,15 @@
                                               (->> (map-indexed vector (or rows []))
                                                    (remove (fn [[idx _]] (= idx feedback-idx)))
                                                    (mapv second)))))]
-              (set-draft-filters! remove-feedback)
-              (set-applied-filters! (fn [prev]
-                                      (build-filter-map (remove-feedback (applied->draft-filters prev))))))
+              (set-draft-filters!
+               (fn [prev]
+                 (let [next-draft (remove-feedback prev)
+                       next-applied (build-filter-map next-draft)]
+                   (set-applied-filters! next-applied)
+                   (set-active-filter-types! (derive-active-filter-types next-applied))
+                   next-draft))))
 
-            (clear-filter-type! filter-type)))
+            (clear-filter-type! filter-type))))
         add-filter-items
         (map (fn [filter-type]
                {:key (name filter-type)
@@ -471,8 +479,10 @@
                 :on-select #(add-filter-type! filter-type)})
              filter-type-order)
         apply-open-filter! (fn []
-                             (set-applied-filters! (build-filter-map draft-filters))
-                             (set-open-filter-type! nil))
+                             (let [next-applied (build-filter-map draft-filters)]
+                               (set-applied-filters! next-applied)
+                               (set-active-filter-types! (derive-active-filter-types next-applied))
+                               (set-open-filter-type! nil)))
         _sync-filters-from-url
         (uix/use-effect
          (fn []
