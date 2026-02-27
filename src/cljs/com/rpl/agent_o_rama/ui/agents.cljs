@@ -348,12 +348,15 @@
         feedback-metric-options
         (->> raw-feedback-metric-options
              (keep (fn [item]
-                     (let [name-value (or (:name item)
-                                          (get item "name")
-                                          (:metric-name item)
-                                          (get item "metric-name"))
-                           metric-value (or (:metric item)
-                                            (get item "metric"))
+                     (let [name-value (cond
+                                        (string? item) item
+                                        :else (or (:name item)
+                                                  (get item "name")
+                                                  (:metric-name item)
+                                                  (get item "metric-name")))
+                           metric-value (when-not (string? item)
+                                          (or (:metric item)
+                                              (get item "metric")))
                            normalized-name (some-> name-value str str/trim)]
                        (when (and normalized-name (not (str/blank? normalized-name)))
                          {:name normalized-name
