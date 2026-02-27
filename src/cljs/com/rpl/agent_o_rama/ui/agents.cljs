@@ -243,8 +243,8 @@
                                               :comparator (keyword (name (or comparator :<=)))
                                               :value value}
                                        (some? source)
-                                       (assoc :source (keyword (name source))))))))))
-                     vec))
+                                       (assoc :source (keyword (name source)))))))))))
+                     vec)
                 node-names
                 (->> (or (:node-names raw-filters) [])
                      (map str)
@@ -447,8 +447,8 @@
                                               :comparator (keyword comparator)
                                               :value value}
                                        (not= "any" source)
-                                       (assoc :source (keyword source)))))))))
-                     vec))]
+                                       (assoc :source (keyword source))))))))))
+                     vec)]
             (cond-> {}
               (seq node-names)
               (assoc :node-names node-names)
