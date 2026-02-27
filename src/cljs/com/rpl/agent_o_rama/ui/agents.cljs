@@ -441,6 +441,7 @@
              {:chip-id (str "node-" idx "-" node-name)
               :filter-type :node
               :description node-name
+              :node-idx idx
               :node-name node-name})
            applied-node-names)
           (when (contains? applied-filters :latency-ms)
@@ -473,15 +474,15 @@
                                   (str " (" (name source) ")")))})
            applied-feedback-metrics)))
         remove-filter-chip!
-        (fn [{:keys [filter-type node-name feedback-idx]}]
+        (fn [{:keys [filter-type node-idx feedback-idx]}]
           (case filter-type
             :node
             (let [remove-node (fn [f]
                                 (update f :node-names
                                         (fn [names]
-                                          (->> (or names [])
-                                               (remove #(= % node-name))
-                                               vec))))]
+                                          (->> (map-indexed vector (or names []))
+                                               (remove (fn [[idx _]] (= idx node-idx)))
+                                               (mapv second)))))]
               (set-draft-filters!
                (fn [prev]
                  (let [next-draft (remove-node prev)
@@ -507,7 +508,7 @@
 
             (clear-filter-type! filter-type))))
         open-filter-chip!
-        (fn [{:keys [chip-id filter-type node-name feedback-idx]}]
+        (fn [{:keys [chip-id filter-type node-name node-idx feedback-idx]}]
           (if (= chip-id (:chip-id open-filter-editor))
             (set-open-filter-editor! nil)
             (do
@@ -530,6 +531,7 @@
               (set-open-filter-editor! {:chip-id chip-id
                                         :filter-type filter-type
                                         :mode :edit
+                                        :node-idx node-idx
                                         :node-name node-name
                                         :feedback-idx feedback-idx}))))
         add-filter-items
@@ -541,21 +543,25 @@
                 :on-select #(add-filter-type! filter-type)})
              filter-type-order)
         apply-open-filter! (fn []
-                             (let [{:keys [filter-type mode node-name feedback-idx]} open-filter-editor
+                             (let [{:keys [filter-type mode node-idx feedback-idx]} open-filter-editor
                                    next-draft
                                    (case filter-type
                                      :node
                                      (let [selected (str/trim (or (:node-current draft-filters) ""))]
                                        (if (str/blank? selected)
                                          draft-filters
-                                         (update draft-filters
-                                                 :node-names
-                                                 (fn [names]
-                                                   (let [base (vec (or names []))
-                                                         no-old (if (= mode :edit)
-                                                                  (vec (remove #(= % node-name) base))
-                                                                  base)]
-                                                     (vec (distinct (conj no-old selected))))))))
+                                         (if (= mode :edit)
+                                           (update draft-filters
+                                                   :node-names
+                                                   (fn [names]
+                                                     (mapv (fn [idx n]
+                                                             (if (= idx node-idx) selected n))
+                                                           (range)
+                                                           (vec (or names [])))))
+                                           (update draft-filters
+                                                   :node-names
+                                                   (fn [names]
+                                                     (conj (vec (or names [])) selected))))))
 
                                      :feedback
                                      (let [{:keys [metric-name comparator value source]} (:feedback-current draft-filters)
