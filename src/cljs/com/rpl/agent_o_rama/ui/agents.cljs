@@ -64,24 +64,24 @@
                                        (str "Error: " (or (:error reply) "Unknown error"))]))))))})
 
 (defui result-badge
- [{:keys [status human-request?]}]
- (cond
-   human-request?
-   ($
-    :span.px-2.py-1.bg-amber-100.text-amber-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
-    "🙋 Needs input")
+  [{:keys [status human-request?]}]
+  (cond
+    human-request?
+    ($
+     :span.px-2.py-1.bg-amber-100.text-amber-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
+     "🙋 Needs input")
 
-   (= status :pending)
-   ($
-    :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
-    ($ common/spinner {:size :small})
-    "Pending")
+    (= status :pending)
+    ($
+     :span.px-2.py-1.bg-blue-100.text-blue-800.rounded-full.text-xs.font-medium.inline-flex.items-center.gap-1
+     ($ common/spinner {:size :small})
+     "Pending")
 
-   (= status :failure)
-   ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
+    (= status :failure)
+    ($ :span.px-2.py-1.bg-red-100.text-red-800.rounded-full.text-xs.font-medium "Failed")
 
-   :else
-   ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))
+    :else
+    ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))
 
 (defui invocation-row [{:keys [invoke module-id agent-name on-click show-feedback-metric? feedback-metric-name]}]
   (let [task-id (:task-id invoke)
@@ -224,26 +224,29 @@
                                                                   (remove str/blank?)
                                                                   vec)]
                                (when (not (str/blank? metric-name))
-                                 (if match-any-value?
+                                 (cond
+                                   match-any-value?
                                    (cond-> {:metric-name metric-name
                                             :metric-type normalized-type
                                             :match-any-value? true}
                                      (some? source)
                                      (assoc :source (keyword (name source))))
-                                   (if (= normalized-type :categorical)
+
+                                   (= normalized-type :categorical)
                                    (when (seq normalized-allowed-values)
                                      (cond-> {:metric-name metric-name
                                               :metric-type :categorical
                                               :allowed-values normalized-allowed-values}
                                        (some? source)
                                        (assoc :source (keyword (name source)))))
-                                   (when (not (str/blank? value))
-                                     (cond-> {:metric-name metric-name
-                                              :metric-type :numeric
-                                              :comparator (keyword (name (or comparator :<=)))
-                                              :value value}
-                                       (some? source)
-                                       (assoc :source (keyword (name source)))))))))))
+
+                                   (not (str/blank? value))
+                                   (cond-> {:metric-name metric-name
+                                            :metric-type :numeric
+                                            :comparator (keyword (name (or comparator :<=)))
+                                            :value value}
+                                     (some? source)
+                                     (assoc :source (keyword (name source)))))))))
                      vec)
                 node-names
                 (->> (or (:node-names raw-filters) [])
@@ -428,26 +431,31 @@
                                                        (remove str/blank?)
                                                        vec)]
                                (when (not (str/blank? metric-name))
-                                 (if match-any-value?
+                                 (cond
+                                   match-any-value?
                                    (cond-> {:metric-name metric-name
                                             :metric-type feedback-type
                                             :match-any-value? true}
                                      (not= "any" source)
                                      (assoc :source (keyword source)))
-                                   (if (= feedback-type :categorical)
+
+                                   (= feedback-type :categorical)
                                    (when (seq allowed-values)
                                      (cond-> {:metric-name metric-name
                                               :metric-type :categorical
                                               :allowed-values allowed-values}
                                        (not= "any" source)
                                        (assoc :source (keyword source))))
-                                   (when (not (str/blank? value))
-                                     (cond-> {:metric-name metric-name
-                                              :metric-type :numeric
-                                              :comparator (keyword comparator)
-                                              :value value}
-                                       (not= "any" source)
-                                       (assoc :source (keyword source))))))))))
+
+                                   (not (str/blank? value))
+                                   (cond-> {:metric-name metric-name
+                                            :metric-type :numeric
+                                            :comparator (keyword comparator)
+                                            :value value}
+                                     (not= "any" source)
+                                     (assoc :source (keyword source))))
+                                       
+                                       ))))
                      vec)]
             (cond-> {}
               (seq node-names)
@@ -583,7 +591,7 @@
                    source-label (when (some? source)
                                   (name source))
                    display-source (when (and source-label
-                                            (not= source-label "any"))
+                                             (not= source-label "any"))
                                     (str " (" source-label ")"))]
                {:chip-id (str "feedback-" idx "-" metric-name "-" metric-type "-" comparator "-" value "-" source "-" (common/to-json allowed-values))
                 :filter-type :feedback
@@ -720,48 +728,48 @@
                                      :feedback
                                      (let [{:keys [metric-name metric-type comparator value source allowed-values match-any-value?]} (:feedback-current draft-filters)
                                            metric-name (str/trim (or metric-name ""))
-                                           feedback-type (keyword (or metric-type "numeric"))
-                                          match-any-value? (boolean match-any-value?)
-                                           value (str/trim (or value ""))
-                                           allowed-values (->> (or allowed-values [])
-                                                               (map str)
-                                                               (map str/trim)
-                                                               (remove str/blank?)
-                                                               vec)]
+                                           feedback-type (keyword (or metric-type "numeric"))]
+                                       match-any-value? (boolean match-any-value?)
+                                       value (str/trim (or value ""))
+                                       allowed-values (->> (or allowed-values [])
+                                                           (map str)
+                                                           (map str/trim)
+                                                           (remove str/blank?)
+                                                           vec)
                                        (if (str/blank? metric-name)
                                          draft-filters
-                                        (let [new-row (if match-any-value?
-                                                        {:metric-name metric-name
-                                                         :metric-type feedback-type
-                                                         :match-any-value? true
-                                                         :source (or source "any")}
-                                                        (if (= feedback-type :categorical)
-                                                          {:metric-name metric-name
-                                                           :metric-type :categorical
-                                                           :allowed-values allowed-values
-                                                           :source (or source "any")}
-                                                          {:metric-name metric-name
-                                                           :metric-type :numeric
-                                                           :comparator (or comparator "<=")
-                                                           :value value
-                                                           :source (or source "any")}))]
-                                          (if (or (and (= feedback-type :categorical)
-                                                       (empty? allowed-values)
-                                                       (not match-any-value?))
-                                                  (and (= feedback-type :numeric)
-                                                       (str/blank? value)
-                                                       (not match-any-value?)))
-                                            draft-filters
-                                            (update draft-filters
-                                                    :feedback-metrics
-                                                    (fn [rows]
-                                                      (let [base (vec (or rows []))]
-                                                        (if (= mode :edit)
-                                                          (mapv (fn [idx m]
-                                                                  (if (= idx feedback-idx) new-row m))
-                                                                (range)
-                                                                base)
-                                                          (conj base new-row))))))))))
+                                         (let [new-row (if match-any-value?
+                                                         {:metric-name metric-name
+                                                          :metric-type feedback-type
+                                                          :match-any-value? true
+                                                          :source (or source "any")}
+                                                         (if (= feedback-type :categorical)
+                                                           {:metric-name metric-name
+                                                            :metric-type :categorical
+                                                            :allowed-values allowed-values
+                                                            :source (or source "any")}
+                                                           {:metric-name metric-name
+                                                            :metric-type :numeric
+                                                            :comparator (or comparator "<=")
+                                                            :value value
+                                                            :source (or source "any")}))]
+                                           (if (or (and (= feedback-type :categorical)
+                                                        (empty? allowed-values)
+                                                        (not match-any-value?))
+                                                   (and (= feedback-type :numeric)
+                                                        (str/blank? value)
+                                                        (not match-any-value?)))
+                                             draft-filters
+                                             (update draft-filters
+                                                     :feedback-metrics
+                                                     (fn [rows]
+                                                       (let [base (vec (or rows []))]
+                                                         (if (= mode :edit)
+                                                           (mapv (fn [idx m]
+                                                                   (if (= idx feedback-idx) new-row m))
+                                                                 (range)
+                                                                 base)
+                                                           (conj base new-row))))))))))
                                    next-applied (build-filter-map next-draft)]
                                (set-draft-filters! next-draft)
                                (set-applied-filters! next-applied)
@@ -812,8 +820,8 @@
                  :items add-filter-items
                  :full-width? false
                  :data-testid "add-invocations-filter"})
-            (if (seq active-filter-chips)
-              (for [{:keys [chip-id filter-type description] :as chip} active-filter-chips]
+             (if (seq active-filter-chips)
+               (for [{:keys [chip-id filter-type description] :as chip} active-filter-chips]
                  ($ :button.inline-flex.items-center.gap-2.px-3.py-1.5.rounded-full.bg-blue-50.text-blue-700.text-xs.font-medium.border.border-blue-200.cursor-pointer.hover:bg-blue-100.transition-colors.duration-150
                     {:key chip-id
                      :type "button"
@@ -824,8 +832,8 @@
                        {:onClick (fn [e]
                                    (.stopPropagation e)
                                    (remove-filter-chip! chip))}
-                       "x")))
-               ($ :div.text-xs.text-gray-500 "No filters added")))
+                       "x"))
+                 ($ :div.text-xs.text-gray-500 "No filters added"))))
           (when open-filter-editor
             ($ :div.mt-3.p-3.border.border-gray-200.rounded-md.bg-gray-50.max-w-2xl
                ($ :div.flex.items-center.justify-between.mb-3
@@ -834,8 +842,8 @@
                           (get filter-type-labels (:filter-type open-filter-editor))
                           " filter"))
                   ($ :button.text-xs.px-2.py-1.bg-blue-600.text-white.rounded.hover:bg-blue-700.cursor-pointer
-                    {:type "button"
-                     :data-testid "invocations-filter-apply"
+                     {:type "button"
+                      :data-testid "invocations-filter-apply"
                       :onClick apply-open-filter!}
                      "Apply"))
                (case (:filter-type open-filter-editor)
@@ -857,15 +865,15 @@
                  :latency
                  ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
                     ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                      {:type "number"
-                       :data-testid "invocations-filter-latency-min"
+                       {:type "number"
+                        :data-testid "invocations-filter-latency-min"
                         :placeholder "Latency min (ms)"
                         :value (:latency-min draft-filters)
                         :onChange #(set-draft-filters! (fn [prev]
                                                          (assoc prev :latency-min (.. % -target -value))))})
                     ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                      {:type "number"
-                       :data-testid "invocations-filter-latency-max"
+                       {:type "number"
+                        :data-testid "invocations-filter-latency-max"
                         :placeholder "Latency max (ms)"
                         :value (:latency-max draft-filters)
                         :onChange #(set-draft-filters! (fn [prev]
@@ -943,69 +951,72 @@
                           ($ :option {:value "any"} "Any source")
                           ($ :option {:value "human"} "Human")
                           ($ :option {:value "non-human"} "Non-human")))
-                    ($ :div
-                       ($ :button.px-2.py-1.rounded.text-xs.cursor-pointer
-                          {:type "button"
-                           :className (if (get-in draft-filters [:feedback-current :match-any-value?])
-                                        "bg-blue-600.text-white"
-                                        "bg-gray-200.text-gray-700.hover:bg-gray-300")
+                    ($ :label.inline-flex.items-center.gap-2.text-sm.text-gray-700.cursor-pointer
+                       ($ :input.h-4.w-4.border.border-gray-300.rounded
+                          {:type "checkbox"
                            :data-testid "invocations-filter-feedback-any-value"
-                           :onClick #(set-draft-filters!
+                           :checked (boolean (get-in draft-filters [:feedback-current :match-any-value?]))
+                           :onChange #(set-draft-filters!
                                       (fn [prev]
                                         (update-in prev [:feedback-current :match-any-value?] not)))}
-                          (if (get-in draft-filters [:feedback-current :match-any-value?])
-                            "Any value: ON"
-                            "Match any value for metric")))
-                    (if (get-in draft-filters [:feedback-current :match-any-value?])
-                      ($ :div.text-xs.text-gray-600
-                         "Matches any invocation that has this metric, regardless of metric value.")
-                      (if (= "categorical" (get-in draft-filters [:feedback-current :metric-type]))
-                      ($ :div.space-y-2
-                         ($ :div.text-xs.text-gray-600 "Select one or more categorical values:")
-                         (if (seq (get-in draft-filters [:feedback-current :categories]))
-                           ($ :div.max-h-56.overflow-auto.border.border-gray-200.rounded-md.bg-white.p-2.space-y-1
-                              (for [cat-value (get-in draft-filters [:feedback-current :categories])]
-                                ($ :label.flex.items-center.gap-2.text-sm.text-gray-700.cursor-pointer
-                                   {:key cat-value}
-                                   ($ :input.h-4.w-4.border.border-gray-300.rounded
-                                      {:type "checkbox"
-                                       :data-testid "invocations-filter-feedback-category-select"
-                                       :checked (boolean (some (fn [v] (= v cat-value))
-                                                               (get-in draft-filters [:feedback-current :allowed-values])))
-                                       :onChange (fn [e]
-                                                   (let [checked? (.. e -target -checked)]
-                                                     (set-draft-filters!
-                                                      (fn [prev]
-                                                        (update-in prev [:feedback-current :allowed-values]
-                                                                   (fn [vals]
-                                                                     (let [curr (vec (or vals []))]
-                                                                       (if checked?
-                                                                         (vec (distinct (conj curr cat-value)))
-                                                                         (vec (remove (fn [v] (= v cat-value)) curr))))))))))})
-                                   ($ :span cat-value))))
-                           ($ :div.text-xs.text-gray-500 "No categories available for this metric.")))
-                      ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
-                         ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                            {:value (get-in draft-filters [:feedback-current :comparator])
-                             :data-testid "invocations-filter-feedback-comparator"
-                             :onChange #(set-draft-filters!
-                                         (fn [prev]
-                                           (assoc-in prev [:feedback-current :comparator] (.. % -target -value))))}
-                            ($ :option {:value "<="} "<=")
-                            ($ :option {:value "<"} "<")
-                            ($ :option {:value "="} "=")
-                            ($ :option {:value "not="} "!=")
-                            ($ :option {:value ">"} ">")
-                            ($ :option {:value ">="} ">="))
-                         ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                            {:placeholder "Feedback value"
-                             :data-testid "invocations-filter-feedback-value"
-                             :value (get-in draft-filters [:feedback-current :value])
-                             :onChange #(set-draft-filters!
-                                         (fn [prev]
-                                           (assoc-in prev [:feedback-current :value] (.. % -target -value))))}))))
-                    ($ :div.text-xs.text-gray-500
-                       "This filter adds one feedback condition."))
+                       ($ :span "Match any value (metric exists)"))
+                    (let [match-any? (boolean (get-in draft-filters [:feedback-current :match-any-value?]))
+                          form-wrapper-class (when match-any?
+                                               "opacity-60 pointer-events-none")]
+                      ($ :div {:className (str "space-y-2 " (or form-wrapper-class ""))}
+                         (when match-any?
+                           ($ :div.text-xs.text-gray-600
+                              "Matches any invocation that has this metric, regardless of metric value."))
+                         (if (= "categorical" (get-in draft-filters [:feedback-current :metric-type]))
+                           ($ :div.space-y-2
+                              ($ :div.text-xs.text-gray-600 "Select one or more categorical values:")
+                              (if (seq (get-in draft-filters [:feedback-current :categories]))
+                                ($ :div.max-h-56.overflow-auto.border.border-gray-200.rounded-md.bg-white.p-2.space-y-1
+                                   (for [cat-value (get-in draft-filters [:feedback-current :categories])]
+                                     ($ :label.flex.items-center.gap-2.text-sm.text-gray-700.cursor-pointer
+                                        {:key cat-value}
+                                        ($ :input.h-4.w-4.border.border-gray-300.rounded
+                                           {:type "checkbox"
+                                            :data-testid "invocations-filter-feedback-category-select"
+                                            :disabled match-any?
+                                            :checked (boolean (some (fn [v] (= v cat-value))
+                                                                    (get-in draft-filters [:feedback-current :allowed-values])))
+                                            :onChange (fn [e]
+                                                        (let [checked? (.. e -target -checked)]
+                                                          (set-draft-filters!
+                                                           (fn [prev]
+                                                             (update-in prev [:feedback-current :allowed-values]
+                                                                        (fn [vals]
+                                                                          (let [curr (vec (or vals []))]
+                                                                            (if checked?
+                                                                              (vec (distinct (conj curr cat-value)))
+                                                                              (vec (remove (fn [v] (= v cat-value)) curr))))))))))})
+                                        ($ :span cat-value))))
+                                ($ :div.text-xs.text-gray-500 "No categories available for this metric.")))
+                           ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
+                              ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
+                                 {:value (get-in draft-filters [:feedback-current :comparator])
+                                  :data-testid "invocations-filter-feedback-comparator"
+                                  :disabled match-any?
+                                  :onChange #(set-draft-filters!
+                                              (fn [prev]
+                                                (assoc-in prev [:feedback-current :comparator] (.. % -target -value))))}
+                                 ($ :option {:value "<="} "<=")
+                                 ($ :option {:value "<"} "<")
+                                 ($ :option {:value "="} "=")
+                                 ($ :option {:value "not="} "!=")
+                                 ($ :option {:value ">"} ">")
+                                 ($ :option {:value ">="} ">="))
+                              ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
+                                 {:placeholder "Feedback value"
+                                  :data-testid "invocations-filter-feedback-value"
+                                  :disabled match-any?
+                                  :value (get-in draft-filters [:feedback-current :value])
+                                  :onChange #(set-draft-filters!
+                                              (fn [prev]
+                                                (assoc-in prev [:feedback-current :value] (.. % -target -value))))})))
+                         ($ :div.text-xs.text-gray-500
+                            "This filter adds one feedback condition."))))
 
                  ($ :div.text-sm.text-gray-500 "Unknown filter")))))
        (cond
@@ -1105,7 +1116,7 @@
                         ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
                            ($ :path {:fillRule "evenodd"
                                      :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                     :clipRule "evenodd"})))))))))))
+                                     :clipRule "evenodd"}))))))))))))
 
 (defui evaluations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])]
@@ -1131,7 +1142,7 @@
        ;; Header
        ($ :div.p-4.border-b.border-gray-200
           ($ :h3.text-lg.font-semibold.text-gray-800 "Node Stats"))
-       
+
        ;; Dropdowns at top of panel
        ($ :div.p-4.border-b.border-gray-200.space-y-3
           ($ :div.flex.items-center.gap-2
@@ -1235,7 +1246,7 @@
       error ($ :div.flex.justify-center.items-center.py-8
                ($ :div.text-red-500 "Error loading graph: " error))
       (nil? (:graph data)) ($ :div.flex.justify-center.items-center.py-8
-                               ($ :div.text-gray-500 "No graph available"))
+                              ($ :div.text-gray-500 "No graph available"))
       :else ($ agent-graph/graph {:initial-data data
                                   :height "500px"
                                   :selected-node selected-node
@@ -1289,8 +1300,6 @@
                       ($ :path {:fillRule "evenodd"
                                 :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                                 :clipRule "evenodd"})))))))))
-
-
 
 (defui manual-run [{:keys [form-id]}]
   (let [form (forms/use-form form-id)
@@ -1402,7 +1411,6 @@
      [module-id agent-name form-id])
 
     ($ :div.p-4
-       
 
        ($ :div.flex.gap-4
           ($ :div {:className "w-1/2"}
