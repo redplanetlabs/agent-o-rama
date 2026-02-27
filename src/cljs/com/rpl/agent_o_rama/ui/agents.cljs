@@ -463,20 +463,29 @@
               :filter-type :source
               :description (str (if (:source-not? applied-filters) "!=" "=")
                                 " "
-                                (:source applied-filters))}])
+                                ((fn [source]
+                                   (case source
+                                     "MANUAL" "Manual"
+                                     "EXPERIMENT" "Experiment"
+                                     source))
+                                 (:source applied-filters)))}])
           (map-indexed
            (fn [idx {:keys [metric-name comparator value source]}]
+             (let [comparator-label (name (or comparator :<=))
+                   source-label (when (some? source)
+                                  (name source))]
              {:chip-id (str "feedback-" idx "-" metric-name "-" comparator "-" value "-" source)
               :filter-type :feedback
               :feedback-idx idx
-              :description (str metric-name " " (name comparator) " " value
-                                (when-not (= :any source)
-                                  (str " (" (name source) ")")))})
+              :description (str metric-name " " comparator-label " " value
+                                (when (and source-label
+                                           (not= source-label "any"))
+                                  (str " (" source-label ")")))}))
            applied-feedback-metrics)))
         remove-filter-chip!
         (fn [{:keys [filter-type node-idx feedback-idx]}]
-          (case filter-type
-            :node
+          (cond
+            (or (= filter-type :node) (= filter-type "node"))
             (let [remove-node (fn [f]
                                 (update f :node-names
                                         (fn [names]
@@ -489,9 +498,9 @@
                        next-applied (build-filter-map next-draft)]
                    (set-applied-filters! next-applied)
                    (set-active-filter-types! (derive-active-filter-types next-applied))
-                   next-draft)))
+                   next-draft))))
 
-            :feedback
+            (or (= filter-type :feedback) (= filter-type "feedback"))
             (let [remove-feedback (fn [f]
                                     (update f :feedback-metrics
                                             (fn [rows]
@@ -506,7 +515,17 @@
                    (set-active-filter-types! (derive-active-filter-types next-applied))
                    next-draft))))
 
-            (clear-filter-type! filter-type))))
+            (or (= filter-type :source) (= filter-type "source"))
+            (clear-filter-type! :source)
+
+            (or (= filter-type :latency) (= filter-type "latency"))
+            (clear-filter-type! :latency)
+
+            (or (= filter-type :error) (= filter-type "error"))
+            (clear-filter-type! :error)
+
+            :else
+            nil))
         open-filter-chip!
         (fn [{:keys [chip-id filter-type node-name node-idx feedback-idx]}]
           (if (= chip-id (:chip-id open-filter-editor))
@@ -713,8 +732,8 @@
                                                          (assoc prev :source (.. % -target -value))))}
                        ($ :option {:value "all"} "All sources")
                        ($ :option {:value "API"} "API")
-                       ($ :option {:value "MANUAL"} "MANUAL")
-                       ($ :option {:value "EXPERIMENT"} "EXPERIMENT"))
+                       ($ :option {:value "MANUAL"} "Manual")
+                       ($ :option {:value "EXPERIMENT"} "Experiment"))
                     ($ :label.inline-flex.items-center.gap-2.text-sm.text-gray-700
                        ($ :input.h-4.w-4.border.border-gray-300.rounded
                           {:type "checkbox"
