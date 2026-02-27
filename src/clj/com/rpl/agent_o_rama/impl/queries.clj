@@ -446,12 +446,15 @@
        set))
 
 (defn feedback-entry-matches?
-  [feedback {:keys [metric-name comparator value source allowed-values]}]
-  (let [score-value (get (:scores feedback) metric-name ::missing)]
+  [feedback {:keys [metric-name comparator value source allowed-values match-any-value?]}]
+  (let [score-value (get (:scores feedback) metric-name ::missing)
+        allowed-set (normalized-allowed-values allowed-values)]
     (and (feedback-source-matches? feedback source)
          (not= ::missing score-value)
-         (if-let [allowed (seq (normalized-allowed-values allowed-values))]
-           (contains? allowed (str score-value))
+         (if match-any-value?
+           true
+           (if (seq allowed-set)
+           (contains? allowed-set (str score-value))
            (if-let [[compare-score compare-value]
                     (normalized-feedback-compare-values
                      {:comparator comparator :value value}
@@ -463,16 +466,19 @@
                 compare-score)
                (catch Throwable _
                  false))
-             false)))))
+             false))))))
 
 (defn feedback-entry-matched-score
   [feedback feedback-metric]
-  (let [{:keys [metric-name allowed-values]} feedback-metric
-        score-value (get (:scores feedback) metric-name ::missing)]
+  (let [{:keys [metric-name allowed-values match-any-value?]} feedback-metric
+        score-value (get (:scores feedback) metric-name ::missing)
+        allowed-set (normalized-allowed-values allowed-values)]
     (when (and (feedback-source-matches? feedback (:source feedback-metric))
                (not= ::missing score-value)
-               (if-let [allowed (seq (normalized-allowed-values allowed-values))]
-                 (contains? allowed (str score-value))
+               (if match-any-value?
+                 true
+                 (if (seq allowed-set)
+                 (contains? allowed-set (str score-value))
                  (if-let [[compare-score compare-value]
                           (normalized-feedback-compare-values feedback-metric
                                                              score-value)]
@@ -483,7 +489,7 @@
                       compare-score)
                      (catch Throwable _
                        false))
-                   false)))
+                   false))))
       (parse-number-like-value score-value))))
 
 (defn invoke-feedback-metric-value
