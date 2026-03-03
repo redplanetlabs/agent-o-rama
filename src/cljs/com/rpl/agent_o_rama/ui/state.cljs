@@ -37,7 +37,8 @@
                :submitting {}}
         :datasets {:selected-examples {}
                    :selected-snapshot-per-dataset {}}
-        :rules {:refetch-trigger {}}}
+        :rules {:refetch-trigger {}}
+        :invocations-filters {}}
    :sente {:connected? false}})
 
 (defonce app-db (atom initial-db))

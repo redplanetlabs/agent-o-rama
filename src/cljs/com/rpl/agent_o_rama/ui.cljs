@@ -29,6 +29,7 @@
    [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.events] ;; Ensure event handlers are registered at app startup
+   [com.rpl.agent-o-rama.ui.invocations-filters] ;; Filter events for invocations view
    [com.rpl.agent-o-rama.ui.experiments.forms]
    [com.rpl.agent-o-rama.ui.datasets.add-from-trace]
    [com.rpl.agent-o-rama.ui.rules :as rules]
