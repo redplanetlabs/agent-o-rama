@@ -46,7 +46,7 @@
 
     (when-not manager
       (throw (ex-info "Unknown module" {:module-id module-id})))
-    
+
     (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
           ds-props (queries/get-dataset-properties datasets-pstate dataset-id)
           ds-name (:name ds-props)
@@ -118,4 +118,4 @@
                         mapper)]
               (-> (resp/response body)
                   (resp/status 200)
-                  (resp/content-type "application/json; charset=utf-8"))))))))
+                  (resp/content-type "application/json; charset=utf-8")))))))))
