@@ -69,7 +69,7 @@
             (resp/header "Content-Disposition"
                          (str "attachment; filename=\"" (dataset-filename ds-name) "\"")))))))
 
-(def ^:const max-bytes (long (* 5 1024 1024)))
+(def ^:const max-bytes (long (* 10 1024 1024)))
 
 (defn handle-dataset-import
   [request]
@@ -79,42 +79,43 @@
         manager (common/get-manager module-id)
         file-param (or (get multipart-params :file)
                        (get params :file))
-        tempfile (:tempfile file-param)
-        filename (:filename file-param)]
-    (when-not manager
-      (throw (ex-info "Unknown module" {:module-id module-id})))
-    (when-not (and (map? file-param) (instance? java.io.File tempfile))
+        tempfile (:tempfile file-param)]
+    (cond
+      (not manager)
+      (throw (ex-info "Unknown module" {:module-id module-id}))
+
+      (not (and (map? file-param) (instance? java.io.File tempfile)))
       (-> (resp/response (j/write-value-as-string
                           {:error "Missing file upload under form field 'file'"}))
           (resp/status 400)
-          (resp/content-type "application/json; charset=utf-8")
-          (throw)))
-    (let [^java.io.File f tempfile]
-      (when (> (.length f) max-bytes)
-        (-> (resp/response (j/write-value-as-string
-                            {:error (str "File exceeds 5MB limit (" (.length f) " bytes)")}))
-            (resp/status 413)
-            (resp/content-type "application/json; charset=utf-8")
-            (throw)))
-      ;; Import into existing dataset
-      (let [;; Count non-blank lines for success calculation
-            total-lines (with-open [r (io/reader f)]
-                          (->> (line-seq r)
-                               (remove str/blank?)
-                               count))
-            failures* (volatile! [])]
-        (datasets/upload-jsonl-examples!
-         manager dataset-id snapshot (.getPath f)
-         (fn [line ex]
-           (vswap! failures* conj {:line_content line
-                                   :error (ex-message ex)})))
-        (let [failure-count (count @failures*)
-              success-count (max 0 (- total-lines failure-count))
-              body (j/write-value-as-string
-                    {:success_count success-count
-                     :failure_count failure-count
-                     :errors @failures*}
-                    mapper)]
-          (-> (resp/response body)
-              (resp/status 200)
-              (resp/content-type "application/json; charset=utf-8")))))))
+          (resp/content-type "application/json; charset=utf-8"))
+
+      :else
+      (let [^java.io.File f tempfile]
+        (if (> (.length f) max-bytes)
+          (-> (resp/response (j/write-value-as-string
+                              {:error (str "File exceeds 10MB limit (" (.length f) " bytes)")}))
+              (resp/status 413)
+              (resp/content-type "application/json; charset=utf-8"))
+          ;; Import into existing dataset
+          (let [;; Count non-blank lines for success calculation
+                total-lines (with-open [r (io/reader f)]
+                              (->> (line-seq r)
+                                   (remove str/blank?)
+                                   count))
+                failures* (volatile! [])]
+            (datasets/upload-jsonl-examples!
+             manager dataset-id snapshot (.getPath f)
+             (fn [line ex]
+               (vswap! failures* conj {:line_content line
+                                       :error (ex-message ex)})))
+            (let [failure-count (count @failures*)
+                  success-count (max 0 (- total-lines failure-count))
+                  body (j/write-value-as-string
+                        {:success_count success-count
+                         :failure_count failure-count
+                         :errors @failures*}
+                        mapper)]
+              (-> (resp/response body)
+                  (resp/status 200)
+                  (resp/content-type "application/json; charset=utf-8"))))))))
