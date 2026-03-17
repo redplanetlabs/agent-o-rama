@@ -67,23 +67,22 @@
                               (set-edit-value! "")
                               (set-error! nil))
 
-        handle-save-click (fn [current-example]
+        handle-save-click (fn []
                             (set-saving! true)
                             (set-error! nil)
                             (try
                               (let [parsed-value (if (str/blank? edit-value)
                                                    nil
                                                    (js/JSON.parse edit-value))
-                                    ;; Create updated example with the new field value
-                                    updated-example (assoc current-example field-key (js->clj parsed-value :keywordize-keys true))]
+                                    value (js->clj parsed-value :keywordize-keys true)]
                                 (sente/request!
                                  [:datasets/edit-example
                                   {:module-id module-id
                                    :dataset-id dataset-id
                                    :snapshot-name snapshot-name
                                    :example-id example-id
-                                   :input (:input updated-example)
-                                   :reference-output (:reference-output updated-example)}]
+                                   :key field-key
+                                   :value value}]
                                  10000
                                  (fn [reply]
                                    (set-saving! false)
@@ -116,7 +115,7 @@
             ($ :div.flex.items-center.space-x-2
                ($ :button
                   {:className "inline-flex items-center px-3 py-1 text-sm text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                   :onClick #(handle-save-click current-example)
+                   :onClick handle-save-click
                    :disabled saving?}
                   (when saving?
                     ($ :svg.animate-spin.-ml-1.mr-2.h-4.w-4.text-white

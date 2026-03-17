@@ -146,25 +146,32 @@
 
 ;; This is the new, unified handler. It accepts structured data directly.
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/edit-example
-  [{:keys [manager dataset-id snapshot-name example-id input reference-output]} uid]
+  [{:keys [manager dataset-id snapshot-name example-id key value input reference-output] :as msg} uid]
   (try
-    (let [snapshot-opts {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}]
-      ;; The data is already parsed by the time it gets here.
-      ;; We just need to dispatch the updates.
-      ;; The `aor/set-dataset-example-*` functions correctly handle nil values if a field wasn't changed.
+    (let [snapshot-opts {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}
+          updates (if (some? key)
+                    [[key value]]
+                    (cond-> []
+                      (contains? msg :input) (conj [:input input])
+                      (contains? msg :reference-output) (conj [:reference-output reference-output])))]
+      (doseq [[field-key field-value] updates]
+        (case field-key
+          :input
+          (aor/set-dataset-example-input! manager
+                                          dataset-id
+                                          example-id
+                                          field-value
+                                          snapshot-opts)
 
-      (aor/set-dataset-example-input! manager
-                                      dataset-id
-                                      example-id
-                                      input
-                                      snapshot-opts)
+          :reference-output
+          (aor/set-dataset-example-reference-output! manager
+                                                     dataset-id
+                                                     example-id
+                                                     field-value
+                                                     snapshot-opts)
 
-      (aor/set-dataset-example-reference-output! manager
-                                                 dataset-id
-                                                 example-id
-                                                 reference-output
-                                                 snapshot-opts)
-
+          (throw (ex-info "Unsupported dataset example field update"
+                          {:field-key field-key}))))
       {:status :ok})
     (catch Exception e
       ;; Catch schema validation errors from the backend and forward them
