@@ -1,0 +1,119 @@
+name: Spel E2E Tests (POC)
+# Proof-of-concept: same tests as playwright.yml but written in Clojure
+# using spel (Playwright Java wrapper) instead of Node.js Playwright.
+# Server setup is identical — only the test runner changes.
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  spel:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    - name: Setup Clojure
+      uses: DeLaGuardo/setup-clojure@12.5
+      with:
+        lein: latest
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Cache Leiningen dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-lein-spel-${{ hashFiles('project.clj') }}
+        restore-keys: |
+          ${{ runner.os }}-lein-spel-
+          ${{ runner.os }}-lein-
+
+    - name: Cache Node modules
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+
+    - name: Install dependencies
+      run: |
+        lein with-profile +dev,+spel deps
+        npm ci
+
+    - name: Install Playwright browsers (Java)
+      # spel uses playwright-java which ships its own browser installer
+      run: lein with-profile +dev,+spel run -m com.microsoft.playwright.CLI install chromium
+
+    - name: Build production frontend
+      env:
+        NODE_ENV: production
+      run: |
+        rm -rf resource/public
+        mkdir -p resource/public
+        cp -r resource/assets/* resource/public
+        lein with-profile +ui run -m shadow.cljs.devtools.cli release :frontend
+
+    - name: Start server
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        CI: true
+      run: |
+        lein with-profile +dev,+ui run -m ci-playwright-setup --no-frontend &
+        SERVER_PID=$!
+        echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+
+        echo "Waiting for server to start..."
+        timeout=180
+        elapsed=0
+        while [ $elapsed -lt $timeout ]; do
+          if curl -f http://localhost:1974 > /dev/null 2>&1; then
+            echo "Server is ready!"
+            break
+          fi
+          sleep 2
+          elapsed=$((elapsed + 2))
+          echo "Waiting... ($elapsed/$timeout seconds)"
+        done
+
+        if [ $elapsed -ge $timeout ]; then
+          echo "Server failed to start within $timeout seconds"
+          kill $SERVER_PID 2>/dev/null || true
+          exit 1
+        fi
+
+    - name: Run spel tests
+      env:
+        CI: true
+      run: |
+        lein with-profile +dev,+spel run -m lazytest.main \
+          --namespace com.rpl.agent-o-rama.ui.spel-navigation-test
+
+    - name: Upload Allure results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: spel-allure-results
+        path: allure-results/
+        retention-days: 30
+
+    - name: Cleanup
+      if: always()
+      run: |
+        if [ -n "$SERVER_PID" ]; then
+          kill $SERVER_PID 2>/dev/null || true
+        fi
+        pkill -f "ci-playwright-setup" || true

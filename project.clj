@@ -97,6 +97,9 @@
                                          [net.java.dev.jna/jna "5.17.0"]
                                          [org.clojure/clojure "1.12.2"]
                                          [prismatic/schema "1.4.1"]]}
+             :spel       {:source-paths ["test/clj"]
+                          :dependencies [[com.blockether/spel "0.7.3"]
+                                         [io.github.noahtheduke/lazytest "1.9.1"]]}
              :test       {:jvm-opts ["-Daor.test.runner=1"]}
              :nrepl-port {:repl-options {:port 7888}}}
   :codox {:source-paths ["src/clj"]
