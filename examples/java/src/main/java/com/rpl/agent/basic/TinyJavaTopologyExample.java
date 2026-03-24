@@ -114,6 +114,17 @@ public class TinyJavaTopologyExample {
               an.result(eventName + " count = " + (c == null ? 0L : c));
             });
 
+      // Strategy 1 only: because the AgentTopology owns $$event-counts, agents
+      // can also write to it directly via transform() — not just read it.
+      // This ResetAgent zeroes out a counter without going through the depot.
+      at.newAgent("ResetAgent")
+        .node("reset", null,
+            (AgentNode an, String eventName) -> {
+              PStateStore counts = an.getStore("$$event-counts");
+              counts.transform(eventName, Path.key(eventName).termVal(0L));
+              an.result("reset: " + eventName);
+            });
+
       // 6. Finalize
       at.define();
     }
