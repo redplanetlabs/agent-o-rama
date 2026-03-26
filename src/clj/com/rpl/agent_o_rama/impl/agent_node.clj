@@ -692,7 +692,9 @@
      "topK"             (.topK request)
      "topP"             (.topP request)
      "input"            (lc4j-trace/messages->trace (.messages request))
-     "response"         (h/safe-> response .aiMessage lc4j-trace/message->trace)
+     "response"         (h/safe-> response .aiMessage .text)
+     "toolRequests"     (some-> response .aiMessage .toolExecutionRequests
+                                (->> (mapv lc4j-trace/tool-request->trace)))
      "finishReason"     (lc4j-trace/finish-reason->trace
                          (.finishReason response))
      "inputTokenCount"  (h/safe-> response
