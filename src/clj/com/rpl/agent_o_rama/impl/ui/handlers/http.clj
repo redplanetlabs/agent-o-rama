@@ -126,7 +126,7 @@
           name))))
 
 (defn- evaluator-trace-for-invoke
-  "Uses the same tracing query topology as the UI graph view (`_agent-get-trace-page`)."
+  "Uses `_agent-get-trace-page` with full pagination (same as invocation graph UI after the fix)."
   [evaluator-client-objects ^AgentInvoke invoke]
   (when invoke
     (let [tracing-query (:tracing-query evaluator-client-objects)
@@ -137,10 +137,11 @@
         (when-let [root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                                       root-pstate
                                                       {:pkey task-id})]
-          (let [dynamic-trace (foreign-invoke-query tracing-query
-                                                    task-id
-                                                    [[task-id root-invoke-id]]
-                                                    10000)]
+          (let [dynamic-trace (queries/invoke-tracing-query-all-pages
+                               tracing-query
+                               task-id
+                               [[task-id root-invoke-id]]
+                               10000)]
             (update dynamic-trace :invokes-map clean-trace-invokes-map)))))))
 
 (defn- agent-invoke->edn-map

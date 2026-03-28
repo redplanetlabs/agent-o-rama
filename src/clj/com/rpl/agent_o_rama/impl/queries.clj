@@ -222,6 +222,32 @@
                 :> *res)
     )))
 
+(defn invoke-tracing-query-all-pages
+  "Invokes `_agent-get-trace-page` until `:next-task-invoke-pairs` is empty, merging each
+  page's `:invokes-map`. A single call only walks up to `page-limit` nodes; large traces
+  require this loop."
+  ([tracing-query agent-task-id initial-task-invoke-pairs page-limit]
+   (invoke-tracing-query-all-pages tracing-query agent-task-id initial-task-invoke-pairs page-limit 10000))
+  ([tracing-query agent-task-id initial-task-invoke-pairs page-limit max-pages]
+   (loop [pairs (vec initial-task-invoke-pairs)
+          merged {}
+          page-idx 0]
+     (when (>= page-idx (long max-pages))
+       (throw (h/ex-info "Trace query exceeded max pagination pages"
+                         {:max-pages max-pages
+                          :agent-task-id agent-task-id
+                          :last-queue-size (count pairs)})))
+     (let [res (foreign-invoke-query tracing-query agent-task-id pairs page-limit)
+           chunk (or (:invokes-map res) {})
+           merged' (into merged chunk)
+           nxt-raw (:next-task-invoke-pairs res)
+           nxt (vec (if (sequential? nxt-raw) nxt-raw []))]
+       (if (seq nxt)
+         (recur nxt merged' (inc page-idx))
+         {:invokes-map merged'
+          :next-task-invoke-pairs []
+          :trace-query-pages (inc page-idx)})))))
+
 (defn declare-fork-affected-aggs-query-topology
   [topologies]
   (<<query-topology topologies

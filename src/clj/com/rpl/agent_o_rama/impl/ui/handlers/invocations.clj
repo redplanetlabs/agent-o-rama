@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
    [jsonista.core :as j])
   (:import [com.rpl.agentorama AgentInvoke]))
 
@@ -106,11 +107,12 @@
                                                  stream-shared-pstate
                                                  {:pkey 0}))
 
-          ;; SIMPLIFIED: Always query from root with reasonable page limit
-          dynamic-trace (foreign-invoke-query tracing-query
-                                              agent-task-id
-                                              [[agent-task-id root-invoke-id]]
-                                              10000)
+          ;; Paginate `_agent-get-trace-page` until the walk queue is empty.
+          dynamic-trace (queries/invoke-tracing-query-all-pages
+                         tracing-query
+                         agent-task-id
+                         [[agent-task-id root-invoke-id]]
+                         10000)
 
           cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
                           (->> m
