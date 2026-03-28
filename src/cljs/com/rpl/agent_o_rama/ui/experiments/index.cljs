@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
+   [com.rpl.agent-o-rama.ui.experiments.download :as exp-download]
    [com.rpl.agent-o-rama.ui.chart :as chart]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]))
@@ -120,13 +121,15 @@
                     :className "block w-full rounded-md border-0 py-1.5 pl-2 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                     :placeholder "Search by name or ID..."})))
 
-          ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
-             {:onClick #(state/dispatch [:modal/show-form :create-experiment
-                                         {:module-id module-id
-                                          :dataset-id dataset-id
-                                          :spec {:type :regular}}])}
-             ($ PlusIcon {:className "h-5 w-5 mr-2"})
-             "Run New Experiment"))
+          ($ :div.flex.flex-wrap.items-center.gap-2
+             ($ exp-download/ExportToolbar {:module-id module-id :dataset-id dataset-id})
+             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
+                {:onClick #(state/dispatch [:modal/show-form :create-experiment
+                                            {:module-id module-id
+                                             :dataset-id dataset-id
+                                             :spec {:type :regular}}])}
+                ($ PlusIcon {:className "h-5 w-5 mr-2"})
+                "Run New Experiment")))
 
 ;; Date range filters
        ($ :div.flex.items-center.gap-4.mb-6

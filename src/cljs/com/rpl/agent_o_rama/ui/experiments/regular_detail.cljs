@@ -9,7 +9,8 @@
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]
    ;; NEW: Require the forms namespace to access the transformation function
-   [com.rpl.agent-o-rama.ui.experiments.forms :as forms]))
+   [com.rpl.agent-o-rama.ui.experiments.forms :as forms]
+   [com.rpl.agent-o-rama.ui.experiments.download :as exp-download]))
 
 (defui ExperimentErrorPanel [{:keys [error-info]}]
   (let [has-exception? (or (:via error-info) (:trace error-info))
@@ -93,9 +94,9 @@
             ($ DetailItem {:label "concurrency"}
                ($ :span.text-sm.text-gray-800 (str conc))))))))
 
-(defui ExperimentHeader [{:keys [info status on-rerun module-id dataset-id show-info? on-toggle-info]}]
-  ($ :div.flex.justify-between.items-center
-     ($ :div.flex.items-center.gap-4
+(defui ExperimentHeader [{:keys [info status on-rerun module-id dataset-id experiment-id show-info? on-toggle-info]}]
+  ($ :div.flex.justify-between.items-center.flex-wrap.gap-4
+     ($ :div.flex.items-center.gap-4.flex-wrap
         ($ :a.inline-flex.items-center.text-gray-600.hover:text-gray-900
            {:href (rfe/href :module/dataset-detail.experiments {:module-id module-id :dataset-id dataset-id})}
            ($ ArrowLeftIcon {:className "h-5 w-5 mr-2"})
@@ -108,7 +109,7 @@
            (if show-info?
              ($ ChevronUpIcon {:className "h-4 w-4"})
              ($ ChevronDownIcon {:className "h-4 w-4"}))))
-     ($ :div.flex.items-center.gap-4
+     ($ :div.flex.items-center.gap-4.flex-wrap
         ($ :span.px-3.py-1.rounded-full.text-sm.font-medium.inline-flex.items-center.gap-2
            {:className (case status
                          :completed "bg-green-100 text-green-800"
@@ -118,6 +119,9 @@
              :completed "✅ Completed"
              :failed "❌ Failed"
              ($ :<> ($ common/spinner {:size :small}) "Running")))
+        ($ exp-download/ExportToolbar {:module-id module-id
+                                      :dataset-id dataset-id
+                                      :experiment-id experiment-id})
         ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
            {:onClick on-rerun}
            ($ PlayIcon {:className "h-5 w-5 mr-2"})
@@ -522,7 +526,6 @@
                                                                         :component ($ ContentModal {:content % :title "Reference Output"})}])}))
                        ;; Output Cell with evaluator capsules
                        (let [agent-result (get-in run [:agent-results 0])]
-                         (println "agent-result" agent-result)
                          ($ :td {:key "output-cell" :className (:td common/table-classes)}
                             (if agent-result
                               ;; If results exist, render the content (success or failure)
@@ -591,6 +594,7 @@
                                                 (state/dispatch [:modal/show-form :create-experiment form-props]))
                                    :module-id module-id
                                    :dataset-id dataset-id
+                                   :experiment-id experiment-id
                                    ;; NEW: Pass state and handler to header
                                    :show-info? show-info?
                                    :on-toggle-info #(set-show-info (not show-info?))})

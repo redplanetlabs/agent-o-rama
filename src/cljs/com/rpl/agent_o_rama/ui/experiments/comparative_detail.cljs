@@ -252,6 +252,7 @@
                                (state/dispatch [:modal/show-form :create-experiment form-props]))
                   :module-id module-id
                   :dataset-id dataset-id
+                  :experiment-id experiment-id
                   :show-info? show-info?
                   :on-toggle-info #(set-show-info (not show-info?))})
 

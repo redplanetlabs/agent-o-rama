@@ -137,6 +137,16 @@
         :get ((ensure-session-uid sente/ring-ajax-get-or-ws-handshake) request)
         :post ((ensure-session-uid sente/ring-ajax-post) request))
 
+      ;; Single-experiment export (must precede .../experiments/export).
+      (and (= method :get)
+           (re-matches #"/api/datasets/.+/.+/experiments/.+/export" uri))
+      (http/handle-single-experiment-export request)
+
+      ;; All experiments for a dataset (before generic dataset `.../export`).
+      (and (= method :get)
+           (re-matches #"/api/datasets/.+/.+/experiments/export" uri))
+      (http/handle-experiments-export request)
+
       ;; Dataset export
       (and (= method :get)
            (re-matches #"/api/datasets/.+/.+/export" uri))
