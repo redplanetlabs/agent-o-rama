@@ -8,7 +8,9 @@
   - Built-in aggregators for common operations"
   (:import
    [com.rpl.agentorama
-    AgentInvoke])
+    AgentInvoke]
+   [dev.langchain4j.model.openai
+    OpenAiChatModel])
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.rama :as rama]
@@ -22,6 +24,17 @@
 ;;; Agent module demonstrating aggregation functionality
 (aor/defagentmodule AggregationAgentModule
   [topology]
+
+  (aor/declare-agent-object-builder
+   topology
+   "gpt-5-4"
+   (fn [_setup]
+     (-> (OpenAiChatModel/builder)
+         (.apiKey (System/getenv "OPENAI_API_KEY"))
+         (.modelName "gpt-5.4")
+         (.temperature 0.0)
+         .build))
+   {:thread-safe? true})
 
   (->
    (aor/new-agent topology "AggregationAgent")
@@ -219,11 +232,68 @@
           {(get-in experimentsp [:experiment-info :id]) experimentsp}})
   (count (pr-str v))
   
-  (app v
-       )
-  
-  
-  
-  
-  
+  (def app (fn [v] (rama/foreign-append!
+                   pstate-write-depot
+                   (aor-types/->PStateWrite
+                    nil
+                    "$$_aor-datasets"
+                    (rpath/path
+                     (rpath/keypath dataset-id)
+                     (rpath/termval v))
+                    dataset-id))))
+  (app v)
+
+  ;; -- Evaluator setup (run after launching module with new AggregationAgentModule) --
+
+  (def eval-name "gpt-5-4-judge")
+  (def eval-prompt
+    (str "You are evaluating <output></output> from an agent, which is responding to a user <input></input>. "
+         "The <reference></reference> has guidelines for what it should contain or not contain.\n\n"
+         "<output/> should contain no information or concepts not explicitly outlined in the <reference/>.\n\n"
+         "Score 0,1,2.\n"
+         "0: mostly missed the guidelines\n"
+         "1: missing some guidelines\n"
+         "2: Nailed it\n\n"
+         "<input>%input</input>\n\n"
+         "<output>%output<output>\n\n"
+         "<reference>%referenceOutput</reference>"))
+  (def eval-schema
+    "{\"type\":\"object\",\"properties\":{\"reasoning\":{\"type\":\"string\",\"description\":\"why you gave the score you gave. what about the <output> aligned or didn't with the <reference>\"},\"score\":{\"type\":\"integer\",\"description\":\"Numeric score from 0-10\"}},\"required\":[\"score\",\"reasoning\"],\"additionalProperties\":false}")
+
+  (aor/create-evaluator!
+   manager
+   eval-name
+   "aor/llm-judge"
+   {"model"        "gpt-5-4"
+    "temperature"  "0.0"
+    "prompt"       eval-prompt
+    "outputSchema" eval-schema}
+   "GPT-5.4 LLM judge")
+
+  ;; -- Run evaluations over experiment results --
+
+  (def experiment-id (java.util.UUID/fromString "019d30a9-bf7e-7926-b985-1c6941097055"))
+  (def {:keys [datasets-pstate]} (aor-types/underlying-objects manager))
+
+  (def results
+    (rpath/select-one (rpath/keypath dataset-id :experiments experiment-id :results)
+                      datasets-pstate))
+
+  (def eval-results
+    (doall
+     (for [[result-idx result-entry] results
+           :let [example-id (:example-id result-entry)
+                 output     (get-in result-entry [:agent-results 0 :result :val])
+                 example    (rpath/select-one (rpath/keypath dataset-id :snapshots nil example-id)
+                                              datasets-pstate)
+                 input      (:input example)
+                 ref-output (:reference-output example)]]
+       (do
+         (println "Evaluating result" result-idx "example-id" example-id)
+         (let [scores (aor/try-evaluator manager eval-name input ref-output output)]
+           (println "  score:" (get scores "score") "| reasoning:" (get scores "reasoning"))
+           {:result-idx result-idx
+            :example-id example-id
+            :scores     scores})))))
+
   )
