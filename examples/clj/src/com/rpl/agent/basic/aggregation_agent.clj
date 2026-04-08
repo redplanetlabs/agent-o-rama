@@ -6,11 +6,18 @@
   - agg-node: Collect and combine results from multiple executions
   - Fan-out/fan-in execution patterns
   - Built-in aggregators for common operations"
+  (:import
+   [com.rpl.agentorama
+    AgentInvoke])
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.rama :as rama]
+   [com.rpl.rama.path :as rpath]
    [com.rpl.rama.aggs :as aggs]
-   [com.rpl.rama.test :as rtest]))
+   [com.rpl.rama.test :as rtest]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]))
 
 ;;; Agent module demonstrating aggregation functionality
 (aor/defagentmodule AggregationAgentModule
@@ -102,3 +109,121 @@
       (println "- Results are automatically aggregated back together")
       (println "- Different chunk sizes create different parallelization")
       (println "- Built-in aggregators simplify result collection"))))
+
+(defn map->StartExperiment
+  [{:keys [id name dataset-id snapshot selector evaluators spec num-repetitions concurrency]}]
+  (aor-types/->StartExperiment
+   (java.util.UUID/fromString id)
+   name
+   (java.util.UUID/fromString dataset-id)
+   snapshot
+   selector
+   evaluators
+   spec
+   num-repetitions
+   concurrency))
+
+(defn map->constructed
+  [constructor]
+  (fn [m] (apply constructor
+                (vec (for [k (first (:arglists (meta constructor)))]
+                       ((keyword k) m))))))
+
+((map->constructed #'aor-types/->AgentInvokeImpl)
+ {:task-id 3 :agent-invoke-id (java.util.UUID/randomUUID)}
+ )
+
+(def uuid-regex #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+(defn uuidify [data]
+  (clojure.walk/postwalk
+   (fn [x]
+     (if (and (string? x) (re-matches uuid-regex x))
+       (java.util.UUID/fromString x)
+       x))
+   data))
+
+(def kwint (fn [kw] (Long/parseLong (name kw))))
+
+
+(comment
+  (def ipc (rtest/create-ipc))
+  (rtest/launch-module! ipc AggregationAgentModule {:tasks 2 :threads 2})
+  (aor/start-ui ipc)
+  (def pstate-write-depot (rama/foreign-depot ipc
+                                              (rama/get-module-name AggregationAgentModule)
+                                              (po/agent-pstate-write-depot-name)))
+
+  (def payload (clojure.data.json/read-json (slurp "/Users/tommy/programming/agent/data/experiments-split/03-Copy_of_first-019d30a9-bf7e-7926-b985-1c6941097055.json")))
+  (def dataset-id (java.util.UUID/fromString (:dataset-id payload)))
+
+  (keys (rpath/select-one [:experiments rpath/FIRST] payload))
+  (keys (rpath/select-one [:experiments rpath/FIRST :results :0] payload))
+  (keys (rpath/select-one [:experiments rpath/FIRST :experiment-info] payload))
+  (sort (map (comp #(Integer/parseInt %) name) (keys (rpath/select-one [:experiments rpath/FIRST :results] payload))))
+  (def dataset-items (rpath/select [:experiments rpath/FIRST :results rpath/MAP-VALS
+                                    (rpath/submap [:input :reference-output :example-id])] payload))
+  
+  (rpath/select [:experiments rpath/FIRST :results rpath/MAP-VALS
+                 (rpath/submap [:input :reference-output :example-id])] payload)
+  
+  (def experiment (rpath/select-one [:experiments rpath/FIRST] payload))
+  (def experimentsp
+    
+    (->> experiment
+         uuidify
+         (rpath/transform [:experiment-info :spec] (map->constructed #'aor-types/->RegularExperiment))
+         (rpath/transform [:experiment-info] (map->constructed #'aor-types/->StartExperiment))
+         (rpath/transform [:experiment-invoke] (map->constructed #'aor-types/->AgentInvokeImpl))
+         (rpath/transform [:results rpath/MAP-VALS :agent-initiates rpath/MAP-VALS :agent-invoke]
+                          (map->constructed #'aor-types/->AgentInvokeImpl))
+         (rpath/transform [:results rpath/MAP-VALS :agent-results rpath/MAP-VALS :result]
+                          (map->constructed #'aor-types/->AgentResult))
+         (rpath/transform [:results rpath/MAP-VALS :eval-initiates rpath/MAP-VALS]
+                          (map->constructed #'aor-types/->AgentInvokeImpl))
+         
+         ;; fixup keys
+         (rpath/transform [:results rpath/MAP-KEYS] kwint)
+         (rpath/transform [:results rpath/MAP-VALS :agent-initiates rpath/MAP-KEYS] kwint)
+         (rpath/transform [:results rpath/MAP-VALS :agent-results rpath/MAP-KEYS] kwint)
+         (rpath/transform [:results rpath/MAP-VALS :eval-initiates rpath/MAP-KEYS] name)
+         (rpath/transform [:results rpath/MAP-VALS :evals rpath/MAP-KEYS] name)
+         (rpath/transform [:results rpath/MAP-VALS :evals rpath/MAP-VALS rpath/MAP-KEYS] name)
+         (rpath/transform [:results rpath/MAP-VALS :eval-failures rpath/MAP-KEYS] name)
+
+         (rpath/transform [:results rpath/MAP-VALS] (fn [m] (select-keys
+                                                             m
+                                                             [:example-id
+                                                              :agent-initiates
+                                                              :agent-results
+                                                              :eval-initiates
+                                                              :evals
+                                                              :eval-failures])))
+         (rpath/select-one [(rpath/submap [:experiment-info
+                                           :experiment-invoke
+                                           :start-time-millis
+                                           :finish-time-millis
+                                           :results])])))
+  (def snapshots (into {}
+                       (map (fn [{:keys [example-id] :as m}]
+                              [(java.util.UUID/fromString example-id)
+                               (-> m
+                                   (dissoc :example-id)
+                                   (assoc :tags #{}))])
+                            dataset-items)))
+  (def v {:props {:name (:dataset-name payload)
+                  :created-at (h/current-time-millis)
+                  :modified-at (h/current-time-millis)}
+          :snapshots {nil snapshots}
+          :experiments
+          {(get-in experimentsp [:experiment-info :id]) experimentsp}})
+  (count (pr-str v))
+  
+  (app v
+       )
+  
+  
+  
+  
+  
+  )
