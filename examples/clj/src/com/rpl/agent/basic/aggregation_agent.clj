@@ -123,24 +123,11 @@
       (println "- Different chunk sizes create different parallelization")
       (println "- Built-in aggregators simplify result collection"))))
 
-(defn map->StartExperiment
-  [{:keys [id name dataset-id snapshot selector evaluators spec num-repetitions concurrency]}]
-  (aor-types/->StartExperiment
-   (java.util.UUID/fromString id)
-   name
-   (java.util.UUID/fromString dataset-id)
-   snapshot
-   selector
-   evaluators
-   spec
-   num-repetitions
-   concurrency))
-
 (defn map->constructed
   [constructor]
   (fn [m] (apply constructor
-                (vec (for [k (first (:arglists (meta constructor)))]
-                       ((keyword k) m))))))
+                 (vec (for [k (first (:arglists (meta constructor)))]
+                        ((keyword k) m))))))
 
 ((map->constructed #'aor-types/->AgentInvokeImpl)
  {:task-id 3 :agent-invoke-id (java.util.UUID/randomUUID)}
@@ -160,6 +147,7 @@
 
 
 (comment
+  
   (def ipc (rtest/create-ipc))
   (rtest/launch-module! ipc AggregationAgentModule {:tasks 2 :threads 2})
   (aor/start-ui ipc)
@@ -170,15 +158,8 @@
   (def payload (clojure.data.json/read-json (slurp "/Users/tommy/programming/agent/data/experiments-split/03-Copy_of_first-019d30a9-bf7e-7926-b985-1c6941097055.json")))
   (def dataset-id (java.util.UUID/fromString (:dataset-id payload)))
 
-  (keys (rpath/select-one [:experiments rpath/FIRST] payload))
-  (keys (rpath/select-one [:experiments rpath/FIRST :results :0] payload))
-  (keys (rpath/select-one [:experiments rpath/FIRST :experiment-info] payload))
-  (sort (map (comp #(Integer/parseInt %) name) (keys (rpath/select-one [:experiments rpath/FIRST :results] payload))))
   (def dataset-items (rpath/select [:experiments rpath/FIRST :results rpath/MAP-VALS
                                     (rpath/submap [:input :reference-output :example-id])] payload))
-  
-  (rpath/select [:experiments rpath/FIRST :results rpath/MAP-VALS
-                 (rpath/submap [:input :reference-output :example-id])] payload)
   
   (def experiment (rpath/select-one [:experiments rpath/FIRST] payload))
   (def experimentsp
@@ -260,6 +241,10 @@
   (def eval-schema
     "{\"type\":\"object\",\"properties\":{\"reasoning\":{\"type\":\"string\",\"description\":\"why you gave the score you gave. what about the <output> aligned or didn't with the <reference>\"},\"score\":{\"type\":\"integer\",\"description\":\"Numeric score from 0-10\"}},\"required\":[\"score\",\"reasoning\"],\"additionalProperties\":false}")
 
+  (def manager (get-in @com.rpl.agent-o-rama.impl.ui/system
+                       [:aor-cache
+                        "com.rpl.agent.basic.aggregation-agent/AggregationAgentModule"
+                        :manager]))
   (aor/create-evaluator!
    manager
    eval-name
@@ -272,28 +257,61 @@
 
   ;; -- Run evaluations over experiment results --
 
-  (def experiment-id (java.util.UUID/fromString "019d30a9-bf7e-7926-b985-1c6941097055"))
-  (def {:keys [datasets-pstate]} (aor-types/underlying-objects manager))
+  (def experiment-id (java.util.UUID/fromString (:id (:experiment-info experiment))))
+  (def datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager)))
 
-  (def results
-    (rpath/select-one (rpath/keypath dataset-id :experiments experiment-id :results)
-                      datasets-pstate))
+  (def keys
+    (rama/foreign-select (rpath/path (rpath/keypath dataset-id)
+                                     :experiments
+                                     (rpath/keypath experiment-id)
+                                     :results
+                                     rpath/MAP-KEYS)
+                         datasets-pstate))
 
+  (def updated-reference-outputs
+    (mapv clojure.data.json/read-str (clojure.string/split-lines (slurp "/Users/tommy/programming/agent/data/sample.jsonl"))))
+
+  (rpath/select-one (rpath/path
+                     (rpath/keypath 0)
+                     (rpath/keypath "output")) updated-reference-outputs)
+  (def results (atom []))
+  @results
+  
   (def eval-results
     (doall
-     (for [[result-idx result-entry] results
-           :let [example-id (:example-id result-entry)
-                 output     (get-in result-entry [:agent-results 0 :result :val])
-                 example    (rpath/select-one (rpath/keypath dataset-id :snapshots nil example-id)
-                                              datasets-pstate)
-                 input      (:input example)
-                 ref-output (:reference-output example)]]
+     (for [k keys]
        (do
-         (println "Evaluating result" result-idx "example-id" example-id)
+         (def result-entry (rama/foreign-select-one
+                            (rpath/path
+                             (rpath/keypath dataset-id)
+                             :experiments
+                             (rpath/keypath experiment-id)
+                             :results
+                             (rpath/keypath k))
+                            datasets-pstate))
+         (def example-id (:example-id result-entry))
+         (def output     (get-in result-entry [:agent-results 0 :result :val]))
+         (def example (rama/foreign-select-one (rpath/path
+                                                (rpath/keypath dataset-id)
+                                                (rpath/view :snapshots)
+                                                (rpath/keypath nil)
+                                                (rpath/keypath example-id))
+                                               datasets-pstate))
+         (def input      (:input example))
+         (def ref-output (rpath/select-one (rpath/path
+                                            (rpath/keypath k)
+                                            (rpath/keypath "output")) updated-reference-outputs))
+
+         (if (= (:reference-output example) ref-output)
+           (println "== NOT CHANGED ==: " ref-output)
+           (println "== OLD REF OUTPUT ==: " (:reference-output example) "NEW:" ref-output))
+
+         (println "Evaluating result" k "example-id" example-id)
          (let [scores (aor/try-evaluator manager eval-name input ref-output output)]
            (println "  score:" (get scores "score") "| reasoning:" (get scores "reasoning"))
-           {:result-idx result-idx
+           (swap! results conj {:result-idx k
+                                :example-id example-id
+                                :scores     scores})
+           {:result-idx k
             :example-id example-id
-            :scores     scores})))))
-
-  )
+            :scores     scores}))))))
