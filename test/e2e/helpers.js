@@ -471,13 +471,15 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   const dropdown = page.getByTestId('evaluator-selector-dropdown');
   const evaluatorOptionByTestId = page.getByTestId(`evaluator-selector-option-${evaluatorName}`);
   const evaluatorOptionByRole = page.getByRole('option').filter({ hasText: evaluatorName }).first();
-  const optionIsVisible = async () =>
-    (await evaluatorOptionByTestId.isVisible().catch(() => false))
-    || (await evaluatorOptionByRole.isVisible().catch(() => false));
+  const selectedEvaluatorBadge = modal.locator('.inline-flex').filter({ hasText: evaluatorName }).first();
+  const getVisibleOption = async () => {
+    if (await evaluatorOptionByTestId.isVisible().catch(() => false)) return evaluatorOptionByTestId;
+    if (await evaluatorOptionByRole.isVisible().catch(() => false)) return evaluatorOptionByRole;
+    return null;
+  };
   const selectionIsApplied = async () => {
     const dropdownVisible = await dropdown.isVisible().catch(() => false);
-    const selectedEvaluator = modal.getByText(evaluatorName, { exact: true }).first();
-    const selectedEvaluatorVisible = await selectedEvaluator.isVisible().catch(() => false);
+    const selectedEvaluatorVisible = await selectedEvaluatorBadge.isVisible().catch(() => false);
     return selectedEvaluatorVisible && !dropdownVisible;
   };
 
@@ -489,38 +491,36 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
     evaluatorName.substring(0, Math.min(8, evaluatorName.length)),
   ])).filter(Boolean);
 
-  for (const term of searchTerms) {
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await searchInput.click();
-      await searchInput.fill('');
-      await searchInput.fill(term);
-      // Dropdown visibility can race with scroll/portal updates, so treat it as optional.
-      await dropdown.isVisible().catch(() => false);
-      if (await optionIsVisible()) break;
-      await page.waitForTimeout(700);
-    }
-    if (await optionIsVisible()) break;
-  }
+  let termIdx = 0;
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    if (await selectionIsApplied()) break;
 
-  let selected = false;
-  for (let clickAttempt = 0; clickAttempt < 5 && !selected; clickAttempt++) {
-    const foundByTestId = await evaluatorOptionByTestId.isVisible().catch(() => false);
-    const evaluatorOption = foundByTestId ? evaluatorOptionByTestId : evaluatorOptionByRole;
-    await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
+    const term = searchTerms[termIdx % searchTerms.length];
+    termIdx += 1;
 
-    try {
-      // The searchable dropdown can refetch and re-render between visibility and click.
-      // Re-query and retry so detached-option races don't consume the entire test timeout.
-      await evaluatorOption.click({ timeout: 5000 });
-    } catch (error) {
-      if (clickAttempt === 4) throw error;
-      await page.waitForTimeout(300);
-      await searchInput.click();
+    await searchInput.click();
+    await searchInput.fill('');
+    await searchInput.fill(term);
+    // Wait for debounce/refetch without assuming the dropdown stays mounted.
+    await page.waitForTimeout(700);
+
+    const evaluatorOption = await getVisibleOption();
+    if (!evaluatorOption) {
+      await page.waitForTimeout(400);
       continue;
     }
 
-    selected = await selectionIsApplied();
-    if (!selected) {
+    try {
+      // The searchable dropdown can refetch and re-render between visibility and click.
+      // Re-query on every loop so detached-option races don't consume the entire test timeout.
+      await evaluatorOption.click({ timeout: 3000 });
+    } catch (_error) {
+      await page.waitForTimeout(300);
+      continue;
+    }
+
+    if (!(await selectionIsApplied())) {
       await page.waitForTimeout(300);
     }
   }
