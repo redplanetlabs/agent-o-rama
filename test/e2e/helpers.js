@@ -474,6 +474,12 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   const optionIsVisible = async () =>
     (await evaluatorOptionByTestId.isVisible().catch(() => false))
     || (await evaluatorOptionByRole.isVisible().catch(() => false));
+  const selectionIsApplied = async () => {
+    const dropdownVisible = await dropdown.isVisible().catch(() => false);
+    const selectedEvaluator = modal.getByText(evaluatorName, { exact: true }).first();
+    const selectedEvaluatorVisible = await selectedEvaluator.isVisible().catch(() => false);
+    return selectedEvaluatorVisible && !dropdownVisible;
+  };
 
   // Retry search to handle async indexing / network jitter in CI.
   // Some backends match prefixes more reliably than full exact strings.
@@ -495,12 +501,31 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
     }
     if (await optionIsVisible()) break;
   }
-  const foundByTestId = await evaluatorOptionByTestId.isVisible().catch(() => false);
-  const evaluatorOption = foundByTestId ? evaluatorOptionByTestId : evaluatorOptionByRole;
-  await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
-  
-  // Click the evaluator in the dropdown
-  await evaluatorOption.click();
+
+  let selected = false;
+  for (let clickAttempt = 0; clickAttempt < 5 && !selected; clickAttempt++) {
+    const foundByTestId = await evaluatorOptionByTestId.isVisible().catch(() => false);
+    const evaluatorOption = foundByTestId ? evaluatorOptionByTestId : evaluatorOptionByRole;
+    await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
+
+    try {
+      // The searchable dropdown can refetch and re-render between visibility and click.
+      // Re-query and retry so detached-option races don't consume the entire test timeout.
+      await evaluatorOption.click({ timeout: 5000 });
+    } catch (error) {
+      if (clickAttempt === 4) throw error;
+      await page.waitForTimeout(300);
+      await searchInput.click();
+      continue;
+    }
+
+    selected = await selectionIsApplied();
+    if (!selected) {
+      await page.waitForTimeout(300);
+    }
+  }
+
+  await expect.poll(selectionIsApplied, { timeout: 10000 }).toBe(true);
   
   console.log(`Successfully added evaluator: ${evaluatorName}`);
 }
