@@ -42,11 +42,20 @@
 
 (defonce app-db (atom initial-db))
 
-;; TODO disable with shado-cljs, for performance
-(add-watch app-db :console-logger
-           (fn [key atom old-state new-state]
-             ;; This runs on EVERY state change
-             (aset js/window "db" (clj->js new-state {:keyword-fn (fn [k] (str/replace (name k) "-" "_"))}))))
+(defn app-db->window-db
+  "Convert app-db into a JS-friendly structure for ad hoc browser debugging."
+  [db]
+  (clj->js db {:keyword-fn (fn [k] (str/replace (name k) "-" "_"))}))
+
+(defn expose-db!
+  "Expose the current app-db as window.db when debugging manually."
+  []
+  (aset js/window "db" (app-db->window-db @app-db)))
+
+(defn clear-exposed-db!
+  "Remove any manually exposed window.db value."
+  []
+  (js-delete js/window "db"))
 
 ;; =============================================================================
 ;; EVENT SYSTEM
