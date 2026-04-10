@@ -1,7 +1,8 @@
 (ns com.rpl.agent-o-rama.impl.ui.rpc.experiments
   (:require
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.impl.types :as aor-types]))
+   [com.rpl.agent-o-rama.impl.types :as aor-types])
+  (:use [com.rpl.rama]))
 
 (defn get-results!!
   [{:keys [manager dataset-id experiment-id]} _uid]

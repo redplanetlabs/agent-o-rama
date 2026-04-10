@@ -161,6 +161,23 @@
         (setup-container default-port)
         merge-vol)))
 
+(defn setup-ui-only-system
+  "Setup IPC, module, and UI without provisioning a Selenium container.
+   Useful for browser tests that launch their own local browser runtime
+   (for example spel/Playwright) and therefore don't need Docker."
+  [system-vol agent-module & {:keys [pre-launch-hook post-deploy-hook]}]
+  (let [merge-vol (fn [val] (vswap! system-vol merge val))]
+    (-> @system-vol
+        (setup-ipc)
+        merge-vol
+        (setup-agent-module
+         agent-module
+         {:pre-launch-hook pre-launch-hook
+          :post-deploy-hook post-deploy-hook})
+        merge-vol
+        (setup-agent-ui {:port default-port})
+        merge-vol)))
+
 (defn- teardown-agent-ui
   [{:keys [ui-launched]}]
   (when ui-launched
@@ -223,6 +240,22 @@
       (when in-test-runner?
         (teardown-system system-vol)))))
 
+(defn reusable-ui-only-system-fixture
+  "Test fixture that sets up IPC/module/UI resources without Docker/webdriver."
+  [system-vol agent-module f & {:keys [pre-launch-hook post-deploy-hook]}]
+  (setup-ui-only-system
+   system-vol
+   agent-module
+   :pre-launch-hook
+   pre-launch-hook
+   :post-deploy-hook
+   post-deploy-hook)
+  (try
+    (f)
+    (finally
+      (when in-test-runner?
+        (teardown-system system-vol)))))
+
 (defmacro with-system
   "Execute body with a system setup.
 
@@ -246,6 +279,18 @@
      (testing ...))"
   [[system-vol agent-module & [{:keys [pre-launch-hook post-deploy-hook]}]] & body]
   `(reusable-system-fixture
+    ~system-vol
+    ~agent-module
+    (fn []
+      ~@body)
+    ~@(when pre-launch-hook [:pre-launch-hook pre-launch-hook])
+    ~@(when post-deploy-hook [:post-deploy-hook post-deploy-hook])))
+
+(defmacro with-ui-system
+  "Execute body with IPC/module/UI setup but without Docker/webdriver.
+   Intended for local browser tests such as spel-backed Playwright tests."
+  [[system-vol agent-module & [{:keys [pre-launch-hook post-deploy-hook]}]] & body]
+  `(reusable-ui-only-system-fixture
     ~system-vol
     ~agent-module
     (fn []
@@ -282,6 +327,14 @@
   [env]
   (str
    "http://host.testcontainers.internal:" (:port env)
+   "/agents/" (url-encode (:module-name env))))
+
+(defn local-module-base-url
+  "Generate a localhost base URL for module-scoped UI pages.
+   Useful for tests that run a browser directly on the host VM."
+  [env]
+  (str
+   "http://localhost:" (:port env)
    "/agents/" (url-encode (:module-name env))))
 
 (defn agent-invoke-url

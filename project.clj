@@ -74,6 +74,7 @@
                             "1.8.0-beta15"]
                            [thheller/shadow-cljs "3.1.7"]
                            [etaoin "1.1.43"]
+                           [com.blockether/spel "0.7.11"]
                            [clj-test-containers/clj-test-containers "0.7.4"]
                            [org.testcontainers/testcontainers "2.0.3"]
                            [clj-kondo "2025.09.22"]]}
