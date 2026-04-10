@@ -6,6 +6,7 @@
    [ring.util.response :as resp]
    [jsonista.core :as j]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.ui :as ui]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.queries :as queries]
@@ -56,7 +57,7 @@
         :else
         (try
           {:success true
-           :data (common/->ui-serializable (@rpc-var processed-data))}
+           :data (common/->ui-serializable (@rpc-var @ui/system processed-data))}
           (catch Throwable e
             {:success false
              :error (or (.getMessage e) (str e) "Unknown error occurred")
