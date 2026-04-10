@@ -5,18 +5,15 @@
     [uix.core :refer [defui $]]
     [uix.re-frame :refer [use-subscribe]]))
 
- (def hello-world-rpc-id
-   :com.rpl.agent-o-rama.impl.ui.rpc.hello-world/index!!)
+(def hello-world-rpc-id
+  :com.rpl.agent-o-rama.impl.ui.rpc.hello-world/index!!)
 
- (defonce registered?
-   (do
-     (rfq/reg-query
-      hello-world-rpc-id
-      {:query-fn (fn [params]
-                   {:rpc/id hello-world-rpc-id
-                    :payload params})
-       :stale-time-ms 0})
-     true))
+(rfq/reg-query
+ hello-world-rpc-id
+ {:query-fn (fn [params]
+              {:rpc/id hello-world-rpc-id
+               :payload params})
+  :stale-time-ms 0})
 
  (defui page [{:keys [module-id]}]
    (let [{:keys [status data error]}

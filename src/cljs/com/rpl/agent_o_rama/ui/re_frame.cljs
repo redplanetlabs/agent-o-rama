@@ -6,13 +6,6 @@
 
  (def ^:private rpc-fx-key ::rpc)
 
- (defn- normalize-error
-   [error]
-   (cond
-     (map? error) error
-     (instance? js/Error error) {:error (or (.-message error) (str error))}
-     :else {:error (str error)}))
-
  (rf/reg-fx
   rpc-fx-key
   (fn [{:keys [request on-success on-failure]}]
@@ -21,7 +14,7 @@
         (.then (fn [data]
                  (rf/dispatch (conj on-success data))))
         (.catch (fn [error]
-                  (rf/dispatch (conj on-failure (normalize-error error))))))))
+                  (rf/dispatch (conj on-failure error)))))))
 
  (defonce initialized? (atom false))
 
