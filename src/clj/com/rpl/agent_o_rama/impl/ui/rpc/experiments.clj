@@ -1,13 +1,12 @@
 (ns com.rpl.agent-o-rama.impl.ui.rpc.experiments
   (:require
    [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.agent-o-rama.impl.ui :as ui])
+   [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:use [com.rpl.rama]))
 
 (defn get-results!!
-  [_system {:keys [decoded-module-id dataset-id experiment-id]}]
-  (let [manager (get-in (:aor-cache @ui/system) [decoded-module-id :manager])
+  [system {:keys [module-id dataset-id experiment-id]}]
+  (let [manager (get-in system [:aor-cache module-id :manager])
         results-query (:experiments-results-query (aor-types/underlying-objects manager))
         base-results (foreign-invoke-query results-query
                                            dataset-id

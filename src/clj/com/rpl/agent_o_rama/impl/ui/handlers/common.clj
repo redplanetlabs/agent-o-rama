@@ -162,7 +162,7 @@
 
           ;; --- Build the new, enriched data map ---
           enriched-data (cond-> thawed-data
-                          decoded-module-id (assoc :decoded-module-id decoded-module-id)
+                          decoded-module-id (assoc :module-id decoded-module-id)
                           decoded-agent-name (assoc :decoded-agent-name decoded-agent-name)
                           parsed-dataset-id (assoc :dataset-id parsed-dataset-id)
                           parsed-experiment-id (assoc :experiment-id parsed-experiment-id)
