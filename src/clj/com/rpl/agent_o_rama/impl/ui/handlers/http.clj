@@ -38,22 +38,7 @@
 
 (defn- preprocess-rpc-payload
   [payload]
-  (let [thawed-data (common/from-ui-serializable payload)
-        module-id (:module-id thawed-data)
-        agent-name (:agent-name thawed-data)
-        parsed-dataset-id (when-let [did (:dataset-id thawed-data)]
-                            (if (and (string? did) (not (str/blank? did)))
-                              (UUID/fromString did)
-                              did))
-        parsed-experiment-id (when-let [eid (:experiment-id thawed-data)]
-                               (if (string? eid) (UUID/fromString eid) eid))
-        parsed-invoke-pair (when-let [iid (:invoke-id thawed-data)]
-                             (if (string? iid) (common/parse-url-pair iid) iid))]
-    (cond-> thawed-data
-      agent-name (assoc :agent-name (common/url-decode agent-name))
-      parsed-dataset-id (assoc :dataset-id parsed-dataset-id)
-      parsed-experiment-id (assoc :experiment-id parsed-experiment-id)
-      parsed-invoke-pair (assoc :invoke-pair parsed-invoke-pair))))
+  (common/from-ui-serializable payload))
 
 (defn invoke-rpc
   "Invoke an allowlisted RPC var directly and return a standard reply envelope."
