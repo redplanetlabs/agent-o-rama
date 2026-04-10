@@ -2,6 +2,7 @@
   (:require
    [uix.core :as uix :refer [defui defhook $]]
    [uix.dom]
+   [uix.re-frame :refer [use-subscribe]]
    [clojure.string :as str]
 
    [com.rpl.agent-o-rama.ui.agents :as agents]
@@ -16,6 +17,8 @@
    [com.rpl.agent-o-rama.ui.experiments.comparative-detail :as comparative-experiments-detail]
    [com.rpl.agent-o-rama.ui.analytics :as analytics]
    [com.rpl.agent-o-rama.impl.ui.rpc.hello-world :as rpc-hello-world]
+   [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
+   [re-frame.query :as rfq]
    [reitit.core :as r]
    [reitit.frontend :as rf]
    [reitit.frontend.easy :as rfe]
@@ -166,11 +169,10 @@
 (defui module-context-nav [{:keys [module-id collapsed?]}]
   (let [location (or (get-in (state/use-sub [:route]) [:path]) "/")
         ;; Query for module-specific agents
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:module-agents module-id]
-          :sente-event [:agents/get-for-module {:module-id module-id}]
-          :enabled? (boolean module-id)})]
+        {:keys [data error]
+         agents-status :status}
+        (use-subscribe [::rfq/query ::rpc-agents/get-for-module!! {:module-id module-id}])
+        loading? (#{:loading :idle} agents-status)]
     ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
        (when-not collapsed?
          ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))

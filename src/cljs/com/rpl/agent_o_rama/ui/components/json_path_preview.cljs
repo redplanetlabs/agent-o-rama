@@ -1,10 +1,13 @@
 (ns com.rpl.agent-o-rama.ui.components.json-path-preview
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [re-frame.query :as rfq]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]))
 
@@ -41,17 +44,16 @@
   (let [[debounced-expression] (useDebounce expression 500)
         should-fetch? (and module-id dataset-id (not (str/blank? debounced-expression)))
 
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:preview-expression module-id dataset-id snapshot-name debounced-expression type source-field]
-          :sente-event [:datasets/preview-expression
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-datasets/preview-expression!!
                         {:module-id module-id
                          :dataset-id dataset-id
                          :snapshot-name snapshot-name
                          :expression debounced-expression
                          :type type
-                         :source-field source-field}]
-          :enabled? should-fetch?})]
+                         :source-field source-field}])
+        loading? (#{:loading :idle} query-status)]
 
     ($ PreviewBox
        {:result (:result data)

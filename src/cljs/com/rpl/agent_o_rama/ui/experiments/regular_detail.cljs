@@ -573,7 +573,7 @@
            :experiment-id experiment-id}])
         ;; NEW: State for the details panel visibility
         [show-info? set-show-info] (uix/use-state false)
-        loading? (= query-status :loading)
+        loading? (#{:loading :idle} query-status)
         error-message (when (= query-status :error) error)
         inv-error (:invocation-error data)
         status (cond

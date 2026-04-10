@@ -2,12 +2,21 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.types :as aor-types])
-  (:use [com.rpl.rama]))
+  (:use [com.rpl.rama])
+  (:import [java.util UUID]))
+
+(defn- ensure-uuid [x]
+  (cond
+    (instance? UUID x) x
+    (string? x) (UUID/fromString x)
+    :else x))
 
 (defn get-results!!
   [system {:keys [module-id dataset-id experiment-id]}]
   (let [manager (get-in system [:aor-cache module-id :manager])
         exp-client (get-in system [:aor-cache module-id :clients aor-types/EVALUATOR-AGENT-NAME])
+        dataset-id (ensure-uuid dataset-id)
+        experiment-id (ensure-uuid experiment-id)
         results-query (:experiments-results-query (aor-types/underlying-objects manager))
         base-results (foreign-invoke-query results-query
                                            dataset-id

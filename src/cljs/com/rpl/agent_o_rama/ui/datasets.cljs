@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
    [uix.core :as uix :refer [defui defhook $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentDuplicateIcon MagnifyingGlassIcon]]
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
@@ -13,6 +14,9 @@
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [re-frame.query :as rfq]
+   [re-frame.core :as rf]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
@@ -91,8 +95,10 @@
                                      (do
                                        (set-editing! false)
                                        (set-edit-value! "")
-                                       ;; Invalidate both the single example query and the main examples list
-                                       (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                       ;; Invalidate the rfq query for this example
+                                       (rf/dispatch [:re-frame.query/invalidate-tags
+                                                     [[:fetch-example module-id dataset-id example-id]]])
+                                       ;; Also invalidate the main examples list
                                        (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                        (when on-save (on-save)))
                                      (set-error! (str "Error saving: " (:error reply)))))))
@@ -144,14 +150,14 @@
 
 (defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
   (let [;; Fetch the specific example data
-        {:keys [data loading? error refetch]}
-        (queries/use-sente-query
-         {:query-key [:single-example module-id dataset-id snapshot-name (str example-id)]
-          :sente-event [:datasets/get-example {:module-id module-id
-                                               :dataset-id dataset-id
-                                               :snapshot-name snapshot-name
-                                               :example-id example-id}]
-          :enabled? (boolean (and module-id dataset-id example-id))})
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-datasets/fetch-example!!
+                        {:module-id module-id
+                         :dataset-id dataset-id
+                         :snapshot-name snapshot-name
+                         :example-id example-id}])
+        loading? (#{:loading :idle} query-status)
 
         example (:example data)]
 
@@ -246,8 +252,9 @@
                               (if (:success reply)
                                 (do
                                   (set-input-value "")
-                                  ;; Invalidate both the single example query and the main examples list
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                  ;; Invalidate the rfq example query and the main examples list
+                                  (rf/dispatch [:re-frame.query/invalidate-tags
+                                                [[:fetch-example module-id dataset-id example-id]]])
                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                   (when on-tags-change (on-tags-change)))
                                 (js/alert (str "Error adding tag: " (:error reply))))))))
@@ -261,10 +268,11 @@
                                                     :tag tag-name}]
                              10000
                              (fn [reply]
-                               (if (:success reply)
+                                 (if (:success reply)
                                  (do
-                                   ;; Invalidate both the single example query and the main examples list
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:single-example module-id dataset-id snapshot-name (str example-id)]}])
+                                   ;; Invalidate the rfq example query
+                                   (rf/dispatch [:re-frame.query/invalidate-tags
+                                                 [[:fetch-example module-id dataset-id example-id]]])
                                    (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                    (when on-tags-change (on-tags-change)))
                                  (js/alert (str "Error removing tag: " (:error reply)))))))
@@ -918,11 +926,11 @@
 ;; =============================================================================
 
 (defui detail-examples-router [{:keys [module-id dataset-id]}]
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:dataset-props module-id dataset-id]
-          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))})
+  (let [{:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-datasets/get-props!!
+                        {:module-id module-id :dataset-id dataset-id}])
+        loading? (#{:loading :idle} query-status)
         dataset data
         is-remote? (boolean (:module-name dataset))]
     (cond
@@ -1080,13 +1088,12 @@
 
                      :else "examples")
         [show-info? set-show-info] (uix/use-state false)
-        {:keys [loading? error]}
-        (queries/use-sente-query
-         {:query-key [:dataset-props module-id dataset-id]
-          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))})
-        ;; not sure about doing it this way, why not. maybe we can eventually decouple fetching from views?
-        dataset (state/use-sub [:queries :dataset-props module-id dataset-id :data])
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-datasets/get-props!!
+                        {:module-id module-id :dataset-id dataset-id}])
+        loading? (#{:loading :idle} query-status)
+        dataset data
         is-remote? (boolean (:module-name dataset))]
     ($ :div.h-full.flex.flex-col
        (cond

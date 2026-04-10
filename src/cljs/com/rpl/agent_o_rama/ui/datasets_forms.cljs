@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
+   [re-frame.core :as rf]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
@@ -336,7 +337,10 @@
             [:datasets/create-snapshot form-state])
    :on-success-invalidate (fn [db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:snapshot-names module-id (str dataset-id)]})
-   :on-success (fn [db {:keys [dataset-id]} reply]
+   :on-success (fn [db {:keys [module-id dataset-id]} reply]
+                 ;; Invalidate rfq snapshot-names query
+                 (rf/dispatch [:re-frame.query/invalidate-tags
+                               [[:snapshot-names module-id dataset-id]]])
                  ;; On success, directly dispatch an event to select the new snapshot
                  (state/dispatch [:datasets/set-selected-snapshot
                                   {:dataset-id dataset-id

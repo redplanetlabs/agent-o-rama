@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.evaluators
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon MagnifyingGlassIcon PlayIcon]]
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
@@ -11,6 +12,8 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
+   [re-frame.query :as rfq]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -102,10 +105,10 @@
 (defui SelectBuilderStep [{:keys [form-id]}]
   (let [{:keys [set-field! next-step!]} (forms/use-form form-id)
         {:keys [module-id]} (state/use-sub [:forms form-id])
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:evaluator-builders module-id]
-          :sente-event [:evaluators/get-all-builders {:module-id module-id}]})]
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-builders!! {:module-id module-id}])
+        loading? (#{:loading :idle} query-status)]
     ;; The on-select logic is now integrated here
     (let [handle-select (fn [builder]
                           (set-field! [:selected-builder] builder)
@@ -329,20 +332,17 @@
         [loading? set-loading] (uix/use-state false)
         [dropdown-open? set-dropdown-open] (uix/use-state false)
 
-        ;; Fetch all evaluator instances - use distinct query key to avoid conflicts
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:evaluator-instances-modal module-id]
-          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
-          :enabled? (boolean module-id)})
+        ;; Fetch all evaluator instances
+        {instances-data :data instances-error :error instances-status :status}
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-instances!! {:module-id module-id}])
+        data instances-data
+        loading? (= instances-status :loading)
+        error instances-error
 
         ;; Fetch evaluator builders to get their options for conditional rendering
-        builders-query (queries/use-sente-query
-                        {:query-key [:evaluator-builders module-id]
-                         :sente-event [:evaluators/get-all-builders {:module-id module-id}]
-                         :enabled? (boolean module-id)})
-
-        builders-by-name (:data builders-query)
+        {builders-data :data}
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-builders!! {:module-id module-id}])
+        builders-by-name builders-data
 
         ;; Filter evaluators based on the modal's mode (:single or :multi)
         evaluators (filter

@@ -1,9 +1,12 @@
 (ns com.rpl.agent-o-rama.ui.selectors
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
+   [re-frame.query :as rfq]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [MagnifyingGlassIcon]]))
@@ -30,11 +33,11 @@
 (defui NodeSelectorDropdown
   "A dropdown that fetches and displays nodes for a given agent."
   [{:keys [module-id agent-name value on-change disabled? error data-testid]}]
-  (let [{:keys [data loading? error query-error]}
-        (queries/use-sente-query
-         {:query-key [:graph module-id agent-name]
-          :sente-event [:invocations/get-graph {:module-id module-id :agent-name agent-name}]
-          :enabled? (boolean (and module-id agent-name))})
+  (let [{:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-invocations/get-graph!!
+                        {:module-id module-id :agent-name agent-name}])
+        loading? (#{:loading :idle} query-status)
 
         nodes (when-let [graph (:graph data)]
                 (sort (keys (:node-map graph))))
@@ -63,7 +66,7 @@
            :display-text display-text
            :items node-items
            :loading? loading?
-           :error? query-error
+           :error? error
            :empty-content empty-content
            :data-testid data-testid})
        (if error

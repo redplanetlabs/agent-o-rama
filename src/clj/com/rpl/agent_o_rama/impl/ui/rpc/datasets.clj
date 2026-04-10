@@ -1,0 +1,180 @@
+(ns com.rpl.agent-o-rama.impl.ui.rpc.datasets
+  (:require
+   [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
+   [com.rpl.agent-o-rama.impl.queries :as queries]
+   [com.rpl.agent-o-rama.impl.datasets :as datasets]
+   [com.rpl.agent-o-rama.impl.helpers :as h]
+   [clojure.string :as str]
+   [jsonista.core :as j])
+  (:import [java.util UUID])
+  (:use [com.rpl.rama]))
+
+(defn- get-manager [system module-id]
+  (get-in system [:aor-cache module-id :manager]))
+
+(defn- process-example-source [example]
+  (if-let [source (:source example)]
+    (assoc example :source-string (aor-types/source-string source))
+    example))
+
+(defn- process-examples [examples]
+  (mapv process-example-source examples))
+
+(defn- mark-remote-datasets [datasets]
+  (mapv (fn [dataset]
+          (let [module-name (:module-name dataset)
+                host (:cluster-conductor-host dataset)
+                port (:cluster-conductor-port dataset)]
+            (if module-name
+              (assoc dataset
+                     :remote? true
+                     :remote-module-name module-name
+                     :remote-host host
+                     :remote-port port)
+              dataset)))
+        datasets))
+
+(defn- ensure-uuid [x]
+  (cond
+    (instance? java.util.UUID x) x
+    (string? x) (java.util.UUID/fromString x)
+    :else x))
+
+(defn get-all!!
+  [system {:keys [module-id pagination filters]}]
+  (let [manager (get-manager system module-id)
+        underlying-objects (aor-types/underlying-objects manager)
+        search-string (get filters :search-string)]
+    (if-not (str/blank? search-string)
+      (let [search-query (:search-datasets-query underlying-objects)]
+        (->> (foreign-invoke-query search-query search-string 500)
+             (mapv (fn [[id name]] {:dataset-id id, :name name}))
+             (hash-map :datasets)))
+      (let [datasets-page-query (:datasets-page-query underlying-objects)
+            result (foreign-invoke-query datasets-page-query 25 pagination)]
+        (update result :datasets mark-remote-datasets)))))
+
+(defn get-props!!
+  [system {:keys [module-id dataset-id]}]
+  (let [manager (get-manager system module-id)
+        dataset-id (ensure-uuid dataset-id)
+        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
+    (queries/get-dataset-properties datasets-pstate dataset-id)))
+
+(defn get-snapshot-names!!
+  [system {:keys [module-id dataset-id]}]
+  (let [manager (get-manager system module-id)
+        dataset-id (ensure-uuid dataset-id)
+        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
+    (queries/get-dataset-snapshot-names datasets-pstate dataset-id)))
+
+(defn search-examples!!
+  [system {:keys [module-id dataset-id snapshot-name filters limit pagination]}]
+  (let [manager (get-manager system module-id)
+        dataset-id (ensure-uuid dataset-id)
+        {:keys [search-examples-query]} (aor-types/underlying-objects manager)
+        result (foreign-invoke-query search-examples-query
+                                     dataset-id
+                                     (when-not (str/blank? snapshot-name) snapshot-name)
+                                     (or filters {})
+                                     (or limit 20)
+                                     pagination)]
+    (update result :examples process-examples)))
+
+(defn get-example!!
+  [system {:keys [module-id dataset-id snapshot-name example-id]}]
+  (let [manager (get-manager system module-id)
+        dataset-id (ensure-uuid dataset-id)
+        example-id (ensure-uuid example-id)
+        {:keys [multi-examples-query]} (aor-types/underlying-objects manager)
+        examples-map (foreign-invoke-query multi-examples-query
+                                           dataset-id
+                                           (when-not (str/blank? snapshot-name) snapshot-name)
+                                           [example-id])
+        example (get examples-map example-id)]
+    (if example
+      {:status :ok :example (process-example-source example)}
+      {:status :error :error "Example not found"})))
+
+(defn fetch-example!!
+  [system params]
+  (get-example!! system params))
+
+(defn validate-direct-data!!
+  [system {:keys [module-id dataset-id input output]}]
+  (let [manager (get-manager system module-id)
+        dataset-id (ensure-uuid dataset-id)
+        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
+        schemas (queries/get-dataset-properties datasets-pstate dataset-id)
+        input-schema (:input-json-schema schemas)
+        output-schema (:output-json-schema schemas)]
+    (if-not schemas
+      (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
+      (let [input-validation (when input-schema (datasets/validate-with-schema* input-schema input))
+            output-validation (when output-schema (datasets/validate-with-schema* output-schema output))]
+        {:input {:is-valid? (or (nil? input-schema) (nil? input-validation))
+                 :validation-error input-validation}
+         :output {:is-valid? (or (nil? output-schema) (nil? output-validation))
+                  :validation-error output-validation}}))))
+
+(defn preview-expression!!
+  [system {:keys [module-id dataset-id snapshot-name source-field expression type]}]
+  (let [manager (get-manager system module-id)
+        dataset-id (ensure-uuid dataset-id)
+        {:keys [search-examples-query multi-examples-query]}
+        (aor-types/underlying-objects manager)
+        search-result (foreign-invoke-query search-examples-query
+                                            dataset-id
+                                            (when-not (str/blank? snapshot-name) snapshot-name)
+                                            {}
+                                            1
+                                            nil)
+        example-summary (first (:examples search-result))]
+    (if-not example-summary
+      {:status :ok :result nil :error "No examples found in dataset"}
+      (let [full-examples (foreign-invoke-query multi-examples-query
+                                                dataset-id
+                                                (when-not (str/blank? snapshot-name) snapshot-name)
+                                                [(:id example-summary)])
+            example (get full-examples (:id example-summary))
+            source-data (case source-field
+                          :input (:input example)
+                          :reference-output (:reference-output example)
+                          nil)
+            preview-result
+            (if (nil? source-data)
+              ::no-source-data
+              (try
+                (case type
+                  :path
+                  (h/read-json-path source-data expression)
+                  :template
+                  (let [template-obj
+                        (if (string? expression)
+                          (if (or (str/starts-with? (str/trim expression) "{")
+                                  (str/starts-with? (str/trim expression) "["))
+                            (j/read-value expression)
+                            expression)
+                          expression)]
+                    (h/resolve-json-path-template template-obj source-data)))
+                (catch Exception e
+                  (let [msg (or (.getMessage e) "")]
+                    (cond
+                      (or (str/includes? msg "can not be null")
+                          (str/includes? msg "cannot be null")
+                          (str/includes? msg "No results")
+                          (str/includes? msg "Missing property"))
+                      ::path-not-found
+                      :else
+                      (throw e))))))]
+        (cond
+          (= preview-result ::no-source-data)
+          {:status :ok :result nil :error (str "No " (name source-field) " data in this example")}
+          (= preview-result ::path-not-found)
+          {:status :ok :result nil :error "Path not found in data"}
+          :else
+          {:status :ok
+           :result (common/->ui-serializable preview-result)
+           :example-preview (common/->ui-serializable source-data)})))))

@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.experiments.comparative-detail
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [BeakerIcon ArrowLeftIcon ChevronDownIcon ChevronUpIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
@@ -8,6 +9,8 @@
    [com.rpl.agent-o-rama.ui.experiments.forms :as forms]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.experiments.regular-detail :as regular-detail]
+   [com.rpl.agent-o-rama.impl.ui.rpc.experiments :as rpc-experiments]
+   [re-frame.query :as rfq]
    [reitit.frontend.easy :as rfe]))
 
 (defn find-all-selector-evaluators
@@ -221,13 +224,13 @@
                                      :columns-metadata columns-metadata}))))))))))))))
 
 (defui detail-page [{:keys [module-id dataset-id experiment-id]}]
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:experiment-results module-id dataset-id experiment-id]
-          :sente-event [:experiments/get-results {:module-id module-id
-                                                  :dataset-id dataset-id
-                                                  :experiment-id experiment-id}]
-          :refetch-interval-ms 2000})
+  (let [{:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-experiments/get-results!!
+                        {:module-id module-id
+                         :dataset-id dataset-id
+                         :experiment-id experiment-id}])
+        loading? (#{:loading :idle} query-status)
         [show-info? set-show-info] (uix/use-state false)
         [show-full-text? set-show-full-text] (uix/use-state false)
         inv-error (:invocation-error data)

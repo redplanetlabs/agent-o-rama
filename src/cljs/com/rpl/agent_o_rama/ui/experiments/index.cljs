@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.experiments.index
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon TrashIcon MagnifyingGlassIcon XMarkIcon]]
    ["use-debounce" :refer [useDebounce]]
    ["react-datetime-picker" :default DateTimePicker]
@@ -10,6 +11,8 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.chart :as chart]
+   [com.rpl.agent-o-rama.impl.ui.rpc.experiment-list :as rpc-experiment-list]
+   [re-frame.query :as rfq]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]))
 
@@ -81,20 +84,17 @@
         start-ts (when start-date (.getTime start-date))
         end-ts (when end-date (.getTime end-date))
 
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:experiments module-id dataset-id :regular debounced-search-term start-ts end-ts]
-          :sente-event [:experiments/get-all-for-dataset
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-experiment-list/get-all-for-dataset!!
                         {:module-id module-id
                          :dataset-id dataset-id
                          :filters (cond-> {:type :regular}
                                     (not (str/blank? debounced-search-term))
                                     (assoc :search-string debounced-search-term)
-
                                     (seq times-filter)
-                                    (assoc :times times-filter))}]
-          :enabled? (boolean (and module-id dataset-id))
-          :refresh-interval-ms 1000})
+                                    (assoc :times times-filter))}])
+        loading? (#{:loading :idle} query-status)
 
         experiments (get data :items)
         {:keys [columns ambiguous-metrics] :as evaluator-metadata}

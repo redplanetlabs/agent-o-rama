@@ -1,12 +1,15 @@
 (ns com.rpl.agent-o-rama.ui.datasets.add-from-trace
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [re-frame.query :as rfq]
    [clojure.string :as str]
    ["react" :refer [useEffect]]
    ["use-debounce" :refer [useDebounce]]))
@@ -37,10 +40,10 @@
         [debounced-output-data, _] (useDebounce (:value output-data-field) 500)
 
         ;; Fetch dataset schemas for the selected dataset
-        {:keys [data loading?]} (queries/use-sente-query
-                                 {:query-key [:datasets module-id]
-                                  :sente-event [:datasets/get-all {:module-id module-id}]
-                                  :enabled? (some? (:value dataset-id-field))})]
+        {:keys [data]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-datasets/get-all!! {:module-id module-id}])
+        loading? (#{:loading :idle} query-status)]
 
     (useEffect
      (fn []

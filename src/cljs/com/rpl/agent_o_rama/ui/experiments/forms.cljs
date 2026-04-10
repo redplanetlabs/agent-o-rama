@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.experiments.forms
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -10,6 +11,10 @@
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]
    [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
+   [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
+   [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [re-frame.query :as rfq]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [reitit.frontend.easy :as rfe]
@@ -76,11 +81,10 @@
 ;; =============================================================================
 
 (defui AgentSelectorDropdown [{:keys [module-id selected-agent on-select-agent disabled? data-testid]}]
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:module-agents module-id]
-          :sente-event [:agents/get-for-module {:module-id module-id}]
-          :enabled? (boolean module-id)})
+  (let [{:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-agents/get-for-module!! {:module-id module-id}])
+        loading? (#{:loading :idle} query-status)
         agent-items (->> data
                          (keep (fn [agent]
                                  (let [decoded-name (common/url-decode (:agent-name agent))]
@@ -112,12 +116,11 @@
   [{:keys [module-id selected-evaluators on-change allowed-types use-remote?]}]
   (let [[remote-eval-name set-remote-eval-name] (uix/use-state "")
 
-        ;; Fetch all evaluators to get info for display - use distinct query key
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:evaluator-instances-list module-id]
-          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
-          :enabled? (boolean module-id)})
+        ;; Fetch all evaluators to get info for display
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-instances!! {:module-id module-id}])
+        loading? (#{:loading :idle} query-status)
         all-evaluators (or (:items data) [])
         filtered-evaluators (if allowed-types
                               (filter #(allowed-types (:type %)) all-evaluators)
@@ -310,12 +313,10 @@
   (let [{:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
 
         ;; Check if dataset is remote
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:dataset-props module-id dataset-id]
-          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (and (boolean module-id) (boolean dataset-id))})
-        is-remote-dataset? (:module-name data)
+        {dataset-props :data}
+        (use-subscribe [::rfq/query ::rpc-datasets/get-props!!
+                        {:module-id module-id :dataset-id dataset-id}])
+        is-remote-dataset? (:module-name dataset-props)
 
         ;; Basic info fields
         name-field (forms/use-form-field form-id :name)

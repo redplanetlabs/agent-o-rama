@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback-queues
   (:require
    [uix.core :as uix :refer [defui defhook $]]
+   [uix.re-frame :refer [use-subscribe]]
    [reitit.frontend.easy :as rfe]
    ["@heroicons/react/24/outline" :refer [PencilIcon ChevronLeftIcon ChevronRightIcon XMarkIcon TrashIcon ArrowTopRightOnSquareIcon]]
    ["react" :refer [useState]]
@@ -13,6 +14,9 @@
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
+   [com.rpl.agent-o-rama.impl.ui.rpc.human-feedback :as rpc-hf]
+   [re-frame.query :as rfq]
+   [re-frame.core :as rf]
    [clojure.string :as str]
    [cljs.pprint]
    [cljs.reader]))
@@ -528,7 +532,10 @@
 
    :on-success
    (fn [db {:keys [module-id name]} _reply]
-     ;; Also invalidate the specific queue info (useful for edit mode)
+     ;; Invalidate the rfq queue-info query
+     (rf/dispatch [:re-frame.query/invalidate-tags
+                   [[:human-feedback/queue-info module-id name]]])
+     ;; Also invalidate using old system for backward compat
      (state/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queue-info module-id name]}]))}})
 
 ;; =============================================================================
@@ -914,13 +921,11 @@
         decoded-queue-id (common/url-decode queue-id)
 
         ;; Query for queue info (description, rubrics)
-        {:keys [data loading? error] :as queue-info-query}
-        (queries/use-sente-query
-         {:query-key [:human-feedback-queue-info module-id queue-id]
-          :sente-event [:human-feedback/get-queue-info
-                        {:module-id decoded-module-id
-                         :queue-name decoded-queue-id}]
-          :enabled? (boolean (and decoded-module-id decoded-queue-id))})
+        {:keys [data error]
+         queue-info-status :status}
+        (use-subscribe [::rfq/query ::rpc-hf/get-queue-info!!
+                        {:module-id decoded-module-id :queue-name decoded-queue-id}])
+        loading? (#{:loading :idle} queue-info-status)
 
         queue-info data
         queue-info-error error
@@ -1051,14 +1056,12 @@
         item-id-str (str item-id)
 
         ;; Fetch queue info for rubrics
-        {:keys [data queue-info-loading?]}
-        (queries/use-sente-query
-         {:query-key [:human-feedback-queue-info module-id queue-id]
-          :sente-event [:human-feedback/get-queue-info
-                        {:module-id decoded-module-id
-                         :queue-name decoded-queue-id}]
-          :enabled? (boolean (and decoded-module-id decoded-queue-id))})
+        {:keys [data]
+         queue-info-status :status}
+        (use-subscribe [::rfq/query ::rpc-hf/get-queue-info!!
+                        {:module-id decoded-module-id :queue-name decoded-queue-id}])
         queue-info data
+        queue-info-loading? (#{:loading :idle} queue-info-status)
 
         ;; Fetch queue items with shared cache for review session
         ;; If item isn't in cache yet, load from its cursor and merge.

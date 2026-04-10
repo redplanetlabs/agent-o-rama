@@ -1,0 +1,207 @@
+(ns com.rpl.agent-o-rama.impl.ui.rpc.invocations
+  (:use [com.rpl.rama]
+        [com.rpl.rama.path])
+  (:require
+   [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.analytics :as ana]
+   [com.rpl.agent-o-rama.impl.pobjects :as po]
+   [com.rpl.agent-o-rama.impl.stats :as stats]
+   [com.rpl.agent-o-rama.impl.types :as aor-types]
+   [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
+   [jsonista.core :as j])
+  (:import [com.rpl.agentorama AgentInvoke]
+           [java.util UUID]))
+
+(defn- get-client [system module-id agent-name]
+  (get-in system [:aor-cache module-id :clients (common/url-decode agent-name)]))
+
+(defn- get-manager [system module-id]
+  (get-in system [:aor-cache module-id :manager]))
+
+(defn get-page!!
+  [system {:keys [module-id agent-name pagination filters]}]
+  (let [client (get-client system module-id agent-name)
+        page-size 10
+        scan-page-size 100
+        pages (if (empty? pagination) nil pagination)]
+    (when client
+      (foreign-invoke-query
+       (:invokes-page-query (aor-types/underlying-objects client))
+       page-size scan-page-size pages filters))))
+
+(defn get-filter-options!!
+  [system {:keys [module-id agent-name]}]
+  (let [client (get-client system module-id agent-name)
+        manager (get-manager system module-id)
+        decoded-agent-name (common/url-decode agent-name)
+        graph-nodes (let [graph-res (foreign-invoke-query
+                                    (:current-graph-query (aor-types/underlying-objects client)))]
+                      (-> graph-res
+                          :node-map
+                          keys
+                          sort
+                          vec))
+        human-metrics (let [search-human-metrics-query (:search-human-metrics-query
+                                                        (aor-types/underlying-objects manager))
+                            metric-res (foreign-invoke-query search-human-metrics-query {} 1000 nil)]
+                        (->> (:items metric-res)
+                             (map :name)
+                             sort
+                             vec))]
+    {:nodes graph-nodes
+     :feedback-metrics human-metrics}))
+
+(defn get-graph!!
+  [system {:keys [module-id agent-name]}]
+  (let [client (get-client system module-id agent-name)]
+    (if client
+      {:graph (foreign-invoke-query
+               (:current-graph-query
+                (aor-types/underlying-objects client)))}
+      {:graph nil})))
+
+(defn get-graph-page!!
+  [system {:keys [module-id agent-name invoke-id]}]
+  (let [client (get-client system module-id agent-name)]
+    (if-not client
+      (throw (ex-info "No client available - module or agent may not be loaded" {:invoke-id invoke-id}))
+      (let [invoke-pair (common/parse-url-pair invoke-id)
+            client-objects (aor-types/underlying-objects client)
+            tracing-query (:tracing-query client-objects)
+            root-pstate (:root-pstate client-objects)
+            stream-shared-pstate (:stream-shared-pstate client-objects)
+
+            [agent-task-id agent-id] invoke-pair
+
+            summary-info-raw (foreign-select-one
+                              [(keypath agent-id)
+                               (submap
+                                [:result :start-time-millis :finish-time-millis :graph-version
+                                 :retry-num :fork-of :exception-summaries :invoke-args :stats
+                                 :feedback :metadata])]
+                              root-pstate
+                              {:pkey agent-task-id})
+
+            summary-info (merge
+                          {:forks (foreign-select-one
+                                   [(keypath agent-id) :forks
+                                    (sorted-set-range-to-end 100)]
+                                   root-pstate
+                                   {:pkey agent-task-id})}
+                          (->> summary-info-raw
+                               (transform [:feedback :results ALL]
+                                          (fn [feedback-result]
+                                            (let [feedback-map (into {} feedback-result)
+                                                  source (:source feedback-map)]
+                                              (if source
+                                                (assoc feedback-map :source-string (aor-types/source-string source))
+                                                feedback-map))))
+                               (transform [:feedback :results ALL :scores MAP-KEYS] name)
+                               (transform [:feedback :actions MAP-KEYS] name))
+                          (when-let [stats (:stats summary-info-raw)]
+                            {:stats (merge {:aggregated-stats
+                                            (stats/aggregated-basic-stats stats)}
+                                           stats)}))
+
+            root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
+                                               root-pstate
+                                               {:pkey agent-task-id})
+
+            historical-graph (when-let [graph-version (:graph-version summary-info)]
+                               (foreign-select-one [:history (keypath graph-version)]
+                                                   stream-shared-pstate
+                                                   {:pkey 0}))
+
+            dynamic-trace (foreign-invoke-query tracing-query
+                                                agent-task-id
+                                                [[agent-task-id root-invoke-id]]
+                                                10000)
+
+            cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
+                            (->> m
+                                 common/remove-implicit-nodes
+                                 (transform
+                                  [MAP-VALS :feedback :results ALL]
+                                  (fn [feedback-result]
+                                    (let [feedback-map (into {} feedback-result)
+                                          source (:source feedback-map)]
+                                      (if source
+                                        (assoc feedback-map :source-string (aor-types/source-string source))
+                                        feedback-map))))
+                                 (transform
+                                  [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
+                                  name)
+                                 (transform
+                                  [MAP-VALS :feedback :actions MAP-KEYS]
+                                  name)))
+
+            agent-is-complete? (boolean (or (:finish-time-millis summary-info)
+                                            (:result summary-info)))]
+
+        {:is-complete agent-is-complete?
+         :nodes cleaned-nodes
+         :summary summary-info
+         :task-id agent-task-id
+         :agent-id agent-id
+         :root-invoke-id root-invoke-id
+         :historical-graph historical-graph}))))
+
+(defn get-node-stats!!
+  [system {:keys [module-id agent-name granularity]}]
+  (let [decoded-agent-name (common/url-decode agent-name)
+        client (get-client system module-id agent-name)]
+    (when client
+      (let [client-objects (aor-types/underlying-objects client)
+            telemetry-pstate (:telemetry-pstate client-objects)
+            gran-seconds (or granularity po/HOUR-GRANULARITY)
+            now-millis (System/currentTimeMillis)
+            bucket-size-millis (* gran-seconds 1000)
+            lookback-millis (* 3 bucket-size-millis)
+            start-time-millis (- now-millis lookback-millis)
+            end-time-millis (+ now-millis bucket-size-millis)
+            telemetry-data (ana/select-telemetry
+                            telemetry-pstate
+                            decoded-agent-name
+                            gran-seconds
+                            [:agent :node-latencies]
+                            start-time-millis
+                            end-time-millis
+                            [:mean :count :min :max 0.25 0.5 0.75 0.9 0.99]
+                            nil)]
+
+        (let [current-bucket (quot now-millis bucket-size-millis)
+              prev-bucket (dec current-bucket)
+              current-bucket-data (get telemetry-data current-bucket)
+              prev-bucket-data (get telemetry-data prev-bucket)
+
+              merge-node-stats
+              (fn [curr-stats prev-stats]
+                (cond
+                  (and curr-stats prev-stats)
+                  (let [total-count (+ (:count curr-stats) (:count prev-stats))
+                        total-latency (+ (* (:mean curr-stats) (:count curr-stats))
+                                         (* (:mean prev-stats) (:count prev-stats)))]
+                    {:count total-count
+                     :mean (/ total-latency total-count)
+                     :min (min (:min curr-stats) (:min prev-stats))
+                     :max (max (:max curr-stats) (:max prev-stats))
+                     0.5 (max (get curr-stats 0.5 0) (get prev-stats 0.5 0))
+                     0.9 (max (get curr-stats 0.9 0) (get prev-stats 0.9 0))
+                     0.99 (max (get curr-stats 0.99 0) (get prev-stats 0.99 0))})
+                  curr-stats curr-stats
+                  prev-stats prev-stats
+                  :else nil))
+
+              all-nodes (set (concat (keys current-bucket-data) (keys prev-bucket-data)))
+
+              aggregated-stats
+              (into {}
+                    (keep (fn [node-name]
+                            (when-let [merged (merge-node-stats
+                                               (get current-bucket-data node-name)
+                                               (get prev-bucket-data node-name))]
+                              [node-name merged]))
+                          all-nodes))]
+
+          {:node-stats aggregated-stats
+           :granularity gran-seconds})))))
