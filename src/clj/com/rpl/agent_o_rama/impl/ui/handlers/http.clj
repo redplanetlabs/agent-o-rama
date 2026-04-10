@@ -1,11 +1,13 @@
 (ns com.rpl.agent-o-rama.impl.ui.handlers.http
   (:require
+   [cognitect.transit :as transit]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [ring.util.response :as resp]
    [jsonista.core :as j]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
+   [com.rpl.agent-o-rama.impl.ui.sente :as sente]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
@@ -14,6 +16,29 @@
   (:use [com.rpl.rama]))
 
 (def ^:private mapper (j/object-mapper))
+(def ^:private transit-content-type "application/transit+json; charset=utf-8")
+
+(defn- parse-rpc-route
+  "Extract RPC namespace/method from /api/rpc/:namespace/:method."
+  [uri]
+  (when-let [[_ namespace method]
+             (re-matches #"(?i)/api/rpc/([^/]+)/([^/]+)" uri)]
+    (keyword (str (common/url-decode namespace) "/" (common/url-decode method)))))
+
+(defn- parse-transit-body
+  [body]
+  (if body
+    (with-open [in body]
+      (transit/read (transit/reader in :json)))
+    nil))
+
+(defn- transit-response
+  [body]
+  (-> (resp/response
+       (let [out (java.io.ByteArrayOutputStream.)]
+         (transit/write (transit/writer out :json) body)
+         (.toString out "UTF-8")))
+      (resp/content-type transit-content-type)))
 
 (defn- parse-export-params
   "Extract module-id and dataset-id from export route: /api/datasets/:module-id/:dataset-id/export"
@@ -118,3 +143,23 @@
           (-> (resp/response body)
               (resp/status 200)
               (resp/content-type "application/json; charset=utf-8")))))))
+
+(defn handle-rpc
+  [request]
+  (let [{:keys [uri session]} request
+        event-id (parse-rpc-route uri)
+        uid (or (:uid session)
+                (throw (ex-info "Missing session uid for RPC request" {:uri uri})))
+        request-body (parse-transit-body (:body request))
+        payload (cond
+                  (map? request-body) request-body
+                  (nil? request-body) {}
+                  :else (throw (ex-info "RPC request body must be a map" {:body-type (type request-body)
+                                                                          :uri uri})))
+        reply (sente/invoke-event {:id event-id
+                                   :data payload
+                                   :uid uid})]
+    (if (:success reply)
+      (transit-response reply)
+      (-> (transit-response reply)
+          (resp/status (or (:http-status reply) 400))))))

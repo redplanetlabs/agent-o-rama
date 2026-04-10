@@ -31,42 +31,51 @@
 
 (defmulti -event-msg-handler :id)
 
-(defn event-msg-handler
-  "Smart router that preprocesses the event and then finds the dispatched handler."
-  [ev-msg]
+(defn invoke-event
+  "Invoke a UI RPC handler and return a Sente-style reply map."
+  [{:keys [id data uid]}]
   (try
-    (let [processed-ev-msg (common/preprocess-event-msg ev-msg)
+    (let [processed-ev-msg (common/preprocess-event-msg {:id id
+                                                         :?data data
+                                                         :uid uid})
 
           ;; The rest of the function now operates on the processed message
-          {:keys [id ?reply-fn ?data uid]} processed-ev-msg
+          {:keys [id ?data uid]} processed-ev-msg
           handler-fn (get-method -event-msg-handler id)]
 
       ;; Check if we found a specific handler or just the default
       (if (= handler-fn (get-method -event-msg-handler :default))
         ;; This is an unhandled event, use the default logic
-        (do
-          (cljlogging/warn "Unhandled Sente event:" id)
-          (when ?reply-fn
-            (?reply-fn {:success false :error (str "No handler for event: " id)})))
+        (do (cljlogging/warn "Unhandled Sente event:" id)
+            {:success false
+             :error (str "No handler for event: " id)
+             :http-status 404})
 
         ;; A specific handler was found, so we wrap it and call it
         (try
           ;; Call the core handler with the clean [data uid] signature
           (let [result (handler-fn ?data uid) ; Pass the processed ?data to the handler
                 serializable-result (common/->ui-serializable result)]
-            (when ?reply-fn
-              (?reply-fn {:success true :data serializable-result})))
+            {:success true :data serializable-result})
           (catch Throwable e
             ;; Catch Throwable (not just Exception) to also handle Errors like NoSuchFieldError
             (cljlogging/error e "Error executing handler for" id)
-            (when ?reply-fn
-              (let [error-msg (or (.getMessage e) (str e) "Unknown error occurred")]
-                (?reply-fn {:success false :error error-msg})))))))
+            (let [error-msg (or (.getMessage e) (str e) "Unknown error occurred")]
+              {:success false
+               :error error-msg
+               :http-status 500})))))
     (catch Throwable e
       ;; Catch errors in preprocessing or anywhere else in the handler
       (cljlogging/error e "Fatal error in Sente event-msg-handler")
-      (when-let [reply-fn (:?reply-fn ev-msg)]
-        (reply-fn {:success false :error (str "Fatal error: " (.getMessage e))})))))
+      {:success false
+       :error (str "Fatal error: " (.getMessage e))
+       :http-status 500})))
+
+(defn event-msg-handler
+  "Smart router that preprocesses the event and then finds the dispatched handler."
+  [{:keys [id ?data uid ?reply-fn]}]
+  (when ?reply-fn
+    (?reply-fn (invoke-event {:id id :data ?data :uid uid}))))
 
 ;; A more robust default handler
 (defmethod -event-msg-handler :default [_])

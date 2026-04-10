@@ -147,6 +147,11 @@
            (re-matches #"/api/datasets/.+/.+/import" uri))
       (http/handle-dataset-import request)
 
+      ;; Transit-over-HTTP RPC for new frontend code
+      (and (= method :post)
+           (re-matches #"(?i)/api/rpc/[^/]+/[^/]+" uri))
+      ((ensure-session-uid http/handle-rpc) request)
+
       ;; For any other route, return nil to let the next handler take over.
       :else nil)))
 
@@ -174,6 +179,8 @@
                  :access-control-allow-headers #{"Content-Type"
                                                  "Authorization"
                                                  "X-CSRF-Token"
-                                                 "x-requested-with"})
+                                                 "x-requested-with"
+                                                 "Accept"}
+                 :access-control-expose-headers #{"Content-Type"})
       ;; Add cache control headers as outermost middleware
       wrap-cache-control))
