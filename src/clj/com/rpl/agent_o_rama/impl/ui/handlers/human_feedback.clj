@@ -103,11 +103,6 @@
     (evals/remove-human-feedback-queue! global-actions-depot name)
     {:status :ok}))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-info
-  [{:keys [manager queue-name]} uid]
-  (let [underlying-objects (aor-types/underlying-objects manager)
-        queue-info-query (:human-feedback-queue-info-query underlying-objects)]
-    (foreign-invoke-query queue-info-query queue-name)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :human-feedback/get-queue-items
   [{:keys [manager queue-name pagination limit include-cursor? reverse?]} uid]

@@ -13,18 +13,6 @@
     (= schema-fn h/boolean-spec) :boolean
     :else :text))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/get-all
-  [{:keys [client]} uid]
-  (let [client-objects (aor-types/underlying-objects client)
-        config-pstate (:config-pstate client-objects)
-        current-config-map (or (foreign-select-one STAY config-pstate {:pkey 0}) {})]
-    (for [[key config-def] aor-types/ALL-CONFIGS]
-      (let [current-value (get current-config-map key (:default config-def))]
-        {:key key
-         :doc (:doc config-def)
-         :current-value (str current-value)
-         :default-value (str (:default config-def))
-         :input-type (schema-fn->input-type (:schema-fn config-def))}))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/set
   [{:keys [client key value]} uid]
@@ -44,21 +32,6 @@
       (catch Exception e
         (throw (ex-info (str "Failed to set config: " (.getMessage e)) {:key key :value value}))))))
 
-;; Handler to get all global configs
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/get-all-global
-  [{:keys [manager]} uid]
-  (let [manager-objects (aor-types/underlying-objects manager)
-        ;; Use the global config PState
-        config-pstate (:global-config-pstate manager-objects)
-        current-config-map (or (foreign-select-one STAY config-pstate {:pkey 0}) {})]
-    ;; Read from ALL-GLOBAL-CONFIGS instead of ALL-CONFIGS
-    (for [[key config-def] aor-types/ALL-GLOBAL-CONFIGS]
-      (let [current-value (get current-config-map key (:default config-def))]
-        {:key key
-         :doc (:doc config-def)
-         :current-value (str current-value)
-         :default-value (str (:default config-def))
-         :input-type (schema-fn->input-type (:schema-fn config-def))}))))
 
 ;; Handler to set a global config
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :config/set-global

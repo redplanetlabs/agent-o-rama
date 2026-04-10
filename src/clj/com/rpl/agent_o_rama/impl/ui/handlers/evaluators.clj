@@ -10,9 +10,6 @@
   (:use [com.rpl.rama]
         [com.rpl.rama.path]))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-builders
-  [{:keys [manager]} uid]
-  (foreign-invoke-query (:all-eval-builders-query (aor-types/underlying-objects manager))))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :evaluators/get-all-instances
   [{:keys [manager pagination module-id filters]} uid]

@@ -205,14 +205,6 @@
                                        pagination-params)]
       result)))
 
-(defmethod sente/-event-msg-handler :analytics/search-metadata
-  [{:keys [manager decoded-agent-name search-string]} _uid]
-  (when manager
-    (let [agent-client (aor/agent-client manager decoded-agent-name)
-          {:keys [search-metadata-query]} (aor-types/underlying-objects agent-client)]
-      (when-not search-metadata-query
-        (throw (ex-info "search-metadata-query missing" {:agent decoded-agent-name})))
-      (foreign-invoke-query search-metadata-query (or search-string "") 200 nil))))
 
 (defmethod sente/-event-msg-handler :analytics/fetch-telemetry
   [{:keys [manager decoded-agent-name granularity metric-id start-time-millis end-time-millis metrics-set metadata-key]} uid]
@@ -227,8 +219,3 @@
                           (vec metrics-set)
                           metadata-key)))
 
-(defmethod sente/-event-msg-handler :analytics/fetch-all-metrics
-  [{:keys [manager decoded-agent-name]} uid]
-  (let [agent-client (aor/agent-client manager decoded-agent-name)
-        {:keys [all-agent-metrics-query]} (aor-types/underlying-objects agent-client)]
-    (foreign-invoke-query all-agent-metrics-query)))

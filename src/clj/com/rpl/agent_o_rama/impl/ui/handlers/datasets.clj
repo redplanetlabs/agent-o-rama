@@ -57,10 +57,6 @@
         ;; Process datasets to add remote flags
         (update result :datasets mark-remote-datasets)))))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-props
-  [{:keys [manager dataset-id]} uid]
-  (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
-    (queries/get-dataset-properties datasets-pstate dataset-id)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/create
   [{:keys [manager name description input-schema output-schema]} uid]
@@ -120,10 +116,6 @@
                                :tags     (set tags)}))
   {:status :ok})
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-snapshot-names
-  [{:keys [manager dataset-id]} uid]
-  (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
-    (queries/get-dataset-snapshot-names datasets-pstate dataset-id)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/create-snapshot
   [{:keys [manager dataset-id from-snapshot-name to-snapshot-name]} uid]
@@ -195,18 +187,6 @@
                                    {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})
   {:status :ok})
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/get-example
-  [{:keys [manager dataset-id snapshot-name example-id]} uid]
-  (let [{:keys [multi-examples-query]} (aor-types/underlying-objects manager)]
-    ;; Fetch by exact ID to avoid search filtering and ordering issues
-    (let [examples-map (foreign-invoke-query multi-examples-query
-                                             dataset-id
-                                             (when-not (str/blank? snapshot-name) snapshot-name)
-                                             [example-id])
-          example (get examples-map example-id)]
-      (if example
-        {:status :ok :example (process-example-source example)}
-        {:status :error :error "Example not found"}))))
 
 ;; =============================================================================
 ;; BULK OPERATION HANDLERS
@@ -281,83 +261,3 @@
                                               {:reference-output output}))
                   {:status :ok}))))))
 
-;; =============================================================================
-;; JSONPATH PREVIEW HANDLER
-;; =============================================================================
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :datasets/preview-expression
-  [{:keys [manager dataset-id snapshot-name source-field expression type]} uid]
-  (let [{:keys [search-examples-query multi-examples-query]}
-        (aor-types/underlying-objects manager)
-
-        ;; 1. Fetch the first example ID from the dataset/snapshot
-        ;; We use the search query with limit 1 to get an ID efficiently
-        search-result (foreign-invoke-query search-examples-query
-                                            dataset-id
-                                            (when-not (str/blank? snapshot-name) snapshot-name)
-                                            {} ; no filters
-                                            1  ; limit 1
-                                            nil)
-        example-summary (first (:examples search-result))]
-
-    (if-not example-summary
-      {:status :ok :result nil :error "No examples found in dataset"}
-
-      ;; 2. Fetch the full example data
-      (let [full-examples (foreign-invoke-query multi-examples-query
-                                                dataset-id
-                                                (when-not (str/blank? snapshot-name) snapshot-name)
-                                                [(:id example-summary)])
-            example (get full-examples (:id example-summary))
-
-            ;; 3. Select the source data (input or reference-output)
-            source-data (case source-field
-                          :input (:input example)
-                          :reference-output (:reference-output example)
-                          nil)
-
-            ;; 4. Apply logic based on type (:path or :template)
-            preview-result
-            (if (nil? source-data)
-              ::no-source-data
-              (try
-                (case type
-                  :path
-                  (h/read-json-path source-data expression)
-
-                  :template
-                  (let [template-obj
-                        (if (string? expression)
-                          ;; If it looks like a JSON object/array string, parse it
-                          ;; Otherwise treat as a raw string template
-                          (if (or (str/starts-with? (str/trim expression) "{")
-                                  (str/starts-with? (str/trim expression) "["))
-                            (j/read-value expression)
-                            expression)
-                          expression)]
-                    (h/resolve-json-path-template template-obj source-data)))
-                (catch Exception e
-                  (let [msg (or (.getMessage e) "")]
-                    (cond
-                      ;; JSONPath errors when path doesn't exist in data
-                      (or (str/includes? msg "can not be null")
-                          (str/includes? msg "cannot be null")
-                          (str/includes? msg "No results")
-                          (str/includes? msg "Missing property"))
-                      ::path-not-found
-
-                      ;; Re-throw other exceptions
-                      :else
-                      (throw e))))))]
-
-        (cond
-          (= preview-result ::no-source-data)
-          {:status :ok :result nil :error (str "No " (name source-field) " data in this example")}
-
-          (= preview-result ::path-not-found)
-          {:status :ok :result nil :error "Path not found in data"}
-
-          :else
-          {:status :ok
-           :result (common/->ui-serializable preview-result)
-           :example-preview (common/->ui-serializable source-data)})))))

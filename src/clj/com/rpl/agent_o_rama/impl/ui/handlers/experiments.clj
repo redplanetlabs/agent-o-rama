@@ -1,52 +1,10 @@
 (ns com.rpl.agent-o-rama.impl.ui.handlers.experiments
   (:require
    [clojure.string :as str]
-   [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.helpers :as h])
-  (:use [com.rpl.rama])
-  (:import
-   [java.util
-    UUID]
-   [com.rpl.agentorama
-    AgentFailedException]
-   [com.rpl.agent_o_rama.impl.types
-    RegularExperiment
-    ComparativeExperiment]))
+  (:use [com.rpl.rama]))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-all-for-dataset
-  [{:keys [manager dataset-id pagination filters]} uid]
-  (let [search-query (:search-experiments-query (aor-types/underlying-objects manager))
-        ;; Helper to convert keyword predicates to functions
-        keyword->pred (fn [k]
-                        (case k
-                          :>= >=
-                          :<= <=
-                          :< <
-                          :> >
-                          k))
-        ;; Process filters to translate type keywords to classes and predicates to functions
-        processed-filters (cond-> filters
-                            ;; Convert type keyword to class
-                            (:type filters)
-                            (assoc :type (case (:type filters)
-                                           :regular RegularExperiment
-                                           :comparative ComparativeExperiment
-                                           nil))
-
-                            ;; Convert predicate keywords to functions in times filter
-                            (:times filters)
-                            (assoc :times (mapv (fn [time-spec]
-                                                  (update time-spec :pred keyword->pred))
-                                                (:times filters))))]
-    ;; For the index table, we get the first page with a reasonable limit
-    (foreign-invoke-query search-query
-                          dataset-id
-                          (or processed-filters {}) ; Use processed filters
-                          20 ; limit
-                          pagination)))
 
 (defn- parse-selector [selector]
   (when selector
@@ -92,32 +50,6 @@
                             (long concurrency)))]
       {:status :ok :experiment-id (str experiment-id)})))
 
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/get-results
-  [{:keys [manager dataset-id experiment-id]} uid]
-  (let [results-query (:experiments-results-query (aor-types/underlying-objects manager))
-        ;; 1. Fetch the base experiment data as before.
-        base-results (foreign-invoke-query results-query
-                                           dataset-id
-                                           experiment-id)]
-
-;; 2. NEW LOGIC STARTS HERE: Check for early failure.
-    (if-let [invoke (:experiment-invoke base-results)]
-      ;; If we have the invoke coordinates for the experimenter agent...
-      (do
-        (with-open [exp-client (aor/agent-client manager aor-types/EVALUATOR-AGENT-NAME)]
-          (if (aor/agent-invoke-complete? exp-client invoke)
-            ;; If the agent is complete, fetch its result.
-            (let [result (try (aor/agent-result exp-client invoke)
-                              (catch Exception e
-                                (Throwable->map e)))]
-              ;; A successful run returns :done. Anything else is an error.
-              (if (not= :done result)
-                (assoc base-results :invocation-error result)
-                base-results))
-            ;; If the agent is not yet complete, just return the base results.
-            base-results)))
-      ;; If there are no invoke coordinates, it's too early, return base results.
-      base-results)))
 
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :experiments/delete
   [{:keys [manager dataset-id experiment-id]} uid]

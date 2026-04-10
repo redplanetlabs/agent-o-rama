@@ -2,14 +2,7 @@
   (:require
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common])
-  (:use [com.rpl.rama])
-  (:import [java.util UUID]))
-
-(defn- ensure-uuid [x]
-  (cond
-    (instance? UUID x) x
-    (string? x) (UUID/fromString x)
-    :else x))
+  (:use [com.rpl.rama]))
 
 (defn- get-manager [system module-id]
   (get-in system [:aor-cache module-id :manager]))
@@ -17,7 +10,6 @@
 (defn get-all-for-dataset!!
   [system {:keys [module-id dataset-id pagination filters]}]
   (let [manager (get-manager system module-id)
-        dataset-id (ensure-uuid dataset-id)
         search-query (:search-experiments-query (aor-types/underlying-objects manager))
         keyword->pred (fn [k]
                         (case k

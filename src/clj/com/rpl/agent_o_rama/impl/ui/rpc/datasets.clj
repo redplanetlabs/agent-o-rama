@@ -8,7 +8,6 @@
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [clojure.string :as str]
    [jsonista.core :as j])
-  (:import [java.util UUID])
   (:use [com.rpl.rama]))
 
 (defn- get-manager [system module-id]
@@ -36,12 +35,6 @@
               dataset)))
         datasets))
 
-(defn- ensure-uuid [x]
-  (cond
-    (instance? java.util.UUID x) x
-    (string? x) (java.util.UUID/fromString x)
-    :else x))
-
 (defn get-all!!
   [system {:keys [module-id pagination filters]}]
   (let [manager (get-manager system module-id)
@@ -59,21 +52,18 @@
 (defn get-props!!
   [system {:keys [module-id dataset-id]}]
   (let [manager (get-manager system module-id)
-        dataset-id (ensure-uuid dataset-id)
         datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
     (queries/get-dataset-properties datasets-pstate dataset-id)))
 
 (defn get-snapshot-names!!
   [system {:keys [module-id dataset-id]}]
   (let [manager (get-manager system module-id)
-        dataset-id (ensure-uuid dataset-id)
         datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))]
     (queries/get-dataset-snapshot-names datasets-pstate dataset-id)))
 
 (defn search-examples!!
   [system {:keys [module-id dataset-id snapshot-name filters limit pagination]}]
   (let [manager (get-manager system module-id)
-        dataset-id (ensure-uuid dataset-id)
         {:keys [search-examples-query]} (aor-types/underlying-objects manager)
         result (foreign-invoke-query search-examples-query
                                      dataset-id
@@ -86,8 +76,6 @@
 (defn get-example!!
   [system {:keys [module-id dataset-id snapshot-name example-id]}]
   (let [manager (get-manager system module-id)
-        dataset-id (ensure-uuid dataset-id)
-        example-id (ensure-uuid example-id)
         {:keys [multi-examples-query]} (aor-types/underlying-objects manager)
         examples-map (foreign-invoke-query multi-examples-query
                                            dataset-id
@@ -105,7 +93,6 @@
 (defn validate-direct-data!!
   [system {:keys [module-id dataset-id input output]}]
   (let [manager (get-manager system module-id)
-        dataset-id (ensure-uuid dataset-id)
         datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
         schemas (queries/get-dataset-properties datasets-pstate dataset-id)
         input-schema (:input-json-schema schemas)
@@ -122,7 +109,6 @@
 (defn preview-expression!!
   [system {:keys [module-id dataset-id snapshot-name source-field expression type]}]
   (let [manager (get-manager system module-id)
-        dataset-id (ensure-uuid dataset-id)
         {:keys [search-examples-query multi-examples-query]}
         (aor-types/underlying-objects manager)
         search-result (foreign-invoke-query search-examples-query

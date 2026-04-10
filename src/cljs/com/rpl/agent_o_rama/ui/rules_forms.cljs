@@ -138,7 +138,7 @@
                              {:module-id module-id
                               :filters {:search-string search-string}}])
           :items-key :datasets
-          :item-id-fn #(str (:dataset-id %))
+          :item-id-fn :dataset-id
           :item-label-fn :name
           :item-sublabel-fn #(str (:dataset-id %))
           :placeholder "Type to search datasets..."
