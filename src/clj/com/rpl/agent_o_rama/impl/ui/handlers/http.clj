@@ -56,7 +56,7 @@
         :else
         (try
           {:success true
-           :data (common/->ui-serializable (@rpc-var processed-data uid))}
+           :data (common/->ui-serializable (@rpc-var processed-data))}
           (catch Throwable e
             {:success false
              :error (or (.getMessage e) (str e) "Unknown error occurred")

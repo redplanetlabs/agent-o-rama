@@ -5,7 +5,7 @@
   (:use [com.rpl.rama]))
 
 (defn get-results!!
-  [{:keys [manager dataset-id experiment-id]} _uid]
+  [{:keys [manager dataset-id experiment-id]}]
   (let [results-query (:experiments-results-query (aor-types/underlying-objects manager))
         base-results (foreign-invoke-query results-query
                                            dataset-id
