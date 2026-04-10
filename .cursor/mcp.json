@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "clojure-mcp": {
+      "command": "clojure",
+      "args": [
+        "-Tmcp",
+        "start",
+        ":config-profile",
+        ":cli-assist",
+        ":start-nrepl-cmd",
+        "[\"lein\" \"with-profile\" \"+ui,+nrepl-port\" \"repl\" \":headless\"]",
+        ":project-dir",
+        "\"/workspace\""
+      ]
+    }
+  }
+}
