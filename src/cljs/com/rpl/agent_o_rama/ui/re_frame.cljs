@@ -16,8 +16,7 @@
  (rf/reg-fx
   rpc-fx-key
   (fn [{:keys [request on-success on-failure]}]
-    (-> (rpc/call (:rpc/namespace request)
-                  (:rpc/method request)
+    (-> (rpc/call (:rpc/id request)
                   (:payload request))
         (.then (fn [data]
                  (rf/dispatch (conj on-success data))))

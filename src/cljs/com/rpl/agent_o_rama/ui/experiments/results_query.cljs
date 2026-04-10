@@ -2,7 +2,8 @@
    (:require
     [re-frame.query :as rfq]))
 
- (def experiment-results-query-key ::experiment-results)
+ (def experiment-results-rpc-id
+   :com.rpl.agent-o-rama.impl.ui.rpc.experiments/get-results!!)
 
  (defn- normalize-error
    [error _params]
@@ -16,10 +17,9 @@
  (defonce registered?
    (do
      (rfq/reg-query
-      experiment-results-query-key
+      experiment-results-rpc-id
       {:query-fn (fn [params]
-                   {:rpc/namespace :experiments
-                    :rpc/method :get-results
+                   {:rpc/id experiment-results-rpc-id
                     :payload params})
        :stale-time-ms 0
        :polling-interval-ms 2000

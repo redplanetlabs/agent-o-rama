@@ -13,6 +13,7 @@
    [com.rpl.agent-o-rama.impl.ui.handlers.invocations]
    [com.rpl.agent-o-rama.impl.ui.handlers.streaming]
    [com.rpl.agent-o-rama.impl.ui.handlers.http :as http]
+   [com.rpl.agent-o-rama.impl.ui.rpc.experiments]
    [ring.util.response :as resp]
    [ring.middleware.resource :as resource]
    [ring.middleware.file :as ring-file]

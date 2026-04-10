@@ -19,23 +19,26 @@
   (transit/reader :json {:handlers {"u" uuid-read-handler}}))
 
 (defn route-for
-  [namespace method]
-  (str "/api/rpc/"
-       (js/encodeURIComponent (name namespace))
-       "/"
-       (js/encodeURIComponent (name method))))
+  [rpc-id]
+  (let [rpc-ns (namespace rpc-id)
+        rpc-fn (name rpc-id)]
+    (str "/api/rpc/"
+         (js/encodeURIComponent rpc-ns)
+         "/"
+         (js/encodeURIComponent rpc-fn))))
 
 (defn call
   "Call a transit-over-HTTP RPC endpoint.
 
    Example:
-   (call :experiments :get-results {:module-id module-id
-                                    :dataset-id dataset-id
-                                    :experiment-id experiment-id})"
-  ([namespace method]
-   (call namespace method {}))
-  ([namespace method payload]
-   (-> (js/fetch (route-for namespace method)
+   (call :com.rpl.agent-o-rama.impl.ui.rpc.experiments/results!!
+         {:module-id module-id
+          :dataset-id dataset-id
+          :experiment-id experiment-id})"
+  ([rpc-id]
+   (call rpc-id {}))
+  ([rpc-id payload]
+   (-> (js/fetch (route-for rpc-id)
                  #js {:method "POST"
                       :credentials "same-origin"
                       :headers #js {"Content-Type" transit-content-type

@@ -7,7 +7,6 @@
    [jsonista.core :as j]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
-   [com.rpl.agent-o-rama.impl.ui.sente :as sente]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.datasets :as datasets]
@@ -17,13 +16,55 @@
 
 (def ^:private mapper (j/object-mapper))
 (def ^:private transit-content-type "application/transit+json; charset=utf-8")
+(def ^:private rpc-allowlist-prefix "com.rpl.agent-o-rama.impl.ui.rpc.")
 
 (defn- parse-rpc-route
-  "Extract RPC namespace/method from /api/rpc/:namespace/:method."
+  "Extract RPC var symbol from /api/rpc/:fully-qualified-ns/:method."
   [uri]
   (when-let [[_ namespace method]
-             (re-matches #"(?i)/api/rpc/([^/]+)/([^/]+)" uri)]
-    (keyword (str (common/url-decode namespace) "/" (common/url-decode method)))))
+             (re-matches #"(?i)/api/rpc/(.+)/([^/]+)" uri)]
+    (symbol (str (common/url-decode namespace) "/" (common/url-decode method)))))
+
+(defn- allowlisted-rpc-symbol?
+  [sym]
+  (str/starts-with? (str (namespace sym)) rpc-allowlist-prefix))
+
+(defn- resolve-rpc-var
+  [sym]
+  (when (allowlisted-rpc-symbol? sym)
+    (requiring-resolve sym)))
+
+(defn invoke-rpc
+  "Invoke an allowlisted RPC var directly and return a standard reply envelope."
+  [{:keys [rpc-id data uid]}]
+  (try
+    (let [processed-data (:?data (common/preprocess-event-msg {:id rpc-id
+                                                               :?data data
+                                                               :uid uid}))
+          rpc-var (resolve-rpc-var rpc-id)]
+      (cond
+        (nil? rpc-var)
+        {:success false
+         :error (str "RPC not allowlisted or not found: " rpc-id)
+         :http-status 404}
+
+        (not (fn? @rpc-var))
+        {:success false
+         :error (str "RPC target is not callable: " rpc-id)
+         :http-status 500}
+
+        :else
+        (try
+          {:success true
+           :data (common/->ui-serializable (@rpc-var processed-data uid))}
+          (catch Throwable e
+            {:success false
+             :error (or (.getMessage e) (str e) "Unknown error occurred")
+             :http-status 500}))))
+    (catch Throwable e
+      {:success false
+       :error (str "Fatal error: " (.getMessage e))
+       :http-status 500})))
 
 (defn- parse-transit-body
   [body]
@@ -147,7 +188,7 @@
 (defn handle-rpc
   [request]
   (let [{:keys [uri session]} request
-        event-id (parse-rpc-route uri)
+        rpc-id (parse-rpc-route uri)
         uid (or (:uid session)
                 (throw (ex-info "Missing session uid for RPC request" {:uri uri})))
         request-body (parse-transit-body (:body request))
@@ -156,9 +197,9 @@
                   (nil? request-body) {}
                   :else (throw (ex-info "RPC request body must be a map" {:body-type (type request-body)
                                                                           :uri uri})))
-        reply (sente/invoke-event {:id event-id
-                                   :data payload
-                                   :uid uid})]
+        reply (invoke-rpc {:rpc-id rpc-id
+                           :data payload
+                           :uid uid})]
     (if (:success reply)
       (transit-response reply)
       (-> (transit-response reply)

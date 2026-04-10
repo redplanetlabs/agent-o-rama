@@ -567,7 +567,7 @@
          query-status :status}
         (or (use-subscribe
              [::rfq/query
-              results-query/experiment-results-query-key
+              results-query/experiment-results-rpc-id
               {:module-id module-id
                :dataset-id dataset-id
                :experiment-id experiment-id}])
