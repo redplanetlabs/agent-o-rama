@@ -15,7 +15,7 @@
    [com.rpl.agent-o-rama.ui.experiments.regular-detail :as experiments-detail]
    [com.rpl.agent-o-rama.ui.experiments.comparative-detail :as comparative-experiments-detail]
    [com.rpl.agent-o-rama.ui.analytics :as analytics]
-   [com.rpl.agent-o-rama.ui.rpc.hello-world :as rpc-hello-world]
+   [com.rpl.agent-o-rama.impl.ui.rpc.hello-world :as rpc-hello-world]
    [reitit.core :as r]
    [reitit.frontend :as rf]
    [reitit.frontend.easy :as rfe]
