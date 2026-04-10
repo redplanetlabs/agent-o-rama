@@ -5,7 +5,7 @@
    ["@heroicons/react/24/outline" :refer [ArrowLeftIcon PlayIcon ChevronDownIcon ChevronUpIcon ArrowTopRightOnSquareIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.experiments.results-query :as results-query]
+   [com.rpl.agent-o-rama.impl.ui.rpc.experiments :as rpc-experiments]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]
@@ -567,7 +567,7 @@
          query-status :status}
         (or (use-subscribe
              [::rfq/query
-              results-query/experiment-results-rpc-id
+              ::rpc-experiments/get-results!!
               {:module-id module-id
                :dataset-id dataset-id
                :experiment-id experiment-id}])
