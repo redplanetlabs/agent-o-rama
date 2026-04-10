@@ -23,10 +23,9 @@
          [pg]
          (page/navigate pg hello-url)
          (page/wait-for-load-state pg :networkidle)
-         (let [message-loc (page/get-by-test-id pg "rpc-hello-message")
-               module-id-loc (page/get-by-test-id pg "rpc-hello-module")
-               transport-loc (page/get-by-test-id pg "rpc-hello-transport")
-               rpc-id-loc (page/get-by-test-id pg "rpc-hello-rpc-id")]
+        (let [message-loc (page/get-by-test-id pg "rpc-hello-message")
+              module-id-loc (page/get-by-test-id pg "rpc-hello-module")
+              rpc-id-loc (page/get-by-test-id pg "rpc-hello-rpc-id")]
            (locator/wait-for message-loc {:state "visible" :timeout 10000})
            (testing "renders RPC hello world message"
              (is (= "Hello RPC world"
@@ -34,9 +33,6 @@
            (testing "renders module id from the RPC payload"
              (is (= (:module-name env)
                     (locator/text-content module-id-loc))))
-           (testing "renders transport marker from backend"
-             (is (= "http-transit"
-                    (locator/text-content transport-loc))))
            (testing "renders canonical RPC id"
              (is (= ":com.rpl.agent-o-rama.impl.ui.rpc.hello-world/index!!"
                     (locator/text-content rpc-id-loc)))))))))

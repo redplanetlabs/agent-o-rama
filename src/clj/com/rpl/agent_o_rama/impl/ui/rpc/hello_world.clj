@@ -3,5 +3,4 @@
 (defn index!!
   [_system {:keys [module-id]}]
   {:message "Hello RPC world"
-   :module-id module-id
-   :transport "http-transit"})
+   :module-id module-id})

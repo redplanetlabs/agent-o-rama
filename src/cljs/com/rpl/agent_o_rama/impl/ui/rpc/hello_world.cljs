@@ -35,10 +35,7 @@
                          (:message data))
                       ($ :div.text-sm.text-gray-700
                          {:data-testid "rpc-hello-module"}
-                         (:module-id data))
-                      ($ :div.text-sm.text-gray-700
-                         {:data-testid "rpc-hello-transport"}
-                         (:transport data)))
+                         (:module-id data)))
           ($ :div.text-gray-500
              {:data-testid "rpc-hello-idle"}
              "Waiting for query...")))))
