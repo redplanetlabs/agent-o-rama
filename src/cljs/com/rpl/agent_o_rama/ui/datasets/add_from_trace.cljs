@@ -2,6 +2,7 @@
   (:require
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
@@ -9,6 +10,7 @@
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [re-frame.query :as rfq]
    [clojure.string :as str]
    ["react" :refer [useEffect]]
@@ -63,18 +65,15 @@
              :else
              (do
                (set-is-validating true)
-               (sente/request! [:datasets/validate-direct-data
-                                {:module-id module-id
-                                 :dataset-id debounced-dataset-id
-                                 :input parsed-input
-                                 :output parsed-output}]
-                               10000
-                               (fn [reply]
-                                 (set-is-validating false)
-                                 ;; Only update state on success.
-                                 ;; On timeout or other failure, do nothing to preserve the last known state.
-                                 (when (:success reply)
-                                   (set-validation-state (:data reply)))))))))
+               (-> (rpc/call ::rpc-datasets/validate-direct-data!!
+                               {:module-id module-id
+                                :dataset-id debounced-dataset-id
+                                :input parsed-input
+                                :output parsed-output})
+                              (.then (fn [data]
+                                       (set-is-validating false)
+                                       (set-validation-state data)))
+                              (.catch (fn [_err] (set-is-validating false))))))))
        js/undefined)
      (clj->js [debounced-dataset-id debounced-input-data debounced-output-data]))
 
@@ -198,9 +197,8 @@
    :ui (fn [{:keys [form-id]}] ($ AddFromTraceForm {:form-id form-id}))
    :modal-props (fn [props] {:title (or (:title props) "Add to Dataset") :submit-text "Add Example"})}
   :on-submit
-  {:event
+  {:mutation
    (fn [_db form-state]
-     ;; Parse JSON on frontend and send parsed data
      (let [{:keys [module-id]} form-state
            dataset-id (:dataset-id form-state)
            input-str (:input-data form-state)
@@ -209,16 +207,16 @@
            parsed-output (parse-json->cljs output-str)]
        (cond
          (= ::parse-error parsed-input)
-         [:db/set-value [:forms (:form-id form-state) :error] "Input is not valid JSON"]
-
+         (do (state/dispatch [:db/set-value [:forms (:form-id form-state) :error] "Input is not valid JSON"])
+             nil)
          (= ::parse-error parsed-output)
-         [:db/set-value [:forms (:form-id form-state) :error] "Output is not valid JSON"]
-
+         (do (state/dispatch [:db/set-value [:forms (:form-id form-state) :error] "Output is not valid JSON"])
+             nil)
          :else
-         [:datasets/add-direct-data
+         [::rpc-datasets/add-direct-data!!
           {:module-id module-id
            :dataset-id dataset-id
            :input parsed-input
            :output parsed-output}])))
-   :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
-                            {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
+   :rfq-invalidate-tags (fn [_db {:keys [module-id dataset-id]} _reply]
+                          [[:dataset-examples module-id dataset-id]])}})

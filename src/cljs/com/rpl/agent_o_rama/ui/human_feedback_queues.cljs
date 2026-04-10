@@ -15,6 +15,7 @@
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
    [com.rpl.agent-o-rama.impl.ui.rpc.human-feedback :as rpc-hf]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [re-frame.query :as rfq]
    [re-frame.core :as rf]
    [clojure.string :as str]
@@ -105,15 +106,11 @@
         handle-delete (uix/use-callback
                        (fn [metric-name]
                          (when (js/confirm (str "Delete metric '" metric-name "'?"))
-                           (sente/request!
-                            [:human-feedback/delete-metric {:module-id decoded-module-id
-                                                            :name metric-name}]
-                            10000
-                            (fn [reply]
-                              (if (:success reply)
-                                (state/dispatch [:query/invalidate
-                                                 {:query-key-pattern [:human-metrics module-id]}])
-                                (js/alert (str "Error: " (:error reply))))))))
+                           (-> (rpc/call ::rpc-hf/delete-metric!! {:module-id decoded-module-id :name metric-name})
+                           (.then (fn [_]
+                                    (state/dispatch [:query/invalidate {:query-key-pattern [:human-metrics module-id]}])
+                                    (rf/dispatch [:re-frame.query/invalidate-tags [[:human-feedback/metrics module-id]]])))
+                           (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))
                        [decoded-module-id])]
 
     (if-not decoded-module-id
@@ -342,20 +339,18 @@
                  :submit-text "Create"}}
 
   :on-submit
-  {:event (fn [db form-state]
-            (let [{:keys [name type min max categories module-id]} form-state]
-              [:human-feedback/create-metric
-               (cond-> {:module-id module-id
-                        :name name
-                        :type type}
-                 (= type :numeric)
-                 (assoc :min (js/parseInt min 10)
-                        :max (js/parseInt max 10))
-
-                 (= type :categorical)
-                 (assoc :categories categories))]))
-   :on-success-invalidate (fn [db {:keys [module-id]} _reply]
-                            {:query-key-pattern [:human-metrics module-id]})}})
+  {:mutation (fn [_db form-state]
+               (let [{:keys [name type min max categories module-id]} form-state]
+                 [::rpc-hf/create-metric!!
+                  (cond-> {:module-id module-id :name name :type type}
+                    (= type :numeric)
+                    (assoc :min (js/parseInt min 10) :max (js/parseInt max 10))
+                    (= type :categorical)
+                    (assoc :categories categories))]))
+   :on-success-invalidate (fn [_db {:keys [module-id]} _reply]
+                            {:query-key-pattern [:human-metrics module-id]})
+   :rfq-invalidate-tags (fn [_db {:keys [module-id]} _reply]
+                          [[:human-feedback/metrics module-id]])}})
 
 ;; =============================================================================
 ;; QUEUE FORM - Create Human Feedback Queue
@@ -509,34 +504,19 @@
                     {:title "Create Human Feedback Queue"
                      :submit-text "Create"}))}
   :on-submit
-  {:event (fn [db form-state]
-            (let [{:keys [name description rubrics module-id editing?]} form-state
-                  ;; Strip out :id field used for React keys
-                  clean-rubrics (mapv #(dissoc % :id) rubrics)]
-              (if editing?
-                [:human-feedback/update-queue
-                 {:module-id module-id
-                  :name name
-                  :description description
-                  :rubrics clean-rubrics}]
-                [:human-feedback/create-queue
-                 {:module-id module-id
-                  :name name
-                  :description description
-                  :rubrics clean-rubrics}])))
-
-   :on-success-invalidate
-   (fn [db {:keys [module-id]} _reply]
-     ;; Invalidate the queue list to show the newly created queue
-     {:query-key-pattern [:human-feedback-queues module-id]})
-
-   :on-success
-   (fn [db {:keys [module-id name]} _reply]
-     ;; Invalidate the rfq queue-info query
-     (rf/dispatch [:re-frame.query/invalidate-tags
-                   [[:human-feedback/queue-info module-id name]]])
-     ;; Also invalidate using old system for backward compat
-     (state/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queue-info module-id name]}]))}})
+  {:mutation (fn [_db form-state]
+               (let [{:keys [name description rubrics module-id editing?]} form-state
+                     clean-rubrics (mapv #(dissoc % :id) rubrics)]
+                 (if editing?
+                   [::rpc-hf/update-queue!!
+                    {:module-id module-id :name name :description description :rubrics clean-rubrics}]
+                   [::rpc-hf/create-queue!!
+                    {:module-id module-id :name name :description description :rubrics clean-rubrics}])))
+   :on-success-invalidate (fn [_db {:keys [module-id]} _reply]
+                            {:query-key-pattern [:human-feedback-queues module-id]})
+   :rfq-invalidate-tags (fn [_db {:keys [module-id name]} _reply]
+                          [[:human-feedback/queues module-id]
+                           [:human-feedback/queue-info module-id name]])}})
 
 ;; =============================================================================
 ;; QUEUE LIST PAGE
@@ -630,15 +610,11 @@
                                 :onClick (fn [e]
                                            (.stopPropagation e)
                                            (when (js/confirm (str "Are you sure you want to delete queue \"" queue-name "\"?"))
-                                             (sente/request!
-                                              [:human-feedback/delete-queue
-                                               {:module-id decoded-module-id
-                                                :name queue-name}]
-                                              10000
-                                              (fn [reply]
-                                                (if (:success reply)
-                                                  (state/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queues module-id]}])
-                                                  (js/alert (str "Error deleting queue: " (:error reply))))))))}
+                                             (-> (rpc/call ::rpc-hf/delete-queue!! {:module-id decoded-module-id :name queue-name})
+                                             (.then (fn [_]
+                                                      (state/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queues module-id]}])
+                                                      (rf/dispatch [:re-frame.query/invalidate-tags [[:human-feedback/queues module-id]]])))
+                                             (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
                                ($ TrashIcon {:className "h-5 w-5"})))))))
 
                ;; Load more row
@@ -1191,64 +1167,44 @@
                             (do
                               (hf-common/save-reviewer-name! reviewer-name)
                               ;; Submit to backend
-                              (sente/request!
-                               [:human-feedback/resolve-queue-item
-                                {:module-id decoded-module-id
-                                 :queue-name decoded-queue-id
-                                 :item-id item-id-str
-                                 :target (:target current-item)
-                                 :reviewer-name reviewer-name
-                                 :scores scores
-                                 :comment comment}]
-                               10000
-                               (fn [reply]
-                                 (if (:success reply)
-                                   (do
-                                     ;; Invalidate the queue items cache
-                                     (state/dispatch [:query/invalidate
-                                                      {:query-key-pattern [:human-feedback-queue-items module-id queue-id]}])
-                                     ;; Clear form state before navigating
-                                     (set-scores {})
-                                     (set-comment "")
-                                     (set-errors {})
-                                    ;; Auto-advance to next item
-                                     (if has-next?
-                                       (handle-next)
-                                       (rfe/push-state :module/human-feedback-queue-end
-                                                       {:module-id module-id
-                                                        :queue-id queue-id})))
-                                   (js/alert (str "Error submitting: " (:error reply)))))))
+                              (-> (rpc/call ::rpc-hf/resolve-queue-item!!
+                               {:module-id decoded-module-id
+                                :queue-name decoded-queue-id
+                                :item-id item-id-str
+                                :target (:target current-item)
+                                :reviewer-name reviewer-name
+                                :scores scores
+                                :comment comment})
+                              (.then (fn [_]
+                                       (rf/dispatch [:re-frame.query/invalidate-tags
+                                                     [[:human-feedback/queue-items module-id queue-id]]])
+                                       (set-scores {})
+                                       (set-comment "")
+                                       (set-errors {})
+                                       (if has-next?
+                                         (handle-next)
+                                         (rfe/push-state :module/human-feedback-queue-end
+                                                         {:module-id module-id :queue-id queue-id}))))
+                              (.catch (fn [err] (js/alert (str "Error submitting: " (if (map? err) (or (:error err) (str err)) (str err))))))))
                             (set-errors validation-errors))))
 
         handle-dismiss (fn []
                          (when (js/confirm "Dismiss this item? This will remove it from the queue without adding feedback. This action cannot be undone.")
                            ;; Dismiss via backend
-                           (sente/request!
-                            [:human-feedback/dismiss-queue-item
-                             {:module-id decoded-module-id
-                              :queue-name decoded-queue-id
-                              :item-id item-id-str}]
-                            10000
-                            (fn [reply]
-                              (if (:success reply)
-                                (do
-                          ;; Invalidate the queue items cache
-                                  (state/dispatch [:query/invalidate
-                                                   {:query-key-pattern [:human-feedback-queue-items module-id queue-id]}])
-                          ;; Clear form state before navigating
-                                  (set-scores {})
-                                  (set-comment "")
-                                  (set-errors {})
-                          ;; Navigate to next item or back to queue
-                                  (if has-next?
-                                    (rfe/push-state :module/human-feedback-queue-item
-                                                    {:module-id module-id
-                                                     :queue-id queue-id
-                                                     :item-id next-item-id})
-                                    (rfe/push-state :module/human-feedback-queue-detail
-                                                    {:module-id module-id
-                                                     :queue-id queue-id})))
-                                (js/alert (str "Error dismissing: " (:error reply))))))))]
+                           (-> (rpc/call ::rpc-hf/dismiss-queue-item!!
+                            {:module-id decoded-module-id :queue-name decoded-queue-id :item-id item-id-str})
+                           (.then (fn [_]
+                                    (rf/dispatch [:re-frame.query/invalidate-tags
+                                                  [[:human-feedback/queue-items module-id queue-id]]])
+                                    (set-scores {})
+                                    (set-comment "")
+                                    (set-errors {})
+                                    (if has-next?
+                                      (rfe/push-state :module/human-feedback-queue-item
+                                                      {:module-id module-id :queue-id queue-id :item-id next-item-id})
+                                      (rfe/push-state :module/human-feedback-queue-detail
+                                                      {:module-id module-id :queue-id queue-id}))))
+                           (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))]
 
     (uix/use-effect
      (fn []

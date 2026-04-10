@@ -140,3 +140,68 @@
         agent-client (aor/agent-client manager decoded-agent-name)
         {:keys [all-agent-metrics-query]} (aor-types/underlying-objects agent-client)]
     (foreign-invoke-query all-agent-metrics-query)))
+
+;; =============================================================================
+;; FILTER CONVERSION HELPERS (for mutations)
+;; =============================================================================
+
+(defn- ui-comparator-spec->comparator-spec [{:keys [comparator value]}]
+  (aor-types/->valid-ComparatorSpec comparator value))
+
+(declare ui-filter->filter)
+
+(defn- ui-filter->filter [{:keys [type] :as filter-map}]
+  (case type
+    :error (aor-types/->valid-ErrorFilter)
+    :latency (aor-types/->valid-LatencyFilter (ui-comparator-spec->comparator-spec filter-map))
+    :feedback (aor-types/->valid-FeedbackFilter
+               (:rule-name filter-map)
+               (:feedback-key filter-map)
+               (ui-comparator-spec->comparator-spec (:comparator-spec filter-map)))
+    :input-match (aor-types/->valid-InputMatchFilter
+                  (:json-path filter-map)
+                  (Pattern/compile (:regex filter-map)))
+    :output-match (aor-types/->valid-OutputMatchFilter
+                   (:json-path filter-map)
+                   (Pattern/compile (:regex filter-map)))
+    :token-count (aor-types/->valid-TokenCountFilter
+                  (:token-type filter-map)
+                  (ui-comparator-spec->comparator-spec (:comparator-spec filter-map)))
+    :and (aor-types/->valid-AndFilter (mapv ui-filter->filter (:filters filter-map)))
+    :or (aor-types/->valid-OrFilter (mapv ui-filter->filter (:filters filter-map)))
+    :not (aor-types/->valid-NotFilter (ui-filter->filter (:filter filter-map)))
+    (throw (ex-info "Unknown filter type" {:type type}))))
+
+(defn- convert-ui-filter [{:keys [type filters] :as filter-structure}]
+  (if (and (= type :and) (seq filters))
+    (aor-types/->valid-AndFilter (mapv ui-filter->filter filters))
+    (ui-filter->filter filter-structure)))
+
+;; =============================================================================
+;; MUTATIONS
+;; =============================================================================
+
+(defn add-rule!!
+  [system {:keys [module-id agent-name rule-name rule-spec]}]
+  (let [manager (get-manager system module-id)
+        decoded-agent-name (common/url-decode agent-name)]
+    (when manager
+      (let [{:keys [global-actions-depot]} (aor-types/underlying-objects manager)
+            converted-filter (convert-ui-filter (:filter rule-spec))
+            converted-rule-spec (-> rule-spec
+                                    (update :sampling-rate double)
+                                    (assoc :filter converted-filter))]
+        (ana/add-rule! global-actions-depot
+                       rule-name
+                       decoded-agent-name
+                       converted-rule-spec)
+        {:status :ok}))))
+
+(defn delete-rule!!
+  [system {:keys [module-id agent-name rule-name]}]
+  (let [manager (get-manager system module-id)
+        decoded-agent-name (common/url-decode agent-name)]
+    (when manager
+      (let [{:keys [global-actions-depot]} (aor-types/underlying-objects manager)]
+        (ana/delete-rule! global-actions-depot decoded-agent-name rule-name)
+        {:status :ok}))))

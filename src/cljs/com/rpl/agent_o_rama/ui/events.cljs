@@ -2,6 +2,11 @@
   (:require [com.rpl.agent-o-rama.ui.sente :as sente]
             [com.rpl.agent-o-rama.ui.state :as state]
             [com.rpl.agent-o-rama.ui.common :as common]
+            [com.rpl.agent-o-rama.ui.rpc :as rpc]
+            [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
+            [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+            [com.rpl.agent-o-rama.impl.ui.rpc.config :as rpc-config]
+            [re-frame.core :as rf]
             [com.rpl.specter :as s]
             [clojure.string :as str]))
 
@@ -239,19 +244,18 @@
                  (fn [db {:keys [module-id agent-name invoke-id request response]}]
                    (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] true])
 
-                   (sente/request!
-                    [:invocations/provide-human-input
-                     {:module-id module-id
-                      :agent-name agent-name
-                      :invoke-id invoke-id
-                      :request request
-                      :response response}]
-                    5000
-                    (fn [reply]
-                      (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] false])
-                      (if (:success reply)
-                        (println "HITL response submitted successfully. Polling loop will automatically pick up new nodes.")
-                        (js/console.error "HITL submit failed" (:error reply)))))
+                   (-> (rpc/call ::rpc-invocations/provide-human-input!!
+                    {:module-id module-id
+                     :agent-name agent-name
+                     :invoke-id invoke-id
+                     :request request
+                     :response response})
+                   (.then (fn [_]
+                            (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] false])
+                            (println "HITL response submitted successfully.")))
+                   (.catch (fn [err]
+                             (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] false])
+                             (js/console.error "HITL submit failed" (if (map? err) (:error err) (str err))))))
                    nil))
 
 ;; =============================================================================
@@ -264,18 +268,16 @@
                      ;; Set loading state for this specific config item
                      (state/dispatch [:db/set-value state-path {:submitting? true :error nil}])
 
-                     (sente/request!
-                      [:config/set {:module-id module-id :agent-name agent-name :key key :value value}]
-                      10000 ;; 10 second timeout
-                      (fn [reply]
-                        (if (:success reply)
-                          (do
-                            (println "Config update success for" key)
-                            (state/dispatch [:db/set-value state-path {:submitting? false :error nil}]))
-                          (do
-                            (js/console.error "Config update failed:" (:error reply))
-                            (state/dispatch [:db/set-value state-path {:submitting? false :error (:error reply)}])
-                            (when on-error (on-error (:error reply))))))))
+                     (-> (rpc/call ::rpc-config/set!!
+                       {:module-id module-id :agent-name agent-name :key key :value value})
+                      (.then (fn [_]
+                               (println "Config update success for" key)
+                               (state/dispatch [:db/set-value state-path {:submitting? false :error nil}])))
+                      (.catch (fn [err]
+                                (let [msg (if (map? err) (or (:error err) (str err)) (str err))]
+                                  (js/console.error "Config update failed:" msg)
+                                  (state/dispatch [:db/set-value state-path {:submitting? false :error msg}])
+                                  (when on-error (on-error msg)))))))
                    nil))
 
 (state/reg-event :config/submit-global-change
@@ -284,18 +286,16 @@
                      ;; Set loading state for this specific config item
                      (state/dispatch [:db/set-value state-path {:submitting? true :error nil}])
 
-                     (sente/request!
-                      [:config/set-global {:module-id module-id :key key :value value}]
-                      10000 ;; 10 second timeout
-                      (fn [reply]
-                        (if (:success reply)
-                          (do
-                            (println "Global config update success for" key)
-                            (state/dispatch [:db/set-value state-path {:submitting? false :error nil}]))
-                          (do
-                            (js/console.error "Global config update failed:" (:error reply))
-                            (state/dispatch [:db/set-value state-path {:submitting? false :error (:error reply)}])
-                            (when on-error (on-error (:error reply))))))))
+                     (-> (rpc/call ::rpc-config/set-global!!
+                       {:module-id module-id :key key :value value})
+                      (.then (fn [_]
+                               (println "Global config update success for" key)
+                               (state/dispatch [:db/set-value state-path {:submitting? false :error nil}])))
+                      (.catch (fn [err]
+                                (let [msg (if (map? err) (or (:error err) (str err)) (str err))]
+                                  (js/console.error "Global config update failed:" msg)
+                                  (state/dispatch [:db/set-value state-path {:submitting? false :error msg}])
+                                  (when on-error (on-error msg)))))))
                    nil))
 
  ;; =============================================================================
@@ -312,22 +312,24 @@
                        (when-not (str/blank? input) (js/JSON.parse input))
                        (when-not (str/blank? output) (js/JSON.parse output))
 
-                       (sente/request!
-                        [:datasets/edit-example {:module-id module-id
-                                                 :dataset-id dataset-id
-                                                 :snapshot-name snapshot-name
-                                                 :example-id example-id
-                                                 :input input
-                                                 :output output}]
-                        10000
-                        (fn [reply]
-                          (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                          (if (:success reply)
-                            (do
-                              (state/dispatch [:modal/hide])
-                              (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                              (state/dispatch [:form/clear form-id]))
-                            (state/dispatch [:db/set-value [:forms form-id :error] (or (:error reply) "An unknown server error occurred.")]))))
+                       (-> (rpc/call ::rpc-datasets/edit-example!!
+                        {:module-id module-id
+                         :dataset-id dataset-id
+                         :snapshot-name snapshot-name
+                         :example-id example-id
+                         :input input
+                         :reference-output output})
+                       (.then (fn [_]
+                                (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                                (state/dispatch [:modal/hide])
+                                (do
+                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                                       (rf/dispatch [:re-frame.query/invalidate-tags [[:fetch-example module-id dataset-id example-id] [:dataset-examples module-id dataset-id snapshot-name]]]))
+                                (state/dispatch [:form/clear form-id])))
+                       (.catch (fn [err]
+                                 (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                                 (state/dispatch [:db/set-value [:forms form-id :error]
+                                                  (if (map? err) (or (:error err) "An unknown server error occurred.") (str err))]))))
                        (catch js/Error e
                          (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
                          (state/dispatch [:db/set-value [:forms form-id :error] (str "Invalid JSON: " (.-message e))]))))
@@ -338,18 +340,18 @@
 
 (state/reg-event :dataset/delete-selected
                  (fn [db {:keys [module-id dataset-id snapshot-name example-ids]}]
-                   (sente/request!
-                    [:datasets/delete-examples {:module-id module-id
-                                                :dataset-id dataset-id
-                                                :snapshot-name snapshot-name
-                                                :example-ids (vec example-ids)}]
-                    15000
-                    (fn [reply]
-                      (if (:success reply)
-                        (do
-                          (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-                          (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}]))
-                        (js/alert (str "Failed to delete examples: " (:error reply))))))
+                   (-> (rpc/call ::rpc-datasets/delete-examples!!
+                    {:module-id module-id
+                     :dataset-id dataset-id
+                     :snapshot-name snapshot-name
+                     :example-ids (vec example-ids)})
+                   (.then (fn [_]
+                            (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
+                            (do
+                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                            (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id snapshot-name]]]))))
+                   (.catch (fn [err]
+                             (js/alert (str "Failed to delete examples: " (if (map? err) (or (:error err) (str err)) (str err)))))))
                    nil))
 
 ;; =============================================================================

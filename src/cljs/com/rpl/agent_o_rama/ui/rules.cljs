@@ -6,6 +6,8 @@
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.rules-forms :as rules-forms :refer [action-friendly-name]]))
 
@@ -212,18 +214,14 @@
                                     rule-name
                                     "'?"))
                           (set-deleting! true)
-                          (sente/request!
-                           [:analytics/delete-rule {:module-id module-id
-                                                    :agent-name agent-name
-                                                    :rule-name rule-name}]
-                           5000
-                           (fn [reply]
-                             (set-deleting! false)
-                             (if (:success reply)
-                               (when on-delete (on-delete))
-                               (js/alert
-                                (str "Failed to delete rule: "
-                                     (or (:error reply) "Unknown error"))))))))]
+                          (-> (rpc/call ::rpc-analytics/delete-rule!!
+                           {:module-id module-id :agent-name agent-name :rule-name rule-name})
+                          (.then (fn [_]
+                                   (set-deleting! false)
+                                   (when on-delete (on-delete))))
+                          (.catch (fn [err]
+                                    (set-deleting! false)
+                                    (js/alert (str "Failed to delete rule: " (if (map? err) (or (:error err) "Unknown error") (str err)))))))))]
     ($ :tr.hover:bg-gray-50
        ($ :td.px-4.py-1.text-sm.font-medium.text-gray-900 rule-name)
        ($ :td.px-4.py-1.text-sm.text-gray-600

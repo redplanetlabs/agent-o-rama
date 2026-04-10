@@ -17,6 +17,8 @@
    [com.rpl.agent-o-rama.ui.human-feedback.add-to-queue :as add-to-queue]
 
    [reitit.frontend.easy :as rfe]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
@@ -841,36 +843,30 @@
                       (try
                         ;; Test if it's valid JSON
                         (js/JSON.parse edit-value)
-                        (com.rpl.agent-o-rama.ui.sente/request!
-                         [:invocations/set-metadata {:module-id module-id
-                                                     :agent-name agent-name
-                                                     :invoke-id invoke-id
-                                                     :key m-key
-                                                     :value-str edit-value}]
-                         10000
-                         (fn [reply]
-                           (set-is-saving! false)
-                           (if (:success reply)
-                             (do
-                               (set-editing! false)
-                               (on-change))
-                             (set-error! (or (:error reply) "Save failed.")))))
+                        (-> (rpc/call ::rpc-invocations/set-metadata!!
+                         {:module-id module-id
+                          :agent-name agent-name
+                          :invoke-id invoke-id
+                          :key m-key
+                          :value-str edit-value})
+                        (.then (fn [_]
+                                 (set-is-saving! false)
+                                 (set-editing! false)
+                                 (on-change)))
+                        (.catch (fn [err]
+                                  (set-is-saving! false)
+                                  (set-error! (if (map? err) (or (:error err) "Save failed.") (str err))))))
                         (catch :default e
                           (set-is-saving! false)
                           (set-error! (str "Invalid JSON: " (.-message e))))))
 
         handle-delete (fn []
                         (when (js/confirm (str "Are you sure you want to remove the metadata key '" m-key "'?"))
-                          (com.rpl.agent-o-rama.ui.sente/request!
-                           [:invocations/remove-metadata {:module-id module-id
-                                                          :agent-name agent-name
-                                                          :invoke-id invoke-id
-                                                          :key m-key}]
-                           10000
-                           (fn [reply]
-                             (if (:success reply)
-                               (on-change)
-                               (js/alert (str "Failed to remove metadata: " (:error reply))))))))]
+                          (-> (rpc/call ::rpc-invocations/remove-metadata!!
+                           {:module-id module-id :agent-name agent-name :invoke-id invoke-id :key m-key})
+                          (.then (fn [_] (on-change)))
+                          (.catch (fn [err]
+                                    (js/alert (str "Failed: " (if (map? err) (or (:error err) (str err)) (str err)))))))))]
 
     ($ :div.py-2.sm:grid.sm:grid-cols-3.sm:gap-4.sm:px-0
        ($ :dt.text-sm.font-medium.leading-6.text-gray-900.font-mono.truncate {:title m-key} m-key)

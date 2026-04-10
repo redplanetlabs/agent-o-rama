@@ -5,8 +5,10 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
    [re-frame.core :as rf]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
@@ -171,21 +173,23 @@
    :modal-props {:title "Create New Dataset"
                  :submit-text "Create Dataset"}}
   :on-submit
-  {:event (fn [db form-state]
-            (if (= (:dataset-type form-state) :remote)
-              ;; Remote dataset
-              [:datasets/add-remote (-> form-state
-                                        (select-keys [:remote-dataset-id :module-name
-                                                      :cluster-conductor-host :cluster-conductor-port
-                                                      :module-id])
-                                        (assoc :cluster-conductor-port
-                                               (when-not (str/blank? (:cluster-conductor-port form-state))
-                                                 (js/parseInt (:cluster-conductor-port form-state)))))]
-              ;; Local dataset
-              [:datasets/create (select-keys form-state [:module-id :name :description
-                                                         :input-schema :output-schema])]))
-   :on-success-invalidate (fn [db {:keys [module-id]} _reply]
-                            {:query-key-pattern [:datasets module-id]})}})
+  {:mutation (fn [_db form-state]
+               (if (= (:dataset-type form-state) :remote)
+                 [::rpc-datasets/add-remote!!
+                  (-> form-state
+                      (select-keys [:remote-dataset-id :module-name
+                                    :cluster-conductor-host :cluster-conductor-port
+                                    :module-id])
+                      (assoc :cluster-conductor-port
+                             (when-not (str/blank? (:cluster-conductor-port form-state))
+                               (js/parseInt (:cluster-conductor-port form-state)))))]
+                 [::rpc-datasets/create!!
+                  (select-keys form-state [:module-id :name :description
+                                           :input-schema :output-schema])]))
+   :on-success-invalidate (fn [_db {:keys [module-id]} _reply]
+                            {:query-key-pattern [:datasets module-id]})
+   :rfq-invalidate-tags (fn [_db {:keys [module-id]} _reply]
+                          [[:datasets module-id]])}})
 
 (defui EditDatasetForm [{:keys [form-id initial-name initial-description]}]
   (let [{:keys [field-errors]} (forms/use-form form-id)
@@ -222,42 +226,29 @@
    :modal-props {:title "Edit Dataset"
                  :submit-text "Save Changes"}}
   :on-submit
-  (fn [db form-state] ; The elegant single-map signature!
-    ;; All data is now in one place - much cleaner!
+  (fn [db form-state]
     (let [{:keys [form-id module-id dataset-id name description initial-name initial-description]} form-state]
-
-      (let [name-promise (js/Promise.
-                          (fn [resolve reject]
-                            (if (= name initial-name)
-                              (resolve {:success true})
-                              (sente/request!
-                               [:datasets/set-name {:module-id module-id
-                                                    :dataset-id dataset-id
-                                                    :name name}]
-                               5000
-                               #(if (:success %) (resolve %) (reject (:error %)))))))
-            desc-promise (js/Promise.
-                          (fn [resolve reject]
-                            (if (= description initial-description)
-                              (resolve {:success true})
-                              (sente/request!
-                               [:datasets/set-description {:module-id module-id
-                                                           :dataset-id dataset-id
-                                                           :description description}]
-                               5000
-                               #(if (:success %) (resolve %) (reject (:error %)))))))]
-
+      (let [name-promise (if (= name initial-name)
+                           (js/Promise.resolve nil)
+                           (rpc/call ::rpc-datasets/set-name!!
+                                     {:module-id module-id :dataset-id dataset-id :name name}))
+            desc-promise (if (= description initial-description)
+                           (js/Promise.resolve nil)
+                           (rpc/call ::rpc-datasets/set-description!!
+                                     {:module-id module-id :dataset-id dataset-id :description description}))]
         (-> (.all js/Promise [name-promise desc-promise])
             (.then (fn [_]
                      (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
                      (state/dispatch [:modal/hide])
-                     (let [decoded-module-id (when module-id (common/url-decode module-id))]
-                       (state/dispatch [:query/invalidate {:query-key-pattern [:datasets decoded-module-id]}])
-                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props decoded-module-id dataset-id]}]))
+                     (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
+                     (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props module-id dataset-id]}])
+                     (rf/dispatch [:re-frame.query/invalidate-tags
+                                   [[:datasets module-id] [:dataset-props module-id dataset-id]]])
                      (state/dispatch [:form/clear form-id])))
             (.catch (fn [error]
                       (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                      (state/dispatch [:db/set-value [:forms form-id :error] (str "Failed to save: " error)])))))))})
+                      (state/dispatch [:db/set-value [:forms form-id :error]
+                                       (str "Failed to save: " (if (map? error) (:error error) error))])))))))})
 
 (defui ExampleForm [{:keys [form-id]}]
   (let [{:keys [field-errors]} (forms/use-form form-id)
@@ -293,23 +284,21 @@
    :modal-props {:title "Add Example"
                  :submit-text "Add Example"}}
   :on-submit
-  {:event (fn [db form-state]
-            (try
-              (let [parsed-input (-> (:input form-state) js/JSON.parse js->clj)
-                    parsed-output (when-not (str/blank? (:output form-state))
-                                    (-> (:output form-state) js/JSON.parse js->clj))]
-                ;; Return the Sente event with PARSED data
-                [:datasets/add-example (assoc form-state
-                                              :input parsed-input
-                                              :output parsed-output)])
-              (catch js/Error e
-                ;; If parsing fails, update the form with an error instead of sending.
-                (state/dispatch [:db/set-value [:forms (:form-id form-state) :error]
-                                 (str "Invalid JSON: " (.-message e))])
-                ;; Return nil to prevent Sente request from being sent
-                nil)))
-   :on-success-invalidate (fn [db {:keys [module-id dataset-id]} _reply]
-                            {:query-key-pattern [:dataset-examples module-id dataset-id]})}})
+  {:mutation (fn [_db form-state]
+               (try
+                 (let [parsed-input (-> (:input form-state) js/JSON.parse js->clj)
+                       parsed-output (when-not (str/blank? (:output form-state))
+                                       (-> (:output form-state) js/JSON.parse js->clj))]
+                   [::rpc-datasets/add-example!!
+                    (assoc form-state :input parsed-input :output parsed-output)])
+                 (catch js/Error e
+                   (state/dispatch [:db/set-value [:forms (:form-id form-state) :error]
+                                    (str "Invalid JSON: " (.-message e))])
+                   nil)))
+   :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
+                            {:query-key-pattern [:dataset-examples module-id dataset-id]})
+   :rfq-invalidate-tags (fn [_db {:keys [module-id dataset-id]} _reply]
+                          [[:dataset-examples module-id dataset-id]])}})
 
 (defn show-add-example-modal! [props]
   (state/dispatch [:modal/show-form :add-dataset-example props]))
@@ -333,18 +322,18 @@
                                :required? true}))))}
 
   :on-submit
-  {:event (fn [db form-state]
-            [:datasets/create-snapshot form-state])
-   :on-success-invalidate (fn [db {:keys [module-id dataset-id]} _reply]
-                            {:query-key-pattern [:snapshot-names module-id (str dataset-id)]})
-   :on-success (fn [db {:keys [module-id dataset-id]} reply]
-                 ;; Invalidate rfq snapshot-names query
-                 (rf/dispatch [:re-frame.query/invalidate-tags
-                               [[:snapshot-names module-id dataset-id]]])
-                 ;; On success, directly dispatch an event to select the new snapshot
-                 (state/dispatch [:datasets/set-selected-snapshot
-                                  {:dataset-id dataset-id
-                                   :snapshot-name (get-in reply [:data :snapshot-name])}]))}})
+  {:mutation (fn [_db form-state]
+               [::rpc-datasets/create-snapshot!! form-state])
+   :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
+                            {:query-key-pattern [:snapshot-names module-id dataset-id]})
+   :rfq-invalidate-tags (fn [_db {:keys [module-id dataset-id]} _reply]
+                          [[:snapshot-names module-id dataset-id]])
+   :on-success (fn [_db {:keys [dataset-id]} reply]
+                 (let [snapshot-name (or (get-in reply [:data :snapshot-name])
+                                         (:snapshot-name reply))]
+                   (state/dispatch [:datasets/set-selected-snapshot
+                                    {:dataset-id dataset-id
+                                     :snapshot-name snapshot-name}])))}})
 
 (defui CreateSnapshotForm [{:keys [form-id from-snapshot-name]}]
   (let [{:keys [error]} (forms/use-centralized-form form-id)
@@ -377,24 +366,22 @@
    :modal-props {:title "Add Tag to examples"
                  :submit-text "Add Tag"}}
   :on-submit
-  {:event (fn [db form-state]
-            ;; 1. Get stable IDs from the route.
-            (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
-                  ;; 2. Get the CURRENTLY selected snapshot name from its state path.
-                  snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
-                  ;; 3. Get example IDs from form state (passed as props)
-                  {:keys [tag-name example-ids]} form-state]
-              [:datasets/add-tag-to-examples
-               {:module-id module-id
-                :dataset-id dataset-id
-                ;; Only send snapshot-name if it's not blank.
-                :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
-                ;; Ensure example-ids is a vector and not nil.
-                :example-ids (vec (or example-ids #{}))
-                :tag tag-name}]))
+  {:mutation (fn [db form-state]
+               (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
+                     snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
+                     {:keys [tag-name example-ids]} form-state]
+                 [::rpc-datasets/add-tag-to-examples!!
+                  {:module-id module-id
+                   :dataset-id dataset-id
+                   :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
+                   :example-ids (vec (or example-ids #{}))
+                   :tag tag-name}]))
    :on-success-invalidate (fn [db _form-state _reply]
                             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
                               {:query-key-pattern [:dataset-examples module-id dataset-id]}))
+   :rfq-invalidate-tags (fn [db _form-state _reply]
+                          (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+                            [[:dataset-examples module-id dataset-id]]))
    :on-success (fn [db _form-state _reply]
                  (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
                    (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
@@ -409,30 +396,27 @@
   {:initial-fields (fn [props] (merge {:tag-name ""} props))
    :validators {:tag-name [forms/required]}
    :ui (fn [{:keys [form-id props]}]
-         ;; The UI for this form needs the list of selected examples to populate the dropdown.
          ($ RemoveTagForm {:form-id form-id
                            :selected-examples (:selected-examples props)}))
    :modal-props {:title "Remove Tag from examples"
                  :submit-text "Remove Tag"}}
   :on-submit
-  {:event (fn [db form-state]
-            ;; 1. Get stable IDs from the route.
-            (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
-                  ;; 2. Get the CURRENTLY selected snapshot name from its state path.
-                  snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
-                  ;; 3. Get example IDs from form state (passed as props)
-                  {:keys [tag-name example-ids]} form-state]
-              [:datasets/remove-tag-from-examples
-               {:module-id module-id
-                :dataset-id dataset-id
-                ;; Only send snapshot-name if it's not blank.
-                :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
-                ;; Ensure example-ids is a vector and not nil.
-                :example-ids (vec (or example-ids #{}))
-                :tag tag-name}]))
+  {:mutation (fn [db form-state]
+               (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
+                     snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
+                     {:keys [tag-name example-ids]} form-state]
+                 [::rpc-datasets/remove-tag-from-examples!!
+                  {:module-id module-id
+                   :dataset-id dataset-id
+                   :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
+                   :example-ids (vec (or example-ids #{}))
+                   :tag tag-name}]))
    :on-success-invalidate (fn [db _form-state _reply]
                             (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
                               {:query-key-pattern [:dataset-examples module-id dataset-id]}))
+   :rfq-invalidate-tags (fn [db _form-state _reply]
+                          (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+                            [[:dataset-examples module-id dataset-id]]))
    :on-success (fn [db _form-state _reply]
                  (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
                    (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})

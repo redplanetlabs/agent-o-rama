@@ -146,6 +146,66 @@
          :root-invoke-id root-invoke-id
          :historical-graph historical-graph}))))
 
+;; =============================================================================
+;; MUTATIONS
+;; =============================================================================
+
+(defn run-agent!!
+  [system {:keys [module-id agent-name args metadata]}]
+  (let [client (get-client system module-id agent-name)]
+    (when-not (vector? args)
+      (throw (ex-info "must be a json list of args" {:bad-args args})))
+    (let [m (or metadata {})
+          ^AgentInvoke inv (apply aor/agent-initiate-with-context client {:metadata m} args)]
+      {:task-id (.getTaskId inv)
+       :invoke-id (.getAgentInvokeId inv)})))
+
+(defn execute-fork!!
+  [system {:keys [module-id agent-name invoke-pair changed-nodes]}]
+  (let [client (get-client system module-id agent-name)
+        [task-id agent-invoke-id] invoke-pair
+        json-parsed-nodes (transform
+                           [MAP-VALS]
+                           #(j/read-value %)
+                           changed-nodes)
+        rehydrated-nodes (common/from-ui-serializable json-parsed-nodes)
+        ^AgentInvoke result (aor/agent-initiate-fork
+                             client
+                             (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
+                             rehydrated-nodes)]
+    {:agent-invoke-id (:agentInvokeId (bean result))
+     :task-id (:taskId (bean result))}))
+
+(defn provide-human-input!!
+  [system {:keys [module-id agent-name request response]}]
+  (let [client (get-client system module-id agent-name)
+        {:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
+        req (aor-types/->NodeHumanInputRequest agent-task-id agent-id node node-task-id invoke-id prompt uuid)]
+    (aor/provide-human-input client req response)
+    {:ok true}))
+
+(defn set-metadata!!
+  [system {:keys [module-id agent-name invoke-id key value-str]}]
+  (let [client (get-client system module-id agent-name)
+        [task-id agent-id] (common/parse-url-pair invoke-id)
+        invoke (aor-types/->AgentInvokeImpl task-id agent-id)
+        parsed-value (j/read-value value-str)]
+    (aor/set-metadata! client
+                       invoke
+                       key
+                       (if (= java.lang.Integer (class parsed-value))
+                         (long parsed-value)
+                         parsed-value))
+    {:success true}))
+
+(defn remove-metadata!!
+  [system {:keys [module-id agent-name invoke-id key]}]
+  (let [client (get-client system module-id agent-name)
+        [task-id agent-id] (common/parse-url-pair invoke-id)
+        invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
+    (aor/remove-metadata! client invoke key)
+    {:success true}))
+
 (defn get-node-stats!!
   [system {:keys [module-id agent-name granularity]}]
   (let [decoded-agent-name (common/url-decode agent-name)

@@ -7,6 +7,7 @@
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.impl.ui.rpc.human-feedback :as rpc-hf]
    [clojure.string :as str]))
 
 ;; Separate component for each metric row in the manual feedback form
@@ -251,42 +252,23 @@
                    :submit-text (if (:editing? props) "Save" "Submit")})}
 
   :on-submit
-  {:event (fn [db form-state]
-            (let [{:keys [form-id module-id agent-name invoke-id node-task-id node-invoke-id
-                          reviewer-name metrics comment feedback-id editing?]} form-state
-                  ;; Save reviewer name to localStorage
-                  _ (when-not (str/blank? reviewer-name)
-                      (hf-common/save-reviewer-name! reviewer-name))
-                  ;; Convert metrics to scores map
-                  ;; metric-data has :name, :metric, :value, :required
-                  scores (into {} (map (fn [{:keys [name value]}]
-                                         [name value])
-                                       (filter #(not (str/blank? (:value %))) metrics)))]
-              (if editing?
-                [:human-feedback/edit-feedback
-                 {:module-id module-id
-                  :agent-name agent-name
-                  :invoke-id invoke-id
-                  :node-task-id node-task-id
-                  :node-invoke-id node-invoke-id
-                  :feedback-id feedback-id
-                  :reviewer-name reviewer-name
-                  :scores scores
-                  :comment comment}]
-                [:human-feedback/add-feedback
-                 {:module-id module-id
-                  :agent-name agent-name
-                  :invoke-id invoke-id
-                  :node-task-id node-task-id
-                  :node-invoke-id node-invoke-id
-                  :reviewer-name reviewer-name
-                  :scores scores
-                  :comment comment}])))
-   :on-success (fn [db form-state reply]
+  {:mutation (fn [_db form-state]
+               (let [{:keys [module-id agent-name invoke-id node-task-id node-invoke-id
+                             reviewer-name metrics comment feedback-id editing?]} form-state]
+                 (when-not (str/blank? reviewer-name)
+                   (hf-common/save-reviewer-name! reviewer-name))
+                 (let [scores (into {} (map (fn [{:keys [name value]}] [name value])
+                                            (filter #(not (str/blank? (:value %))) metrics)))]
+                   (if editing?
+                     [::rpc-hf/edit-feedback!!
+                      {:module-id module-id :agent-name agent-name :invoke-id invoke-id
+                       :node-task-id node-task-id :node-invoke-id node-invoke-id
+                       :feedback-id feedback-id :reviewer-name reviewer-name :scores scores :comment comment}]
+                     [::rpc-hf/add-feedback!!
+                      {:module-id module-id :agent-name agent-name :invoke-id invoke-id
+                       :node-task-id node-task-id :node-invoke-id node-invoke-id
+                       :reviewer-name reviewer-name :scores scores :comment comment}]))))
+   :on-success (fn [_db form-state _reply]
                  (let [{:keys [invoke-id module-id agent-name]} form-state]
-                   ;; Reload the invocation to show updated feedback
-                   ;; Note: modal/hide and form/clear are already handled by the form framework
                    (state/dispatch [:invocation/start-graph-loading
-                                    {:invoke-id invoke-id
-                                     :module-id module-id
-                                     :agent-name agent-name}])))}})
+                                    {:invoke-id invoke-id :module-id module-id :agent-name agent-name}])))}})

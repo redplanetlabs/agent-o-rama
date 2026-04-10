@@ -14,6 +14,9 @@
    [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
    [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
    [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.impl.ui.rpc.experiment-list :as rpc-experiment-list]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [re-frame.core :as rf]
    [re-frame.query :as rfq]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
@@ -550,26 +553,26 @@
                                                       (update :metadata #(if (str/blank? %) {} (-> % js/JSON.parse js->clj)))
                                                       (update :input->args (fn [args] (mapv :value args)))))
                                                 targets)))]
-      (sente/request!
-       [:experiments/start
-        {:module-id module-id
-         :dataset-id dataset-id
-         :form-data cleaned-form-state}]
-       15000
-       (fn [reply]
-         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-         (if (:success reply)
-           (do
-             (state/dispatch [:modal/hide])
-             (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
-             (let [eid (get-in reply [:data :experiment-id])]
-               (if (and eid (not= spec-type :comparative))
-                 (rfe/push-state :module/dataset-detail.experiment-detail
-                                 {:module-id module-id :dataset-id dataset-id :experiment-id eid})
-                 (if (= spec-type :comparative)
-                   (rfe/push-state :module/dataset-detail.comparative-experiments
-                                   {:module-id module-id :dataset-id dataset-id})
-                   (rfe/push-state :module/dataset-detail.experiments
-                                   {:module-id module-id :dataset-id dataset-id}))))
-             (state/dispatch [:form/clear form-id]))
-           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+      (-> (rpc/call ::rpc-experiment-list/start!!
+                    {:module-id module-id
+                     :dataset-id dataset-id
+                     :form-data cleaned-form-state})
+          (.then (fn [data]
+                   (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                   (state/dispatch [:modal/hide])
+                   (rf/dispatch [:re-frame.query/invalidate-tags
+                                 [[:experiments module-id dataset-id]]])
+                   (let [eid (:experiment-id data)]
+                     (if (and eid (not= spec-type :comparative))
+                       (rfe/push-state :module/dataset-detail.experiment-detail
+                                       {:module-id module-id :dataset-id dataset-id :experiment-id eid})
+                       (if (= spec-type :comparative)
+                         (rfe/push-state :module/dataset-detail.comparative-experiments
+                                         {:module-id module-id :dataset-id dataset-id})
+                         (rfe/push-state :module/dataset-detail.experiments
+                                         {:module-id module-id :dataset-id dataset-id}))))
+                   (state/dispatch [:form/clear form-id])))
+          (.catch (fn [err]
+                    (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                    (state/dispatch [:db/set-value [:forms form-id :error]
+                                     (if (map? err) (or (:error err) (str err)) (str err))]))))))})

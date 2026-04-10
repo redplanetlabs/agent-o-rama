@@ -2,7 +2,8 @@
   (:require
    [re-frame.query :as rfq]))
 
-(rfq/reg-query
+(def ^:export _q1
+  (rfq/reg-query
  ::get-page!!
  {:query-fn (fn [params]
                {:rpc/id ::get-page!!
@@ -10,9 +11,10 @@
   :stale-time-ms 0
   :polling-interval-ms 2000
   :tags (fn [{:keys [module-id agent-name]}]
-           [[:invocations module-id agent-name]])})
+           [[:invocations module-id agent-name]])}))
 
-(rfq/reg-query
+(def ^:export _q2
+  (rfq/reg-query
  ::get-filter-options!!
  {:query-fn (fn [params]
                {:rpc/id ::get-filter-options!!
@@ -20,9 +22,10 @@
   :stale-time-ms 0
   :polling-interval-ms 30000
   :tags (fn [{:keys [module-id agent-name]}]
-           [[:invocations/filter-options module-id agent-name]])})
+           [[:invocations/filter-options module-id agent-name]])}))
 
-(rfq/reg-query
+(def ^:export _q3
+  (rfq/reg-query
  ::get-graph!!
  {:query-fn (fn [params]
                {:rpc/id ::get-graph!!
@@ -30,9 +33,10 @@
   :stale-time-ms 0
   :polling-interval-ms 2000
   :tags (fn [{:keys [module-id agent-name]}]
-           [[:graph module-id agent-name]])})
+           [[:graph module-id agent-name]])}))
 
-(rfq/reg-query
+(def ^:export _q4
+  (rfq/reg-query
  ::get-node-stats!!
  {:query-fn (fn [params]
                {:rpc/id ::get-node-stats!!
@@ -40,4 +44,4 @@
   :stale-time-ms 0
   :polling-interval-ms 30000
   :tags (fn [{:keys [module-id agent-name granularity]}]
-           [[:node-stats module-id agent-name granularity]])})
+           [[:node-stats module-id agent-name granularity]])}))

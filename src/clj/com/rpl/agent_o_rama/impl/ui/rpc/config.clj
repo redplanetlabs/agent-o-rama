@@ -46,3 +46,39 @@
          :current-value (str current-value)
          :default-value (str (:default config-def))
          :input-type (schema-fn->input-type (:schema-fn config-def))}))))
+
+;; =============================================================================
+;; MUTATIONS
+;; =============================================================================
+
+(defn set!!
+  [system {:keys [module-id agent-name key value]}]
+  (let [client (get-client system module-id agent-name)
+        client-objects (aor-types/underlying-objects client)
+        agent-config-depot (:agent-config-depot client-objects)
+        config-def (get aor-types/ALL-CONFIGS key)]
+    (when-not config-def
+      (throw (ex-info "Unknown configuration key" {:key key})))
+    (let [parsed-value (case (schema-fn->input-type (:schema-fn config-def))
+                         :number (Long/parseLong value)
+                         value)
+          change-fn (:change-fn config-def)
+          change-record (change-fn parsed-value)]
+      (foreign-append! agent-config-depot change-record)
+      {:success true})))
+
+(defn set-global!!
+  [system {:keys [module-id key value]}]
+  (let [manager (get-manager system module-id)
+        manager-objects (aor-types/underlying-objects manager)
+        global-actions-depot (:global-actions-depot manager-objects)
+        config-def (get aor-types/ALL-GLOBAL-CONFIGS key)]
+    (when-not config-def
+      (throw (ex-info "Unknown global configuration key" {:key key})))
+    (let [parsed-value (case (schema-fn->input-type (:schema-fn config-def))
+                         :number (Long/parseLong value)
+                         value)
+          change-fn (:change-fn config-def)
+          change-record (change-fn parsed-value)]
+      (foreign-append! global-actions-depot change-record)
+      {:success true})))

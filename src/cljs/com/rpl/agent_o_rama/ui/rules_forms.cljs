@@ -9,6 +9,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]
    ["@heroicons/react/24/outline" :refer [XMarkIcon]]))
@@ -453,26 +454,24 @@
                  :submit-text "Add Rule"}}
 
   :on-submit
-  {:event (fn [_db form-state]
-            (let [{:keys [module-id agent-name rule-name node-name status-filter
-                          sampling-rate filter start-time
-                          action-name action-params]} form-state
-                  start-time-millis (compute-start-time-millis start-time)
-                  action-params-cleaned (into {}
-                                              #_(filter #(not (str/blank? (val %))))
-                                              action-params)
-                  rule-spec {:node-name node-name
-                             :action-name action-name
-                             :action-params action-params-cleaned
-                             :filter filter
-                             :sampling-rate sampling-rate
-                             :start-time-millis start-time-millis
-                             :status-filter status-filter}]
-              [:analytics/add-rule
-               {:module-id module-id
-                :agent-name agent-name
-                :rule-name rule-name
-                :rule-spec rule-spec}]))
+  {:mutation (fn [_db form-state]
+               (let [{:keys [module-id agent-name rule-name node-name status-filter
+                             sampling-rate filter start-time
+                             action-name action-params]} form-state
+                     start-time-millis (compute-start-time-millis start-time)
+                     action-params-cleaned (into {} action-params)
+                     rule-spec {:node-name node-name
+                                :action-name action-name
+                                :action-params action-params-cleaned
+                                :filter filter
+                                :sampling-rate sampling-rate
+                                :start-time-millis start-time-millis
+                                :status-filter status-filter}]
+                 [::rpc-analytics/add-rule!!
+                  {:module-id module-id
+                   :agent-name agent-name
+                   :rule-name rule-name
+                   :rule-spec rule-spec}]))
    :on-success (fn [db {:keys [module-id agent-name]} _reply]
                  (let [current-val (get-in db [:ui :rules :refetch-trigger module-id agent-name] 0)
                        new-val (inc current-val)]

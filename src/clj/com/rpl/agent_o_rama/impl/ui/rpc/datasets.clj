@@ -90,6 +90,163 @@
   [system params]
   (get-example!! system params))
 
+;; =============================================================================
+;; MUTATIONS
+;; =============================================================================
+
+(defn create!!
+  [system {:keys [module-id name description input-schema output-schema]}]
+  (let [manager (get-manager system module-id)
+        dataset-id (aor/create-dataset! manager name
+                                        {:description (when-not (str/blank? description) description)
+                                         :input-json-schema (when-not (str/blank? input-schema) input-schema)
+                                         :output-json-schema (when-not (str/blank? output-schema) output-schema)})]
+    {:status :ok :dataset-id dataset-id}))
+
+(defn add-remote!!
+  [system {:keys [module-id remote-dataset-id cluster-conductor-host cluster-conductor-port module-name]}]
+  (let [manager (get-manager system module-id)]
+    (aor-types/add-remote-dataset-internal
+     manager
+     (java.util.UUID/fromString remote-dataset-id)
+     (when-not (str/blank? cluster-conductor-host) cluster-conductor-host)
+     (when cluster-conductor-port (long cluster-conductor-port))
+     module-name)
+    {:status :ok :dataset-id remote-dataset-id}))
+
+(defn set-name!!
+  [system {:keys [module-id dataset-id name]}]
+  (let [manager (get-manager system module-id)]
+    (aor/set-dataset-name! manager dataset-id name)
+    {:status :ok}))
+
+(defn set-description!!
+  [system {:keys [module-id dataset-id description]}]
+  (let [manager (get-manager system module-id)]
+    (aor/set-dataset-description! manager dataset-id description)
+    {:status :ok}))
+
+(defn delete!!
+  [system {:keys [module-id dataset-id]}]
+  (let [manager (get-manager system module-id)]
+    (aor/destroy-dataset! manager dataset-id)
+    {:status :ok}))
+
+(defn add-example!!
+  [system {:keys [module-id dataset-id snapshot-name input output tags]}]
+  (let [manager (get-manager system module-id)]
+    (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user" nil)]
+      (aor/add-dataset-example! manager
+                                dataset-id
+                                input
+                                {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)
+                                 :reference-output output
+                                 :tags (set tags)}))
+    {:status :ok}))
+
+(defn create-snapshot!!
+  [system {:keys [module-id dataset-id from-snapshot-name to-snapshot-name]}]
+  (let [manager (get-manager system module-id)
+        from-name (when-not (str/blank? from-snapshot-name) from-snapshot-name)]
+    (aor/snapshot-dataset! manager dataset-id from-name to-snapshot-name)
+    {:status :ok :snapshot-name to-snapshot-name}))
+
+(defn delete-snapshot!!
+  [system {:keys [module-id dataset-id snapshot-name]}]
+  (let [manager (get-manager system module-id)]
+    (aor/remove-dataset-snapshot! manager dataset-id snapshot-name)
+    {:status :ok}))
+
+(defn delete-example!!
+  [system {:keys [module-id dataset-id snapshot-name example-id]}]
+  (let [manager (get-manager system module-id)]
+    (aor/remove-dataset-example! manager
+                                 dataset-id
+                                 example-id
+                                 {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})))
+
+(defn edit-example!!
+  [system {:keys [module-id dataset-id snapshot-name example-id input reference-output]}]
+  (let [manager (get-manager system module-id)
+        snapshot-opts {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}]
+    (aor/set-dataset-example-input! manager dataset-id example-id input snapshot-opts)
+    (aor/set-dataset-example-reference-output! manager dataset-id example-id reference-output snapshot-opts)
+    {:status :ok}))
+
+(defn add-tag!!
+  [system {:keys [module-id dataset-id snapshot-name example-id tag]}]
+  (let [manager (get-manager system module-id)]
+    (aor/add-dataset-example-tag! manager
+                                  dataset-id
+                                  example-id
+                                  tag
+                                  {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})
+    {:status :ok}))
+
+(defn remove-tag!!
+  [system {:keys [module-id dataset-id snapshot-name example-id tag]}]
+  (let [manager (get-manager system module-id)]
+    (aor/remove-dataset-example-tag! manager
+                                     dataset-id
+                                     example-id
+                                     tag
+                                     {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)})
+    {:status :ok}))
+
+(defn add-tag-to-examples!!
+  [system {:keys [module-id dataset-id snapshot-name example-ids tag]}]
+  (let [manager (get-manager system module-id)]
+    (doseq [example-id example-ids]
+      (aor/add-dataset-example-tag! manager
+                                    dataset-id
+                                    example-id
+                                    tag
+                                    {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
+    {:status :ok}))
+
+(defn remove-tag-from-examples!!
+  [system {:keys [module-id dataset-id snapshot-name example-ids tag]}]
+  (let [manager (get-manager system module-id)]
+    (doseq [example-id example-ids]
+      (aor/remove-dataset-example-tag! manager
+                                       dataset-id
+                                       example-id
+                                       tag
+                                       {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
+    {:status :ok}))
+
+(defn delete-examples!!
+  [system {:keys [module-id dataset-id snapshot-name example-ids]}]
+  (let [manager (get-manager system module-id)]
+    (doseq [example-id example-ids]
+      (aor/remove-dataset-example! manager
+                                   dataset-id
+                                   example-id
+                                   {:snapshot (when-not (str/blank? snapshot-name) snapshot-name)}))
+    {:status :ok}))
+
+(defn add-direct-data!!
+  [system {:keys [module-id dataset-id input output]}]
+  (let [manager (get-manager system module-id)
+        datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
+        schemas (queries/get-dataset-properties datasets-pstate dataset-id)
+        input-schema (:input-json-schema schemas)
+        output-schema (:output-json-schema schemas)]
+    (if-not schemas
+      (throw (ex-info "Dataset not found" {:dataset-id dataset-id}))
+      (let [input-validation  (when input-schema
+                                (datasets/validate-with-schema* input-schema input))
+            output-validation (when output-schema
+                                (datasets/validate-with-schema* output-schema output))]
+        (cond
+          input-validation (throw (ex-info (str "Input schema validation failed: " input-validation) {}))
+          output-validation (throw (ex-info (str "Output schema validation failed: " output-validation) {}))
+          :else (do
+                  (binding [aor-types/OPERATION-SOURCE (aor-types/->HumanSourceImpl "user" nil)]
+                    (aor/add-dataset-example! manager dataset-id input
+                                              {:reference-output output}))
+                  {:status :ok}))))))
+
 (defn validate-direct-data!!
   [system {:keys [module-id dataset-id input output]}]
   (let [manager (get-manager system module-id)

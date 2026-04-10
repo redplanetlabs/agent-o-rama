@@ -156,35 +156,6 @@
     (aor-types/->valid-AndFilter
      (mapv ui-filter->filter filters))
     (ui-filter->filter filter-structure)))
-
-(defmethod sente/-event-msg-handler :analytics/add-rule
-  [{:keys [manager decoded-agent-name rule-name rule-spec]} uid]
-  (when manager
-    (let [{:keys [global-actions-depot]} (aor-types/underlying-objects manager)
-          converted-filter (convert-ui-filter (:filter rule-spec))
-          converted-rule-spec (-> rule-spec
-                                  (update :sampling-rate double)
-                                  (assoc :filter converted-filter))]
-      (try
-        (ana/add-rule! global-actions-depot
-                       rule-name
-                       decoded-agent-name
-                       converted-rule-spec)
-        (catch Exception e
-          (cljlogging/error
-           e "Failed to add rule" {:agent-name decoded-agent-name})
-          (throw e)))
-      {:status :ok})))
-
-(defmethod sente/-event-msg-handler :analytics/delete-rule
-  [{:keys [manager decoded-agent-name rule-name]} uid]
-  (when manager
-    (let [{:keys [global-actions-depot]} (aor-types/underlying-objects manager)]
-      (ana/delete-rule! global-actions-depot
-                        decoded-agent-name
-                        rule-name)
-      {:status :ok})))
-
 (defmethod sente/-event-msg-handler :analytics/all-action-builders
   [{:keys [manager]} uid]
   (when manager

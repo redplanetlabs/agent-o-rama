@@ -13,7 +13,9 @@
    [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [re-frame.query :as rfq]
+   [re-frame.core :as rf]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -282,36 +284,27 @@
                   {:title (str "Create Evaluator: " (get-in form-state [:selected-builder :name]))})}
 
   :on-submit
-  (fn [db form-state] ; Updated to use the new flattened signature!
-    (let [{:keys [form-id module-id name description input-json-path output-json-path reference-output-json-path params selected-builder]} form-state]
-      (sente/request!
-       [:evaluators/create {:module-id module-id
-                            :builder-name (:name selected-builder)
-                            :name name
-                            :description description
-                            :params params
-                            :input-json-path input-json-path
-                            :output-json-path output-json-path
-                            :reference-output-json-path reference-output-json-path}]
-       15000
-       (fn [reply]
-         (println "Evaluator create reply:" reply)
-         (if (:success reply)
-           (do
-             (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-             (state/dispatch [:modal/hide])
-             ;; Don't decode module-id - use it as-is since query keys use the encoded version
-             (state/dispatch [:query/invalidate
-                              {:query-key-pattern
-                               (fn [query-key]
-                                 (and (>= (count query-key) 2)
-                                      (#{:evaluator-instances :evaluator-instances-modal :evaluator-instances-list :evaluator-instances-search} (first query-key))
-                                      (= module-id (second query-key))))}])
-             (state/dispatch [:form/clear form-id]))
-           (do
-             (println "Setting error and stopping spinner in form:" (:error reply) form-id)
-             (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-             (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])))))))})
+  (fn [_db form-state]
+    (let [{:keys [form-id module-id name description input-json-path output-json-path reference-output-json-path params selected-builder]} form-state
+          on-success (fn [_data]
+                       (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                       (state/dispatch [:modal/hide])
+                       (rf/dispatch [:re-frame.query/invalidate-tags [[:evaluator-instances module-id]]])
+                       (state/dispatch [:form/clear form-id]))
+          on-error (fn [err]
+                     (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                     (state/dispatch [:db/set-value [:forms form-id :error]
+                                      (if (map? err) (or (:error err) (str err)) (str err))]))]
+      (-> (rpc/call ::rpc-evaluators/create!!
+                    {:module-id module-id
+                     :builder-name (:name selected-builder)
+                     :name name :description description
+                     :params params
+                     :input-json-path input-json-path
+                     :output-json-path output-json-path
+                     :reference-output-json-path reference-output-json-path})
+          (.then on-success)
+          (.catch on-error))))})
 
 (defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids pre-selected-evaluator]}]
   (let [;; NEW: If pre-selected, use it. Otherwise, state is nil.
@@ -397,17 +390,17 @@
                                                          show-output-path? (assoc :outputs (mapv #(-> % :value js/JSON.parse js->clj) model-outputs-input)))
                                           :summary {:dataset-id dataset-id
                                                     :example-ids selected-example-ids})]
-                           (sente/request!
-                            [:evaluators/run {:module-id module-id
-                                              :name (:name selected-evaluator)
-                                              :type evaluator-type
-                                              :run-data run-data}]
-                            60000 ; Generous timeout
-                            (fn [reply]
-                              (set-loading false)
-                              (if (:success reply)
-                                (set-evaluation-result (:data reply))
-                                (set-error (:error reply))))))
+                           (-> (rpc/call ::rpc-evaluators/run!!
+                                         {:module-id module-id
+                                          :name (:name selected-evaluator)
+                                          :type evaluator-type
+                                          :run-data run-data})
+                               (.then (fn [data]
+                                        (set-loading false)
+                                        (set-evaluation-result data)))
+                               (.catch (fn [err]
+                                         (set-loading false)
+                                         (set-error (if (map? err) (or (:error err) (str err)) (str err)))))))
                          (catch js/Error e
                            (set-loading false)
                            (set-error (str "Invalid JSON in one of the fields: " (.-message e)))))))]
@@ -615,12 +608,12 @@
         handle-delete (uix/use-callback
                        (fn [evaluator-name]
                          (when (js/confirm (str "Are you sure you want to delete evaluator '" evaluator-name "'?"))
-                           (sente/request! [:evaluators/delete {:name evaluator-name
-                                                                :module-id module-id}] 15000
-                                           (fn [reply]
-                                             (if (:success reply)
-                                               (refetch)
-                                               (js/alert (str "Failed to delete evaluator: " (:error reply))))))))
+                           (-> (rpc/call ::rpc-evaluators/delete!!
+                                         {:name evaluator-name :module-id module-id})
+                               (.then (fn [_] (refetch)))
+                               (.catch (fn [err]
+                                         (js/alert (str "Failed to delete evaluator: "
+                                                        (if (map? err) (or (:error err) (str err)) (str err)))))))))
                        [module-id refetch])]
 
     ($ :div.p-6

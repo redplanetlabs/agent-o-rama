@@ -5,6 +5,8 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [re-frame.core :as rf]
    [clojure.string :as str]
    [com.rpl.specter :as s]
    ["react-dom" :refer [createPortal]]))
@@ -395,34 +397,60 @@
                        (let [on-submit-handler (:on-submit form-spec)
                              form-state-with-id (assoc form-state :form-id form-id)]
                          (cond
-                           ;; New declarative path
-                           (map? on-submit-handler)
-                           (let [{:keys [event on-success-invalidate on-success on-error]} on-submit-handler
-                                 sente-event (event db form-state-with-id)]
-                             (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
-                             (sente/request!
-                              sente-event
-                              15000
-                              (fn [reply]
-                                (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                                ;; Check for nested error structure: {:success true, :data {:status :error, :error "..."}}
-                                (let [has-nested-error? (and (:success reply)
-                                                             (= :error (get-in reply [:data :status]))
-                                                             (get-in reply [:data :error]))
-                                      actual-error (if has-nested-error?
-                                                     (get-in reply [:data :error])
-                                                     (:error reply))
-                                      is-success? (and (:success reply) (not has-nested-error?))]
-                                  (if is-success?
-                                    (do
-                                      (state/dispatch [:modal/hide])
+                          ;; New declarative path
+                          (map? on-submit-handler)
+                          (let [{:keys [event mutation on-success-invalidate on-success on-error
+                                        rfq-invalidate-tags]} on-submit-handler]
+                            (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
+                            (letfn [(do-invalidations [reply]
                                       (when on-success-invalidate
                                         (state/dispatch [:query/invalidate (on-success-invalidate db form-state-with-id reply)]))
-                                      (when on-success (on-success db form-state-with-id reply))
-                                      (state/dispatch [:form/clear form-id]))
-                                    (do
-                                      (state/dispatch [:db/set-value [:forms form-id :error] actual-error])
-                                      (when on-error (on-error db form-state-with-id actual-error))))))))
+                                      (when rfq-invalidate-tags
+                                        (let [tags (rfq-invalidate-tags db form-state-with-id reply)]
+                                          (when (seq tags)
+                                            (rf/dispatch [:re-frame.query/invalidate-tags tags])))))
+                                    (handle-success [reply]
+                                      (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                                      (let [has-nested-error? (and (:success reply)
+                                                                   (= :error (get-in reply [:data :status]))
+                                                                   (get-in reply [:data :error]))
+                                            actual-error (if has-nested-error?
+                                                           (get-in reply [:data :error])
+                                                           (:error reply))
+                                            is-success? (and (:success reply) (not has-nested-error?))]
+                                        (if is-success?
+                                          (do
+                                            (state/dispatch [:modal/hide])
+                                            (do-invalidations reply)
+                                            (when on-success (on-success db form-state-with-id reply))
+                                            (state/dispatch [:form/clear form-id]))
+                                          (do
+                                            (state/dispatch [:db/set-value [:forms form-id :error] actual-error])
+                                            (when on-error (on-error db form-state-with-id actual-error))))))
+                                    (handle-error [err]
+                                      (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
+                                      (let [msg (if (map? err) (or (:error err) (str err)) (str err))]
+                                        (state/dispatch [:db/set-value [:forms form-id :error] msg])
+                                        (when on-error (on-error db form-state-with-id msg))))]
+                              (cond
+                                ;; HTTP RPC mutation path
+                                mutation
+                                (let [mut-result (mutation db form-state-with-id)]
+                                  (when mut-result
+                                    (let [[rpc-id params] mut-result]
+                                      (-> (rpc/call rpc-id params)
+                                          (.then (fn [data]
+                                                   (handle-success {:success true :data data})))
+                                          (.catch (fn [err]
+                                                    (handle-error err)))))))
+                                ;; Legacy Sente event path
+                                event
+                                (let [sente-event (event db form-state-with-id)]
+                                  (sente/request!
+                                   sente-event
+                                   15000
+                                   (fn [reply]
+                                     (handle-success reply)))))))
 
                            ;; Fallback to original function-based handler for complex cases
                            (fn? on-submit-handler)

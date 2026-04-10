@@ -15,6 +15,7 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
    [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -44,28 +45,23 @@
                  (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] true])
 
                  ;; Make the Sente request
-                 (sente/request!
-                  [:invocations/run-agent {:module-id module-id
+                 (-> (rpc/call ::rpc-invocations/run-agent!!
+                  {:module-id module-id
+                   :agent-name agent-name
+                   :args parsed-args
+                   :metadata parsed-metadata})
+                 (.then (fn [data]
+                          (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] false])
+                          (state/dispatch [:form/update-field (:form-id form-state) :args ""])
+                          (state/dispatch [:form/update-field (:form-id form-state) :metadata-args ""])
+                          (rfe/push-state :agent/invocation-detail
+                                          {:module-id module-id
                                            :agent-name agent-name
-                                           :args parsed-args
-                                           :metadata parsed-metadata}]
-                  5000
-                  (fn [reply]
-                    (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] false])
-                    (if (:success reply)
-                      (let [data (:data reply)]
-                        ;; Clear the form fields on success
-                        (state/dispatch [:form/update-field (:form-id form-state) :args ""])
-                        (state/dispatch [:form/update-field (:form-id form-state) :metadata-args ""])
-                        ;; Navigate to the trace
-                        (rfe/push-state :agent/invocation-detail
-                                        {:module-id module-id
-                                         :agent-name agent-name
-                                         :invoke-id (str (:task-id data) "-" (:invoke-id data))}))
-                      ;; Set error on failure
-                      (state/dispatch [:db/set-value
-                                       [:forms (:form-id form-state) :error]
-                                       (str "Error: " (or (:error reply) "Unknown error"))]))))))})
+                                           :invoke-id (str (:task-id data) "-" (:invoke-id data))})))
+                 (.catch (fn [err]
+                           (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] false])
+                           (state/dispatch [:db/set-value [:forms (:form-id form-state) :error]
+                                            (str "Error: " (if (map? err) (or (:error err) "Unknown error") (str err)))]))))))})
 
 (defui result-badge
  [{:keys [status human-request?]}]

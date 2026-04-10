@@ -4,6 +4,7 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :refer [SearchableSelector]]
+   [com.rpl.agent-o-rama.impl.ui.rpc.human-feedback :as rpc-hf]
    ["@heroicons/react/24/outline" :refer [ArrowDownIcon]]))
 
 (defui QueueCombobox [{:keys [module-id value on-change error required?]}]
@@ -87,7 +88,7 @@
   {:event
    (fn [_db form-state]
      ;; invoke-id is in "taskId-agentInvokeId" format
-     (let [{:keys [module-id queue-name comment agent-name invoke-id 
+     (let [{:keys [module-id queue-name comment agent-name invoke-id
                    node-task-id node-invoke-id]} form-state]
        [:human-feedback/add-to-queue
         {:module-id module-id

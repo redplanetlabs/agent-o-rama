@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.schemas :as schemas]
+   [re-frame.core :as rf]
    [schema.core :as s-core :include-macros true]))
 
 ;; =============================================================================
@@ -345,6 +346,15 @@
   ([specter-path]
    (js/console.log "Value at path" specter-path ":"
                    (clj->js (s/select-one specter-path @app-db)))))
+
+(defn invalidate!
+  "Invalidate both the old query system and rfq for a given query-key-pattern and rfq tags.
+  Call this after any mutation that affects queries from both systems."
+  [{:keys [query-key-pattern rfq-tags]}]
+  (when query-key-pattern
+    (dispatch [:query/invalidate {:query-key-pattern query-key-pattern}]))
+  (when (seq rfq-tags)
+    (rf/dispatch [:re-frame.query/invalidate-tags rfq-tags])))
 
 (reg-event :datasets/clear-selection
            (fn [db {:keys [dataset-id]}]

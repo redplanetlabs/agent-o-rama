@@ -8,6 +8,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [re-frame.query :as rfq]
    [re-frame.core :as rf]
    [com.rpl.specter :as s]
@@ -35,16 +36,16 @@
         handle-delete (fn [snapshot-name]
                         (set-dropdown-open false)
                         (when (js/confirm (str "Are you sure you want to delete snapshot '" snapshot-name "'?"))
-                          (sente/request!
-                           [:datasets/delete-snapshot {:module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name}]
-                           10000
-                           (fn [reply]
-                             (if (:success reply)
-                               (do
-                                 (when (= selected-snapshot snapshot-name)
-                                   (on-select-snapshot ""))
-                                 (rf/dispatch [:re-frame.query/invalidate-tags [[:snapshot-names module-id dataset-id]]]))
-                               (js/alert (str "Error deleting snapshot: " (:error reply))))))))
+                          (-> (rpc/call ::rpc-datasets/delete-snapshot!!
+                                        {:module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name})
+                              (.then (fn [_]
+                                       (when (= selected-snapshot snapshot-name)
+                                         (on-select-snapshot ""))
+                                       (do (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
+                                       (rf/dispatch [:re-frame.query/invalidate-tags [[:snapshot-names module-id dataset-id]]]))))
+                              (.catch (fn [err]
+                                        (js/alert (str "Error deleting snapshot: "
+                                                       (if (map? err) (or (:error err) (str err)) (str err)))))))))
 
         handle-select (fn [snapshot-name]
                         (set-dropdown-open false)

@@ -15,6 +15,7 @@
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
    [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [re-frame.query :as rfq]
    [re-frame.core :as rf]
    [reitit.frontend.easy :as rfe]
@@ -39,16 +40,14 @@
           {:onClick (fn [e]
                       (.stopPropagation e)
                       (when (js/confirm "Are you sure you want to delete this example?")
-                        (sente/request!
-                         [:datasets/delete-example
-                          {:module-id module-id, :dataset-id dataset-id, :snapshot-name snapshot-name, :example-id example-id}]
-                         10000
-                         (fn [reply]
-                           (if (:success reply)
-                             (do
-                               (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                               (when on-delete-success (on-delete-success)))
-                             (js/alert (str "Error deleting example: " (:error reply))))))))}
+                        (-> (rpc/call ::rpc-datasets/delete-example!!
+                             {:module-id module-id :dataset-id dataset-id
+                              :snapshot-name snapshot-name :example-id example-id})
+                            (.then (fn [_]
+                                     (do (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                   (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
+                                     (when on-delete-success (on-delete-success))))
+                            (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
           ($ TrashIcon {:className delete-icon-classes})
           "Delete"))))
 
@@ -80,28 +79,31 @@
                                                    (js/JSON.parse edit-value))
                                     ;; Create updated example with the new field value
                                     updated-example (assoc current-example field-key (js->clj parsed-value :keywordize-keys true))]
-                                (sente/request!
-                                 [:datasets/edit-example
-                                  {:module-id module-id
-                                   :dataset-id dataset-id
-                                   :snapshot-name snapshot-name
-                                   :example-id example-id
-                                   :input (:input updated-example)
-                                   :reference-output (:reference-output updated-example)}]
-                                 10000
-                                 (fn [reply]
-                                   (set-saving! false)
-                                   (if (:success reply)
-                                     (do
-                                       (set-editing! false)
-                                       (set-edit-value! "")
-                                       ;; Invalidate the rfq query for this example
-                                       (rf/dispatch [:re-frame.query/invalidate-tags
-                                                     [[:fetch-example module-id dataset-id example-id]]])
-                                       ;; Also invalidate the main examples list
-                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                                       (when on-save (on-save)))
-                                     (set-error! (str "Error saving: " (:error reply)))))))
+                                (-> (rpc/call ::rpc-datasets/edit-example!!
+                                 {:module-id module-id
+                                  :dataset-id dataset-id
+                                  :snapshot-name snapshot-name
+                                  :example-id example-id
+                                  :input (:input updated-example)
+                                  :reference-output (:reference-output updated-example)})
+                                (.then (fn [_]
+                                         (set-saving! false)
+                                         (set-editing! false)
+                                         (set-edit-value! "")
+                                         (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                         (rf/dispatch [:re-frame.query/invalidate-tags
+                                                       [[:fetch-example module-id dataset-id example-id]
+                                                        [:dataset-examples module-id dataset-id]]])
+                                         (js/setTimeout
+                                          #(rf/dispatch [:re-frame.query/ensure-query
+                                                         ::rpc-datasets/fetch-example!!
+                                                         {:module-id module-id :dataset-id dataset-id
+                                                          :snapshot-name snapshot-name :example-id example-id}])
+                                          50)
+                                         (when on-save (on-save))))
+                                (.catch (fn [err]
+                                          (set-saving! false)
+                                          (set-error! (str "Error saving: " (if (map? err) (or (:error err) (str err)) (str err))))))))
                               (catch js/Error e
                                 (set-saving! false)
                                 (set-error! (str "Invalid JSON: " (.-message e))))))]
@@ -150,14 +152,14 @@
 
 (defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
   (let [;; Fetch the specific example data
-        {:keys [data error]
-         query-status :status}
-        (use-subscribe [::rfq/query ::rpc-datasets/fetch-example!!
-                        {:module-id module-id
-                         :dataset-id dataset-id
-                         :snapshot-name snapshot-name
-                         :example-id example-id}])
-        loading? (#{:loading :idle} query-status)
+        {:keys [data loading? error refetch]}
+        (queries/use-sente-query
+         {:query-key [:single-example module-id dataset-id snapshot-name (str example-id)]
+          :sente-event [:datasets/get-example {:module-id module-id
+                                               :dataset-id dataset-id
+                                               :snapshot-name snapshot-name
+                                               :example-id example-id}]
+          :enabled? (boolean (and module-id dataset-id example-id))})
 
         example (:example data)]
 
@@ -176,16 +178,14 @@
                   :onClick (fn []
                              (when (js/confirm "Are you sure you want to delete this example?")
                                (state/dispatch [:modal/hide]) ; Close modal before deleting
-                               (sente/request!
-                                [:datasets/delete-example
-                                 {:module-id module-id, :dataset-id dataset-id, :snapshot-name snapshot-name, :example-id example-id}]
-                                10000
-                                (fn [reply]
-                                  (if (:success reply)
-                                    (do
-                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                                      (when on-delete-success (on-delete-success)))
-                                    (js/alert (str "Error deleting example: " (:error reply))))))))}
+                               (-> (rpc/call ::rpc-datasets/delete-example!!
+                                      {:module-id module-id :dataset-id dataset-id
+                                       :snapshot-name snapshot-name :example-id example-id})
+                                  (.then (fn [_]
+                                           (do (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                   (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
+                                           (when on-delete-success (on-delete-success))))
+                                  (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
                  ($ TrashIcon {:className "mr-2 h-4 w-4"})
                  "Delete")))
 
@@ -219,7 +219,7 @@
             ($ :div
                ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
                ($ :div.bg-gray-50.rounded-md.p-4.border
-                  ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only?}))) ;; Pass read-only state
+                  ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only? :on-tags-change refetch})))
 
             ;; Source section
             ($ :div
@@ -240,42 +240,51 @@
         handle-add-tag (fn [tag-name]
                          (when-not (or (str/blank? tag-name) (contains? (set (map name tags)) tag-name))
                            (set-is-adding true)
-                           (sente/request!
-                            [:datasets/add-tag {:module-id module-id
-                                                :dataset-id dataset-id
-                                                :snapshot-name snapshot-name
-                                                :example-id example-id
-                                                :tag tag-name}]
-                            10000
-                            (fn [reply]
-                              (set-is-adding false)
-                              (if (:success reply)
-                                (do
-                                  (set-input-value "")
-                                  ;; Invalidate the rfq example query and the main examples list
-                                  (rf/dispatch [:re-frame.query/invalidate-tags
-                                                [[:fetch-example module-id dataset-id example-id]]])
-                                  (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                                  (when on-tags-change (on-tags-change)))
-                                (js/alert (str "Error adding tag: " (:error reply))))))))
+                           (-> (rpc/call ::rpc-datasets/add-tag!!
+                             {:module-id module-id
+                              :dataset-id dataset-id
+                              :snapshot-name snapshot-name
+                              :example-id example-id
+                              :tag tag-name})
+                            (.then (fn [_]
+                                     (set-is-adding false)
+                                     (set-input-value "")
+                                     (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                     (rf/dispatch [:re-frame.query/invalidate-tags
+                                                   [[:fetch-example module-id dataset-id example-id]
+                                                    [:dataset-examples module-id dataset-id]]])
+                                     ;; Force a fresh ensure-query to trigger immediate refetch
+                                     (js/setTimeout
+                                      #(rf/dispatch [:re-frame.query/ensure-query
+                                                     ::rpc-datasets/fetch-example!!
+                                                     {:module-id module-id :dataset-id dataset-id
+                                                      :snapshot-name snapshot-name :example-id example-id}])
+                                      50)
+                                     (when on-tags-change (on-tags-change))))
+                            (.catch (fn [err]
+                                      (set-is-adding false)
+                                      (js/alert (str "Error adding tag: " (if (map? err) (or (:error err) (str err)) (str err)))))))))
 
         handle-remove-tag (fn [tag-name]
-                            (sente/request!
-                             [:datasets/remove-tag {:module-id module-id
-                                                    :dataset-id dataset-id
-                                                    :snapshot-name snapshot-name
-                                                    :example-id example-id
-                                                    :tag tag-name}]
-                             10000
-                             (fn [reply]
-                                 (if (:success reply)
-                                 (do
-                                   ;; Invalidate the rfq example query
-                                   (rf/dispatch [:re-frame.query/invalidate-tags
-                                                 [[:fetch-example module-id dataset-id example-id]]])
-                                   (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                                   (when on-tags-change (on-tags-change)))
-                                 (js/alert (str "Error removing tag: " (:error reply)))))))
+                            (-> (rpc/call ::rpc-datasets/remove-tag!!
+                              {:module-id module-id
+                               :dataset-id dataset-id
+                               :snapshot-name snapshot-name
+                               :example-id example-id
+                               :tag tag-name})
+                             (.then (fn [_]
+                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                      (rf/dispatch [:re-frame.query/invalidate-tags
+                                                    [[:fetch-example module-id dataset-id example-id]
+                                                     [:dataset-examples module-id dataset-id]]])
+                                      (js/setTimeout
+                                       #(rf/dispatch [:re-frame.query/ensure-query
+                                                      ::rpc-datasets/fetch-example!!
+                                                      {:module-id module-id :dataset-id dataset-id
+                                                       :snapshot-name snapshot-name :example-id example-id}])
+                                       50)
+                                      (when on-tags-change (on-tags-change))))
+                             (.catch (fn [err] (js/alert (str "Error removing tag: " (if (map? err) (or (:error err) (str err)) (str err))))))))
 
         handle-key-press (fn [e]
                            (when (= (.-key e) "Enter")
@@ -614,19 +623,16 @@
                                         :onClick (fn [e]
                                                    (.stopPropagation e)
                                                    (set-open-dropdown nil)
-                                                   (sente/request!
-                                                    [:datasets/add-example
-                                                     {:module-id module-id
-                                                      :dataset-id dataset-id
+                                                   (-> (rpc/call ::rpc-datasets/add-example!!
+                                                     {:module-id module-id :dataset-id dataset-id
                                                       :snapshot-name snapshot-name
                                                       :input (:input example)
                                                       :output (:reference-output example)
-                                                      :tags (vec (:tags example))}]
-                                                    10000
-                                                    (fn [reply]
-                                                      (if (:success reply)
-                                                        (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                                                        (js/alert (str "Error duplicating example: " (:error reply)))))))}
+                                                      :tags (vec (:tags example))})
+                                                   (.then (fn [_]
+                                                            (do (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                   (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))))
+                                                   (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err))))))))}
                                        ($ DocumentDuplicateIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
                                        "Duplicate")
                                     ;; Delete button
@@ -636,19 +642,14 @@
                                                    (.stopPropagation e)
                                                    (set-open-dropdown nil)
                                                    (when (js/confirm "Are you sure you want to delete this example?")
-                                                     (sente/request!
-                                                      [:datasets/delete-example
-                                                       {:module-id module-id
-                                                        :dataset-id dataset-id
-                                                        :snapshot-name snapshot-name
-                                                        :example-id example-id}]
-                                                      10000
-                                                      (fn [reply]
-                                                        (if (:success reply)
-                                                          (do
-                                                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                                                            (when on-delete-success (on-delete-success)))
-                                                          (js/alert (str "Error deleting example: " (:error reply))))))))}
+                                                     (-> (rpc/call ::rpc-datasets/delete-example!!
+                                                      {:module-id module-id :dataset-id dataset-id
+                                                       :snapshot-name snapshot-name :example-id example-id})
+                                                    (.then (fn [_]
+                                                             (do (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                   (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
+                                                             (when on-delete-success (on-delete-success))))
+                                                    (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
                                        ($ TrashIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-red-500"})
                                        "Delete")))))))))))
 
@@ -806,13 +807,11 @@
                                                   (.preventDefault e)
                                                   (.stopPropagation e)
                                                   (when (js/confirm (str "Are you sure you want to delete dataset '" name "'? This action cannot be undone."))
-                                                    (sente/request!
-                                                     [:datasets/delete {:module-id module-id :dataset-id dsid}]
-                                                     10000
-                                                     (fn [reply]
-                                                       (if (:success reply)
-                                                         (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
-                                                         (js/alert (str "Error deleting dataset: " (:error reply))))))))}
+                                                    (-> (rpc/call ::rpc-datasets/delete!! {:module-id module-id :dataset-id dsid})
+                                                    (.then (fn [_]
+                                                             (do (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
+                                                             (rf/dispatch [:re-frame.query/invalidate-tags [[:datasets module-id]]]))))
+                                                    (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
                                       ($ TrashIcon {:className "h-4 w-4 mr-1"})
                                       "Delete")))))))
 

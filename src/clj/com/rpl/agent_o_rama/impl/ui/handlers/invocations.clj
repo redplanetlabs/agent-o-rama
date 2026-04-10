@@ -17,17 +17,6 @@
       (foreign-invoke-query
        (:invokes-page-query (aor-types/underlying-objects client))
        page-size scan-page-size pages filters))))
-
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/run-agent
-  [{:keys [client args metadata]} uid]
-  (when-not (vector? args)
-    (throw (ex-info "must be a json list of args" {:bad-args args})))
-  (let [metadata (or metadata {})
-        ^AgentInvoke inv (apply aor/agent-initiate-with-context client {:metadata metadata} args)]
-    {:task-id (.getTaskId inv)
-     :invoke-id (.getAgentInvokeId inv)}))
-
 (defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/get-graph-page
   [{:keys [client invoke-pair]} _uid]
   (if-not client
@@ -124,44 +113,3 @@
        :agent-id agent-id
        :root-invoke-id root-invoke-id
        :historical-graph historical-graph})))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/execute-fork
-  [{:keys [client invoke-pair changed-nodes]} uid]
-  (let [[task-id agent-invoke-id] invoke-pair
-        json-parsed-nodes (transform [MAP-VALS] #(j/read-value %) changed-nodes)
-        rehydrated-nodes (common/from-ui-serializable json-parsed-nodes)
-        ^AgentInvoke result (aor/agent-initiate-fork
-                             client
-                             (aor-types/->AgentInvokeImpl task-id agent-invoke-id)
-                             rehydrated-nodes)]
-    {:agent-invoke-id (:agentInvokeId (bean result))
-     :task-id (:taskId (bean result))}))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/provide-human-input
-  [{:keys [client request response]} uid]
-  (let [{:keys [agent-task-id agent-id node node-task-id invoke-id uuid prompt]} request
-        req (aor-types/->NodeHumanInputRequest agent-task-id agent-id node node-task-id invoke-id prompt uuid)]
-    (aor/provide-human-input client req response)
-    {:ok true}))
-
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/set-metadata
-  [{:keys [client invoke-id key value-str]} uid]
-  (let [[task-id agent-id] (common/parse-url-pair invoke-id)
-        invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
-    (let [parsed-value (j/read-value value-str)]
-      (aor/set-metadata! client
-                         invoke
-                         key
-                         (if (= java.lang.Integer (class parsed-value))
-                           (long parsed-value)
-                           parsed-value))
-      {:success true})))
-
-(defmethod com.rpl.agent-o-rama.impl.ui.sente/-event-msg-handler :invocations/remove-metadata
-  [{:keys [client invoke-id key]} uid]
-  (let [[task-id agent-id] (common/parse-url-pair invoke-id)
-        invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
-    (aor/remove-metadata! client invoke key)
-    {:success true}))
-
