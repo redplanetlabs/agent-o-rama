@@ -8,7 +8,7 @@
     [com.rpl.agent-o-rama.ui.rpc-hello-world-test-agent
      :refer [RpcHelloWorldTestAgentModule]]))
 
- (defonce system (volatile! nil))
+ (def system (volatile! nil))
 
  (deftest rpc-hello-world-spel-test
    (eth/with-ui-system [system RpcHelloWorldTestAgentModule]
@@ -17,9 +17,9 @@
                          "/agents/"
                          (java.net.URLEncoder/encode ^String (:module-name env) "UTF-8")
                          "/rpc-hello")]
-       (spel/with-testing-page {:browser-type :chromium
-                                :headless true
-                                :executable-path "/usr/local/bin/google-chrome"}
+     (spel/with-testing-page {:browser-type :chromium
+                              :channel "chrome"
+                              :headless true}
          [pg]
          (page/navigate pg hello-url)
          (page/wait-for-load-state pg :networkidle)

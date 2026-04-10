@@ -18,13 +18,6 @@
 (def reader
   (transit/reader :json {:handlers {"u" uuid-read-handler}}))
 
-(defn- consistent-error
-  [error]
-  (cond
-    (map? error) error
-    (instance? js/Error error) {:error (or (.-message error) (str error))}
-    :else {:error (str error)}))
-
 (defn route-for
   [rpc-id]
   (let [rpc-ns (namespace rpc-id)
@@ -57,10 +50,10 @@
                              (let [reply (transit/read reader body)]
                                (if (.-ok response)
                                  reply
-                                 (js/Promise.reject (consistent-error reply)))))))))
+                                 (js/Promise.reject reply))))))))
        (.then (fn [reply]
                 (if (:success reply)
                   (:data reply)
-                  (js/Promise.reject (consistent-error reply)))))
+                  (js/Promise.reject reply))))
        (.catch (fn [error]
-                 (js/Promise.reject (consistent-error error)))))))
+                 (js/Promise.reject error))))))

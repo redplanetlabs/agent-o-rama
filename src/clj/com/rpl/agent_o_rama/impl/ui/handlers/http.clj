@@ -24,24 +24,42 @@
   [uri]
   (when-let [[_ namespace method]
              (re-matches #"(?i)/api/rpc/(.+)/([^/]+)" uri)]
-    (symbol (str (common/url-decode namespace) "/" (common/url-decode method)))))
+    (symbol (str namespace "/" (common/url-decode method)))))
 
 (defn- allowlisted-rpc-symbol?
   [sym]
-  (str/starts-with? (str (namespace sym)) rpc-allowlist-prefix))
+  (and (str/starts-with? (str (namespace sym)) rpc-allowlist-prefix)
+       (str/ends-with? (name sym) "!!")))
 
 (defn- resolve-rpc-var
   [sym]
   (when (allowlisted-rpc-symbol? sym)
     (requiring-resolve sym)))
 
+(defn- preprocess-rpc-payload
+  [payload]
+  (let [thawed-data (common/from-ui-serializable payload)
+        module-id (:module-id thawed-data)
+        agent-name (:agent-name thawed-data)
+        parsed-dataset-id (when-let [did (:dataset-id thawed-data)]
+                            (if (and (string? did) (not (str/blank? did)))
+                              (UUID/fromString did)
+                              did))
+        parsed-experiment-id (when-let [eid (:experiment-id thawed-data)]
+                               (if (string? eid) (UUID/fromString eid) eid))
+        parsed-invoke-pair (when-let [iid (:invoke-id thawed-data)]
+                             (if (string? iid) (common/parse-url-pair iid) iid))]
+    (cond-> thawed-data
+      agent-name (assoc :agent-name (common/url-decode agent-name))
+      parsed-dataset-id (assoc :dataset-id parsed-dataset-id)
+      parsed-experiment-id (assoc :experiment-id parsed-experiment-id)
+      parsed-invoke-pair (assoc :invoke-pair parsed-invoke-pair))))
+
 (defn invoke-rpc
   "Invoke an allowlisted RPC var directly and return a standard reply envelope."
-  [{:keys [rpc-id data uid]}]
+  [{:keys [rpc-id data]}]
   (try
-    (let [processed-data (:?data (common/preprocess-event-msg {:id rpc-id
-                                                               :?data data
-                                                               :uid uid}))
+    (let [processed-data (preprocess-rpc-payload data)
           rpc-var (resolve-rpc-var rpc-id)]
       (cond
         (nil? rpc-var)
@@ -188,10 +206,8 @@
 
 (defn handle-rpc
   [request]
-  (let [{:keys [uri session]} request
+  (let [{:keys [uri]} request
         rpc-id (parse-rpc-route uri)
-        uid (or (:uid session)
-                (throw (ex-info "Missing session uid for RPC request" {:uri uri})))
         request-body (parse-transit-body (:body request))
         payload (cond
                   (map? request-body) request-body
@@ -199,8 +215,7 @@
                   :else (throw (ex-info "RPC request body must be a map" {:body-type (type request-body)
                                                                           :uri uri})))
         reply (invoke-rpc {:rpc-id rpc-id
-                           :data payload
-                           :uid uid})]
+                           :data payload})]
     (if (:success reply)
       (transit-response reply)
       (-> (transit-response reply)

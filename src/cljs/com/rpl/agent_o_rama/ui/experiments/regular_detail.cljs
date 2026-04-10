@@ -565,15 +565,12 @@
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
   (let [{:keys [data error]
          query-status :status}
-        (or (use-subscribe
-             [::rfq/query
-              ::rpc-experiments/get-results!!
-              {:module-id module-id
-               :dataset-id dataset-id
-               :experiment-id experiment-id}])
-            {:status :idle
-             :data nil
-             :error nil})
+        (use-subscribe
+         [::rfq/query
+          ::rpc-experiments/get-results!!
+          {:module-id module-id
+           :dataset-id dataset-id
+           :experiment-id experiment-id}])
         ;; NEW: State for the details panel visibility
         [show-info? set-show-info] (uix/use-state false)
         loading? (= query-status :loading)

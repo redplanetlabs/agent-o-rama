@@ -16,14 +16,8 @@
         (.catch (fn [error]
                   (rf/dispatch (conj on-failure error)))))))
 
- (defonce initialized? (atom false))
-
- (defn init!
-   []
-   (when-not @initialized?
-     (reset! initialized? true)
-     (rfq/set-default-effect-fn!
-      (fn [request on-success on-failure]
-        {rpc-fx-key {:request request
-                     :on-success on-success
-                     :on-failure on-failure}}))))
+(rfq/set-default-effect-fn!
+ (fn [request on-success on-failure]
+   {rpc-fx-key {:request request
+                :on-success on-success
+                :on-failure on-failure}}))

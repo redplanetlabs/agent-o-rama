@@ -151,7 +151,7 @@
       ;; Transit-over-HTTP RPC for new frontend code
       (and (= method :post)
            (re-matches #"(?i)/api/rpc/[^/]+/[^/]+" uri))
-      ((ensure-session-uid http/handle-rpc) request)
+      (http/handle-rpc request)
 
       ;; For any other route, return nil to let the next handler take over.
       :else nil)))

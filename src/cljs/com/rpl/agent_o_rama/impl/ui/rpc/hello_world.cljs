@@ -14,10 +14,7 @@
 
  (defui page [{:keys [module-id]}]
    (let [{:keys [status data error]}
-         (or (use-subscribe [::rfq/query ::index!! {:module-id module-id}])
-             {:status :idle
-              :data nil
-              :error nil})]
+        (use-subscribe [::rfq/query ::index!! {:module-id module-id}])]
      ($ :div.p-6.space-y-4
         ($ :h2.text-2xl.font-bold "RPC Hello World")
         (case status

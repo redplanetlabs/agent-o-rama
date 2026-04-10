@@ -25,7 +25,7 @@
                                           RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon BoltIcon UserIcon QueueListIcon]]
 
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.re-frame :as re-frame-app]
+   [com.rpl.agent-o-rama.ui.re-frame]
    [com.rpl.agent-o-rama.ui.rpc]
    [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
@@ -420,7 +420,6 @@
 (defui app [] ($ with-router {:routes routes} ($ main-layout)))
 
 (defn init []
-  (re-frame-app/init!)
   (sente/init!)
   (uix.dom/render-root
    ($ app)
