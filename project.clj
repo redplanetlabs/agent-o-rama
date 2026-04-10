@@ -89,6 +89,8 @@
                           :dependencies [[com.rpl/specter "1.1.4"] ;; only cljs
                                          [com.pitch/uix.core "1.4.3"]
                                          [com.pitch/uix.dom "1.4.3"]
+                                         [re-frame "1.4.3"]
+                                         [com.shipclojure/re-frame-query "0.5.0"]
                                          [thheller/shadow-cljs "3.1.7"]
                                          [cider/cider-nrepl "0.57.0"]
                                          [metosin/reitit-frontend "0.7.2"]
