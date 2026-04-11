@@ -6,7 +6,6 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.experiments.events]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]

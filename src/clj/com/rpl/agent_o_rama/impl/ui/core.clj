@@ -6,7 +6,6 @@
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.queries :as queries]
    [com.rpl.agent-o-rama.impl.ui.server :as srv]
-   [com.rpl.agent-o-rama.impl.ui.sente :as sente]
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [clojure.tools.logging :as cljlogging]
    [org.httpkit.server :as http-kit])
@@ -66,7 +65,6 @@
         (setval [ATOM :aor-cache (keypath mod)] NONE ui/system)))))
 
 (defn start [ipc port]
-  (sente/start-sente!)
   (swap! ui/system assoc :server (http-kit/run-server #'srv/handler
                                                      {:port port
                                                       :join? false}))
@@ -84,7 +82,6 @@
    TimeUnit/SECONDS))
 
 (defn stop-ui []
-  (sente/stop-sente!)
   ;; Gracefully shutdown executor and wait for in-flight refresh task to complete
   ;; before closing clients (avoids race condition with cluster shutdown)
   (when-let [exec ^ScheduledThreadPoolExecutor (:background-exec @ui/system)]

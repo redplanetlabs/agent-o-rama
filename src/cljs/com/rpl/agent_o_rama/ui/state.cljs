@@ -38,8 +38,7 @@
                :submitting {}}
         :datasets {:selected-examples {}
                    :selected-snapshot-per-dataset {}}
-        :rules {:refetch-trigger {}}}
-   :sente {:connected? false}})
+        :rules {:refetch-trigger {}}}})
 
 (defonce app-db (atom initial-db))
 
@@ -191,11 +190,6 @@
 ;; (dispatch [:db/set-value [:ui :current-route] route])
 ;; (dispatch [:db/set-value [:ui :changed-nodes node-id] changes])
 ;; (dispatch [:db/set-value [:ui :changed-nodes] {}])
-
-;; Note: Sente connection events should use :db/set-value
-;; Examples:
-;; (dispatch [:db/set-value [:sente :connection-state] new-state])
-;; (dispatch [:db/set-value [:sente :connected?] connected?])
 
 (reg-event :invocation/update-node
            (fn [db invoke-id node-id node-data]

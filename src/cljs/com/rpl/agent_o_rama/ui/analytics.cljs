@@ -652,7 +652,8 @@
                          :start-time-millis (:start-time-millis time-window)
                          :end-time-millis (:end-time-millis time-window)
                          :metrics-set metrics-set
-                         :metadata-key metadata-key}])
+                         :metadata-key metadata-key
+                         :refresh-counter refresh-counter}])
         loading? (#{:loading :idle} query-status)
 
         ;; Detect if data is categorical and adjust config accordingly
@@ -718,7 +719,8 @@
                          :start-time-millis (:start-time-millis time-window)
                          :end-time-millis (:end-time-millis time-window)
                          :metrics-set metrics-set
-                         :metadata-key metadata-key}])
+                         :metadata-key metadata-key
+                         :refresh-counter refresh-counter}])
         loading? (#{:loading :idle} query-status)
 
         ;; Detect if data is categorical and adjust config accordingly
@@ -856,29 +858,22 @@
                               (fn [] (group-charts-by-metric chart-configs))
                               [])
 
-        ;; Create queries for static metrics
+        ;; Create queries for static metrics (HTTP RPC; refresh-counter bumps live window)
         static-metric-queries
         (into {}
               (map (fn [[metric-id {:keys [metrics-set]}]]
                      (let [{:keys [data loading? error]}
-                           (queries/use-sente-query
-                            {:query-key [:analytics-telemetry
-                                         metric-id
-                                         module-id
-                                         decoded-agent-name
-                                         (:seconds granularity-config)
-                                         (:start-time-millis time-window)
-                                         metadata-key
-                                         refresh-counter]
-                             :sente-event [:analytics/fetch-telemetry
-                                           {:module-id module-id
-                                            :agent-name decoded-agent-name
-                                            :granularity (:seconds granularity-config)
-                                            :metric-id metric-id
-                                            :start-time-millis (:start-time-millis time-window)
-                                            :end-time-millis (:end-time-millis time-window)
-                                            :metrics-set metrics-set
-                                            :metadata-key metadata-key}]
+                           (queries/use-rpc-query
+                            {:rfq-key ::rpc-analytics/fetch-telemetry!!
+                             :params {:module-id module-id
+                                      :agent-name decoded-agent-name
+                                      :granularity (:seconds granularity-config)
+                                      :metric-id metric-id
+                                      :start-time-millis (:start-time-millis time-window)
+                                      :end-time-millis (:end-time-millis time-window)
+                                      :metrics-set metrics-set
+                                      :metadata-key metadata-key
+                                      :refresh-counter refresh-counter}
                              :enabled? (boolean (and module-id decoded-agent-name))})]
                        [metric-id {:data data :loading? loading? :error error}]))
                    static-metric-groups))

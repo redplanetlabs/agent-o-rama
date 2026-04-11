@@ -1,17 +1,6 @@
 (ns com.rpl.agent-o-rama.impl.ui.server
   (:require
-   [com.rpl.agent-o-rama.impl.ui.sente :as sente]
-   ;; Load all handler namespaces to register their defmethods
-   ;; Load all handler namespaces to register their defmethods
-   [com.rpl.agent-o-rama.impl.ui.handlers.agents]
-   [com.rpl.agent-o-rama.impl.ui.handlers.analytics]
    [com.rpl.agent-o-rama.impl.ui.handlers.config]
-   [com.rpl.agent-o-rama.impl.ui.handlers.datasets]
-   [com.rpl.agent-o-rama.impl.ui.handlers.evaluators]
-   [com.rpl.agent-o-rama.impl.ui.handlers.experiments]
-   [com.rpl.agent-o-rama.impl.ui.handlers.human-feedback]
-   [com.rpl.agent-o-rama.impl.ui.handlers.invocations]
-   [com.rpl.agent-o-rama.impl.ui.handlers.streaming]
    [com.rpl.agent-o-rama.impl.ui.handlers.http :as http]
    [com.rpl.agent-o-rama.impl.ui.rpc.experiments]
    [ring.util.response :as resp]
@@ -91,8 +80,7 @@
 
 (defn spa-index-handler
   "Serves the SPA index.html and ensures session cookie is set.
-   This is critical for Firefox AJAX mode - the session must be established
-   on the initial page load since Sente's async responses can't set cookies."
+   Establishes the session on first load so subsequent HTTP RPC calls share it."
   [request]
   (let [response (-> (resp/response (render-index-html))
                      (resp/content-type "text/html")
@@ -132,12 +120,6 @@
   (let [uri (:uri request)
         method (:request-method request)]
     (cond
-      ;; Sente routes are the only specific routes we need
-      (= uri "/chsk")
-      (case method
-        :get ((ensure-session-uid sente/ring-ajax-get-or-ws-handshake) request)
-        :post ((ensure-session-uid sente/ring-ajax-post) request))
-
       ;; Dataset export
       (and (= method :get)
            (re-matches #"/api/datasets/.+/.+/export" uri))
@@ -161,14 +143,14 @@
   (or
    ;; 1. Try to serve a static file from "public" or "resources/public".
    (file-handler request)
-   ;; 2. Try our specific Sente routes.
+   ;; 2. Try API routes (dataset import/export, RPC).
    (routes request)
    ;; 3. As a fallback for any other GET request, serve the SPA's index.html.
    ;; This enables client-side routing.
    (when (= :get (:request-method request))
      (spa-index-handler request))))
 
-;; Keep wrap-defaults for Sente's session management
+;; Session + cookie defaults for the SPA and RPC
 (def handler
   (-> #'app-handler
       wrap-multipart-params

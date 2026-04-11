@@ -7,7 +7,6 @@
    ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
@@ -153,12 +152,12 @@
 (defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
   (let [;; Fetch the specific example data
         {:keys [data loading? error refetch]}
-        (queries/use-sente-query
-         {:query-key [:single-example module-id dataset-id snapshot-name (str example-id)]
-          :sente-event [:datasets/get-example {:module-id module-id
-                                               :dataset-id dataset-id
-                                               :snapshot-name snapshot-name
-                                               :example-id example-id}]
+        (queries/use-rpc-query
+         {:rfq-key ::rpc-datasets/get-example!!
+          :params {:module-id module-id
+                   :dataset-id dataset-id
+                   :snapshot-name snapshot-name
+                   :example-id example-id}
           :enabled? (boolean (and module-id dataset-id example-id))})
 
         example (:example data)]

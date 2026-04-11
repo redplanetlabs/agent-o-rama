@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.handlers.analytics-test
   (:require
    [clojure.test :refer [deftest testing is]]
-   [com.rpl.agent-o-rama.impl.ui.handlers.analytics :as analytics]
+   [com.rpl.agent-o-rama.impl.ui.handlers.analytics-filters :as analytics]
    [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import
    [com.rpl.agent_o_rama.impl.types

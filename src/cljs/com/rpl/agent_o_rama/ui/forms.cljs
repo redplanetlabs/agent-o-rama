@@ -14,7 +14,6 @@
    [re-frame.query :as rfq]
   [com.rpl.agent-o-rama.ui.common :as common]
   [com.rpl.agent-o-rama.ui.rpc :as rpc]
-  [com.rpl.agent-o-rama.ui.sente :as sente]
   [com.rpl.agent-o-rama.ui.state :as ui-state]
   [clojure.string :as str]
   [com.rpl.specter :as s]
@@ -193,9 +192,9 @@
                                 (assoc-in [:forms form-id :meta :submitting?] true)
                                 (assoc-in [:forms form-id :meta :error] nil))]
           (cond
-            ;; --- declarative map with :mutation or :event ---
+            ;; --- declarative map with :mutation ---
             (map? handler)
-            (let [{:keys [event mutation on-success-invalidate on-success on-error
+            (let [{:keys [mutation on-success-invalidate on-success on-error
                            rfq-invalidate-tags]} handler]
               {:db   new-db
                :dispatch [::do-submit form-id handler form-state]})
@@ -208,7 +207,7 @@
 ;; Actual side-effecting submit (outside the pure event-db)
 (rf/reg-event-fx ::do-submit
   (fn [{:keys [db]} [_ form-id handler form-state]]
-    (let [{:keys [event mutation on-success-invalidate on-success on-error
+    (let [{:keys [mutation on-success-invalidate on-success on-error
                   rfq-invalidate-tags]} handler
 
           on-ok
@@ -219,24 +218,14 @@
           (fn [err]
             (rf/dispatch [::submit-failure form-id on-error form-state err]))]
 
-      (cond
-        mutation
+      (when mutation
         (let [mut-result (mutation db form-state)]
           (when mut-result
             (let [[rpc-id params] mut-result]
               (-> (rpc/call rpc-id params)
                   (.then (fn [data] (on-ok {:success true :data data})))
-                  (.catch on-fail))))
-          nil)   ; no re-frame effect — Promise drives it
-
-        event
-        (do
-          (let [sente-event (event db form-state)]
-            (when sente-event
-              (sente/request! sente-event 15000
-                              (fn [reply] (on-ok reply)))))
-          nil))
-    nil)))
+                  (.catch on-fail))))))
+      nil)))
 
 (rf/reg-event-fx ::do-submit-fn
   (fn [{:keys [db]} [_ form-id handler form-state]]

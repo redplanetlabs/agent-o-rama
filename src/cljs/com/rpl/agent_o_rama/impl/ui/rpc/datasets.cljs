@@ -59,6 +59,16 @@
     :tags (fn [{:keys [module-id dataset-id example-id]}]
              [[:fetch-example module-id dataset-id example-id]])}))
 
+(def ^:export q-get-example
+  (rfq/reg-query
+   ::get-example!!
+   {:query-fn (fn [params]
+                {:rpc/id ::get-example!!
+                 :payload params})
+    :stale-time-ms 0
+    :tags (fn [{:keys [module-id dataset-id example-id]}]
+            [[:fetch-example module-id dataset-id example-id]])}))
+
 (def ^:export q-validate-direct-data
   (rfq/reg-query
    ::validate-direct-data!!

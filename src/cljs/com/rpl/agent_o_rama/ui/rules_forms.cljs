@@ -4,8 +4,8 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.filter-builder :as filter-builder]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
@@ -311,19 +311,15 @@
     (uix/use-effect
      (fn []
        (set-loading! true)
-       (sente/request!
-        [:analytics/all-action-builders
-         {:module-id module-id
-          :agent-name agent-name}]
-        5000
-        (fn [reply]
-          (set-loading! false)
-          (if (:success reply)
-            (set-action-builders! (:data reply))
-            (.error
-             js/console
-             "Failed to fetch action builders:"
-             (:error reply)))))
+       (-> (rpc/call ::rpc-analytics/all-action-builders!!
+                      {:module-id module-id
+                       :agent-name agent-name})
+           (.then (fn [data]
+                    (set-loading! false)
+                    (set-action-builders! data)))
+           (.catch (fn [err]
+                     (set-loading! false)
+                     (.error js/console "Failed to fetch action builders:" err))))
        js/undefined)
      [module-id agent-name])
 

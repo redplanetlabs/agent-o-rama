@@ -1,6 +1,5 @@
 (ns com.rpl.agent-o-rama.ui.events
-  (:require [com.rpl.agent-o-rama.ui.sente :as sente]
-            [com.rpl.agent-o-rama.ui.state :as state]
+  (:require [com.rpl.agent-o-rama.ui.state :as state]
             [com.rpl.agent-o-rama.ui.common :as common]
             [com.rpl.agent-o-rama.ui.rpc :as rpc]
             [com.rpl.agent-o-rama.ui.forms :as forms]
@@ -11,7 +10,7 @@
             [com.rpl.specter :as s]
             [clojure.string :as str]))
 
-;; Orchestration events that perform side-effects using sente helpers,
+;; Orchestration events that perform side-effects (HTTP RPC),
 ;; keeping React components pure.
 
 ;; =============================================================================
@@ -140,16 +139,16 @@
 ;; Kick off or continue fetching a page of graph data
 (state/reg-event :invocation/fetch-graph-page
                  (fn [db {:keys [invoke-id module-id agent-name]}]
-                   (sente/request!
-                    [:invocations/get-graph-page
-                     {:invoke-id invoke-id
-                      :module-id module-id
-                      :agent-name agent-name}]
-                    10000
-                    (fn [reply]
-                      (if (:success reply)
-                        (state/dispatch [:invocation/process-graph-page invoke-id (:data reply)])
-                        (state/dispatch [:invocation/fetch-graph-error invoke-id (or (:error reply) "Unknown error occurred")]))))
+                   (-> (rpc/call ::rpc-invocations/get-graph-page!!
+                                  {:invoke-id invoke-id
+                                   :module-id module-id
+                                   :agent-name agent-name})
+                       (.then (fn [data]
+                                (state/dispatch [:invocation/process-graph-page invoke-id data])))
+                       (.catch (fn [err]
+                                 (state/dispatch [:invocation/fetch-graph-error
+                                                  invoke-id
+                                                  (if (map? err) (or (:error err) (str err)) (str err))]))))
                    nil))
 
 (state/reg-event :invocation/fetch-graph-error

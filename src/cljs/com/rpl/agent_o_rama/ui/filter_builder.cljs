@@ -4,7 +4,8 @@
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.sente :as sente]))
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]))
 
 ;;; Comparator Component
 
@@ -121,17 +122,17 @@
      (fn []
        (when (and module-id agent-name)
          (set-loading! true)
-         (sente/request!
-          [:analytics/fetch-rules {:module-id module-id
-                                    :agent-name agent-name
-                                    :names-only? true
-                                    :filter-by-action "aor/eval"}]
-          5000
-          (fn [reply]
-            (set-loading! false)
-            (if (:success reply)
-              (set-rules! (:data reply))
-              (.error js/console "Failed to fetch rules:" (:error reply)))))
+         (-> (rpc/call ::rpc-analytics/fetch-rules!!
+                        {:module-id module-id
+                         :agent-name agent-name
+                         :names-only? true
+                         :filter-by-action "aor/eval"})
+             (.then (fn [data]
+                      (set-loading! false)
+                      (set-rules! data)))
+             (.catch (fn [err]
+                       (set-loading! false)
+                       (.error js/console "Failed to fetch rules:" err))))
          js/undefined))
      [module-id agent-name])
 

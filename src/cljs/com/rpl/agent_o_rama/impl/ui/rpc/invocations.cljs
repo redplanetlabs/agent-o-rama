@@ -47,6 +47,16 @@
   :tags (fn [{:keys [module-id agent-name granularity]}]
            [[:node-stats module-id agent-name granularity]])}))
 
+(def ^:export _q-graph-page
+  (rfq/reg-query
+   ::get-graph-page!!
+   {:query-fn (fn [params]
+                {:rpc/id ::get-graph-page!!
+                 :payload params})
+    :stale-time-ms 0
+    :tags (fn [{:keys [module-id agent-name invoke-id]}]
+            [[:invocation-graph-page module-id agent-name invoke-id]])}))
+
 (def ^:export _q5
   (rfq/reg-query
    ::get-page-inf!!

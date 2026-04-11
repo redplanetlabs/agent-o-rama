@@ -1,15 +1,7 @@
-(ns com.rpl.agent-o-rama.impl.ui.handlers.analytics
-  (:require
-   [clojure.tools.logging :as cljlogging]
-   [com.rpl.agent-o-rama :as aor]
-   [com.rpl.agent-o-rama.impl.analytics :as ana]
-   [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
-   [com.rpl.agent-o-rama.impl.ui.sente :as sente])
-  (:use [com.rpl.rama]
-        [com.rpl.rama.path])
-  (:import
-   [java.util.regex Pattern]))
+(ns com.rpl.agent-o-rama.impl.ui.handlers.analytics-filters
+  "Pure filter conversion helpers shared by RPC and tests (no transport)."
+  (:require [com.rpl.agent-o-rama.impl.types :as aor-types])
+  (:import [java.util.regex Pattern]))
 
 (defn comparator-spec->ui
   "Convert ComparatorSpec record to UI map."
@@ -65,35 +57,6 @@
 
       :else
       nil)))
-
-(defmethod sente/-event-msg-handler :analytics/fetch-rules
-  [{:keys [manager decoded-agent-name names-only? filter-by-action]} uid]
-  (when manager
-    (let [agent-client (aor/agent-client manager decoded-agent-name)
-          agent-rules-pstate (:agent-rules-pstate
-                              (aor-types/underlying-objects agent-client))
-          rules (ana/fetch-agent-rules agent-rules-pstate)
-          filtered-rules (if filter-by-action
-                           (into {}
-                                 (filter (fn [[_rule-name rule-info]]
-                                           (= filter-by-action
-                                              (get-in rule-info [:definition :action-name])))
-                                         rules))
-                           rules)]
-      (if names-only?
-        (vec (keys filtered-rules))
-        (into {}
-              (map (fn [[rule-name rule-info]]
-                     (let [definition (:definition rule-info)]
-                       [rule-name
-                        (-> definition
-                            (dissoc :node-invoke)
-                            (select-keys
-                             [:name :agent-name :node-name :action-name
-                              :action-params :filter :sampling-rate
-                              :start-time-millis :status-filter])
-                            (update :filter filter->ui))]))
-                   filtered-rules))))))
 
 (defn ui-comparator-spec->comparator-spec
   "Convert a UI comparator spec map to a ComparatorSpec record."
@@ -156,37 +119,3 @@
     (aor-types/->valid-AndFilter
      (mapv ui-filter->filter filters))
     (ui-filter->filter filter-structure)))
-(defmethod sente/-event-msg-handler :analytics/all-action-builders
-  [{:keys [manager]} uid]
-  (when manager
-    (let [all-action-builders-query (:all-action-builders-query
-                                     (aor-types/underlying-objects manager))
-          result (foreign-invoke-query all-action-builders-query)]
-      result)))
-
-(defmethod sente/-event-msg-handler :analytics/fetch-action-log
-  [{:keys [manager decoded-agent-name rule-name page-size pagination-params]} uid]
-  (when manager
-    (let [agent-client (aor/agent-client manager decoded-agent-name)
-          action-log-query (:action-log-query
-                            (aor-types/underlying-objects agent-client))
-          result (foreign-invoke-query action-log-query
-                                       rule-name
-                                       (or page-size 50)
-                                       pagination-params)]
-      result)))
-
-
-(defmethod sente/-event-msg-handler :analytics/fetch-telemetry
-  [{:keys [manager decoded-agent-name granularity metric-id start-time-millis end-time-millis metrics-set metadata-key]} uid]
-  (let [agent-client (aor/agent-client manager decoded-agent-name)
-        {:keys [telemetry-pstate]} (aor-types/underlying-objects agent-client)]
-    (ana/select-telemetry telemetry-pstate
-                          decoded-agent-name
-                          granularity
-                          metric-id
-                          start-time-millis
-                          end-time-millis
-                          (vec metrics-set)
-                          metadata-key)))
-

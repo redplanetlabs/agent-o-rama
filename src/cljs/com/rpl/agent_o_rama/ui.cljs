@@ -31,7 +31,6 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.re-frame]
    [com.rpl.agent-o-rama.ui.rpc]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -432,7 +431,6 @@
 (defn init []
   ;; Seed re-frame app-db with base UI state (forms, modal) at startup
   (re-frame/dispatch-sync [::init-db {}])
-  (sente/init!)
   (uix.dom/render-root
    ($ app)
    (uix.dom/create-root

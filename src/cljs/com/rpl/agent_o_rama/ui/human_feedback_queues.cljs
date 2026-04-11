@@ -10,7 +10,6 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
@@ -724,7 +723,6 @@
         state-path [:queries :human-feedback-queue-items module-id queue-id]
         query-state (state/use-sub state-path)
         should-refetch? (:should-refetch? query-state)
-        connected? (state/use-sub [:sente :connected?])
         data (or (:data query-state) [])
         pagination-params (:pagination-params query-state)
         reverse-pagination-params (:reverse-pagination-params query-state)
@@ -739,7 +737,7 @@
 
     (let [fetch-page (uix/use-callback
                       (fn [pagination-cursor append? include-cursor? merge? reverse?]
-                        (when (and enabled? connected?)
+                        (when enabled?
                           (cond
                             reverse?
                             (state/dispatch [:db/set-value (into state-path [:fetching-before?]) true])
@@ -750,52 +748,50 @@
                             :else
                             (state/dispatch [:db/set-value (into state-path [:status]) :loading]))
 
-                          (let [paginated-event [:human-feedback/get-queue-items
-                                                 (cond-> {:module-id decoded-module-id
-                                                          :queue-name decoded-queue-id
-                                                          :pagination pagination-cursor
-                                                          :limit 20
-                                                          :reverse? reverse?}
-                                                   include-cursor?
-                                                   (assoc :include-cursor? true))]]
-                            (sente/request!
-                             paginated-event
-                             15000
-                             (fn [reply]
-                               (if reverse?
-                                 (state/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
-                                 (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
-                               (if (:success reply)
-                                 (let [response-data (:data reply)
-                                       new-items (or (:items response-data) [])
-                                       new-pagination (:pagination-params response-data)
-                                       new-has-more? (queries/has-more-pages? new-pagination)
-                                       current-data (or (get-in @state/app-db (into state-path [:data])) [])
-                                       update-pagination? (not reverse?)]
-                                   (cond
-                                     append?
-                                     (state/dispatch [:db/set-value (into state-path [:data])
-                                                      (vec (concat current-data new-items))])
+                          (let [payload (cond-> {:module-id decoded-module-id
+                                                  :queue-name decoded-queue-id
+                                                  :pagination pagination-cursor
+                                                  :limit 20
+                                                  :reverse? reverse?}
+                                          include-cursor?
+                                          (assoc :include-cursor? true))]
+                            (-> (rpc/call ::rpc-hf/get-queue-items!! payload)
+                                (.then (fn [response-data]
+                                         (if reverse?
+                                           (state/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
+                                           (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
+                                         (let [new-items (or (:items response-data) [])
+                                               new-pagination (:pagination-params response-data)
+                                               new-has-more? (queries/has-more-pages? new-pagination)
+                                               current-data (or (get-in @state/app-db (into state-path [:data])) [])
+                                               update-pagination? (not reverse?)]
+                                           (cond
+                                             append?
+                                             (state/dispatch [:db/set-value (into state-path [:data])
+                                                              (vec (concat current-data new-items))])
 
-                                     (and merge? (seq current-data))
-                                     (state/dispatch [:db/set-value (into state-path [:data])
-                                                      (merge-queue-items current-data new-items)])
+                                             (and merge? (seq current-data))
+                                             (state/dispatch [:db/set-value (into state-path [:data])
+                                                              (merge-queue-items current-data new-items)])
 
-                                     :else
-                                     (state/dispatch [:db/set-value (into state-path [:data]) new-items]))
-                                   (if update-pagination?
-                                     (do
-                                       (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
-                                       (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?]))
-                                     (do
-                                       (state/dispatch [:db/set-value (into state-path [:reverse-pagination-params]) new-pagination])
-                                       (state/dispatch [:db/set-value (into state-path [:has-more-before?]) new-has-more?])))
-                                   (state/dispatch [:db/set-value (into state-path [:status]) :success]))
-                                 (do
-                                   (state/dispatch [:db/set-value (into state-path [:status]) :error])
-                                   (state/dispatch [:db/set-value (into state-path [:error])
-                                                    (or (:error reply) "Failed to fetch data")]))))))))
-                      [enabled? connected? decoded-module-id decoded-queue-id state-path])
+                                             :else
+                                             (state/dispatch [:db/set-value (into state-path [:data]) new-items]))
+                                           (if update-pagination?
+                                             (do
+                                               (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
+                                               (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?]))
+                                             (do
+                                               (state/dispatch [:db/set-value (into state-path [:reverse-pagination-params]) new-pagination])
+                                               (state/dispatch [:db/set-value (into state-path [:has-more-before?]) new-has-more?])))
+                                           (state/dispatch [:db/set-value (into state-path [:status]) :success]))))
+                                (.catch (fn [err]
+                                          (if reverse?
+                                            (state/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
+                                            (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
+                                          (state/dispatch [:db/set-value (into state-path [:status]) :error])
+                                          (state/dispatch [:db/set-value (into state-path [:error])
+                                                           (if (map? err) (or (:error err) (str err)) (str err))])))))))
+                      [enabled? decoded-module-id decoded-queue-id state-path])
 
           load-more (uix/use-callback
                      (fn []
@@ -829,14 +825,14 @@
       ;; Effect: Force refetch from start if flag is set and cache exists
       (uix/use-effect
        (fn []
-         (when (and force-from-start? (seq data) connected? enabled?)
+         (when (and force-from-start? (seq data) enabled?)
            (refetch))
          js/undefined)
        [force-from-start?]) ; Only run on mount
 
       (uix/use-effect
        (fn []
-         (when (and connected? enabled?
+         (when (and enabled?
                     (or (empty? data) initial-needed?))
            (if (and initial-needed? initial-cursor include-initial-cursor?)
              (do
@@ -844,14 +840,14 @@
                (fetch-page initial-cursor false true true true))
              (fetch-page initial-cursor false include-initial-cursor? false false)))
          js/undefined)
-       [connected? enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
+       [enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
 
       (uix/use-effect
        (fn []
-         (when (and should-refetch? connected? enabled?)
+         (when (and should-refetch? enabled?)
            (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
            (refetch)))
-       [should-refetch? connected? enabled? refetch state-path])
+       [should-refetch? enabled? refetch state-path])
 
       {:data data
        :isLoading is-loading?

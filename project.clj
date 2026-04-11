@@ -42,7 +42,6 @@
                  ;; ui dependencies
                  [ring/ring-core "1.9.5" :exclusions [org.clojure/clojure]]
                  [ring/ring-codec "1.2.0" :exclusions [org.clojure/clojure]]
-                 [com.taoensso/sente "1.20.0" :exclusions [org.clojure/clojure]]
                  [ring/ring-defaults "0.4.0" :exclusions [org.clojure/clojure]]
                  [ring-cors/ring-cors "0.1.13" :exclusions [org.clojure/clojure]]
                  [com.cognitect/transit-clj "1.0.333" :exclusions [org.clojure/clojure]]

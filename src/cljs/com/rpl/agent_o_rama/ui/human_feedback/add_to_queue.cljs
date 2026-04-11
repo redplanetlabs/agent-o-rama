@@ -86,12 +86,11 @@
    :modal-props (fn [props] {:title (or (:title props) "Add to Human Feedback Queue") 
                              :submit-text "Add to Queue"})}
   :on-submit
-  {:event
+  {:mutation
    (fn [_db form-state]
-     ;; invoke-id is in "taskId-agentInvokeId" format
      (let [{:keys [module-id queue-name comment agent-name invoke-id
-                   node-task-id node-invoke-id]} form-state]
-       [:human-feedback/add-to-queue
+                    node-task-id node-invoke-id]} form-state]
+       [::rpc-hf/add-to-queue!!
         {:module-id module-id
          :queue-name queue-name
          :agent-name agent-name

@@ -5,7 +5,6 @@
    [reitit.frontend.easy :as rfe]
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]
    [com.rpl.agent-o-rama.ui.state :as state]
@@ -315,26 +314,21 @@
         [rules set-rules!] (uix/use-state nil)
         [loading? set-loading!] (uix/use-state true)
         [error set-error!] (uix/use-state nil)
-        connected? (state/use-sub [:sente :connected?])
         refetch-trigger (state/use-sub [:ui :rules :refetch-trigger module-id agent-name])]
 
     (uix/use-effect
      (fn []
-       (when connected?
+       (when (and module-id agent-name)
          (set-loading! true)
          (set-error! nil)
-         (sente/request!
-          [:analytics/fetch-rules {:module-id module-id :agent-name agent-name}]
-          15000
-          (fn [reply]
-            (set-loading! false)
-            (if (:success reply)
-              (set-rules! (:data reply))
-              (set-error! (or (:error reply)
-                              (when (= reply :chsk/closed) "Connection closed")
-                              "Failed to fetch rules"))))))
+         (-> (rpc/call ::rpc-analytics/fetch-rules!!
+                        {:module-id module-id :agent-name agent-name})
+             (.then (fn [data] (set-loading! false) (set-rules! data)))
+             (.catch (fn [err]
+                       (set-loading! false)
+                       (set-error! (if (map? err) (or (:error err) (str err)) (str err)))))))
        js/undefined)
-     [module-id agent-name refetch-trigger connected?])
+     [module-id agent-name refetch-trigger])
 
     ($ :div.p-6
        ($ :div.flex.justify-end.items-center.mb-4

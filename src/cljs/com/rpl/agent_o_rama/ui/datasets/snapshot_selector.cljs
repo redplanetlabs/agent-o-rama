@@ -6,7 +6,6 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [re-frame.query :as rfq]
