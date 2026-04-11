@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback.manual-feedback
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
@@ -21,11 +22,11 @@
         
         ;; Fetch metric definition if we have a name but no definition
         fetch-result (when (and has-metric-name? (not has-definition?))
-                       (queries/use-sente-query
-                        {:query-key [:human-metric-definition module-id metric-name]
-                         :sente-event [:human-feedback/get-metrics
-                                       {:module-id module-id
-                                        :filters {:search-string metric-name}}]}))
+                       (queries/use-rpc-query
+                        {:rfq-key ::rpc-hf/get-metrics!!
+                         :params {:module-id module-id
+                                  :filters {:search-string metric-name}}
+                         :enabled? true}))
         
         ;; Extract the metric definition from the fetch result
         fetched-metric (when fetch-result
@@ -69,10 +70,7 @@
                 :on-change (fn [metric-name opts]
                              (when metric-name
                                (on-select metric-name opts)))
-                :sente-event-fn (fn [mid search-string]
-                                  [:human-feedback/get-metrics
-                                   {:module-id mid
-                                    :filters {:search-string search-string}}])
+                :rfq-key ::rpc-hf/get-metrics!!
                 :items-key :items
                 :item-id-fn :name
                 :item-label-fn :name
@@ -94,8 +92,8 @@
             "Remove")))))
 
 (defui ManualFeedbackForm [{:keys [form-id]}]
-  (let [props (state/use-sub [:forms form-id])
-        {:keys [module-id editing?]} props
+  (let [props (use-subscribe [::forms/form form-id])
+        {:keys [module-id editing?]} (merge (:fields props {}) (:meta props {}))
 
         ;; Form fields
         metrics-field (forms/use-form-field form-id :metrics)

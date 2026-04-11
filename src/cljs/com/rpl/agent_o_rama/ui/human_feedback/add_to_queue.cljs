@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback.add-to-queue
   (:require
    [uix.core :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :refer [SearchableSelector]]
@@ -12,10 +13,10 @@
      {:module-id module-id
       :value value
       :on-change on-change
-      :sente-event-fn (fn [module-id search-string]
-                        [:human-feedback/get-queues
-                         {:module-id module-id
-                          :filters {:search-string (or search-string "")}}])
+      :rfq-key ::rpc-hf/get-queues!!
+      :rpc-params-fn (fn [module-id search-string]
+                       {:module-id module-id
+                        :filters {:search-string (or search-string "")}})
       :items-key :items
       :item-id-fn :name
       :item-label-fn :name
@@ -30,8 +31,8 @@
         queue-name-field (forms/use-form-field form-id :queue-name)
         comment-field (forms/use-form-field form-id :comment)
 
-        props (state/use-sub [:forms form-id])
-        {:keys [module-id source-type agent-name node-name]} props]
+        props (use-subscribe [::forms/form form-id])
+        {:keys [module-id source-type agent-name node-name]} (merge (:fields props {}) (:meta props {}))]
 
     ($ forms/form
        ($ :div.space-y-4.p-4

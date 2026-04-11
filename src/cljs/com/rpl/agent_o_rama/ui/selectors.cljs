@@ -6,6 +6,7 @@
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
+   [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
    [re-frame.query :as rfq]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]
@@ -83,11 +84,11 @@
      {:module-id module-id
       :value value
       :on-change on-change
-      :sente-event-fn (fn [module-id search-string]
-                       [:evaluators/get-all-instances
-                        {:module-id module-id
-                         :filters {:search-string search-string
-                                   :types allowed-types}}])
+      :rfq-key ::rpc-evaluators/get-all-instances!!
+      :rpc-params-fn (fn [module-id search-string]
+                       {:module-id module-id
+                        :filters {:search-string search-string
+                                  :types allowed-types}})
       :items-key :items
       :item-id-fn :name
       :item-label-fn :name

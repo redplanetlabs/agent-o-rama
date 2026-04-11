@@ -19,11 +19,12 @@
   (get-in system [:aor-cache module-id :manager]))
 
 (defn get-page!!
-  [system {:keys [module-id agent-name pagination filters]}]
+  [system {:keys [module-id agent-name pagination filters limit cursor]}]
   (let [client (get-client system module-id agent-name)
-        page-size 10
+        page-size (or limit 10)
         scan-page-size 100
-        pages (if (empty? pagination) nil pagination)]
+        pages-raw (or pagination cursor)
+        pages (if (empty? pages-raw) nil pages-raw)]
     (when client
       (foreign-invoke-query
        (:invokes-page-query (aor-types/underlying-objects client))

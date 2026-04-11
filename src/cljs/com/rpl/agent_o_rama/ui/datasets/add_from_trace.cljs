@@ -29,8 +29,8 @@
         input-data-field (forms/use-form-field form-id :input-data)
         output-data-field (forms/use-form-field form-id :output-data)
 
-        props (state/use-sub [:forms form-id])
-        {:keys [module-id source-args source-result source-emits error]} props
+        props (use-subscribe [::forms/form form-id])
+        {:keys [module-id source-args source-result source-emits error]} (merge (:fields props {}) (:meta props {}))
 
         ;; Local state
         [validation-state set-validation-state] (uix/use-state nil)
@@ -84,10 +84,7 @@
              {:module-id module-id
               :value (:value dataset-id-field)
               :on-change (:on-change dataset-id-field)
-              :sente-event-fn (fn [module-id search-string]
-                                [:datasets/get-all
-                                 {:module-id module-id
-                                  :filters {:search-string search-string}}])
+              :rfq-key ::rpc-datasets/get-all!!
               :items-key :datasets
               :item-id-fn :dataset-id
               :item-label-fn :name
@@ -207,10 +204,10 @@
            parsed-output (parse-json->cljs output-str)]
        (cond
          (= ::parse-error parsed-input)
-         (do (state/dispatch [:db/set-value [:forms (:form-id form-state) :error] "Input is not valid JSON"])
+         (do (forms/set-error! (:form-id form-state) "Input is not valid JSON")
              nil)
          (= ::parse-error parsed-output)
-         (do (state/dispatch [:db/set-value [:forms (:form-id form-state) :error] "Output is not valid JSON"])
+         (do (forms/set-error! (:form-id form-state) "Output is not valid JSON")
              nil)
          :else
          [::rpc-datasets/add-direct-data!!

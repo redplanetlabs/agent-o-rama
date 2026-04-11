@@ -9,6 +9,8 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.impl.ui.rpc.human-feedback :as rpc-hf]
    [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]
@@ -134,10 +136,7 @@
          {:module-id module-id
           :value (:value param-field)
           :on-change (:on-change param-field)
-          :sente-event-fn (fn [module-id search-string]
-                            [:datasets/get-all
-                             {:module-id module-id
-                              :filters {:search-string search-string}}])
+          :rfq-key ::rpc-datasets/get-all!!
           :items-key :datasets
           :item-id-fn :dataset-id
           :item-label-fn :name
@@ -154,10 +153,7 @@
          {:module-id module-id
           :value (:value param-field)
           :on-change (:on-change param-field)
-          :sente-event-fn (fn [module-id search-string]
-                            [:human-feedback/get-queues
-                             {:module-id module-id
-                              :filters {:search-string search-string}}])
+          :rfq-key ::rpc-hf/get-queues!!
           :items-key :items
           :item-id-fn :name
           :item-label-fn :name

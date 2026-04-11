@@ -10,6 +10,7 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
    [re-frame.core :as rf]
+   [re-frame.query :as rfq]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [com.rpl.specter :as s]))
@@ -226,29 +227,14 @@
    :modal-props {:title "Edit Dataset"
                  :submit-text "Save Changes"}}
   :on-submit
-  (fn [db form-state]
-    (let [{:keys [form-id module-id dataset-id name description initial-name initial-description]} form-state]
-      (let [name-promise (if (= name initial-name)
-                           (js/Promise.resolve nil)
-                           (rpc/call ::rpc-datasets/set-name!!
-                                     {:module-id module-id :dataset-id dataset-id :name name}))
-            desc-promise (if (= description initial-description)
-                           (js/Promise.resolve nil)
-                           (rpc/call ::rpc-datasets/set-description!!
-                                     {:module-id module-id :dataset-id dataset-id :description description}))]
-        (-> (.all js/Promise [name-promise desc-promise])
-            (.then (fn [_]
-                     (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                     (state/dispatch [:modal/hide])
-                     (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
-                     (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-props module-id dataset-id]}])
-                     (rf/dispatch [:re-frame.query/invalidate-tags
-                                   [[:datasets module-id] [:dataset-props module-id dataset-id]]])
-                     (state/dispatch [:form/clear form-id])))
-            (.catch (fn [error]
-                      (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                      (state/dispatch [:db/set-value [:forms form-id :error]
-                                       (str "Failed to save: " (if (map? error) (:error error) error))])))))))})
+  {:mutation (fn [_db form-state]
+               [::rpc-datasets/upsert!!
+                (select-keys form-state [:module-id :dataset-id :name :description
+                                         :initial-name :initial-description])])
+   :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
+                            {:query-key-pattern [:datasets module-id]})
+   :rfq-invalidate-tags (fn [_db {:keys [module-id dataset-id]} _reply]
+                          [[:datasets module-id] [:dataset-props module-id dataset-id]])}})
 
 (defui ExampleForm [{:keys [form-id]}]
   (let [{:keys [field-errors]} (forms/use-form form-id)
@@ -292,8 +278,7 @@
                    [::rpc-datasets/add-example!!
                     (assoc form-state :input parsed-input :output parsed-output)])
                  (catch js/Error e
-                   (state/dispatch [:db/set-value [:forms (:form-id form-state) :error]
-                                    (str "Invalid JSON: " (.-message e))])
+                   (forms/set-error! (:form-id form-state) (str "Invalid JSON: " (.-message e)))
                    nil)))
    :on-success-invalidate (fn [_db {:keys [module-id dataset-id]} _reply]
                             {:query-key-pattern [:dataset-examples module-id dataset-id]})
@@ -366,24 +351,26 @@
    :modal-props {:title "Add Tag to examples"
                  :submit-text "Add Tag"}}
   :on-submit
-  {:mutation (fn [db form-state]
-               (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
-                     snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
-                     {:keys [tag-name example-ids]} form-state]
+  {:mutation (fn [_db form-state]
+               (let [{:keys [module-id dataset-id snapshot-name tag-name example-ids]} form-state
+                     ;; Legacy atom may still hold snapshot when not passed on the modal
+                     snapshot-name' (or snapshot-name
+                                        (when dataset-id
+                                          (get-in @state/app-db [:ui :datasets :selected-snapshot-per-dataset dataset-id])))]
                  [::rpc-datasets/add-tag-to-examples!!
                   {:module-id module-id
                    :dataset-id dataset-id
-                   :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
+                   :snapshot-name (when-not (str/blank? snapshot-name') snapshot-name')
                    :example-ids (vec (or example-ids #{}))
                    :tag tag-name}]))
-   :on-success-invalidate (fn [db _form-state _reply]
-                            (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+   :on-success-invalidate (fn [_db form-state _reply]
+                            (let [{:keys [module-id dataset-id]} form-state]
                               {:query-key-pattern [:dataset-examples module-id dataset-id]}))
-   :rfq-invalidate-tags (fn [db _form-state _reply]
-                          (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+   :rfq-invalidate-tags (fn [_db form-state _reply]
+                          (let [{:keys [module-id dataset-id]} form-state]
                             [[:dataset-examples module-id dataset-id]]))
-   :on-success (fn [db _form-state _reply]
-                 (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
+   :on-success (fn [_db form-state _reply]
+                 (let [{:keys [dataset-id]} form-state]
                    (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
 
 (defn show-add-tag-modal! [props]
@@ -401,24 +388,25 @@
    :modal-props {:title "Remove Tag from examples"
                  :submit-text "Remove Tag"}}
   :on-submit
-  {:mutation (fn [db form-state]
-               (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)
-                     snapshot-name (s/select-one (state/path->specter-path [:ui :datasets :selected-snapshot-per-dataset dataset-id]) db)
-                     {:keys [tag-name example-ids]} form-state]
+  {:mutation (fn [_db form-state]
+               (let [{:keys [module-id dataset-id snapshot-name tag-name example-ids]} form-state
+                     snapshot-name' (or snapshot-name
+                                        (when dataset-id
+                                          (get-in @state/app-db [:ui :datasets :selected-snapshot-per-dataset dataset-id])))]
                  [::rpc-datasets/remove-tag-from-examples!!
                   {:module-id module-id
                    :dataset-id dataset-id
-                   :snapshot-name (when-not (str/blank? snapshot-name) snapshot-name)
+                   :snapshot-name (when-not (str/blank? snapshot-name') snapshot-name')
                    :example-ids (vec (or example-ids #{}))
                    :tag tag-name}]))
-   :on-success-invalidate (fn [db _form-state _reply]
-                            (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+   :on-success-invalidate (fn [_db form-state _reply]
+                            (let [{:keys [module-id dataset-id]} form-state]
                               {:query-key-pattern [:dataset-examples module-id dataset-id]}))
-   :rfq-invalidate-tags (fn [db _form-state _reply]
-                          (let [{:keys [module-id dataset-id]} (s/select-one [:route :path-params] db)]
+   :rfq-invalidate-tags (fn [_db form-state _reply]
+                          (let [{:keys [module-id dataset-id]} form-state]
                             [[:dataset-examples module-id dataset-id]]))
-   :on-success (fn [db _form-state _reply]
-                 (let [{:keys [dataset-id]} (s/select-one [:route :path-params] db)]
+   :on-success (fn [_db form-state _reply]
+                 (let [{:keys [dataset-id]} form-state]
                    (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
 
 (defn show-remove-tag-modal! [props]
@@ -489,6 +477,7 @@
                                                 (state/dispatch [:modal/hide])
                                                 ;; Invalidate query to refresh the example list
                                                 (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]])
                                                 ;; Show the results modal
                                                 (state/dispatch [:modal/show :import-results
                                                                  {:title "Import Results"

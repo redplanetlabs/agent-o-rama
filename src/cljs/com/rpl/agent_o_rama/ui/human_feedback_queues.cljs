@@ -92,14 +92,12 @@
         [search-term set-search-term] (useState "")
         [debounced-search] (useDebounce search-term 300)
 
-        ;; Use paginated query
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
-        (queries/use-paginated-query
-         {:query-key [:human-metrics module-id debounced-search]
-          :sente-event [:human-feedback/get-metrics
-                        {:module-id decoded-module-id
-                         :filters (when-not (str/blank? debounced-search)
-                                    {:search-string debounced-search})}]
+        (queries/use-infinite-rpc-query
+         {:rfq-key ::rpc-hf/get-metrics-inf!!
+          :params {:module-id decoded-module-id
+                   :filters (when-not (str/blank? debounced-search)
+                              {:search-string debounced-search})}
           :page-size 20
           :enabled? (and module-id (boolean decoded-module-id))})
 
@@ -369,10 +367,7 @@
            {:module-id module-id
             :value value
             :on-change on-change
-            :sente-event-fn (fn [mid search-string]
-                              [:human-feedback/get-metrics
-                               {:module-id mid
-                                :filters {:search-string search-string}}])
+            :rfq-key ::rpc-hf/get-metrics!!
             :items-key :items
             :item-id-fn :name
             :item-label-fn :name
@@ -439,9 +434,14 @@
                                             :required false})))
 
                update-rubric (fn [idx metric-name opts]
-                               (let [updated (assoc-in rubrics [idx]
-                                                       (merge {:metric metric-name}
-                                                              opts))]
+                               (let [prev (get rubrics idx)
+                                     opts' (dissoc opts :item)
+                                     ;; Checkbox sends {:required ...} with `value` from a possibly
+                                     ;; stale render — never merge {:metric nil} over a fresh selection.
+                                     row (if (:item opts)
+                                           (merge prev (merge {:metric metric-name} opts'))
+                                           (merge prev (select-keys opts' [:required])))
+                                     updated (assoc-in rubrics [idx] row)]
                                  ((:on-change rubrics-field) updated)))
 
                remove-rubric (fn [idx]
@@ -530,14 +530,13 @@
         [search-term set-search-term] (useState "")
         [debounced-search] (useDebounce search-term 300)
 
-        ;; Use paginated query
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
-        (queries/use-paginated-query
-         {:query-key [:human-feedback-queues module-id debounced-search]
-          :sente-event [:human-feedback/get-queues
-                        {:module-id decoded-module-id
-                         :filters {:search-string debounced-search}}]
-          :page-size 20})]
+        (queries/use-infinite-rpc-query
+         {:rfq-key ::rpc-hf/get-queues-inf!!
+          :params {:module-id decoded-module-id
+                   :filters {:search-string debounced-search}}
+          :page-size 20
+          :enabled? true})]
 
     ($ :div.p-6
        ;; Header with Create Button

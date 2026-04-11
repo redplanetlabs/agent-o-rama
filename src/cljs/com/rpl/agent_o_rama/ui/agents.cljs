@@ -16,6 +16,7 @@
    [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
    [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [re-frame.core :as rf]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -42,7 +43,7 @@
                                           (catch js/Error _ {}))]
 
                  ;; Mark as submitting
-                 (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] true])
+                 (forms/set-submitting! (:form-id form-state) true)
 
                  ;; Make the Sente request
                  (-> (rpc/call ::rpc-invocations/run-agent!!
@@ -51,17 +52,16 @@
                    :args parsed-args
                    :metadata parsed-metadata})
                  (.then (fn [data]
-                          (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] false])
-                          (state/dispatch [:form/update-field (:form-id form-state) :args ""])
-                          (state/dispatch [:form/update-field (:form-id form-state) :metadata-args ""])
+                          (forms/set-submitting! (:form-id form-state) false)
+                          (rf/dispatch [::forms/set-field (:form-id form-state) :args ""])
+                          (rf/dispatch [::forms/set-field (:form-id form-state) :metadata-args ""])
                           (rfe/push-state :agent/invocation-detail
                                           {:module-id module-id
                                            :agent-name agent-name
                                            :invoke-id (str (:task-id data) "-" (:invoke-id data))})))
                  (.catch (fn [err]
-                           (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] false])
-                           (state/dispatch [:db/set-value [:forms (:form-id form-state) :error]
-                                            (str "Error: " (if (map? err) (or (:error err) "Unknown error") (str err)))]))))))})
+                           (forms/set-submitting! (:form-id form-state) false)
+                           (forms/set-error! (:form-id form-state) (str "Error: " (if (map? err) (or (:error err) "Unknown error") (str err)))))))))})
 
 (defui result-badge
  [{:keys [status human-request?]}]
@@ -308,13 +308,12 @@
                              (set-applied-filters! (build-filter-map draft-filters))
                              (set-open-filter-type! nil))
 
-        ;; Use the new paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
-        (queries/use-paginated-query
-         {:query-key [:invocations module-id agent-name filter-key]
-          :sente-event [:invocations/get-page {:module-id module-id
-                                               :agent-name agent-name
-                                               :filters applied-filters}]
+        (queries/use-infinite-rpc-query
+         {:rfq-key ::rpc-invocations/get-page-inf!!
+          :params {:module-id module-id
+                   :agent-name agent-name
+                   :filters applied-filters}
           :page-size 20
           :enabled? (boolean (and module-id agent-name))})]
 
@@ -832,11 +831,10 @@
     ;; Initialize the form when the component mounts or when module-id/agent-name changes
     (uix/use-effect
      (fn []
-       (state/dispatch [:form/initialize form-id {:module-id module-id
-                                                  :agent-name agent-name}])
+       (rf/dispatch [::forms/initialize form-id {:module-id module-id :agent-name agent-name}])
        ;; Cleanup: Clear the form when the component unmounts or agent changes
        (fn []
-         (state/dispatch [:form/clear form-id])))
+         (forms/clear-form! form-id)))
      [module-id agent-name form-id])
 
     ($ :div.p-4

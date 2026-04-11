@@ -73,10 +73,7 @@
              {:module-id module-id
               :value selected-dataset
               :on-change set-selected-dataset
-              :sente-event-fn (fn [module-id search-string]
-                                [:datasets/get-all
-                                 {:module-id module-id
-                                  :filters {:search-string search-string}}])
+              :rfq-key ::rpc-datasets/get-all!!
               :items-key :datasets
               :item-id-fn :dataset-id
               :item-label-fn :name

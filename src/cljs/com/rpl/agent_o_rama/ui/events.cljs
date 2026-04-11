@@ -3,6 +3,7 @@
             [com.rpl.agent-o-rama.ui.state :as state]
             [com.rpl.agent-o-rama.ui.common :as common]
             [com.rpl.agent-o-rama.ui.rpc :as rpc]
+            [com.rpl.agent-o-rama.ui.forms :as forms]
             [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
             [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
             [com.rpl.agent-o-rama.impl.ui.rpc.config :as rpc-config]
@@ -320,19 +321,18 @@
                          :input input
                          :reference-output output})
                        (.then (fn [_]
-                                (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                                (state/dispatch [:modal/hide])
+                                (forms/set-submitting! form-id false)
+                                (rf/dispatch [:modal/hide])
                                 (do
                                        (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
                                        (rf/dispatch [:re-frame.query/invalidate-tags [[:fetch-example module-id dataset-id example-id] [:dataset-examples module-id dataset-id snapshot-name]]]))
-                                (state/dispatch [:form/clear form-id])))
+                                (forms/clear-form! form-id)))
                        (.catch (fn [err]
-                                 (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                                 (state/dispatch [:db/set-value [:forms form-id :error]
-                                                  (if (map? err) (or (:error err) "An unknown server error occurred.") (str err))]))))
+                                 (forms/set-submitting! form-id false)
+                                 (forms/set-error! form-id (if (map? err) (or (:error err) "An unknown server error occurred.") (str err))))))
                        (catch js/Error e
-                         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                         (state/dispatch [:db/set-value [:forms form-id :error] (str "Invalid JSON: " (.-message e))]))))
+                         (forms/set-submitting! form-id false)
+                         (forms/set-error! form-id (str "Invalid JSON: " (.-message e))))))
                    nil))
 ;; =============================================================================
 ;; BULK OPERATION EVENTS

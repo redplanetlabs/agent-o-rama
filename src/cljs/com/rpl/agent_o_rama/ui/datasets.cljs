@@ -681,14 +681,12 @@
         [search-term set-search-term] (useState "")
         [debounced-search-term] (useDebounce search-term 300)
 
-        ;; Use the new paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
-        (queries/use-paginated-query
-         {:query-key [:datasets module-id debounced-search-term]
-          :sente-event [:datasets/get-all
-                        {:module-id module-id
-                         :filters (when-not (str/blank? debounced-search-term)
-                                    {:search-string debounced-search-term})}]
+        (queries/use-infinite-rpc-query
+         {:rfq-key ::rpc-datasets/get-all-inf!!
+          :params {:module-id module-id
+                   :filters (when-not (str/blank? debounced-search-term)
+                              {:search-string debounced-search-term})}
           :page-size 3
           :enabled? (boolean module-id)})]
 
@@ -955,15 +953,14 @@
         [search-string set-search-string] (uix/use-state "")
         [debounced-search-string] (useDebounce search-string 300)
 
-        ;; Use the paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error refetch]}
-        (queries/use-paginated-query
-         {:query-key [:dataset-examples module-id dataset-id selected-snapshot-name debounced-search-string]
-          :sente-event [:datasets/search-examples {:module-id module-id
-                                                   :dataset-id dataset-id
-                                                   :snapshot-name selected-snapshot-name
-                                                   :filters (when-not (str/blank? debounced-search-string)
-                                                              {:search-string debounced-search-string})}]
+        (queries/use-infinite-rpc-query
+         {:rfq-key ::rpc-datasets/search-examples-inf!!
+          :params {:module-id module-id
+                   :dataset-id dataset-id
+                   :snapshot-name selected-snapshot-name
+                   :filters (when-not (str/blank? debounced-search-string)
+                              {:search-string debounced-search-string})}
           :page-size 20
           :enabled? (boolean (and module-id dataset-id))})
 

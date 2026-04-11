@@ -143,7 +143,9 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
 
   // Select Examples
   if (selectorType === 'tag') {
-    await modal.getByLabel('Only examples with tag:').check();
+    const tagRadio = modal.getByLabel('Only examples with tag:');
+    await tagRadio.scrollIntoViewIfNeeded();
+    await tagRadio.click({ force: true });
     await modal.getByPlaceholder('e.g., hard-case').fill(selectorTag);
     console.log(`Selected tag: ${selectorTag}`);
   } else if (selectorType === 'selected') {
@@ -151,7 +153,9 @@ async function runAndVerifyExperiment(page, { experimentName, snapshot, selector
     await modal.getByLabel(/Only the \d+ selected examples/).check();
     console.log(`Selected examples option chosen (${selectedExamples.length} examples)`);
   } else {
-    await modal.getByLabel('All examples in snapshot').check();
+    const allRadio = modal.getByLabel('All examples in snapshot');
+    await allRadio.scrollIntoViewIfNeeded();
+    await allRadio.click({ force: true });
     console.log('Selected all examples.');
   }
 

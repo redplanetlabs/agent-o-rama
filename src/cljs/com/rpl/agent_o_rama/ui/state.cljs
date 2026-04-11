@@ -76,12 +76,17 @@
 
 (defn dispatch
   "Dispatch an event to update app-db. Event is a vector [event-id & args].
+   If no custom handler is registered, falls through to rf/dispatch for
+   re-frame events (e.g. modal/show-form, modal/hide, forms/*).
    The handler must return a Specter path navigator suitable for s/multi-transform.
    Includes centralized schema validation for development builds."
   [event]
   (let [event-id (first event)
         event-args (rest event)
         handler (get @event-handlers event-id)]
+    (when-not handler
+      ;; Fall through to re-frame for events not handled by the custom system
+      (rf/dispatch event))
     (if handler
       (try
         (let [current-db @app-db
@@ -346,6 +351,25 @@
   ([specter-path]
    (js/console.log "Value at path" specter-path ":"
                    (clj->js (s/select-one specter-path @app-db)))))
+
+
+;; Re-frame bridge: allow rf/dispatch [:query/invalidate ...] to reach the
+;; custom state system without going through state/dispatch (avoids re-entry)
+(rf/reg-event-fx :query/invalidate-bridge
+  (fn [_ [_ invalidation-map]]
+    ;; Directly call state/dispatch — no circular risk since we're in an fx handler
+    (dispatch [:query/invalidate invalidation-map])
+    nil))
+
+;; Re-frame subscription for modal state — uses long name to avoid Closure collision
+(rf/reg-sub ::aor-global-modal
+  (fn [db _]
+    (get-in db [:ui :modal] {:active nil :data {} :form {}})))
+
+;; Also expose forms map via re-frame sub for cross-system visibility
+(rf/reg-sub :forms/all
+  (fn [db _]
+    (:forms db {})))
 
 (defn invalidate!
   "Invalidate both the old query system and rfq for a given query-key-pattern and rfq tags.

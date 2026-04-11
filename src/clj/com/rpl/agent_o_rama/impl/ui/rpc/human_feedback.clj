@@ -14,32 +14,34 @@
   (get-in system [:aor-cache module-id :manager]))
 
 (defn get-metrics!!
-  [system {:keys [module-id pagination filters]}]
+  [system {:keys [module-id pagination filters limit cursor]}]
   (let [manager (get-manager system module-id)
         underlying-objects (aor-types/underlying-objects manager)
         search-query (:search-human-metrics-query underlying-objects)
         search-string (get filters :search-string)
-        query-limit 20]
+        query-limit (or limit 20)
+        pagination' (or pagination cursor)]
     (foreign-invoke-query search-query
                           (cond-> {}
                             (not (str/blank? search-string))
                             (assoc :search-string search-string))
                           query-limit
-                          pagination)))
+                          pagination')))
 
 (defn get-queues!!
-  [system {:keys [module-id pagination filters]}]
+  [system {:keys [module-id pagination filters limit cursor]}]
   (let [manager (get-manager system module-id)
         underlying-objects (aor-types/underlying-objects manager)
         search-query (:search-human-feedback-queues-query underlying-objects)
         search-string (get filters :search-string)
-        query-limit 20]
+        query-limit (or limit 20)
+        pagination' (or pagination cursor)]
     (foreign-invoke-query search-query
                           (cond-> {}
                             (not (str/blank? search-string))
                             (assoc :search-string search-string))
                           query-limit
-                          pagination)))
+                          pagination')))
 
 (defn get-queue-info!!
   [system {:keys [module-id queue-name]}]

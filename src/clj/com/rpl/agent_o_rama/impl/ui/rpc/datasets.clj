@@ -36,17 +36,19 @@
         datasets))
 
 (defn get-all!!
-  [system {:keys [module-id pagination filters]}]
+  [system {:keys [module-id pagination filters limit cursor]}]
   (let [manager (get-manager system module-id)
         underlying-objects (aor-types/underlying-objects manager)
-        search-string (get filters :search-string)]
+        search-string (get filters :search-string)
+        page-size (or limit 25)
+        pagination' (or pagination cursor)]
     (if-not (str/blank? search-string)
       (let [search-query (:search-datasets-query underlying-objects)]
         (->> (foreign-invoke-query search-query search-string 500)
              (mapv (fn [[id name]] {:dataset-id id, :name name}))
              (hash-map :datasets)))
       (let [datasets-page-query (:datasets-page-query underlying-objects)
-            result (foreign-invoke-query datasets-page-query 25 pagination)]
+            result (foreign-invoke-query datasets-page-query page-size pagination')]
         (update result :datasets mark-remote-datasets)))))
 
 (defn get-props!!
@@ -62,15 +64,16 @@
     (queries/get-dataset-snapshot-names datasets-pstate dataset-id)))
 
 (defn search-examples!!
-  [system {:keys [module-id dataset-id snapshot-name filters limit pagination]}]
+  [system {:keys [module-id dataset-id snapshot-name filters limit pagination cursor]}]
   (let [manager (get-manager system module-id)
         {:keys [search-examples-query]} (aor-types/underlying-objects manager)
+        pagination' (or pagination cursor)
         result (foreign-invoke-query search-examples-query
                                      dataset-id
                                      (when-not (str/blank? snapshot-name) snapshot-name)
                                      (or filters {})
                                      (or limit 20)
-                                     pagination)]
+                                     pagination')]
     (update result :examples process-examples)))
 
 (defn get-example!!
@@ -124,6 +127,16 @@
   [system {:keys [module-id dataset-id description]}]
   (let [manager (get-manager system module-id)]
     (aor/set-dataset-description! manager dataset-id description)
+    {:status :ok}))
+
+(defn upsert!!
+  "Update dataset name and/or description, applying only changed fields."
+  [system {:keys [module-id dataset-id name description initial-name initial-description]}]
+  (let [manager (get-manager system module-id)]
+    (when (and name (not= name initial-name))
+      (aor/set-dataset-name! manager dataset-id name))
+    (when (not= description initial-description)
+      (aor/set-dataset-description! manager dataset-id description))
     {:status :ok}))
 
 (defn delete!!

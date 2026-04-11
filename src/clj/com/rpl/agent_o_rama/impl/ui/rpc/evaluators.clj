@@ -16,13 +16,14 @@
     (foreign-invoke-query (:all-eval-builders-query (aor-types/underlying-objects manager)))))
 
 (defn get-all-instances!!
-  [system {:keys [module-id pagination filters]}]
+  [system {:keys [module-id pagination filters limit cursor]}]
   (let [manager (get-manager system module-id)
         underlying-objects (aor-types/underlying-objects manager)
         search-query (:search-evals-query underlying-objects)
         search-string (get filters :search-string)
         types (get filters :types)
-        query-limit 20]
+        query-limit (or limit 20)
+        pagination' (or pagination cursor)]
     (foreign-invoke-query search-query
                           (cond-> {}
                             (not (str/blank? search-string))
@@ -30,7 +31,7 @@
                             (seq types)
                             (assoc :types types))
                           query-limit
-                          pagination)))
+                          pagination')))
 
 ;; =============================================================================
 ;; MUTATIONS

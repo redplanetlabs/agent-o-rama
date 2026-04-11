@@ -18,6 +18,7 @@
    [com.rpl.agent-o-rama.ui.analytics :as analytics]
    [com.rpl.agent-o-rama.impl.ui.rpc.hello-world :as rpc-hello-world]
    [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
+   [re-frame.core :as re-frame]
    [re-frame.query :as rfq]
    [reitit.core :as r]
    [reitit.frontend :as rf]
@@ -421,7 +422,16 @@
 
 (defui app [] ($ with-router {:routes routes} ($ main-layout)))
 
+(re-frame/reg-event-db ::init-db
+  (fn [db [_ seed]]
+    (merge {:ui {:modal {:active nil :data {} :form {}}}
+            :forms {}}
+           db
+           seed)))
+
 (defn init []
+  ;; Seed re-frame app-db with base UI state (forms, modal) at startup
+  (re-frame/dispatch-sync [::init-db {}])
   (sente/init!)
   (uix.dom/render-root
    ($ app)

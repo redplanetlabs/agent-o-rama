@@ -12,6 +12,7 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
    [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [re-frame.query :as rfq]
@@ -106,7 +107,7 @@
 
 (defui SelectBuilderStep [{:keys [form-id]}]
   (let [{:keys [set-field! next-step!]} (forms/use-form form-id)
-        {:keys [module-id]} (state/use-sub [:forms form-id])
+        {:keys [module-id]} (:fields (use-subscribe [::forms/form form-id]) {})
         {:keys [data error]
          query-status :status}
         (use-subscribe [::rfq/query ::rpc-evaluators/get-all-builders!! {:module-id module-id}])
@@ -197,10 +198,7 @@
                   {:module-id module-id
                    :value preview-dataset
                    :on-change set-preview-dataset
-                   :sente-event-fn (fn [module-id search-string]
-                                     [:datasets/get-all
-                                      {:module-id module-id
-                                       :filters {:search-string search-string}}])
+                   :rfq-key ::rpc-datasets/get-all!!
                    :items-key :datasets
                    :item-id-fn :dataset-id
                    :item-label-fn :name
@@ -284,27 +282,19 @@
                   {:title (str "Create Evaluator: " (get-in form-state [:selected-builder :name]))})}
 
   :on-submit
-  (fn [_db form-state]
-    (let [{:keys [form-id module-id name description input-json-path output-json-path reference-output-json-path params selected-builder]} form-state
-          on-success (fn [_data]
-                       (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                       (state/dispatch [:modal/hide])
-                       (rf/dispatch [:re-frame.query/invalidate-tags [[:evaluator-instances module-id]]])
-                       (state/dispatch [:form/clear form-id]))
-          on-error (fn [err]
-                     (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                     (state/dispatch [:db/set-value [:forms form-id :error]
-                                      (if (map? err) (or (:error err) (str err)) (str err))]))]
-      (-> (rpc/call ::rpc-evaluators/create!!
-                    {:module-id module-id
-                     :builder-name (:name selected-builder)
-                     :name name :description description
-                     :params params
-                     :input-json-path input-json-path
-                     :output-json-path output-json-path
-                     :reference-output-json-path reference-output-json-path})
-          (.then on-success)
-          (.catch on-error))))})
+  {:mutation (fn [_db form-state]
+               (let [{:keys [module-id name description params selected-builder
+                              input-json-path output-json-path reference-output-json-path]} form-state]
+                 [::rpc-evaluators/create!!
+                  {:module-id module-id
+                   :builder-name (:name selected-builder)
+                   :name name :description description
+                   :params params
+                   :input-json-path input-json-path
+                   :output-json-path output-json-path
+                   :reference-output-json-path reference-output-json-path}]))
+   :rfq-invalidate-tags (fn [_db {:keys [module-id]} _reply]
+                          [[:evaluator-instances module-id]])}})
 
 (defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids pre-selected-evaluator]}]
   (let [;; NEW: If pre-selected, use it. Otherwise, state is nil.
@@ -587,21 +577,16 @@
         ;; Add state for type filter
         [selected-type set-selected-type] (useState "all")
 
-        ;; Use the new paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error refetch]}
-        (queries/use-paginated-query
-         {:query-key [:evaluator-instances
-                      module-id
-                      debounced-search-term
-                      selected-type]
-          :sente-event [:evaluators/get-all-instances
-                        {:module-id module-id
-                         :filters (cond-> {}
-                                    (not (str/blank? debounced-search-term))
-                                    (assoc :search-string debounced-search-term)
+        (queries/use-infinite-rpc-query
+         {:rfq-key ::rpc-evaluators/get-all-instances-inf!!
+          :params {:module-id module-id
+                   :filters (cond-> {}
+                              (not (str/blank? debounced-search-term))
+                              (assoc :search-string debounced-search-term)
 
-                                    (not= selected-type "all")
-                                    (assoc :types #{(keyword selected-type)}))}]
+                              (not= selected-type "all")
+                              (assoc :types #{(keyword selected-type)}))}
           :page-size 20
           :enabled? (boolean module-id)})
 
