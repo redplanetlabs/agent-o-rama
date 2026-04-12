@@ -1,6 +1,9 @@
 (ns com.rpl.agent-o-rama.impl.ui.handlers.analytics-filters
   "Pure filter conversion helpers shared by RPC and tests (no transport)."
-  (:require [com.rpl.agent-o-rama.impl.types :as aor-types])
+  (:require
+   ;; Loads `extend-protocol RuleFilter` so composite filters validate (tests and RPC).
+   [com.rpl.agent-o-rama.impl.analytics]
+   [com.rpl.agent-o-rama.impl.types :as aor-types])
   (:import [java.util.regex Pattern]))
 
 (defn comparator-spec->ui

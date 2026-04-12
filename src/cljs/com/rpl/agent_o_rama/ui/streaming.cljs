@@ -1,22 +1,27 @@
 (ns com.rpl.agent-o-rama.ui.streaming
   "React hooks for node streaming output.
 
-  Real-time streaming previously used WebSockets; that path is not wired yet.
-  Hooks return empty/inactive state until a transport (e.g. SSE) is implemented."
+  Live WebSocket streaming is not wired. When the graph includes
+  `:streaming-chunks` on the node (replay from the server), this hook exposes
+  those chunks so the Streaming Output panel can render."
   (:require
    [com.rpl.agent-o-rama.ui.state :as state]))
 
 (defn use-node-stream
-  ([_module-id _agent-name _invoke-id _node-name _node-invoke-id]
-   (use-node-stream _module-id _agent-name _invoke-id _node-name _node-invoke-id nil))
+  ([module-id agent-name invoke-id node-name node-invoke-id]
+   (use-node-stream module-id agent-name invoke-id node-name node-invoke-id nil))
 
-  ([_module-id _agent-name _invoke-id _node-name _node-invoke-id _opts]
-   {:chunks []
-    :text ""
-    :streaming? false
-    :reset-count 0
-    :complete? true
-    :stream-id nil}))
+  ([_module-id _agent-name _invoke-id _node-name node-invoke-id opts]
+   (let [{:keys [replay-chunks is-live?]} opts
+         chunks (or replay-chunks [])
+         text (apply str (map str chunks))
+         has-replay? (seq chunks)]
+     {:chunks (vec chunks)
+      :text text
+      :streaming? (boolean (and is-live? (not has-replay?)))
+      :reset-count 0
+      :complete? (or has-replay? (not is-live?))
+      :stream-id (when node-invoke-id (str node-invoke-id))})))
 
 (defn clear-stream-buffer!
   [stream-id]

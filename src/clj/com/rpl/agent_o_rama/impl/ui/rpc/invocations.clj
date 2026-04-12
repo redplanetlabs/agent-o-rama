@@ -4,6 +4,7 @@
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.analytics :as ana]
+   [com.rpl.agent-o-rama.impl.client :as iclient]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.stats :as stats]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
@@ -17,6 +18,41 @@
 
 (defn- get-manager [system module-id]
   (get-in system [:aor-cache module-id :manager]))
+
+(defn- merge-streaming-chunks-into-nodes
+  "Attach `:streaming-chunks` (strings) to each node in `invokes-map` from root PState
+  `:streaming` → per-node → `:all` (walk in Clojure; avoids subindexed path quirks)."
+  [nodes-map agent-id root-pstate agent-task-id]
+  (if-not (and nodes-map agent-id root-pstate)
+    nodes-map
+    (let [by-node (or (foreign-select-one
+                       [(keypath agent-id) :streaming]
+                       root-pstate
+                       {:pkey agent-task-id})
+                      {})
+          chunks-by-invoke
+          (reduce
+           (fn [acc [_node-name {:keys [all]}]]
+             (reduce
+              (fn [a chunk]
+                (let [iid (:invoke-id chunk)
+                      c (:chunk chunk)]
+                  (if (or (nil? iid)
+                          (contains? #{iclient/FINISHED iclient/FINISHED-INVOKE} c))
+                    a
+                    ;; Normalize key — UUID vs string across Transit
+                    (update a (str iid) (fnil conj []) c))))
+              acc
+              (or all [])))
+           {}
+           by-node)]
+      (reduce-kv
+       (fn [m node-invoke-id node-data]
+         (if-let [ch (get chunks-by-invoke (str node-invoke-id))]
+           (assoc m node-invoke-id (assoc node-data :streaming-chunks (mapv str ch)))
+           (assoc m node-invoke-id node-data)))
+       {}
+       nodes-map))))
 
 (defn get-page!!
   [system {:keys [module-id agent-name pagination filters limit cursor]}]
@@ -119,22 +155,24 @@
                                                 10000)
 
             cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
-                            (->> m
-                                 common/remove-implicit-nodes
-                                 (transform
-                                  [MAP-VALS :feedback :results ALL]
-                                  (fn [feedback-result]
-                                    (let [feedback-map (into {} feedback-result)
-                                          source (:source feedback-map)]
-                                      (if source
-                                        (assoc feedback-map :source-string (aor-types/source-string source))
-                                        feedback-map))))
-                                 (transform
-                                  [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
-                                  name)
-                                 (transform
-                                  [MAP-VALS :feedback :actions MAP-KEYS]
-                                  name)))
+                            (let [merged (->> m
+                                              common/remove-implicit-nodes
+                                              (transform
+                                               [MAP-VALS :feedback :results ALL]
+                                               (fn [feedback-result]
+                                                 (let [feedback-map (into {} feedback-result)
+                                                       source (:source feedback-map)]
+                                                   (if source
+                                                     (assoc feedback-map :source-string (aor-types/source-string source))
+                                                     feedback-map))))
+                                              (transform
+                                               [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
+                                               name)
+                                              (transform
+                                               [MAP-VALS :feedback :actions MAP-KEYS]
+                                               name)
+                                              (merge-streaming-chunks-into-nodes agent-id root-pstate agent-task-id))]
+                              merged))
 
             agent-is-complete? (boolean (or (:finish-time-millis summary-info)
                                             (:result summary-info)))]
