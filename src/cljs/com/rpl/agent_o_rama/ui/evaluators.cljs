@@ -332,9 +332,12 @@
         loading? (= instances-status :loading)
         error instances-error
 
-        ;; Fetch evaluator builders to get their options for conditional rendering
+        ;; Fetch evaluator builders for conditional field rendering (paths). Skip when the
+        ;; evaluator is already chosen (Try Evaluator from details) — avoids an extra RPC
+        ;; and prevents stale/broken builder fetches from blocking the run form.
         {builders-data :data}
-        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-builders!! {:module-id module-id}])
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-builders!! {:module-id module-id}
+                        {:skip? (boolean pre-selected-evaluator)}])
         builders-by-name builders-data
 
         ;; Filter evaluators based on the modal's mode (:single or :multi)
@@ -348,7 +351,10 @@
 
         ;; Determine visibility flags based on selected evaluator's builder options
         builder-options (when selected-evaluator
-                          (get-in builders-by-name [(:builder-name selected-evaluator) :options] {}))
+                          (or (get-in builders-by-name [(:builder-name selected-evaluator) :options])
+                              ;; When :skip? skipped the builders query, default to output-only try flow
+                              (when pre-selected-evaluator
+                                {:input-path? false :reference-output-path? false :output-path? true})))
         show-input-path? (get builder-options :input-path? true)
         show-output-path? (get builder-options :output-path? true)
         show-ref-output-path? (get builder-options :reference-output-path? true)
