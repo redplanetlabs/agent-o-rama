@@ -214,14 +214,14 @@
   (count (pr-str v))
   
   (def app (fn [v] (rama/foreign-append!
-                   pstate-write-depot
-                   (aor-types/->PStateWrite
-                    nil
-                    "$$_aor-datasets"
-                    (rpath/path
-                     (rpath/keypath dataset-id)
-                     (rpath/termval v))
-                    dataset-id))))
+                    pstate-write-depot
+                    (aor-types/->PStateWrite
+                     nil
+                     "$$_aor-datasets"
+                     (rpath/path
+                      (rpath/keypath dataset-id)
+                      (rpath/termval v))
+                     dataset-id))))
   (app v)
 
   ;; -- Evaluator setup (run after launching module with new AggregationAgentModule) --
@@ -230,7 +230,7 @@
   (def eval-prompt
     (str "You are evaluating <output></output> from an agent, which is responding to a user <input></input>. "
          "The <reference></reference> has guidelines for what it should contain or not contain.\n\n"
-         "<output/> should contain no information or concepts not explicitly outlined in the <reference/>.\n\n"
+         "<output/> should strictly follow the the guidlines. \n\n"
          "Score 0,1,2.\n"
          "0: mostly missed the guidelines\n"
          "1: missing some guidelines\n"
@@ -276,35 +276,47 @@
                      (rpath/keypath "output")) updated-reference-outputs)
   (def results (atom []))
   @results
-  
+
+  (float (/ (reduce +  (rpath/select [rpath/ALL :scores (rpath/keypath "score")] @results))
+            (count (rpath/select [rpath/ALL :scores (rpath/keypath "score")] @results))))
+  (clojure.string/join "\n" (rpath/select [rpath/ALL :scores (rpath/keypath "score")] @results))
+  (println (clojure.string/join "\n" (rpath/select [rpath/ALL :scores (rpath/keypath "score")] @results)))
   (def eval-results
     (doall
      (for [k keys]
        (do
-         (def result-entry (rama/foreign-select-one
-                            (rpath/path
-                             (rpath/keypath dataset-id)
-                             :experiments
-                             (rpath/keypath experiment-id)
-                             :results
-                             (rpath/keypath k))
-                            datasets-pstate))
+         (def k k)
+         (defn get-result-entry [kid] (rama/foreign-select-one
+                                       (rpath/path
+                                        (rpath/keypath dataset-id)
+                                        :experiments
+                                        (rpath/keypath experiment-id)
+                                        :results
+                                        (rpath/keypath kid))
+                                       datasets-pstate))
+         (def result-entry (get-result-entry k))
          (def example-id (:example-id result-entry))
          (def output     (get-in result-entry [:agent-results 0 :result :val]))
-         (def example (rama/foreign-select-one (rpath/path
-                                                (rpath/keypath dataset-id)
-                                                (rpath/view :snapshots)
-                                                (rpath/keypath nil)
-                                                (rpath/keypath example-id))
-                                               datasets-pstate))
+         
+         (defn get-example [dataset-id exid]
+           (rama/foreign-select-one (rpath/path
+                                     (rpath/keypath dataset-id)
+                                     (rpath/view :snapshots)
+                                     (rpath/keypath nil)
+                                     (rpath/keypath exid))
+                                    datasets-pstate))
+         
+         (def example (get-example dataset-id example-id))
          (def input      (:input example))
-         (def ref-output (rpath/select-one (rpath/path
-                                            (rpath/keypath k)
-                                            (rpath/keypath "output")) updated-reference-outputs))
-
+         (defn get-ref-output [idx]
+           (rpath/select-one (rpath/path
+                              (rpath/keypath k)
+                              (rpath/keypath "output")) updated-reference-outputs))
+         (def ref-output (get-ref-output k))
+         
          (if (= (:reference-output example) ref-output)
            (println "== NOT CHANGED ==: " ref-output)
-           (println "== OLD REF OUTPUT ==: " (:reference-output example) "NEW:" ref-output))
+           (println "== OLD REF OUTPUT ==: " (:reference-output example)  "\n== NEW ==:" ref-output))
 
          (println "Evaluating result" k "example-id" example-id)
          (let [scores (aor/try-evaluator manager eval-name input ref-output output)]
@@ -312,6 +324,8 @@
            (swap! results conj {:result-idx k
                                 :example-id example-id
                                 :scores     scores})
+
+           (println "\n\n\n\n\n\n")
            {:result-idx k
             :example-id example-id
             :scores     scores}))))))
