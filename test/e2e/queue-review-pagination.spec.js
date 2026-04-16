@@ -133,11 +133,10 @@ test.describe('Queue Review Pagination', () => {
       await page.getByTestId(`queue-row-${queueName}`).getByTestId('queue-name-link').click();
 
       const loadMoreCell = page.getByRole('cell', { name: 'Load More' });
-      if (await loadMoreCell.isVisible()) {
-        // Click Load More
-        await loadMoreCell.click();
-        await page.waitForTimeout(1000);
-      }
+
+      // Click Load More
+      await loadMoreCell.click();
+      await page.waitForTimeout(1000);
 
       // Verify more items loaded (either via Load More or auto-pagination from Next)
       const afterLoadCount = await itemsTable.getByRole('row').count();
