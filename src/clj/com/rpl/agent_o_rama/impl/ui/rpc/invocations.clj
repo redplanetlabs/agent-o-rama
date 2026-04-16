@@ -194,9 +194,9 @@
        :invoke-id (.getAgentInvokeId inv)})))
 
 (defn execute-fork!!
-  [system {:keys [module-id agent-name invoke-pair changed-nodes]}]
+  [system {:keys [module-id agent-name invoke-id changed-nodes]}]
   (let [client (get-client system module-id agent-name)
-        [task-id agent-invoke-id] invoke-pair
+        [task-id agent-invoke-id] (common/parse-url-pair invoke-id)
         json-parsed-nodes (transform
                            [MAP-VALS]
                            #(j/read-value %)
