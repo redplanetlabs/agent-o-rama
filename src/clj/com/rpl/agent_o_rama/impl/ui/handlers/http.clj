@@ -3,33 +3,37 @@
    [cognitect.transit :as transit]
    [clojure.java.io :as io]
    [clojure.string :as str]
+   [org.httpkit.server :as http-kit]
    [ring.util.response :as resp]
    [jsonista.core :as j]
-   [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.ui :as ui]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.queries :as queries]
-   [com.rpl.agent-o-rama.impl.datasets :as datasets]
-   [com.rpl.agent-o-rama.impl.helpers :as h])
-  (:import [java.util UUID])
-  (:use [com.rpl.rama]))
+   [com.rpl.agent-o-rama.impl.datasets :as datasets])
+  (:import [java.util UUID]))
 
 (def ^:private mapper (j/object-mapper))
 (def ^:private transit-content-type "application/transit+json; charset=utf-8")
 (def ^:private rpc-allowlist-prefix "com.rpl.agent-o-rama.impl.ui.rpc.")
 
 (defn- parse-rpc-route
-  "Extract RPC var symbol from /api/rpc/:fully-qualified-ns/:method."
+  "Returns {:sym ..., :is-sse? true} for methods ending in !!sse (Server-Sent Events);
+   {:sym ..., :is-sse? false} for ordinary !! request-response RPCs."
   [uri]
   (when-let [[_ namespace method]
              (re-matches #"(?i)/api/rpc/(.+)/([^/]+)" uri)]
-    (symbol (str namespace "/" (common/url-decode method)))))
+    (let [method-str (common/url-decode method)
+          is-sse? (str/ends-with? method-str "!!sse")]
+      {:sym (symbol (str namespace "/" method-str))
+       :is-sse? is-sse?})))
 
 (defn- allowlisted-rpc-symbol?
   [sym]
-  (and (str/starts-with? (str (namespace sym)) rpc-allowlist-prefix)
-       (str/ends-with? (name sym) "!!")))
+  (let [n (name sym)]
+    (and (str/starts-with? (str (namespace sym)) rpc-allowlist-prefix)
+         (or (str/ends-with? n "!!sse")
+             (str/ends-with? n "!!")))))
 
 (defn- resolve-rpc-var
   [sym]
@@ -72,10 +76,8 @@
 
 (defn- parse-transit-body
   [body]
-  (if body
-    (with-open [in body]
-      (transit/read (transit/reader in :json)))
-    nil))
+  (with-open [in ^java.io.Closeable body]
+    (transit/read (transit/reader in :json))))
 
 (defn- transit-response
   [body]
@@ -84,6 +86,37 @@
          (transit/write (transit/writer out :json) body)
          (.toString out "UTF-8")))
       (resp/content-type transit-content-type)))
+
+(defn- write-transit-str [data]
+  (let [out (java.io.ByteArrayOutputStream.)]
+    (transit/write (transit/writer out :json) (common/->ui-serializable data))
+    (.toString out "UTF-8")))
+
+(defn- sse-rpc-transit-error-response [e-msg http-status]
+  (-> (transit-response {:success false
+                         :error e-msg
+                         :http-status http-status})
+      (resp/status http-status)))
+
+(defn- handle-sse-rpc [rpc-var system processed-data request]
+  (if-not (or (nil? @rpc-var) (fn? @rpc-var))
+    (sse-rpc-transit-error-response (str "RPC target is not callable: " rpc-var) 500)
+    (http-kit/with-channel request channel
+      (http-kit/send!
+       channel
+       {:headers {"Content-Type" "text/event-stream"
+                  "Cache-Control" "no-cache"
+                  "Connection" "keep-alive"
+                  "X-Accel-Buffering" "no"}
+        :status 200}
+       false)
+      (let [emit (fn emit [data]
+                   (http-kit/send! channel (str "data: " (write-transit-str data) "\n\n") false))
+            stream-obj (@rpc-var system processed-data emit)]
+        (http-kit/on-close channel
+                           (fn [_status]
+                             (when (instance? java.io.Closeable stream-obj)
+                               (.close ^java.io.Closeable stream-obj))))))))
 
 (defn- parse-export-params
   "Extract module-id and dataset-id from export route: /api/datasets/:module-id/:dataset-id/export"
@@ -116,7 +149,7 @@
 
     (when-not manager
       (throw (ex-info "Unknown module" {:module-id module-id})))
-    
+
     (let [datasets-pstate (:datasets-pstate (aor-types/underlying-objects manager))
           ds-props (queries/get-dataset-properties datasets-pstate dataset-id)
           ds-name (:name ds-props)
@@ -192,16 +225,31 @@
 (defn handle-rpc
   [request]
   (let [{:keys [uri]} request
-        rpc-id (parse-rpc-route uri)
+        route (parse-rpc-route uri)
         request-body (parse-transit-body (:body request))
         payload (cond
                   (map? request-body) request-body
                   (nil? request-body) {}
                   :else (throw (ex-info "RPC request body must be a map" {:body-type (type request-body)
-                                                                          :uri uri})))
-        reply (invoke-rpc {:rpc-id rpc-id
-                           :data payload})]
-    (if (:success reply)
-      (transit-response reply)
-      (-> (transit-response reply)
-          (resp/status (or (:http-status reply) 400))))))
+                                                                          :uri uri})))]
+    (if-not route
+      (-> (transit-response {:success false
+                             :error "Bad RPC route"
+                             :http-status 404})
+          (resp/status 404))
+      (let [{:keys [sym is-sse?]} route]
+        (if is-sse?
+          
+          ;; streaming case
+          (handle-sse-rpc (resolve-rpc-var sym)
+                          @ui/system
+                          (preprocess-rpc-payload payload)
+                          request)
+          
+          ;; call/response case
+          (let [reply (invoke-rpc {:rpc-id sym
+                                   :data payload})]
+            (if (:success reply)
+              (transit-response reply)
+              (-> (transit-response reply)
+                  (resp/status (or (:http-status reply) 400))))))))))

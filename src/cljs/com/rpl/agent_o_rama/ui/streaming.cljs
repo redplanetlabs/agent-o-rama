@@ -1,27 +1,77 @@
 (ns com.rpl.agent-o-rama.ui.streaming
   "React hooks for node streaming output.
 
-  Live WebSocket streaming is not wired. When the graph includes
-  `:streaming-chunks` on the node (replay from the server), this hook exposes
-  those chunks so the Streaming Output panel can render."
+  When `:is-live?` is true and a node invoke UUID is present, subscribes via
+  POST SSE (`stream-node!!sse` RPC) for tokens from the Rama client stream. Replay
+  chunks from graph payloads remain available when the invocation is not live."
   (:require
-   [com.rpl.agent-o-rama.ui.state :as state]))
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [com.rpl.agent-o-rama.ui.state :as state]
+   [uix.core :as uix]))
 
 (defn use-node-stream
   ([module-id agent-name invoke-id node-name node-invoke-id]
    (use-node-stream module-id agent-name invoke-id node-name node-invoke-id nil))
 
-  ([_module-id _agent-name _invoke-id _node-name node-invoke-id opts]
+  ([module-id agent-name invoke-id node-name node-invoke-id opts]
    (let [{:keys [replay-chunks is-live?]} opts
-         chunks (or replay-chunks [])
-         text (apply str (map str chunks))
-         has-replay? (seq chunks)]
-     {:chunks (vec chunks)
-      :text text
-      :streaming? (boolean (and is-live? (not has-replay?)))
-      :reset-count 0
-      :complete? (or has-replay? (not is-live?))
-      :stream-id (when node-invoke-id (str node-invoke-id))})))
+         initial-text #(apply str (map str %))
+         [stream-data set-stream-data]
+         (uix/use-state
+          (fn []
+            (let [chunks (vec (or replay-chunks []))]
+              {:chunks chunks
+               :text (initial-text chunks)
+               :streaming? (boolean (and is-live? (not (seq chunks))))
+               :reset-count 0
+               :complete? (boolean (or (seq chunks) (not is-live?)))})))]
+     (uix/use-effect
+      (fn []
+        (if-not is-live?
+          (let [chunks (vec (or replay-chunks []))]
+            (set-stream-data
+             {:chunks chunks
+              :text (initial-text chunks)
+              :streaming? false
+              :reset-count 0
+              :complete? true})
+            js/undefined)
+          (if-not (and module-id agent-name invoke-id node-name node-invoke-id)
+            js/undefined
+            (let [start-chunks (vec (or replay-chunks []))]
+              (set-stream-data
+               {:chunks start-chunks
+                :text (initial-text start-chunks)
+                :streaming? true
+                :reset-count 0
+                :complete? false})
+              (let [abort
+                    (rpc/call-sse
+                     :com.rpl.agent-o-rama.impl.ui.rpc.invocations/stream-node!!sse
+                     {:module-id module-id
+                      :agent-name agent-name
+                      :invoke-id invoke-id
+                      :node-name node-name
+                      :node-invoke-id node-invoke-id}
+                     (fn [data]
+                       (set-stream-data
+                        (fn [prev]
+                          (if (:reset? data)
+                            {:chunks (mapv str (:new-chunks data))
+                             :text (apply str (map str (:new-chunks data)))
+                             :reset-count (inc (:reset-count prev 0))
+                             :complete? (boolean (:complete? data))
+                             :streaming? (not (:complete? data))}
+                            (let [n (mapv str (:new-chunks data))
+                                  ch (into (or (:chunks prev) []) n)]
+                              {:chunks ch
+                               :text (str (or (:text prev) "") (apply str n))
+                               :reset-count (:reset-count prev 0)
+                               :complete? (boolean (:complete? data))
+                               :streaming? (not (:complete? data))}))))))]
+                (fn [] (abort)))))))
+      [is-live? module-id agent-name invoke-id node-name node-invoke-id])
+     stream-data)))
 
 (defn clear-stream-buffer!
   [stream-id]
@@ -34,9 +84,9 @@
 (defn ^:export test-stream-start!
   [_invoke-id _node-name]
   (let [stream-id (str "stub-" (random-uuid))]
-    (.warn js/console "Streaming stub: test-stream-start! is a no-op" stream-id)
+    (println "Streaming stub: test-stream-start! is a no-op" stream-id)
     stream-id))
 
 (defn ^:export test-stream-stop!
   [_stream-id]
-  (.warn js/console "Streaming stub: test-stream-stop! is a no-op"))
+  (println "Streaming stub: test-stream-stop! is a no-op"))

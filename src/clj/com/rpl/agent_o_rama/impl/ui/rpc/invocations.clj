@@ -72,7 +72,7 @@
         manager (get-manager system module-id)
         decoded-agent-name (common/url-decode agent-name)
         graph-nodes (let [graph-res (foreign-invoke-query
-                                    (:current-graph-query (aor-types/underlying-objects client)))]
+                                     (:current-graph-query (aor-types/underlying-objects client)))]
                       (-> graph-res
                           :node-map
                           keys
@@ -238,6 +238,25 @@
         invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
     (aor/remove-metadata! client invoke key)
     {:success true}))
+
+(defn stream-node!!sse
+  "SSE RPC: subscribes to [[com.rpl.agent-o-rama/agent-stream-specific]] for one node invocation.
+   Invoked as (stream-node!!sse system payload on-event); returns a Closeable stream handle."
+  [system {:keys [module-id agent-name invoke-id node-name node-invoke-id]} on-event]
+  (let [client (get-client system module-id agent-name)]
+    (when-not client
+      (throw (ex-info "No client available — module or agent may not be loaded"
+                      {:module-id module-id :agent-name agent-name})))
+    (when-not (uuid? node-invoke-id)
+      (throw (ex-info "node-invoke-id must be a UUID" {:node-invoke-id node-invoke-id})))
+    (let [[task-id agent-id] (common/parse-url-pair invoke-id)
+          invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
+      (aor/agent-stream-specific client invoke node-name node-invoke-id
+                                 (fn [all-chunks new-chunks reset? complete?]
+                                   (on-event {:all-chunks all-chunks
+                                              :new-chunks new-chunks
+                                              :reset? reset?
+                                              :complete? complete?}))))))
 
 (defn get-node-stats!!
   [system {:keys [module-id agent-name granularity]}]

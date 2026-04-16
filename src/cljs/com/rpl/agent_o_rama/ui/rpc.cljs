@@ -1,5 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.rpc
   (:require
+   [clojure.string :as str]
    [cognitect.transit :as transit]))
 
 (def transit-content-type "application/transit+json")
@@ -57,3 +58,74 @@
                   (js/Promise.reject reply))))
        (.catch (fn [error]
                  (js/Promise.reject error))))))
+
+(defn- sse-drain-complete-events!
+  "Parses `buf` for SSE event boundaries (blank line); invokes `on-data-str` for each data line payload."
+  [buf-atom on-data-str]
+  (loop []
+    (when-let [^js s @buf-atom]
+      (when (pos? (.-length s))
+        (when-let [idx (str/index-of s "\n\n")]
+          (let [event-text (subs s 0 idx)
+                remainder (subs s (+ idx 2))]
+            (reset! buf-atom remainder)
+            (doseq [line (str/split-lines event-text)
+                    :let [line (str/triml line)]
+                    :when (str/starts-with? line "data:")
+                    :let [ps (-> line (subs (count "data:")) str/trim)]
+                    :when (seq ps)]
+              (on-data-str ps))
+            (recur)))))))
+
+(defn call-sse
+  "POST + `Accept: text/event-stream`, then read the body with the fetch stream API.
+  `on-event` receives each decoded Transit value (Clojure data from the `data:` line).
+  Returns a no-arg function to abort the request (triggers server on-close and stream close).
+
+  `opts` (optional map):
+  - `:on-error` — (fn [v]) if the HTTP response is not ok; `v` is usually a parsed `transit/read` error map."
+  ([rpc-id payload on-event]
+   (call-sse rpc-id payload on-event nil))
+  ([rpc-id payload on-event opts]
+   (let [controller (js/AbortController.)
+         signal (.-signal controller)
+         on-err (or (:on-error opts)
+                    (fn [_err] nil))]
+     (-> (js/fetch (route-for rpc-id)
+                   #js {:method "POST"
+                        :credentials "same-origin"
+                        :headers #js {"Content-Type" transit-content-type
+                                      "Accept" "text/event-stream"}
+                        :body (transit/write writer (or payload {}))
+                        :signal signal})
+         (.then (fn [^js resp]
+                  (if-not (.-ok resp)
+                    (-> (.text resp)
+                        (.then (fn [body]
+                                 (try
+                                   (on-err (transit/read reader body))
+                                   (catch :default _
+                                     (on-err {:http-status (.-status resp)
+                                              :body body}))))))
+                    (let [r (.. resp -body (getReader))
+                          decoder (js/TextDecoder. "utf-8")
+                          buf (atom "")]
+                      (letfn [(step [result]
+                                (let [done? (.-done result)
+                                      v (.-value result)]
+                                  (if done?
+                                    nil
+                                    (let [chunk (.decode decoder v #js {:stream true})]
+                                      (swap! buf str chunk)
+                                      (sse-drain-complete-events! buf
+                                                                  (fn [ps]
+                                                                    (try
+                                                                      (on-event (transit/read reader ps))
+                                                                      (catch :default e
+                                                                        (println "SSE transit decode error" e)))))
+                                      (-> (.read r)
+                                          (.then step))))))]
+                        (-> (.read r)
+                            (.then step))))))))
+     (fn abort []
+       (.abort controller)))))
