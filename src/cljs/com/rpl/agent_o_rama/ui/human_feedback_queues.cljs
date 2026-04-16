@@ -386,7 +386,7 @@
         ($ :span.text-sm.text-gray-600 "Required"))
 
      ;; Remove button
-     ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1
+     ($ :button.text-red-600.hover:text-red-800.p-2.rounded.mt-1.cursor-pointer
         {:key "remove"
          :data-testid "remove-rubric-button"
          :type "button"
@@ -487,7 +487,7 @@
                            :on-remove #(remove-rubric idx)}))))
 
                  ;; Add rubric button
-                 ($ :button.w-full.px-3.py-2.border-2.border-dashed.border-gray-300.rounded-md.text-gray-600.hover:border-gray-400.hover:text-gray-700.transition-colors
+                 ($ :button.w-full.px-3.py-2.border-2.border-dashed.border-gray-300.rounded-md.text-gray-600.hover:border-gray-400.hover:text-gray-700.transition-colors.cursor-pointer
                     {:data-testid "add-rubric-button"
                      :type "button"
                      :onClick add-rubric}
