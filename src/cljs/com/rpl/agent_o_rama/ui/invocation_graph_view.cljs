@@ -1071,11 +1071,11 @@
        ;; Action buttons
        ($ :div {:className "pt-4 border-t border-gray-200 space-y-2"
                 :data-id "fork-action-buttons"}
-          ($ :button {:className "w-full font-medium py-2 px-4 rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white"
+          ($ :button {:className "w-full font-medium py-2 px-4 rounded-md transition-colors bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
                       :data-id "execute-fork-button"
                       :onClick on-execute-fork}
              (str "Execute Fork (" (count changed-nodes) " changes)"))
-          ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors"
+          ($ :button {:className "w-full bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors cursor-pointer"
                       :data-id "clear-fork-button"
                       :onClick on-clear-fork}
              "Clear All Changes")))))

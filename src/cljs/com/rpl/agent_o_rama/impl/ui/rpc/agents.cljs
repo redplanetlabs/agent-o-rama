@@ -6,8 +6,8 @@
   (rfq/reg-query
    ::get-all!!
    {:query-fn (fn [_params]
-                 {:rpc/id ::get-all!!
-                  :payload {}})
+                {:rpc/id ::get-all!!
+                 :payload {}})
     :stale-time-ms 0
     :polling-interval-ms 2000
     :tags (constantly [[:agents]])}))

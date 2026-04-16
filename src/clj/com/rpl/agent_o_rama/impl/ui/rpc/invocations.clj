@@ -109,7 +109,6 @@
             stream-shared-pstate (:stream-shared-pstate client-objects)
 
             [agent-task-id agent-id] invoke-pair
-
             summary-info-raw (foreign-select-one
                               [(keypath agent-id)
                                (submap
@@ -118,7 +117,6 @@
                                  :feedback :metadata])]
                               root-pstate
                               {:pkey agent-task-id})
-
             summary-info (merge
                           {:forks (foreign-select-one
                                    [(keypath agent-id) :forks
@@ -139,40 +137,36 @@
                             {:stats (merge {:aggregated-stats
                                             (stats/aggregated-basic-stats stats)}
                                            stats)}))
-
             root-invoke-id (foreign-select-one [(keypath agent-id) :root-invoke-id]
                                                root-pstate
                                                {:pkey agent-task-id})
-
             historical-graph (when-let [graph-version (:graph-version summary-info)]
                                (foreign-select-one [:history (keypath graph-version)]
                                                    stream-shared-pstate
                                                    {:pkey 0}))
-
             dynamic-trace (foreign-invoke-query tracing-query
                                                 agent-task-id
                                                 [[agent-task-id root-invoke-id]]
                                                 10000)
-
             cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
-                            (let [merged (->> m
-                                              common/remove-implicit-nodes
-                                              (transform
-                                               [MAP-VALS :feedback :results ALL]
-                                               (fn [feedback-result]
-                                                 (let [feedback-map (into {} feedback-result)
-                                                       source (:source feedback-map)]
-                                                   (if source
-                                                     (assoc feedback-map :source-string (aor-types/source-string source))
-                                                     feedback-map))))
-                                              (transform
-                                               [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
-                                               name)
-                                              (transform
-                                               [MAP-VALS :feedback :actions MAP-KEYS]
-                                               name)
-                                              (merge-streaming-chunks-into-nodes agent-id root-pstate agent-task-id))]
-                              merged))
+                            (->> m
+                                 common/remove-implicit-nodes
+                                 (transform
+                                  [MAP-VALS :feedback :results ALL]
+                                  (fn [feedback-result]
+                                    (let [feedback-map (into {} feedback-result)
+                                          source (:source feedback-map)]
+                                      (if source
+                                        (assoc feedback-map :source-string (aor-types/source-string source))
+                                        feedback-map))))
+                                 (transform
+                                  [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
+                                  name)
+                                 (transform
+                                  [MAP-VALS :feedback :actions MAP-KEYS]
+                                  name)
+                                 ;; TODO fixup when fix merge
+                                 #_(merge-streaming-chunks-into-nodes agent-id root-pstate agent-task-id)))
 
             agent-is-complete? (boolean (or (:finish-time-millis summary-info)
                                             (:result summary-info)))]
