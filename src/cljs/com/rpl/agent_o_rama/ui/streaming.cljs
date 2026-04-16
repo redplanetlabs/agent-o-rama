@@ -1,9 +1,5 @@
 (ns com.rpl.agent-o-rama.ui.streaming
-  "React hooks for node streaming output.
-
-  When `:is-live?` is true and a node invoke UUID is present, subscribes via
-  POST SSE (`stream-node!!sse` RPC) for tokens from the Rama client stream. Replay
-  chunks from graph payloads remain available when the invocation is not live."
+  "React hooks for node streaming output."
   (:require
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.ui.state :as state]
@@ -14,17 +10,20 @@
    (use-node-stream module-id agent-name invoke-id node-name node-invoke-id nil))
 
   ([module-id agent-name invoke-id node-name node-invoke-id opts]
-   (let [{:keys [replay-chunks is-live?]} opts
+   (let [{:keys [is-live?]} opts
          initial-text #(apply str (map str %))
+         ;; Live: only SSE fills the panel (avoids duplicating tokens already on the
+         ;; graph snapshot from `get-graph-page!!` — :result/:streaming-chunks, etc.).
+         ;; Not live: replay-only from that same graph payload (no SSE).
+         initial-chunks []
          [stream-data set-stream-data]
          (uix/use-state
           (fn []
-            (let [chunks (vec (or replay-chunks []))]
-              {:chunks chunks
-               :text (initial-text chunks)
-               :streaming? (boolean (and is-live? (not (seq chunks))))
-               :reset-count 0
-               :complete? (boolean (or (seq chunks) (not is-live?)))})))]
+            {:chunks []
+             :text (initial-text chunks)
+             :streaming? (boolean (and is-live? (not (seq chunks))))
+             :reset-count 0
+             :complete? (boolean (or (seq chunks) (not is-live?)))}))]
      (uix/use-effect
       (fn []
         (if-not is-live?
@@ -38,7 +37,7 @@
             js/undefined)
           (if-not (and module-id agent-name invoke-id node-name node-invoke-id)
             js/undefined
-            (let [start-chunks (vec (or replay-chunks []))]
+            (let [start-chunks (initial-chunks true)]
               (set-stream-data
                {:chunks start-chunks
                 :text (initial-text start-chunks)

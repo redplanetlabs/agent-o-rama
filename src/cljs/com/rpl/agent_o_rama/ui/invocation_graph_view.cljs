@@ -39,26 +39,6 @@
         (let [sid (str node-id)]
           (some (fn [[k v]] (when (= (str k) sid) v)) graph-data)))))
 
-(defn- streaming-replay-chunks
-  "Chunks for the Streaming Output panel: PState merge, result persistence, or node input (E2E)."
-  [raw-node-data flow-node-data]
-  (let [res (or (:result raw-node-data) (:result flow-node-data))
-        from-result (or (get-in res [:val :streaming-chunks])
-                        (get-in res ["val" "streaming-chunks"])
-                        (:streaming-chunks res))
-        from-pstate (or (:streaming-chunks raw-node-data)
-                        (:streaming-chunks flow-node-data))
-        inp (or (:input raw-node-data) (:input flow-node-data))
-        ;; Manual run often passes `[{\"chunks\": [...], \"delay-ms\": n}]`
-        from-input (when (vector? inp)
-                     (let [m (first inp)]
-                       (when (map? m)
-                         (or (:chunks m) (get m "chunks")))))
-        pick (or (when (seq from-pstate) from-pstate)
-                 (when (seq from-result) from-result)
-                 (when (seq from-input) (mapv str from-input)))]
-    pick))
-
 (defn format-ms [ms]
   (let [date (js/Date. ms)
         formatter (js/Intl.DateTimeFormat.
@@ -442,12 +422,16 @@
                     ($ generic-data-viewer {:data info :color "indigo" :depth 0})))))))))
 
 (defui node-streaming-panel
-  "Displays streaming output: replay chunks from the graph when present, else live hook (future)."
-  [{:keys [module-id agent-name invoke-id node-name node-invoke-id is-streaming? replay-chunks]}]
+  "Streaming output: replay from graph when the node is finished; live tokens only via SSE
+  (`stream-node!!sse`), not from the same graph snapshot used for replay."
+  [{:keys [module-id agent-name invoke-id node-name node-invoke-id is-streaming?]}]
   (let [{:keys [text streaming? chunks reset-count]}
-        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id
-                                   {:replay-chunks replay-chunks
-                                    :is-live? is-streaming?})
+        (streaming/use-node-stream module-id
+                                   agent-name
+                                   invoke-id
+                                   node-name
+                                   node-invoke-id
+                                   {:is-live? is-streaming?})
 
         ;; Ref for auto-scrolling
         scroll-ref (uix/use-ref nil)]
@@ -572,8 +556,7 @@
                                   :invoke-id agent-invoke-id
                                   :node-name node-name
                                   :node-invoke-id node-id  ;; Specific node invocation ID
-                                  :is-streaming? is-node-in-progress?
-                                  :replay-chunks (streaming-replay-chunks raw-node-data data)}))
+                                  :is-streaming? is-node-in-progress?}))
 
        ($ node-exceptions-panel {:exceptions exceptions})
 

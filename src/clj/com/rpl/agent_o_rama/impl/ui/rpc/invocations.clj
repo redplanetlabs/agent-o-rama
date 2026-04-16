@@ -19,41 +19,6 @@
 (defn- get-manager [system module-id]
   (get-in system [:aor-cache module-id :manager]))
 
-(defn- merge-streaming-chunks-into-nodes
-  "Attach `:streaming-chunks` (strings) to each node in `invokes-map` from root PState
-  `:streaming` → per-node → `:all` (walk in Clojure; avoids subindexed path quirks)."
-  [nodes-map agent-id root-pstate agent-task-id]
-  (if-not (and nodes-map agent-id root-pstate)
-    nodes-map
-    (let [by-node (or (foreign-select-one
-                       [(keypath agent-id) :streaming]
-                       root-pstate
-                       {:pkey agent-task-id})
-                      {})
-          chunks-by-invoke
-          (reduce
-           (fn [acc [_node-name {:keys [all]}]]
-             (reduce
-              (fn [a chunk]
-                (let [iid (:invoke-id chunk)
-                      c (:chunk chunk)]
-                  (if (or (nil? iid)
-                          (contains? #{iclient/FINISHED iclient/FINISHED-INVOKE} c))
-                    a
-                    ;; Normalize key — UUID vs string across Transit
-                    (update a (str iid) (fnil conj []) c))))
-              acc
-              (or all [])))
-           {}
-           by-node)]
-      (reduce-kv
-       (fn [m node-invoke-id node-data]
-         (if-let [ch (get chunks-by-invoke (str node-invoke-id))]
-           (assoc m node-invoke-id (assoc node-data :streaming-chunks (mapv str ch)))
-           (assoc m node-invoke-id node-data)))
-       {}
-       nodes-map))))
-
 (defn get-page!!
   [system {:keys [module-id agent-name pagination filters limit cursor]}]
   (let [client (get-client system module-id agent-name)
@@ -164,9 +129,7 @@
                                   name)
                                  (transform
                                   [MAP-VALS :feedback :actions MAP-KEYS]
-                                  name)
-                                 ;; TODO fixup when fix merge
-                                 #_(merge-streaming-chunks-into-nodes agent-id root-pstate agent-task-id)))
+                                  name)))
 
             agent-is-complete? (boolean (or (:finish-time-millis summary-info)
                                             (:result summary-info)))]
