@@ -1,16 +1,21 @@
 (ns com.rpl.agent-o-rama.ui.evaluators
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon MagnifyingGlassIcon PlayIcon]]
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [re-frame.query :as rfq]
+   [re-frame.core :as rf]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -101,11 +106,11 @@
 
 (defui SelectBuilderStep [{:keys [form-id]}]
   (let [{:keys [set-field! next-step!]} (forms/use-form form-id)
-        {:keys [module-id]} (state/use-sub [:forms form-id])
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:evaluator-builders module-id]
-          :sente-event [:evaluators/get-all-builders {:module-id module-id}]})]
+        {:keys [module-id]} (:fields (use-subscribe [::forms/form form-id]) {})
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-builders!! {:module-id module-id}])
+        loading? (#{:loading :idle} query-status)]
     ;; The on-select logic is now integrated here
     (let [handle-select (fn [builder]
                           (set-field! [:selected-builder] builder)
@@ -192,12 +197,9 @@
                   {:module-id module-id
                    :value preview-dataset
                    :on-change set-preview-dataset
-                   :sente-event-fn (fn [module-id search-string]
-                                     [:datasets/get-all
-                                      {:module-id module-id
-                                       :filters {:search-string search-string}}])
+                   :rfq-key ::rpc-datasets/get-all!!
                    :items-key :datasets
-                   :item-id-fn #(str (:dataset-id %))
+                   :item-id-fn :dataset-id
                    :item-label-fn :name
                    :item-sublabel-fn #(str (:dataset-id %))
                    :placeholder "Type to search datasets..."
@@ -279,36 +281,19 @@
                   {:title (str "Create Evaluator: " (get-in form-state [:selected-builder :name]))})}
 
   :on-submit
-  (fn [db form-state] ; Updated to use the new flattened signature!
-    (let [{:keys [form-id module-id name description input-json-path output-json-path reference-output-json-path params selected-builder]} form-state]
-      (sente/request!
-       [:evaluators/create {:module-id module-id
-                            :builder-name (:name selected-builder)
-                            :name name
-                            :description description
-                            :params params
-                            :input-json-path input-json-path
-                            :output-json-path output-json-path
-                            :reference-output-json-path reference-output-json-path}]
-       15000
-       (fn [reply]
-         (println "Evaluator create reply:" reply)
-         (if (:success reply)
-           (do
-             (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-             (state/dispatch [:modal/hide])
-             ;; Don't decode module-id - use it as-is since query keys use the encoded version
-             (state/dispatch [:query/invalidate
-                              {:query-key-pattern
-                               (fn [query-key]
-                                 (and (>= (count query-key) 2)
-                                      (#{:evaluator-instances :evaluator-instances-modal :evaluator-instances-list :evaluator-instances-search} (first query-key))
-                                      (= module-id (second query-key))))}])
-             (state/dispatch [:form/clear form-id]))
-           (do
-             (println "Setting error and stopping spinner in form:" (:error reply) form-id)
-             (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-             (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)])))))))})
+  {:mutation (fn [_db form-state]
+               (let [{:keys [module-id name description params selected-builder
+                              input-json-path output-json-path reference-output-json-path]} form-state]
+                 [::rpc-evaluators/create!!
+                  {:module-id module-id
+                   :builder-name (:name selected-builder)
+                   :name name :description description
+                   :params params
+                   :input-json-path input-json-path
+                   :output-json-path output-json-path
+                   :reference-output-json-path reference-output-json-path}]))
+   :rfq-invalidate-tags (fn [_db {:keys [module-id]} _reply]
+                          [[:evaluator-instances module-id]])}})
 
 (defui RunEvaluatorModal [{:keys [module-id dataset-id mode example selected-example-ids pre-selected-evaluator]}]
   (let [;; NEW: If pre-selected, use it. Otherwise, state is nil.
@@ -329,20 +314,17 @@
         [loading? set-loading] (uix/use-state false)
         [dropdown-open? set-dropdown-open] (uix/use-state false)
 
-        ;; Fetch all evaluator instances - use distinct query key to avoid conflicts
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:evaluator-instances-modal module-id]
-          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
-          :enabled? (boolean module-id)})
+        ;; Fetch all evaluator instances
+        {instances-data :data instances-error :error instances-status :status}
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-instances!! {:module-id module-id}])
+        data instances-data
+        loading? (= instances-status :loading)
+        error instances-error
 
         ;; Fetch evaluator builders to get their options for conditional rendering
-        builders-query (queries/use-sente-query
-                        {:query-key [:evaluator-builders module-id]
-                         :sente-event [:evaluators/get-all-builders {:module-id module-id}]
-                         :enabled? (boolean module-id)})
-
-        builders-by-name (:data builders-query)
+        {builders-data :data}
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-builders!! {:module-id module-id}])
+        builders-by-name builders-data
 
         ;; Filter evaluators based on the modal's mode (:single or :multi)
         evaluators (filter
@@ -397,17 +379,17 @@
                                                          show-output-path? (assoc :outputs (mapv #(-> % :value js/JSON.parse js->clj) model-outputs-input)))
                                           :summary {:dataset-id dataset-id
                                                     :example-ids selected-example-ids})]
-                           (sente/request!
-                            [:evaluators/run {:module-id module-id
-                                              :name (:name selected-evaluator)
-                                              :type evaluator-type
-                                              :run-data run-data}]
-                            60000 ; Generous timeout
-                            (fn [reply]
-                              (set-loading false)
-                              (if (:success reply)
-                                (set-evaluation-result (:data reply))
-                                (set-error (:error reply))))))
+                           (-> (rpc/call ::rpc-evaluators/run!!
+                                         {:module-id module-id
+                                          :name (:name selected-evaluator)
+                                          :type evaluator-type
+                                          :run-data run-data})
+                               (.then (fn [data]
+                                        (set-loading false)
+                                        (set-evaluation-result data)))
+                               (.catch (fn [err]
+                                         (set-loading false)
+                                         (set-error (if (map? err) (or (:error err) (str err)) (str err)))))))
                          (catch js/Error e
                            (set-loading false)
                            (set-error (str "Invalid JSON in one of the fields: " (.-message e)))))))]
@@ -594,33 +576,28 @@
         ;; Add state for type filter
         [selected-type set-selected-type] (useState "all")
 
-        ;; Use the new paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error refetch]}
-        (queries/use-paginated-query
-         {:query-key [:evaluator-instances
-                      module-id
-                      debounced-search-term
-                      selected-type]
-          :sente-event [:evaluators/get-all-instances
-                        {:module-id module-id
-                         :filters (cond-> {}
-                                    (not (str/blank? debounced-search-term))
-                                    (assoc :search-string debounced-search-term)
+        (queries/use-infinite-rpc-query
+         {:rfq-key ::rpc-evaluators/get-all-instances-inf!!
+          :params {:module-id module-id
+                   :filters (cond-> {}
+                              (not (str/blank? debounced-search-term))
+                              (assoc :search-string debounced-search-term)
 
-                                    (not= selected-type "all")
-                                    (assoc :types #{(keyword selected-type)}))}]
+                              (not= selected-type "all")
+                              (assoc :types #{(keyword selected-type)}))}
           :page-size 20
           :enabled? (boolean module-id)})
 
         handle-delete (uix/use-callback
                        (fn [evaluator-name]
                          (when (js/confirm (str "Are you sure you want to delete evaluator '" evaluator-name "'?"))
-                           (sente/request! [:evaluators/delete {:name evaluator-name
-                                                                :module-id module-id}] 15000
-                                           (fn [reply]
-                                             (if (:success reply)
-                                               (refetch)
-                                               (js/alert (str "Failed to delete evaluator: " (:error reply))))))))
+                           (-> (rpc/call ::rpc-evaluators/delete!!
+                                         {:name evaluator-name :module-id module-id})
+                               (.then (fn [_] (refetch)))
+                               (.catch (fn [err]
+                                         (js/alert (str "Failed to delete evaluator: "
+                                                        (if (map? err) (or (:error err) (str err)) (str err)))))))))
                        [module-id refetch])]
 
     ($ :div.p-6

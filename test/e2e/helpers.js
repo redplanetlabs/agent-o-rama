@@ -498,9 +498,7 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   const foundByTestId = await evaluatorOptionByTestId.isVisible().catch(() => false);
   const evaluatorOption = foundByTestId ? evaluatorOptionByTestId : evaluatorOptionByRole;
   await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
-  
-  // Click the evaluator in the dropdown
-  await evaluatorOption.click();
+  await evaluatorOption.evaluate((el) => el.click());
   
   console.log(`Successfully added evaluator: ${evaluatorName}`);
 }
@@ -553,4 +551,19 @@ export async function createHumanMetric(page, { name, type, min, max, categories
   await expect(page.locator('table tbody tr').filter({ hasText: name })).toBeVisible({ timeout: 5000 });
   
   console.log(`Successfully created metric: ${name}`);
+}
+
+/**
+ * Toggle the "Required" checkbox on a queue rubric row. After selecting a metric from the
+ * RPC-backed SearchableSelector, React may not have flushed the parent form state yet; a bare
+ * `check()` can race and report "did not change its state".
+ */
+export async function checkRubricRequired(scope) {
+  const page = scope.page();
+  const cb = scope.getByTestId('metric-required-checkbox');
+  await cb.waitFor({ state: 'visible' });
+  // eslint-disable-next-line playwright/no-wait-for-timeout -- allow form state to settle after metric select
+  await page.waitForTimeout(150);
+  await cb.click({ force: true });
+  await expect(cb).toBeChecked();
 }

@@ -1,15 +1,22 @@
 (ns com.rpl.agent-o-rama.ui.experiments.forms
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.experiments.events]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]
    [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
+   [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
+   [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.impl.ui.rpc.experiment-list :as rpc-experiment-list]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [re-frame.core :as rf]
+   [re-frame.query :as rfq]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [reitit.frontend.easy :as rfe]
@@ -76,11 +83,10 @@
 ;; =============================================================================
 
 (defui AgentSelectorDropdown [{:keys [module-id selected-agent on-select-agent disabled? data-testid]}]
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:module-agents module-id]
-          :sente-event [:agents/get-for-module {:module-id module-id}]
-          :enabled? (boolean module-id)})
+  (let [{:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-agents/get-for-module!! {:module-id module-id}])
+        loading? (#{:loading :idle} query-status)
         agent-items (->> data
                          (keep (fn [agent]
                                  (let [decoded-name (common/url-decode (:agent-name agent))]
@@ -112,12 +118,11 @@
   [{:keys [module-id selected-evaluators on-change allowed-types use-remote?]}]
   (let [[remote-eval-name set-remote-eval-name] (uix/use-state "")
 
-        ;; Fetch all evaluators to get info for display - use distinct query key
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:evaluator-instances-list module-id]
-          :sente-event [:evaluators/get-all-instances {:module-id module-id}]
-          :enabled? (boolean module-id)})
+        ;; Fetch all evaluators to get info for display
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-instances!! {:module-id module-id}])
+        loading? (#{:loading :idle} query-status)
         all-evaluators (or (:items data) [])
         filtered-evaluators (if allowed-types
                               (filter #(allowed-types (:type %)) all-evaluators)
@@ -310,12 +315,10 @@
   (let [{:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
 
         ;; Check if dataset is remote
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:dataset-props module-id dataset-id]
-          :sente-event [:datasets/get-props {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (and (boolean module-id) (boolean dataset-id))})
-        is-remote-dataset? (:module-name data)
+        {dataset-props :data}
+        (use-subscribe [::rfq/query ::rpc-datasets/get-props!!
+                        {:module-id module-id :dataset-id dataset-id}])
+        is-remote-dataset? (:module-name dataset-props)
 
         ;; Basic info fields
         name-field (forms/use-form-field form-id :name)
@@ -370,6 +373,7 @@
                 ($ :div.flex.items-center
                    ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
                       {:type "radio" :id "all-examples" :name "selector-type"
+                       :aria-label "All examples in snapshot"
                        :checked (= (:value selector-type-field) :all)
                        :on-change #((:on-change selector-type-field) :all)})
                    ($ :label.ml-3.block.text-sm.text-gray-700 {:htmlFor "all-examples"}
@@ -377,6 +381,7 @@
                 ($ :div.flex.items-center
                    ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
                       {:type "radio" :id "tag-examples" :name "selector-type"
+                       :aria-label "Only examples with tag:"
                        :checked (= (:value selector-type-field) :tag)
                        :on-change #((:on-change selector-type-field) :tag)})
                    ($ :label.ml-3.block.text-sm.text-gray-700 {:htmlFor "tag-examples"}
@@ -392,6 +397,9 @@
                 ($ :div.flex.items-center
                    ($ :input.h-4.w-4.border-gray-300.text-indigo-600.focus:ring-indigo-500
                       {:type "radio" :id "selected-examples" :name "selector-type"
+                       :aria-label (if (pos? selection-count)
+                                     (str "Only the " selection-count " selected examples")
+                                     "Only selected examples (none selected)")
                        :checked (= (:value selector-type-field) :example-ids)
                        :disabled (zero? selection-count) ;; Disable if nothing is selected
                        :on-change #((:on-change selector-type-field) :example-ids)})
@@ -534,41 +542,28 @@
                    :submit-text "Run Experiment"})}
 
   :on-submit
-  (fn [db form-state]
-    (let [{:keys [form-id module-id dataset-id spec]} form-state
-          spec-type (get spec :type)
-;; Example IDs are already in form-state from initial data, no need to add them
-          form-with-selection form-state
-
-          ;; Parse metadata and convert input->args back to simple strings for the backend
-          cleaned-form-state (update-in form-with-selection [:spec :targets]
+  {:mutation (fn [_db form-state]
+               (let [{:keys [module-id dataset-id spec]} form-state
+                     cleaned (update-in form-state [:spec :targets]
                                         (fn [targets]
-                                          (mapv (fn [target]
-                                                  (-> target
-                                                      ;; TODO this is questionable..
+                                          (mapv (fn [t]
+                                                  (-> t
                                                       (update :metadata #(if (str/blank? %) {} (-> % js/JSON.parse js->clj)))
                                                       (update :input->args (fn [args] (mapv :value args)))))
                                                 targets)))]
-      (sente/request!
-       [:experiments/start
-        {:module-id module-id
-         :dataset-id dataset-id
-         :form-data cleaned-form-state}]
-       15000
-       (fn [reply]
-         (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-         (if (:success reply)
-           (do
-             (state/dispatch [:modal/hide])
-             (state/dispatch [:query/invalidate {:query-key-pattern [:experiments module-id dataset-id]}])
-             (let [eid (get-in reply [:data :experiment-id])]
-               (if (and eid (not= spec-type :comparative))
-                 (rfe/push-state :module/dataset-detail.experiment-detail
-                                 {:module-id module-id :dataset-id dataset-id :experiment-id eid})
-                 (if (= spec-type :comparative)
-                   (rfe/push-state :module/dataset-detail.comparative-experiments
-                                   {:module-id module-id :dataset-id dataset-id})
-                   (rfe/push-state :module/dataset-detail.experiments
-                                   {:module-id module-id :dataset-id dataset-id}))))
-             (state/dispatch [:form/clear form-id]))
-           (state/dispatch [:db/set-value [:forms form-id :error] (:error reply)]))))))})
+                 [::rpc-experiment-list/start!!
+                  {:module-id module-id :dataset-id dataset-id :form-data cleaned}]))
+   :rfq-invalidate-tags (fn [_db {:keys [module-id dataset-id]} _reply]
+                          [[:experiments module-id dataset-id]])
+   :on-success (fn [_db {:keys [module-id dataset-id spec]} reply]
+                 (let [spec-type (get spec :type)
+                       eid       (get-in reply [:data :experiment-id])]
+                   (if (and eid (not= spec-type :comparative))
+                     (rfe/push-state :module/dataset-detail.experiment-detail
+                                     {:module-id module-id :dataset-id dataset-id :experiment-id eid})
+                     (if (= spec-type :comparative)
+                       (rfe/push-state :module/dataset-detail.comparative-experiments
+                                       {:module-id module-id :dataset-id dataset-id})
+                       (rfe/push-state :module/dataset-detail.experiments
+                                       {:module-id module-id :dataset-id dataset-id})))))}
+  })

@@ -1,10 +1,13 @@
 (ns com.rpl.agent-o-rama.ui.analytics
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.chart :as chart]
+   [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]
+   [re-frame.query :as rfq]
    [reitit.frontend.easy :as rfe]
    [clojure.string :as str]
    [clojure.set :as set]
@@ -384,15 +387,11 @@
         input-ref (uix/use-ref nil)
 
         ;; Fetch metadata keys with search filter
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:metadata-search module-id agent-name debounced-search]
-          :sente-event [:analytics/search-metadata
-                        {:module-id module-id
-                         :agent-name agent-name
-                         :search-string debounced-search}]
-          :enabled? is-open?
-          :refetch-on-mount true})
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-analytics/search-metadata!!
+                        {:module-id module-id :agent-name agent-name :search-string debounced-search}])
+        loading? (#{:loading :idle} query-status)
 
         ;; Extract metadata array from response
         metadata-items (or (:metadata data) [])
@@ -643,17 +642,9 @@
   (let [{:keys [title description variant variant-opts y-label color metric-id metrics-set]} config
 
         ;; Fetch data for this eval metric
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:analytics-telemetry
-                      metric-id
-                      module-id
-                      agent-name
-                      (:seconds granularity-config)
-                      (:start-time-millis time-window)
-                      metadata-key
-                      refresh-counter]
-          :sente-event [:analytics/fetch-telemetry
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-analytics/fetch-telemetry!!
                         {:module-id module-id
                          :agent-name agent-name
                          :granularity (:seconds granularity-config)
@@ -661,8 +652,9 @@
                          :start-time-millis (:start-time-millis time-window)
                          :end-time-millis (:end-time-millis time-window)
                          :metrics-set metrics-set
-                         :metadata-key metadata-key}]
-          :enabled? (boolean (and module-id agent-name))})
+                         :metadata-key metadata-key
+                         :refresh-counter refresh-counter}])
+        loading? (#{:loading :idle} query-status)
 
         ;; Detect if data is categorical and adjust config accordingly
         categories (uix/use-memo
@@ -717,17 +709,9 @@
   (let [{:keys [title description variant variant-opts y-label color metric-id metrics-set]} config
 
         ;; Fetch data for this human metric
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:analytics-telemetry
-                      metric-id
-                      module-id
-                      agent-name
-                      (:seconds granularity-config)
-                      (:start-time-millis time-window)
-                      metadata-key
-                      refresh-counter]
-          :sente-event [:analytics/fetch-telemetry
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-analytics/fetch-telemetry!!
                         {:module-id module-id
                          :agent-name agent-name
                          :granularity (:seconds granularity-config)
@@ -735,8 +719,9 @@
                          :start-time-millis (:start-time-millis time-window)
                          :end-time-millis (:end-time-millis time-window)
                          :metrics-set metrics-set
-                         :metadata-key metadata-key}]
-          :enabled? (boolean (and module-id agent-name))})
+                         :metadata-key metadata-key
+                         :refresh-counter refresh-counter}])
+        loading? (#{:loading :idle} query-status)
 
         ;; Detect if data is categorical and adjust config accordingly
         categories (uix/use-memo
@@ -845,12 +830,9 @@
            [is-live?])
 
         ;; Query for all agent metrics to get eval metrics
-        {all-metrics :data} (queries/use-sente-query
-                             {:query-key [:all-agent-metrics module-id decoded-agent-name]
-                              :sente-event [:analytics/fetch-all-metrics
-                                            {:module-id module-id
-                                             :agent-name decoded-agent-name}]
-                              :enabled? (boolean (and module-id decoded-agent-name))})
+        {all-metrics :data}
+        (use-subscribe [::rfq/query ::rpc-analytics/fetch-all-metrics!!
+                        {:module-id module-id :agent-name decoded-agent-name}])
 
         ;; Parse eval metrics (stable - only used for rendering, not querying)
         eval-chart-configs (uix/use-memo
@@ -876,29 +858,22 @@
                               (fn [] (group-charts-by-metric chart-configs))
                               [])
 
-        ;; Create queries for static metrics
+        ;; Create queries for static metrics (HTTP RPC; refresh-counter bumps live window)
         static-metric-queries
         (into {}
               (map (fn [[metric-id {:keys [metrics-set]}]]
                      (let [{:keys [data loading? error]}
-                           (queries/use-sente-query
-                            {:query-key [:analytics-telemetry
-                                         metric-id
-                                         module-id
-                                         decoded-agent-name
-                                         (:seconds granularity-config)
-                                         (:start-time-millis time-window)
-                                         metadata-key
-                                         refresh-counter]
-                             :sente-event [:analytics/fetch-telemetry
-                                           {:module-id module-id
-                                            :agent-name decoded-agent-name
-                                            :granularity (:seconds granularity-config)
-                                            :metric-id metric-id
-                                            :start-time-millis (:start-time-millis time-window)
-                                            :end-time-millis (:end-time-millis time-window)
-                                            :metrics-set metrics-set
-                                            :metadata-key metadata-key}]
+                           (queries/use-rpc-query
+                            {:rfq-key ::rpc-analytics/fetch-telemetry!!
+                             :params {:module-id module-id
+                                      :agent-name decoded-agent-name
+                                      :granularity (:seconds granularity-config)
+                                      :metric-id metric-id
+                                      :start-time-millis (:start-time-millis time-window)
+                                      :end-time-millis (:end-time-millis time-window)
+                                      :metrics-set metrics-set
+                                      :metadata-key metadata-key
+                                      :refresh-counter refresh-counter}
                              :enabled? (boolean (and module-id decoded-agent-name))})]
                        [metric-id {:data data :loading? loading? :error error}]))
                    static-metric-groups))

@@ -5,6 +5,7 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.schemas :as schemas]
+   [re-frame.core :as rf]
    [schema.core :as s-core :include-macros true]))
 
 ;; =============================================================================
@@ -37,16 +38,24 @@
                :submitting {}}
         :datasets {:selected-examples {}
                    :selected-snapshot-per-dataset {}}
-        :rules {:refetch-trigger {}}}
-   :sente {:connected? false}})
+        :rules {:refetch-trigger {}}}})
 
 (defonce app-db (atom initial-db))
 
-;; TODO disable with shado-cljs, for performance
-(add-watch app-db :console-logger
-           (fn [key atom old-state new-state]
-             ;; This runs on EVERY state change
-             (aset js/window "db" (clj->js new-state {:keyword-fn (fn [k] (str/replace (name k) "-" "_"))}))))
+(defn app-db->window-db
+  "Convert app-db into a JS-friendly structure for ad hoc browser debugging."
+  [db]
+  (clj->js db {:keyword-fn (fn [k] (str/replace (name k) "-" "_"))}))
+
+(defn expose-db!
+  "Expose the current app-db as window.db when debugging manually."
+  []
+  (aset js/window "db" (app-db->window-db @app-db)))
+
+(defn clear-exposed-db!
+  "Remove any manually exposed window.db value."
+  []
+  (js-delete js/window "db"))
 
 ;; =============================================================================
 ;; EVENT SYSTEM
@@ -66,12 +75,17 @@
 
 (defn dispatch
   "Dispatch an event to update app-db. Event is a vector [event-id & args].
+   If no custom handler is registered, falls through to rf/dispatch for
+   re-frame events (e.g. modal/show-form, modal/hide, forms/*).
    The handler must return a Specter path navigator suitable for s/multi-transform.
    Includes centralized schema validation for development builds."
   [event]
   (let [event-id (first event)
         event-args (rest event)
         handler (get @event-handlers event-id)]
+    (when-not handler
+      ;; Fall through to re-frame for events not handled by the custom system
+      (rf/dispatch event))
     (if handler
       (try
         (let [current-db @app-db
@@ -176,11 +190,6 @@
 ;; (dispatch [:db/set-value [:ui :current-route] route])
 ;; (dispatch [:db/set-value [:ui :changed-nodes node-id] changes])
 ;; (dispatch [:db/set-value [:ui :changed-nodes] {}])
-
-;; Note: Sente connection events should use :db/set-value
-;; Examples:
-;; (dispatch [:db/set-value [:sente :connection-state] new-state])
-;; (dispatch [:db/set-value [:sente :connected?] connected?])
 
 (reg-event :invocation/update-node
            (fn [db invoke-id node-id node-data]
@@ -336,6 +345,34 @@
   ([specter-path]
    (js/console.log "Value at path" specter-path ":"
                    (clj->js (s/select-one specter-path @app-db)))))
+
+
+;; Re-frame bridge: allow rf/dispatch [:query/invalidate ...] to reach the
+;; custom state system without going through state/dispatch (avoids re-entry)
+(rf/reg-event-fx :query/invalidate-bridge
+  (fn [_ [_ invalidation-map]]
+    ;; Directly call state/dispatch — no circular risk since we're in an fx handler
+    (dispatch [:query/invalidate invalidation-map])
+    nil))
+
+;; Re-frame subscription for modal state — uses long name to avoid Closure collision
+(rf/reg-sub ::aor-global-modal
+  (fn [db _]
+    (get-in db [:ui :modal] {:active nil :data {} :form {}})))
+
+;; Also expose forms map via re-frame sub for cross-system visibility
+(rf/reg-sub :forms/all
+  (fn [db _]
+    (:forms db {})))
+
+(defn invalidate!
+  "Invalidate both the old query system and rfq for a given query-key-pattern and rfq tags.
+  Call this after any mutation that affects queries from both systems."
+  [{:keys [query-key-pattern rfq-tags]}]
+  (when query-key-pattern
+    (dispatch [:query/invalidate {:query-key-pattern query-key-pattern}]))
+  (when (seq rfq-tags)
+    (rf/dispatch [:re-frame.query/invalidate-tags rfq-tags])))
 
 (reg-event :datasets/clear-selection
            (fn [db {:keys [dataset-id]}]

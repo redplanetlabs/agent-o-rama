@@ -1,12 +1,14 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback.manual-feedback
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.impl.ui.rpc.human-feedback :as rpc-hf]
    [clojure.string :as str]))
 
 ;; Separate component for each metric row in the manual feedback form
@@ -20,11 +22,11 @@
         
         ;; Fetch metric definition if we have a name but no definition
         fetch-result (when (and has-metric-name? (not has-definition?))
-                       (queries/use-sente-query
-                        {:query-key [:human-metric-definition module-id metric-name]
-                         :sente-event [:human-feedback/get-metrics
-                                       {:module-id module-id
-                                        :filters {:search-string metric-name}}]}))
+                       (queries/use-rpc-query
+                        {:rfq-key ::rpc-hf/get-metrics!!
+                         :params {:module-id module-id
+                                  :filters {:search-string metric-name}}
+                         :enabled? true}))
         
         ;; Extract the metric definition from the fetch result
         fetched-metric (when fetch-result
@@ -68,10 +70,7 @@
                 :on-change (fn [metric-name opts]
                              (when metric-name
                                (on-select metric-name opts)))
-                :sente-event-fn (fn [mid search-string]
-                                  [:human-feedback/get-metrics
-                                   {:module-id mid
-                                    :filters {:search-string search-string}}])
+                :rfq-key ::rpc-hf/get-metrics!!
                 :items-key :items
                 :item-id-fn :name
                 :item-label-fn :name
@@ -93,8 +92,8 @@
             "Remove")))))
 
 (defui ManualFeedbackForm [{:keys [form-id]}]
-  (let [props (state/use-sub [:forms form-id])
-        {:keys [module-id editing?]} props
+  (let [props (use-subscribe [::forms/form form-id])
+        {:keys [module-id editing?]} (merge (:fields props {}) (:meta props {}))
 
         ;; Form fields
         metrics-field (forms/use-form-field form-id :metrics)
@@ -251,42 +250,23 @@
                    :submit-text (if (:editing? props) "Save" "Submit")})}
 
   :on-submit
-  {:event (fn [db form-state]
-            (let [{:keys [form-id module-id agent-name invoke-id node-task-id node-invoke-id
-                          reviewer-name metrics comment feedback-id editing?]} form-state
-                  ;; Save reviewer name to localStorage
-                  _ (when-not (str/blank? reviewer-name)
-                      (hf-common/save-reviewer-name! reviewer-name))
-                  ;; Convert metrics to scores map
-                  ;; metric-data has :name, :metric, :value, :required
-                  scores (into {} (map (fn [{:keys [name value]}]
-                                         [name value])
-                                       (filter #(not (str/blank? (:value %))) metrics)))]
-              (if editing?
-                [:human-feedback/edit-feedback
-                 {:module-id module-id
-                  :agent-name agent-name
-                  :invoke-id invoke-id
-                  :node-task-id node-task-id
-                  :node-invoke-id node-invoke-id
-                  :feedback-id feedback-id
-                  :reviewer-name reviewer-name
-                  :scores scores
-                  :comment comment}]
-                [:human-feedback/add-feedback
-                 {:module-id module-id
-                  :agent-name agent-name
-                  :invoke-id invoke-id
-                  :node-task-id node-task-id
-                  :node-invoke-id node-invoke-id
-                  :reviewer-name reviewer-name
-                  :scores scores
-                  :comment comment}])))
-   :on-success (fn [db form-state reply]
+  {:mutation (fn [_db form-state]
+               (let [{:keys [module-id agent-name invoke-id node-task-id node-invoke-id
+                             reviewer-name metrics comment feedback-id editing?]} form-state]
+                 (when-not (str/blank? reviewer-name)
+                   (hf-common/save-reviewer-name! reviewer-name))
+                 (let [scores (into {} (map (fn [{:keys [name value]}] [name value])
+                                            (filter #(not (str/blank? (:value %))) metrics)))]
+                   (if editing?
+                     [::rpc-hf/edit-feedback!!
+                      {:module-id module-id :agent-name agent-name :invoke-id invoke-id
+                       :node-task-id node-task-id :node-invoke-id node-invoke-id
+                       :feedback-id feedback-id :reviewer-name reviewer-name :scores scores :comment comment}]
+                     [::rpc-hf/add-feedback!!
+                      {:module-id module-id :agent-name agent-name :invoke-id invoke-id
+                       :node-task-id node-task-id :node-invoke-id node-invoke-id
+                       :reviewer-name reviewer-name :scores scores :comment comment}]))))
+   :on-success (fn [_db form-state _reply]
                  (let [{:keys [invoke-id module-id agent-name]} form-state]
-                   ;; Reload the invocation to show updated feedback
-                   ;; Note: modal/hide and form/clear are already handled by the form framework
                    (state/dispatch [:invocation/start-graph-loading
-                                    {:invoke-id invoke-id
-                                     :module-id module-id
-                                     :agent-name agent-name}])))}})
+                                    {:invoke-id invoke-id :module-id module-id :agent-name agent-name}])))}})

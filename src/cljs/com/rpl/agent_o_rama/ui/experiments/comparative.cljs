@@ -1,21 +1,23 @@
 (ns com.rpl.agent-o-rama.ui.experiments.comparative
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.impl.ui.rpc.experiment-list :as rpc-experiment-list]
+   [re-frame.query :as rfq]
    [reitit.frontend.easy :as rfe]))
 
 (defui index [{:keys [module-id dataset-id]}]
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:experiments module-id dataset-id :comparative]
-          :sente-event [:experiments/get-all-for-dataset
+  (let [{:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-experiment-list/get-all-for-dataset!!
                         {:module-id module-id
                          :dataset-id dataset-id
-                         :filters {:type :comparative}}]
-          :enabled? (boolean (and module-id dataset-id))})
+                         :filters {:type :comparative}}])
+        loading? (#{:loading :idle} query-status)
 
         experiments (get data :items)]
 

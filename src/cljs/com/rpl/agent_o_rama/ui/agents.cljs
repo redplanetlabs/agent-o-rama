@@ -4,13 +4,18 @@
    [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
 
    [uix.core :as uix :refer [defui defhook $]]
+   [uix.re-frame :refer [use-subscribe]]
    [reitit.frontend.easy :as rfe]
+   [re-frame.query :as rfq]
 
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
+   [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
+   [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [re-frame.core :as rf]
    [clojure.string :as str]))
 
 ;; =============================================================================
@@ -37,31 +42,25 @@
                                           (catch js/Error _ {}))]
 
                  ;; Mark as submitting
-                 (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] true])
+                 (forms/set-submitting! (:form-id form-state) true)
 
                  ;; Make the Sente request
-                 (sente/request!
-                  [:invocations/run-agent {:module-id module-id
+                 (-> (rpc/call ::rpc-invocations/run-agent!!
+                  {:module-id module-id
+                   :agent-name agent-name
+                   :args parsed-args
+                   :metadata parsed-metadata})
+                 (.then (fn [data]
+                          (forms/set-submitting! (:form-id form-state) false)
+                          (rf/dispatch [::forms/set-field (:form-id form-state) :args ""])
+                          (rf/dispatch [::forms/set-field (:form-id form-state) :metadata-args ""])
+                          (rfe/push-state :agent/invocation-detail
+                                          {:module-id module-id
                                            :agent-name agent-name
-                                           :args parsed-args
-                                           :metadata parsed-metadata}]
-                  5000
-                  (fn [reply]
-                    (state/dispatch [:db/set-value [:forms (:form-id form-state) :submitting?] false])
-                    (if (:success reply)
-                      (let [data (:data reply)]
-                        ;; Clear the form fields on success
-                        (state/dispatch [:form/update-field (:form-id form-state) :args ""])
-                        (state/dispatch [:form/update-field (:form-id form-state) :metadata-args ""])
-                        ;; Navigate to the trace
-                        (rfe/push-state :agent/invocation-detail
-                                        {:module-id module-id
-                                         :agent-name agent-name
-                                         :invoke-id (str (:task-id data) "-" (:invoke-id data))}))
-                      ;; Set error on failure
-                      (state/dispatch [:db/set-value
-                                       [:forms (:form-id form-state) :error]
-                                       (str "Error: " (or (:error reply) "Unknown error"))]))))))})
+                                           :invoke-id (str (:task-id data) "-" (:invoke-id data))})))
+                 (.catch (fn [err]
+                           (forms/set-submitting! (:form-id form-state) false)
+                           (forms/set-error! (:form-id form-state) (str "Error: " (if (map? err) (or (:error err) "Unknown error") (str err)))))))))})
 
 (defui result-badge
  [{:keys [status human-request?]}]
@@ -119,10 +118,10 @@
               (if (nil? v) "-" (str v))))))))
 
 (defui index []
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query {:query-key [:agents]
-                                  :sente-event [:agents/get-all]
-                                  :refetch-interval-ms 2000})]
+  (let [{:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-agents/get-all!! {}])
+        loading? (#{:loading :idle} query-status)]
 
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
@@ -184,14 +183,9 @@
         [active-filter-types set-active-filter-types!] (uix/use-state [])
         [open-filter-type set-open-filter-type!] (uix/use-state nil)
         filter-key (common/to-json applied-filters)
-        filter-options-query
-        (queries/use-sente-query
-         {:query-key [:invocations/filter-options module-id agent-name]
-          :sente-event [:invocations/get-filter-options {:module-id module-id
-                                                         :agent-name agent-name}]
-          :enabled? (boolean (and module-id agent-name))
-          :refetch-interval-ms 30000})
-        filter-options-data (:data filter-options-query)
+        {filter-options-data :data}
+        (use-subscribe [::rfq/query ::rpc-invocations/get-filter-options!!
+                        {:module-id module-id :agent-name agent-name}])
         node-options (or (:nodes filter-options-data) [])
         feedback-metric-options (or (:feedback-metrics filter-options-data) [])
         show-feedback-metric-column? (contains? applied-filters :feedback-metric)
@@ -313,13 +307,12 @@
                              (set-applied-filters! (build-filter-map draft-filters))
                              (set-open-filter-type! nil))
 
-        ;; Use the new paginated query hook
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
-        (queries/use-paginated-query
-         {:query-key [:invocations module-id agent-name filter-key]
-          :sente-event [:invocations/get-page {:module-id module-id
-                                               :agent-name agent-name
-                                               :filters applied-filters}]
+        (queries/use-infinite-rpc-query
+         {:rfq-key ::rpc-invocations/get-page-inf!!
+          :params {:module-id module-id
+                   :agent-name agent-name
+                   :filters applied-filters}
           :page-size 20
           :enabled? (boolean (and module-id agent-name))})]
 
@@ -512,12 +505,13 @@
 
 (defui mini-invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
-        {:keys [data loading? error]}
-        (queries/use-sente-query {:query-key [:mini-invocations module-id agent-name]
-                                  :sente-event [:invocations/get-page {:module-id module-id
-                                                                       :agent-name agent-name
-                                                                       :pagination {}}]
-                                  :refetch-interval-ms 2000})]
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-invocations/get-page!!
+                        {:module-id module-id
+                         :agent-name agent-name
+                         :pagination {}}])
+        loading? (#{:loading :idle} query-status)]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
                   ($ :div.text-gray-500 "Loading invocations..."))
@@ -566,15 +560,11 @@
                                  granularity-items granularity-label stat-items stat-label]}]
   (let [node-id (when selected-node (aget selected-node "id"))
         decoded-agent-name (common/url-decode agent-name)
-
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:node-stats module-id agent-name granularity]
-          :sente-event [:invocations/get-node-stats {:module-id module-id
-                                                     :agent-name decoded-agent-name
-                                                     :granularity granularity}]
-          :refetch-interval-ms 30000
-          :enabled? (boolean (and module-id agent-name))})]
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-invocations/get-node-stats!!
+                        {:module-id module-id :agent-name agent-name :granularity granularity}])
+        loading? (#{:loading :idle} query-status)]
 
     ($ :div
        ;; Header
@@ -663,21 +653,18 @@
         decoded-agent-name (common/url-decode agent-name)
 
         ;; Fetch graph topology
-        graph-query (queries/use-sente-query {:query-key [:graph module-id agent-name]
-                                              :sente-event [:invocations/get-graph {:module-id module-id
-                                                                                    :agent-name agent-name}]
-                                              :refetch-interval-ms 2000})
-        data (:data graph-query)
-        loading? (:loading? graph-query)
-        error (:error graph-query)
+        {graph-data :data graph-error :error graph-status :status}
+        (use-subscribe [::rfq/query ::rpc-invocations/get-graph!!
+                        {:module-id module-id :agent-name agent-name}])
+        data graph-data
+        loading? (= graph-status :loading)
+        error graph-error
 
         ;; Fetch node stats for display on nodes
-        stats-query (queries/use-sente-query {:query-key [:node-stats module-id agent-name granularity]
-                                              :sente-event [:invocations/get-node-stats {:module-id module-id
-                                                                                         :agent-name decoded-agent-name
-                                                                                         :granularity granularity}]
-                                              :refetch-interval-ms 30000})
-        node-stats (:node-stats (:data stats-query))]
+        {stats-data :data}
+        (use-subscribe [::rfq/query ::rpc-invocations/get-node-stats!!
+                        {:module-id module-id :agent-name agent-name :granularity granularity}])
+        node-stats (:node-stats stats-data)]
     (cond
       loading? ($ :div.flex.justify-center.items-center.py-8
                   ($ :div.text-gray-500 "Loading graph..."))
@@ -843,11 +830,10 @@
     ;; Initialize the form when the component mounts or when module-id/agent-name changes
     (uix/use-effect
      (fn []
-       (state/dispatch [:form/initialize form-id {:module-id module-id
-                                                  :agent-name agent-name}])
+       (rf/dispatch [::forms/initialize form-id {:module-id module-id :agent-name agent-name}])
        ;; Cleanup: Clear the form when the component unmounts or agent changes
        (fn []
-         (state/dispatch [:form/clear form-id])))
+         (forms/clear-form! form-id)))
      [module-id agent-name form-id])
 
     ($ :div.p-4

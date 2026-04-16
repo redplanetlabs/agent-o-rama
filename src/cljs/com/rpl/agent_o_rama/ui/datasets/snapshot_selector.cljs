@@ -1,22 +1,26 @@
 (ns com.rpl.agent-o-rama.ui.datasets.snapshot-selector
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [re-frame.query :as rfq]
+   [re-frame.core :as rf]
    [com.rpl.specter :as s]
    [clojure.string :as str]))
 
 (defui SnapshotManager [{:keys [module-id dataset-id selected-snapshot on-select-snapshot disabled? read-only?]}]
   (let [[dropdown-open? set-dropdown-open] (uix/use-state false)
 
-        {:keys [data loading? error refetch]}
-        (queries/use-sente-query
-         {:query-key [:snapshot-names module-id dataset-id]
-          :sente-event [:datasets/get-snapshot-names {:module-id module-id :dataset-id dataset-id}]
-          :enabled? (boolean (and module-id dataset-id))})
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-datasets/get-snapshot-names!!
+                        {:module-id module-id :dataset-id dataset-id}])
+        loading? (#{:loading :idle} query-status)
 
         snapshot-names (or (sort data) [])
 
@@ -31,16 +35,16 @@
         handle-delete (fn [snapshot-name]
                         (set-dropdown-open false)
                         (when (js/confirm (str "Are you sure you want to delete snapshot '" snapshot-name "'?"))
-                          (sente/request!
-                           [:datasets/delete-snapshot {:module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name}]
-                           10000
-                           (fn [reply]
-                             (if (:success reply)
-                               (do
-                                 (when (= selected-snapshot snapshot-name)
-                                   (on-select-snapshot "")) ;; Reset view to latest if deleting current
-                                 (refetch))
-                               (js/alert (str "Error deleting snapshot: " (:error reply))))))))
+                          (-> (rpc/call ::rpc-datasets/delete-snapshot!!
+                                        {:module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name})
+                              (.then (fn [_]
+                                       (when (= selected-snapshot snapshot-name)
+                                         (on-select-snapshot ""))
+                                       (do (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
+                                       (rf/dispatch [:re-frame.query/invalidate-tags [[:snapshot-names module-id dataset-id]]]))))
+                              (.catch (fn [err]
+                                        (js/alert (str "Error deleting snapshot: "
+                                                       (if (map? err) (or (:error err) (str err)) (str err)))))))))
 
         handle-select (fn [snapshot-name]
                         (set-dropdown-open false)
@@ -66,9 +70,7 @@
           {:type "button"
            :onClick (fn [e]
                       (.stopPropagation e)
-                      (let [is-opening (not dropdown-open?)]
-                        (set-dropdown-open is-opening)
-                        (when is-opening (refetch))))
+                      (set-dropdown-open (not dropdown-open?)))
            :disabled (or loading? disabled?)}
           ($ :span.truncate current-display-name)
           ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))

@@ -1,534 +1,582 @@
 (ns com.rpl.agent-o-rama.ui.forms
-  "Reusable form utilities and patterns for cleaner form components."
+  "Form utilities backed by re-frame app-db.
+
+  Form state lives at [:forms form-id] in re-frame's app-db:
+    {:fields  {field-key value ...}
+     :errors  {field-key error-str ...}
+     :meta    {:submitting? false :error nil :valid? true :step :main :steps [...]}}
+
+  The declarative reg-form spec is unchanged; only the plumbing under it moves."
   (:require
    [uix.core :as uix :refer [defui defhook $]]
-   [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
-   [clojure.string :as str]
-   [com.rpl.specter :as s]
-   ["react-dom" :refer [createPortal]]))
+   [uix.re-frame :refer [use-subscribe]]
+   [re-frame.core :as rf]
+   [re-frame.query :as rfq]
+  [com.rpl.agent-o-rama.ui.common :as common]
+  [com.rpl.agent-o-rama.ui.rpc :as rpc]
+  [com.rpl.agent-o-rama.ui.state :as ui-state]
+  [clojure.string :as str]
+  [com.rpl.specter :as s]
+  ["react-dom" :refer [createPortal]]))
+
+;; =============================================================================
+;; FORM REGISTRY  (plain atom — populated at load time, read-only at runtime)
+;; =============================================================================
 
 (defonce form-specs (atom {}))
 
-(defn reg-form
-  "Registers a self-contained form specification."
-  [form-id spec]
+(defn reg-form [form-id spec]
   (swap! form-specs assoc form-id spec))
 
-(defhook use-form
-  [form-id]
-  (let [form-state (state/use-sub [:forms form-id])
-        {:keys [field-errors valid? submitting? error current-step steps]} form-state]
+;; =============================================================================
+;; HELPERS
+;; =============================================================================
 
-    (merge form-state
-           {:field-errors (or field-errors {})
-            :valid? (boolean valid?)
-            :submitting? (boolean submitting?)
-            :error error
-            :current-step current-step
-            :steps steps
-            ;; The set-field! function is now a direct dispatch.
-            :set-field! (fn [field-path value]
-                          (state/dispatch [:form/update-field form-id field-path value]))
-            :next-step! #(state/dispatch [:form/next-step form-id])
-            :prev-step! #(state/dispatch [:form/prev-step form-id])
-            :submit! #(state/dispatch [:form/submit form-id])})))
+(defn- meta-keys []
+  #{:field-errors :valid? :submitting? :error :current-step :steps
+    :set-field! :next-step! :prev-step! :submit! :form-id})
+
+(defn- field-data
+  "Extract only user-supplied fields from a flat form-state map."
+  [form-state]
+  (apply dissoc form-state (meta-keys)))
+
+(defn- validate-fields
+  "Run validators over fields-map. Returns {:valid? bool :errors {}}."
+  [fields validators]
+  (reduce-kv
+   (fn [acc path validator-fns]
+     (let [value (s/select-one path fields)
+           err   (some #(% value fields) validator-fns)]
+       (if err
+         (-> acc (assoc :valid? false) (update :errors #(s/setval path err %)))
+         acc)))
+   {:valid? true :errors {}}
+   (or validators {})))
+
+(defn- step-index
+  "Index of `step` in `steps` vector, or -1 if missing. (Avoids JS .indexOf on clj->js keywords.)"
+  [steps step]
+  (or (first (keep-indexed (fn [i s] (when (= s step) i)) steps))
+      -1))
+
+;; =============================================================================
+;; RE-FRAME EVENT/SUB REGISTRATION
+;; =============================================================================
+
+;; ---- subscriptions ----------------------------------------------------------
+
+(rf/reg-sub ::form
+  (fn [db [_ form-id]]
+    (get-in db [:forms form-id])))
+
+(rf/reg-sub ::field
+  :<- [::forms-map]
+  (fn [forms [_ form-id field-path]]
+    (s/select-one (into [:forms form-id] (if (vector? field-path) field-path [field-path]))
+                  {:forms forms})))
+
+;; Helpers to avoid redundant reads
+(rf/reg-sub ::forms-map
+  (fn [db _] (:forms db {})))
+
+;; ---- events -----------------------------------------------------------------
+
+(rf/reg-event-db ::initialize
+  (fn [db [_ form-id props]]
+    (let [spec         (@form-specs form-id)
+          initial-step (first (:steps spec))
+          step-spec    (get spec initial-step)
+          fields-fn    (:initial-fields step-spec)
+          fields       (if (fn? fields-fn) (fields-fn props) (or fields-fn {}))
+          validators   (:validators step-spec)
+          {:keys [valid? errors]} (validate-fields fields validators)
+          form-state   {:fields  fields
+                        :errors  errors
+                        :meta    {:submitting? false :error nil :valid? valid?
+                                  :steps       (:steps spec)
+                                  :step        initial-step}}]
+      (assoc-in db [:forms form-id] form-state))))
+
+(rf/reg-event-db ::set-field
+  (fn [db [_ form-id field-path value]]
+    (let [path      (if (vector? field-path) field-path [field-path])
+          spec      (@form-specs form-id)
+          form      (get-in db [:forms form-id])
+          step      (get-in form [:meta :step])
+          step-spec (get spec step spec)
+          validators (:validators step-spec)
+          new-fields (assoc-in (:fields form) path value)
+          {:keys [valid? errors]} (validate-fields new-fields validators)]
+      (-> db
+          (assoc-in (into [:forms form-id :fields] path) value)
+          (assoc-in [:forms form-id :errors] errors)
+          (assoc-in [:forms form-id :meta :valid?] valid?)
+          (assoc-in [:forms form-id :meta :error] nil)))))
+
+(rf/reg-event-db ::clear
+  (fn [db [_ form-id]]
+    (update db :forms dissoc form-id)))
+
+;; Used by experiment form nested editors (targets, evaluators, etc.)
+(rf/reg-event-db
+ :form/update-field
+ (fn [db [_ form-id path value]]
+   (let [field-path (into [:forms form-id :fields]
+                          (if (vector? path) path [path]))]
+     (assoc-in db field-path value))))
+
+(rf/reg-event-db ::set-error
+  (fn [db [_ form-id msg]]
+    (-> db
+        (assoc-in [:forms form-id :meta :error] msg)
+        (assoc-in [:forms form-id :meta :submitting?] false))))
+
+(rf/reg-event-db ::set-submitting
+  (fn [db [_ form-id v]]
+    (assoc-in db [:forms form-id :meta :submitting?] v)))
+
+(rf/reg-event-fx ::next-step
+  (fn [{:keys [db]} [_ form-id]]
+    (let [form      (get-in db [:forms form-id])
+          spec      (@form-specs form-id)
+          {:keys [step steps valid?]} (:meta form)]
+      (when valid?
+        (let [idx       (step-index steps step)
+              next-step (get steps (inc idx))]
+          (when next-step
+            (let [next-spec  (get spec next-step)
+                  fields-fn  (:initial-fields next-spec)
+                  new-fields (if (fn? fields-fn)
+                               (fields-fn (merge (:fields form) (:meta form)))
+                               (:fields form))
+                  {:keys [valid? errors]} (validate-fields new-fields (:validators next-spec))]
+              {:db (-> db
+                       (assoc-in [:forms form-id :fields] new-fields)
+                       (assoc-in [:forms form-id :errors] errors)
+                       (assoc-in [:forms form-id :meta :valid?] valid?)
+                       (assoc-in [:forms form-id :meta :step] next-step))})))))))
+
+(rf/reg-event-db ::prev-step
+  (fn [db [_ form-id]]
+    (let [form   (get-in db [:forms form-id])
+          {:keys [step steps]} (:meta form)
+          idx    (step-index steps step)
+          prev   (get steps (dec idx))]
+      (when prev
+        (assoc-in db [:forms form-id :meta :step] prev)))))
+
+(rf/reg-event-fx ::submit
+  (fn [{:keys [db]} [_ form-id]]
+    (let [form       (get-in db [:forms form-id])
+          spec       (@form-specs form-id)
+          step       (get-in form [:meta :step])
+          step-spec  (get spec step spec)
+          fields     (:fields form)
+          {:keys [valid? errors]} (validate-fields fields (:validators step-spec))
+          ;; `modal/show-form` stores opener props on [:ui :modal :data] (e.g. :example-ids for
+          ;; bulk tag modals). Merge them into submit payload — they are not always present on
+          ;; [:forms form-id :fields] after field updates.
+          modal-data (get-in db [:ui :modal :data])
+          modal-props (select-keys modal-data [:example-ids :selected-examples :module-id
+                                               :dataset-id :snapshot-name :editing?
+                                               :agent-name :invoke-id])]
+      (if-not valid?
+        {:db (-> db
+                 (assoc-in [:forms form-id :errors] errors)
+                 (assoc-in [:forms form-id :meta :valid?] false))}
+        (let [handler       (:on-submit spec)
+              ;; Flatten fields + meta for backward-compat with mutation fns
+              form-state    (merge fields modal-props (:meta form) {:form-id form-id})
+              new-db        (-> db
+                                (assoc-in [:forms form-id :meta :submitting?] true)
+                                (assoc-in [:forms form-id :meta :error] nil))]
+          (cond
+            ;; --- declarative map with :mutation ---
+            (map? handler)
+            (let [{:keys [mutation on-success-invalidate on-success on-error
+                           rfq-invalidate-tags]} handler]
+              {:db   new-db
+               :dispatch [::do-submit form-id handler form-state]})
+
+            ;; --- legacy function ---
+            (fn? handler)
+            {:db   new-db
+             :dispatch [::do-submit-fn form-id handler form-state]}))))))
+
+;; Actual side-effecting submit (outside the pure event-db)
+(rf/reg-event-fx ::do-submit
+  (fn [{:keys [db]} [_ form-id handler form-state]]
+    (let [{:keys [mutation on-success-invalidate on-success on-error
+                  rfq-invalidate-tags]} handler
+
+          on-ok
+          (fn [reply]
+            (rf/dispatch [::submit-success form-id handler form-state reply]))
+
+          on-fail
+          (fn [err]
+            (rf/dispatch [::submit-failure form-id on-error form-state err]))]
+
+      (when mutation
+        (let [mut-result (mutation db form-state)]
+          (when mut-result
+            (let [[rpc-id params] mut-result]
+              (-> (rpc/call rpc-id params)
+                  (.then (fn [data] (on-ok {:success true :data data})))
+                  (.catch on-fail))))))
+      nil)))
+
+(rf/reg-event-fx ::do-submit-fn
+  (fn [{:keys [db]} [_ form-id handler form-state]]
+    (handler db form-state)
+    nil))
+
+
+(rf/reg-event-fx ::submit-success
+  (fn [{:keys [db]} [_ form-id handler form-state reply]]
+    (let [{:keys [on-success-invalidate rfq-invalidate-tags on-success]} handler
+          ;; `rpc/call` unwraps HTTP {:success true :data x} → x (no :success key on reply)
+          wrapped?        (contains? reply :success)
+          has-nested-err? (if wrapped?
+                            (and (= :error (get-in reply [:data :status]))
+                                 (some? (get-in reply [:data :error])))
+                            (and (map? reply)
+                                 (or (= :error (:status reply)) (some? (:error reply)))))
+          actual-err      (if wrapped?
+                            (when has-nested-err? (get-in reply [:data :error]))
+                            (when has-nested-err? (or (:error reply) (str (:status reply)))))
+          success?        (if wrapped?
+                            (and (:success reply) (not has-nested-err?))
+                            (not has-nested-err?))
+          close-modal-db  (fn [d]
+                            (-> d
+                                (assoc-in [:ui :modal :active] nil)
+                                (assoc-in [:ui :modal :data] {})
+                                (update :forms dissoc form-id)))]
+      (if success?
+        (cond-> {:db (close-modal-db (assoc-in db [:forms form-id :meta :submitting?] false))
+                 :fx (cond-> []
+                        on-success-invalidate
+                        (conj [:dispatch-fn
+                               #(when-let [inv-map (on-success-invalidate db form-state reply)]
+                                  (rf/dispatch [:query/invalidate-bridge inv-map]))])
+                        rfq-invalidate-tags
+                        (into (let [tags (rfq-invalidate-tags db form-state reply)]
+                                (when (seq tags)
+                                  [[:dispatch [:re-frame.query/invalidate-tags tags]]]))))}
+          on-success (update :fx conj [:dispatch-fn #(on-success db form-state reply)]))
+        {:db (-> db
+                 (assoc-in [:forms form-id :meta :submitting?] false)
+                 (assoc-in [:forms form-id :meta :error] actual-err))}))))
+
+(rf/reg-event-fx ::submit-failure
+  (fn [{:keys [db]} [_ form-id on-error form-state err]]
+    (let [msg (if (map? err) (or (:error err) (str err)) (str err))]
+      (cond-> {:db (-> db
+                       (assoc-in [:forms form-id :meta :submitting?] false)
+                       (assoc-in [:forms form-id :meta :error] msg))}
+        on-error (assoc :fx [[:dispatch-fn #(on-error db form-state msg)]])))))
+
+;; Re-frame effect to call an arbitrary fn (for callbacks that need to escape into js)
+(rf/reg-fx :dispatch-fn
+  (fn [f] (f)))
+
+;; Shim: legacy custom-state modal/hide still needs to work until modal is ported
+(rf/reg-event-fx :modal/hide
+  (fn [{:keys [db]} _]
+    {:db (-> db
+             (assoc-in [:ui :modal :active] nil)
+             (assoc-in [:ui :modal :data] {}))}))
+
+;; =============================================================================
+;; HOOKS
+;; =============================================================================
+
+(defhook use-form
+  "Returns merged form state + action fns. Backward-compat with old use-form callers."
+  [form-id]
+  (let [form (use-subscribe [::form form-id])
+        fields (:fields form {})
+        meta   (:meta form {})
+        errors (:errors form {})]
+    (merge fields meta
+           {:field-errors errors
+            :valid?       (:valid? meta true)
+            :submitting?  (:submitting? meta false)
+            :error        (:error meta)
+            :current-step (:step meta)
+            :steps        (:steps meta)
+            :set-field!   (fn [path v] (rf/dispatch [::set-field form-id path v]))
+            :next-step!   #(rf/dispatch [::next-step form-id])
+            :prev-step!   #(rf/dispatch [::prev-step form-id])
+            :submit!      #(rf/dispatch [::submit form-id])})))
 
 (defhook use-form-field
-  "Subscribes to a single field's state within a form."
+  "Returns {:value :on-change :error} for a single field."
   [form-id field-key]
-  ;; Ensure field-key is always a vector for consistency with specter paths
-  (let [field-path (if (vector? field-key) field-key [field-key])]
-    (let [value (state/use-sub (into [:forms form-id] field-path))
-          error (state/use-sub (into [:forms form-id :field-errors] field-path))
+  (let [path   (if (vector? field-key) field-key [field-key])
+        value  (use-subscribe [::form-field form-id path])
+        error  (use-subscribe [::form-field-error form-id path])
+        on-change (uix/use-callback
+                   (fn [v] (rf/dispatch [::set-field form-id path v]))
+                   [form-id path])]
+    {:value value :on-change on-change :error error}))
 
-          ;; Memoize the on-change handler for performance.
-          ;; It will only be recreated if form-id or field-path changes.
-          on-change (uix/use-callback
-                     (fn [new-value]
-                       (state/dispatch [:form/update-field form-id field-path new-value]))
-                     [form-id field-path])]
+(rf/reg-sub ::form-field
+  (fn [db [_ form-id path]]
+    (get-in db (into [:forms form-id :fields] path))))
 
-      ;; Return the convenient props map
-      {:value value
-       :on-change on-change
-       :error error})))
+(rf/reg-sub ::form-field-error
+  (fn [db [_ form-id path]]
+    (get-in db (into [:forms form-id :errors] path))))
+
+;; Temporary shim — callers still using state/use-sub path directly
+;; will continue to work because re-frame and custom state share the :forms path
+;; via the legacy compat bridge below.
+
 ;; =============================================================================
-;; REUSABLE FORM COMPONENTS
+;; LEGACY COMPAT BRIDGE
+;; =============================================================================
+;; The custom state/app-db atom and re-frame app-db are SEPARATE stores.
+;; Forms now live exclusively in re-frame.  Components that used
+;; (state/use-sub [:forms ...]) need to switch to (use-subscribe [::form ...])
+;; or (use-subscribe [::form-field ...]).
+;;
+;; The modal/show-form + modal/hide events need to dispatch to re-frame.
+;; We register them as plain re-frame events below.
+
+(rf/reg-event-fx :modal/show-form
+  (fn [{:keys [db]} [_ form-id props]]
+    (let [spec        (@form-specs form-id)
+          init-step   (first (:steps spec))
+          step-spec   (get spec init-step)
+          fields-fn   (:initial-fields step-spec)
+          fields      (if (fn? fields-fn) (fields-fn props) (or fields-fn {}))
+          validators  (:validators step-spec)
+          {:keys [valid? errors]} (validate-fields fields validators)
+          modal-props (let [mp (get-in spec [init-step :modal-props] {})]
+                        (if (fn? mp) (mp props) mp))
+          form-state  {:fields  fields
+                       :errors  errors
+                       :meta    {:submitting? false :error nil :valid? valid?
+                                 :steps       (:steps spec)
+                                 :step        init-step}}]
+      {:db (-> db
+               (assoc-in [:forms form-id] form-state)
+               (assoc-in [:ui :modal] {:active form-id
+                                       :data   (assoc modal-props :form-id form-id)
+                                       :form   {:submitting? false :error nil}}))})))
+
+(rf/reg-event-fx :modal/show
+  (fn [{:keys [db]} [_ modal-type modal-data]]
+    {:db (assoc-in db [:ui :modal] {:active modal-type
+                                     :data   modal-data
+                                     :form   {:submitting? false :error nil}})}))
+
+;; =============================================================================
+;; VALIDATORS
+;; =============================================================================
+
+(defn required
+  ([value]        (when (str/blank? value) "This field is required"))
+  ([value _]      (when (str/blank? value) "This field is required")))
+
+(defn min-length [n]
+  (fn
+    ([value]   (when (and (string? value) (< (count value) n)) (str "Must be at least " n " characters")))
+    ([value _] (when (and (string? value) (< (count value) n)) (str "Must be at least " n " characters")))))
+
+(defn max-length [n]
+  (fn
+    ([value]   (when (and (string? value) (> (count value) n)) (str "Must be no more than " n " characters")))
+    ([value _] (when (and (string? value) (> (count value) n)) (str "Must be no more than " n " characters")))))
+
+(defn valid-json
+  ([value]
+   (when-not (str/blank? value)
+     (try (js/JSON.parse value) nil
+          (catch js/Error e (str "Invalid JSON: " (.-message e))))))
+  ([value _]
+   (when-not (str/blank? value)
+     (try (js/JSON.parse value) nil
+          (catch js/Error e (str "Invalid JSON: " (.-message e)))))))
+
+;; =============================================================================
+;; REUSABLE FORM COMPONENTS (unchanged)
 ;; =============================================================================
 
 (defui form-field
-  "Reusable form field component with label, input, and error display.
-
-   Props:
-   - :label - Field label text
-   - :type - Input type (:text, :textarea, :email, etc.)
-   - :value - Current field value
-   - :on-change - Change handler function
-   - :error - Error message to display
-   - :required? - Whether field is required
-   - :placeholder - Placeholder text
-   - :class-name - Additional CSS classes
-   - :rows - For textarea, number of rows"
   [{:keys [label value on-change error required? placeholder class-name
            type rows data-id data-testid disabled]
     :or {type :text rows 3}}]
-
-  (let [input-classes (str "w-full p-3 border rounded-md text-sm transition-colors "
+  (let [[field-id] (uix/use-state #(str "field-" (random-uuid)))
+        aria-label (when (string? label) label)
+        input-classes (str "w-full p-3 border rounded-md text-sm transition-colors "
                            (if disabled
                              "bg-gray-100 text-gray-500 cursor-not-allowed border-gray-200"
                              (if error
                                "border-red-300 focus:ring-red-500 focus:border-red-500"
                                "border-gray-300 focus:ring-blue-500 focus:border-blue-500"))
-                           (when class-name (str " " class-name)))
-
-        field-id (str "field-" (random-uuid))]
-
+                           (when class-name (str " " class-name)))]
     ($ :div.space-y-1
-       ($ :label.block.text-sm.font-medium.text-gray-700
-          {:htmlFor field-id}
+       ($ :label.block.text-sm.font-medium.text-gray-700 {:htmlFor field-id}
           label
           (when required? ($ :span.text-red-500.ml-1 "*")))
-
        (case type
          :textarea
          ($ :textarea
-            (cond-> {:id field-id
-                     :className input-classes
-                     :value (or value "")
-                     :placeholder placeholder
-                     :rows rows
+            (cond-> {:id field-id :className input-classes
+                     :value (or value "") :placeholder placeholder :rows rows
                      :onChange #(on-change (.. % -target -value))}
-              data-id (assoc :data-id data-id)
+              aria-label (assoc :aria-label aria-label)
+              data-id     (assoc :data-id data-id)
               data-testid (assoc :data-testid data-testid)
-              disabled (assoc :disabled true)))
-
-         ;; Default to text input for all other types
+              disabled    (assoc :disabled true)))
          ($ :input
-            (cond-> {:id field-id
-                     :type (name type)
-                     :className input-classes
-                     :value (or value "")
-                     :placeholder placeholder
+            (cond-> {:id field-id :type (name type) :className input-classes
+                     :value (or value "") :placeholder placeholder
                      :onChange #(on-change (.. % -target -value))}
-              data-id (assoc :data-id data-id)
+              aria-label (assoc :aria-label aria-label)
+              data-id     (assoc :data-id data-id)
               data-testid (assoc :data-testid data-testid)
-              disabled (assoc :disabled true))))
-
+              disabled    (assoc :disabled true))))
        (if error
          ($ :p.text-sm.text-red-600.mt-1 error)
          ($ :div.mt-1.h-5)))))
 
-(defui form-error
-  "Reusable error display component.
-
-   Props:
-   - :error - Error message to display
-   - :class-name - Additional CSS classes"
-  [{:keys [error class-name]}]
-
+(defui form-error [{:keys [error class-name]}]
   (when error
     ($ :div {:className (str "mt-4 p-3 bg-red-50 border border-red-200 rounded-md " class-name)}
        ($ :p.text-sm.text-red-700.whitespace-pre-wrap error))))
 
-(defui form
-  [{:keys [children]}]
+(defui form [{:keys [children]}]
+  ($ :form.p-4 children))
 
-  ($ :form.p-4
-     children))
-
- ;; =============================================================================
-;; WIZARD FORM COMPONENTS
+;; =============================================================================
+;; WIZARD / MODAL COMPONENTS
 ;; =============================================================================
 
 (defui WizardForm [{:keys [form-id]}]
-  (let [form (use-form form-id)
-        form-spec (get @form-specs form-id)
-        {:keys [steps current-step]} form
-        current-step-spec (get form-spec current-step)
-        ui-fn (:ui current-step-spec)]
-
+  (let [form      (use-form form-id)
+        form-spec (@form-specs form-id)
+        step      (:current-step form)
+        ui-fn     (:ui (get form-spec step))]
     ($ :div.flex.flex-col.h-full
        ($ :div.flex-1.min-h-0.overflow-y-auto
           (if ui-fn
             (ui-fn {:form-id form-id :props form})
-            ($ :div.p-8.text-center.text-gray-500
-               (str "No UI defined for step: " current-step)))))))
+            ($ :div.p-8.text-center.text-gray-500 (str "No UI for step: " step)))))))
 
 (defui ModalFormContent [{:keys [form-id modal-data]}]
-  (let [form (use-form form-id)
-        form-spec (get @form-specs form-id)
-        is-wizard? (seq (:steps form-spec)) ;; Check if it's a wizard
-        handle-cancel (fn []
-                        (state/dispatch [:form/clear form-id])
-                        (state/dispatch [:modal/hide]))]
-
+  (let [form      (use-form form-id)
+        form-spec (@form-specs form-id)
+        wizard?   (seq (:steps form-spec))
+        cancel!   (fn []
+                    (rf/dispatch [::clear form-id])
+                    (rf/dispatch [:modal/hide]))]
     ($ :<>
-       ;; Main content area
-       ($ :div {:className "flex-1 min-h-0 overflow-y-auto"}
-          (if is-wizard?
-            ($ WizardForm {:form-id form-id}) ;; Render the generic wizard
+       ($ :div.flex-1.min-h-0.overflow-y-auto
+          (if wizard?
+            ($ WizardForm {:form-id form-id})
             (let [ui-fn (or (:ui form-spec) (get-in form-spec [:main :ui]))]
               (if ui-fn
                 (ui-fn {:form-id form-id :props form})
-                ($ :div "No UI defined for this form.")))))
-
-       ;; The footer with form actions
+                ($ :div "No UI defined.")))))
        (when form
-         ($ :div {:className "flex-shrink-0 border-t border-gray-200 bg-white px-6 py-4"}
+         ($ :div.flex-shrink-0.border-t.border-gray-200.bg-white.px-6.py-4
             ($ form-error {:error (:error form)})
-            ($ :div {:className "flex justify-end gap-3"}
-               ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick handle-cancel} "Cancel")
-
-               ;; "Back" button for wizards
-               (when (and is-wizard? (not= (first (:steps form)) (:current-step form)))
-                 ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer", :type "button", :onClick (:prev-step! form)} "Back"))
-
-               ;; "Next" or "Submit" button
-               (if (and is-wizard? (not= (last (:steps form)) (:current-step form)))
-                 ($ :button {:type "button", :disabled (not (:valid? form)), :onClick (:next-step! form)
-                             :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium "
-                                             (if (not (:valid? form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+            ($ :div.flex.justify-end.gap-3
+               ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer"
+                            :type "button" :onClick cancel!} "Cancel")
+               (when (and wizard? (not= (first (:steps form)) (:current-step form)))
+                 ($ :button {:className "px-4 py-2 border border-gray-300 rounded-md text-sm font-medium cursor-pointer"
+                              :type "button" :onClick (:prev-step! form)} "Back"))
+               (if (and wizard? (not= (last (:steps form)) (:current-step form)))
+                 ($ :button {:type "button" :disabled (not (:valid? form))
+                              :onClick (:next-step! form)
+                              :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium "
+                                              (if (not (:valid? form)) "text-gray-400 bg-gray-300 cursor-not-allowed"
+                                                  "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                     "Next")
-                 ($ :button
-                    {:type "button"
-                     :disabled (or (not (:valid? form)) (:submitting? form) (:error form))
-                     :onClick (:submit! form)
-                     :data-id "form-submit"
-                     :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
-                                     (if (or (not (:valid? form)) (:submitting? form) (:error form)) "text-gray-400 bg-gray-300 cursor-not-allowed" "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
+                 ($ :button {:type "button"
+                              :disabled (or (not (:valid? form)) (:submitting? form) (:error form))
+                              :onClick (:submit! form)
+                              :data-id "form-submit"
+                              :className (str "px-4 py-2 border border-transparent rounded-md text-sm font-medium flex items-center gap-2 "
+                                              (if (or (not (:valid? form)) (:submitting? form) (:error form))
+                                                "text-gray-400 bg-gray-300 cursor-not-allowed"
+                                                "text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"))}
                     (when (:submitting? form) ($ common/spinner {:size :medium}))
                     (:submit-text modal-data "Submit")))))))))
 
 (defui global-modal-component []
-  (let [modal-state (state/use-sub [:ui :modal])
+  (let [modal-state  (use-subscribe [::ui-state/aor-global-modal])
         {:keys [active data]} modal-state
-        form-id (when active (:form-id data))
-
-        ;; Get current form state to determine current step
-        form-state (state/use-sub [:forms form-id])
-        current-step (:current-step form-state)
-
-        ;; Get dynamic title based on current step
-        form-spec (when form-id (get @form-specs form-id))
-        current-step-spec (when current-step (get form-spec current-step))
-        modal-props (:modal-props current-step-spec)
+        form-id      (when active (:form-id data))
+        form-state   (use-subscribe [::form form-id])
+        step         (get-in form-state [:meta :step])
+        form-spec    (when form-id (@form-specs form-id))
+        step-spec    (when step (get form-spec step))
+        modal-props  (:modal-props step-spec)
         dynamic-title (when modal-props
                         (if (fn? modal-props)
-                          (:title (modal-props form-state))
+                          (:title (modal-props (merge (:fields form-state {})
+                                                      (:meta form-state {}))))
                           (:title modal-props)))
-
-        ;; Use dynamic title if available, otherwise fall back to data title
-        title (or dynamic-title (:title data))
-
+        title        (or dynamic-title (:title data))
         handle-cancel (fn []
-                        (when form-id (state/dispatch [:form/clear form-id]))
-                        (state/dispatch [:modal/hide]))
+                        (when form-id (rf/dispatch [::clear form-id]))
+                        (rf/dispatch [:modal/hide]))
+        handle-keydown (fn [e]
+                         (when (= (.-key e) "Escape")
+                           (.preventDefault e)
+                           (handle-cancel)))]
 
-        handle-keydown (fn [e] (when (= (.-key e) "Escape") (.preventDefault e) (handle-cancel)))]
-
-    (uix/use-effect (fn [] (when active (.addEventListener js/document "keydown" handle-keydown) #(.removeEventListener js/document "keydown" handle-keydown))) [active handle-keydown])
+    (uix/use-effect
+     (fn []
+       (when active
+         (.addEventListener js/document "keydown" handle-keydown)
+         #(.removeEventListener js/document "keydown" handle-keydown)))
+     [active handle-keydown])
 
     (when active
       (createPortal
-       ($ :div {:className "fixed inset-0 flex items-center justify-center z-50", :style {:backgroundColor "rgba(0, 0, 0, 0.5)"}, :onClick handle-cancel}
-          ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden mx-4 my-8 flex flex-col max-h-screen", :role "dialog", :aria-modal "true", :onClick #(.stopPropagation %)}
-             ;; Header with dynamic title
-             ($ :div {:className "flex-shrink-0 p-4 border-b border-gray-200 flex justify-between items-center bg-white"}
-                ($ :h3 {:className "text-lg font-medium text-gray-800"} title)
-                ($ :button {:className "text-gray-400 hover:text-gray-600 text-xl font-bold cursor-pointer", :onClick handle-cancel} "×"))
-
-             ;; Conditionally render the new content component
+       ($ :div {:className "fixed inset-0 flex items-center justify-center z-50"
+                :style {:backgroundColor "rgba(0,0,0,0.5)"}
+                :onClick handle-cancel}
+          ($ :div {:className "bg-white rounded-lg shadow-xl w-full max-w-5xl overflow-hidden mx-4 my-8 flex flex-col max-h-screen"
+                   :role "dialog" :aria-modal "true"
+                   :onClick #(.stopPropagation %)}
+             ($ :div.flex-shrink-0.p-4.border-b.border-gray-200.flex.justify-between.items-center.bg-white
+                ($ :h3.text-lg.font-medium.text-gray-800 title)
+                ($ :button.text-gray-400.hover:text-gray-600.text-xl.font-bold.cursor-pointer
+                   {:onClick handle-cancel} "×"))
              (when form-id
                ($ ModalFormContent {:form-id form-id :modal-data data}))
-
-             ;; Wrap component in proper scrollable container
              (when (:component data)
-               ($ :div {:className "flex-1 min-h-0 overflow-y-auto"
-                        :data-id "form-container"}
+               ($ :div.flex-1.min-h-0.overflow-y-auto {:data-id "form-container"}
                   (:component data)))))
        (.-body js/document)))))
 
-(defn required
-  "Validator for required fields."
-  ([value]
-   (when (str/blank? value) "This field is required"))
-  ([value _field-data]
-   (when (str/blank? value) "This field is required")))
-
-(defn min-length
-  "Validator for minimum string length"
-  [n]
-  (fn
-    ([value]
-     (when (and (string? value) (< (count value) n))
-       (str "Must be at least " n " characters long")))
-    ([value _field-data]
-     (when (and (string? value) (< (count value) n))
-       (str "Must be at least " n " characters long")))))
-
-(defn max-length
-  "Validator for maximum string length"
-  [n]
-  (fn
-    ([value]
-     (when (and (string? value) (> (count value) n))
-       (str "Must be no more than " n " characters long")))
-    ([value _field-data]
-     (when (and (string? value) (> (count value) n))
-       (str "Must be no more than " n " characters long")))))
-
-(defn valid-json
-  "Validator for JSON strings."
-  ([value]
-   (when-not (str/blank? value)
-     (try
-       (js/JSON.parse value)
-       nil ; Valid JSON
-       (catch js/Error e
-         (str "Invalid JSON: " (.-message e))))))
-  ([value _field-data]
-   (when-not (str/blank? value)
-     (try
-       (js/JSON.parse value)
-       nil ; Valid JSON
-       (catch js/Error e
-         (str "Invalid JSON: " (.-message e)))))))
-
-(defn- validate-form-fields
-  "Validate fields against validators keyed by Specter paths.
-   Returns a map {:valid? boolean :errors {nested-error-map}}
-
-   The form-state contains both field data and metadata. We need to extract
-   only the field data for validation by excluding known metadata keys.
-   
-   Validators receive both the field value and the full field-data for cross-field validation."
-  [form-state validators]
-  (let [metadata-keys #{:field-errors :valid? :submitting? :error :current-step :steps :set-field! :next-step! :prev-step! :submit!}
-        field-data (apply dissoc form-state metadata-keys)]
-    (reduce-kv
-     (fn [acc path validator-fns]
-       (let [value (s/select-one path field-data)
-             ;; Pass both value and field-data to validator functions
-             first-error (some #(% value field-data) validator-fns)]
-         (if first-error
-           (-> acc
-               (assoc :valid? false)
-               (update :errors #(s/setval path first-error %)))
-           acc)))
-     {:valid? true, :errors {}}
-     validators)))
-
-(state/reg-event :form/update-field
-                 (fn [db form-id field-path value]
-                   (let [form-state (get-in db [:forms form-id])
-                         form-spec (@form-specs form-id)
-                         current-step-key (:current-step form-state)
-                         step-spec (get form-spec current-step-key form-spec)
-                         all-validators (:validators step-spec)
-
-                         ;; Update the field value in the form state
-                         updated-form-state (if (vector? field-path)
-                                              (assoc-in form-state field-path value)
-                                              (assoc form-state field-path value))
-
-                         ;; Validate the updated form state
-                         validation-result (validate-form-fields updated-form-state all-validators)]
-
-                     ;; Return the updated form state with new validation results
-                     [:forms form-id
-                      (s/terminal-val
-                       (assoc updated-form-state
-                              :field-errors (:errors validation-result)
-                              :valid? (:valid? validation-result)
-                              :error nil))])))
-
-(state/reg-event :form/next-step
-                 (fn [db form-id]
-                   (let [form-state (get-in db [:forms form-id])
-                         form-spec (@form-specs form-id)
-                         {:keys [valid? current-step steps]} form-state]
-                     (when valid?
-                       (let [current-idx (.indexOf steps current-step)
-                             next-step (get steps (inc current-idx))]
-                         (when next-step
-                           (let [next-step-spec (get form-spec next-step)
-                                 initial-fields-fn (:initial-fields next-step-spec)
-                                 ;; Call the initial-fields function with current form state
-                                 ;; This allows each step to add new fields while preserving existing ones
-                                 updated-form-state (if (fn? initial-fields-fn)
-                                                      (initial-fields-fn form-state)
-                                                      form-state)
-                                 ;; Validate the updated form state for the new step
-                                 validators (:validators next-step-spec)
-                                 {:keys [valid? errors]} (validate-form-fields updated-form-state validators)]
-
-                             ;; Update the entire form state with the new step data
-                             [:forms form-id (s/terminal-val
-                                              (assoc updated-form-state
-                                                     :current-step next-step
-                                                     :field-errors errors
-                                                     :valid? valid?))])))))))
-
-(state/reg-event :form/prev-step
-                 (fn [db form-id]
-                   (let [form-state (get-in db [:forms form-id])
-                         {:keys [current-step steps]} form-state
-                         current-idx (.indexOf steps current-step)
-                         prev-step (get steps (dec current-idx))]
-                     (when prev-step
-                       [:forms form-id :current-step (s/terminal-val prev-step)]))))
-
-(state/reg-event :form/submit
-                 (fn [db form-id]
-                   (let [form-state (get-in db [:forms form-id])
-                         form-spec (@form-specs form-id)
-                         current-step-key (:current-step form-state)
-                         step-spec (get form-spec current-step-key form-spec)
-                         {:keys [valid? errors]} (validate-form-fields form-state (:validators step-spec))]
-
-                     (if-not valid?
-                       (state/dispatch [:db/set-value
-                                        [:forms form-id]
-                                        (assoc form-state :valid? false :field-errors errors)])
-                       (let [on-submit-handler (:on-submit form-spec)
-                             form-state-with-id (assoc form-state :form-id form-id)]
-                         (cond
-                           ;; New declarative path
-                           (map? on-submit-handler)
-                           (let [{:keys [event on-success-invalidate on-success on-error]} on-submit-handler
-                                 sente-event (event db form-state-with-id)]
-                             (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
-                             (sente/request!
-                              sente-event
-                              15000
-                              (fn [reply]
-                                (state/dispatch [:db/set-value [:forms form-id :submitting?] false])
-                                ;; Check for nested error structure: {:success true, :data {:status :error, :error "..."}}
-                                (let [has-nested-error? (and (:success reply)
-                                                             (= :error (get-in reply [:data :status]))
-                                                             (get-in reply [:data :error]))
-                                      actual-error (if has-nested-error?
-                                                     (get-in reply [:data :error])
-                                                     (:error reply))
-                                      is-success? (and (:success reply) (not has-nested-error?))]
-                                  (if is-success?
-                                    (do
-                                      (state/dispatch [:modal/hide])
-                                      (when on-success-invalidate
-                                        (state/dispatch [:query/invalidate (on-success-invalidate db form-state-with-id reply)]))
-                                      (when on-success (on-success db form-state-with-id reply))
-                                      (state/dispatch [:form/clear form-id]))
-                                    (do
-                                      (state/dispatch [:db/set-value [:forms form-id :error] actual-error])
-                                      (when on-error (on-error db form-state-with-id actual-error))))))))
-
-                           ;; Fallback to original function-based handler for complex cases
-                           (fn? on-submit-handler)
-                           (do
-                             (state/dispatch [:db/set-value [:forms form-id] (assoc form-state :submitting? true :error nil)])
-                             (on-submit-handler db form-state-with-id))))))
-                   nil))
-
-(state/reg-event :form/clear
-                 (fn [db form-id]
-                   ;; TODO use s/NONE not dissoc
-                   [:forms (s/terminal #(dissoc % form-id))]))
-
 ;; =============================================================================
-;; NEW MODAL AND FORM INTEGRATION EVENTS
+;; IMPERATIVE HELPERS  — for fn-based :on-submit handlers
 ;; =============================================================================
 
-;; Initialize a form without showing a modal. Useful for persistent forms on pages.
-(state/reg-event
- :form/initialize
- (fn [db form-id props]
-   (let [form-spec (get @form-specs form-id)]
-     (if-not form-spec
-       (do (js/console.error "No form spec registered for" form-id) nil)
-       (let [initial-step (first (:steps form-spec))
-             step-spec (get form-spec initial-step)
-             initial-fields-fn (:initial-fields step-spec)
-             initial-fields (if (fn? initial-fields-fn)
-                              (initial-fields-fn props)
-                              (or initial-fields-fn {}))
-             validators (:validators step-spec)
+(defn set-submitting! [form-id v]
+  (rf/dispatch [::set-submitting form-id v]))
 
-             ;; Create initial form state with metadata
-             initial-form-state (merge initial-fields
-                                       (when (:steps form-spec)
-                                         {:steps (:steps form-spec)
-                                          :current-step initial-step}))
+(defn set-error! [form-id msg]
+  (rf/dispatch [::set-error form-id msg]))
 
-             ;; Validate the initial form state
-             {:keys [valid? errors]} (validate-form-fields initial-form-state validators)
+(defn clear-form! [form-id]
+  (rf/dispatch [::clear form-id]))
 
-             ;; Construct the full state for the form
-             form-state (assoc initial-form-state
-                               :field-errors errors
-                               :valid? valid?
-                               :submitting? false
-                               :error nil)]
+;; =============================================================================
+;; CENTRALIZED FORM HOOK (legacy callers)
+;; =============================================================================
 
-         ;; Return path to initialize form state
-         [:forms form-id (s/terminal-val form-state)])))))
-
-(state/reg-event
- :modal/show-form
-
- (fn [db form-id props]
-   (let [form-spec (get @form-specs form-id)]
-     (if-not form-spec
-       (do (js/console.error "No form spec registered for" form-id) nil)
-       (let [initial-step (first (:steps form-spec))
-             step-spec (get form-spec initial-step)
-             initial-fields-fn (:initial-fields step-spec)
-             initial-fields (if (fn? initial-fields-fn)
-                              (initial-fields-fn props)
-                              (or initial-fields-fn {}))
-             validators (:validators step-spec)
-
-             ;; Create initial form state with metadata
-             initial-form-state (merge initial-fields
-                                       {:steps (:steps form-spec)
-                                        :current-step initial-step})
-
-             ;; Validate the initial form state
-             {:keys [valid? errors]} (validate-form-fields initial-form-state validators)
-             modal-data (let [mp (get-in form-spec [initial-step :modal-props] {})]
-                          (if (fn? mp)
-                            (mp props)
-                            mp))
-
-             ;; 1. Construct the full state for the form - now it's just a single flat map
-             form-state (assoc initial-form-state
-                               :field-errors errors
-                               :valid? valid?
-                               :submitting? false
-                               :error nil)
-
-             ;; 2. Construct the full state for the modal
-             modal-state {:active form-id
-                          :data (assoc modal-data :form-id form-id)
-                          :form {:submitting? false
-                                 :error nil}}]
-
-         ;; 3. Return a single Specter path to update both parts of the DB atomically
-         (s/multi-path
-          [:forms form-id (s/terminal-val form-state)]
-          [:ui :modal (s/terminal-val modal-state)]))))))
-
-(state/reg-event :modal/show
-                 (fn [db modal-type modal-data]
-                   [:ui :modal (s/terminal-val {:active modal-type
-                                                :data modal-data
-                                                :form {:submitting? false
-                                                       :error nil}})]))
-
-(state/reg-event :modal/hide
-                 (fn [db]
-                   [:ui :modal (s/terminal-val {:active nil
-                                                :data {}
-                                                :form {:submitting? false
-                                                       :error nil}})]))
+(defhook use-centralized-form
+  "Alias for use-form — for callers that used the old name."
+  [form-id]
+  (use-form form-id))

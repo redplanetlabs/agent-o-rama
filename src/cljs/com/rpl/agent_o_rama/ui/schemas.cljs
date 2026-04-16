@@ -160,7 +160,7 @@
    :invocations InvocationsSchema
    :queries QueriesCacheSchema
    :route RouteMatchSchema
-   :forms {s/Keyword FormStateSchema}
+   ;; :forms now lives in re-frame app-db — custom atom has empty {}
+   (s/optional-key :forms) {s/Keyword s/Any}
    :ui UiSchema
-   :sente s/Any ;; don't want to schematize all of sente
    (s/optional-key :streaming) StreamingStateSchema})

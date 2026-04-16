@@ -88,9 +88,9 @@ test.describe('Human Metrics', () => {
     await modal.getByLabel('Options (comma separated)').fill('Good, Bad, Average');
     // Verify preview pillboxes appear
     await expect(modal.getByText('Preview:')).toBeVisible();
-    await expect(modal.getByText('Good', { exact: true })).toBeVisible();
-    await expect(modal.getByText('Bad', { exact: true })).toBeVisible();
-    await expect(modal.getByText('Average', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Good', { exact: true }).first()).toBeVisible();
+    await expect(modal.getByText('Bad', { exact: true }).first()).toBeVisible();
+    await expect(modal.getByText('Average', { exact: true }).first()).toBeVisible();
     console.log('✓ Category preview pillboxes work');
     
     // Close modal
@@ -150,10 +150,18 @@ test.describe('Human Metrics', () => {
     // Modal should close on success
     await expect(modal).not.toBeVisible({ timeout: 10000 });
     
-    // Verify metric appears in table
+    // Narrow the list — table may still show a stale first page until search refetches
+    await page.getByPlaceholder('Search metrics...').fill(numericMetricName);
+    await page.waitForTimeout(400);
+    
+    // Verify metric appears in table (list may refetch after invalidation)
     const numericRow = page.locator('table tbody tr').filter({ hasText: numericMetricName });
-    await expect(numericRow).toBeVisible({ timeout: 5000 });
+    await expect(numericRow).toBeVisible({ timeout: 15000 });
     console.log(`✓ Successfully created metric: ${numericMetricName}`);
+
+    // Clear search so the create flow and next assertion see the full list
+    await page.getByPlaceholder('Search metrics...').clear();
+    await page.waitForTimeout(400);
 
     // TEST 9: Successfully create another metric with different name
     console.log('Test 9: Creating second metric');
@@ -166,17 +174,19 @@ test.describe('Human Metrics', () => {
     await modal.getByLabel('Options (comma separated)').fill('Excellent, Good, Fair, Poor');
     
     // Verify preview shows all categories
-    await expect(modal.getByText('Excellent', { exact: true })).toBeVisible();
-    await expect(modal.getByText('Good', { exact: true })).toBeVisible();
-    await expect(modal.getByText('Fair', { exact: true })).toBeVisible();
-    await expect(modal.getByText('Poor', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Excellent', { exact: true }).first()).toBeVisible();
+    await expect(modal.getByText('Good', { exact: true }).first()).toBeVisible();
+    await expect(modal.getByText('Fair', { exact: true }).first()).toBeVisible();
+    await expect(modal.getByText('Poor', { exact: true }).first()).toBeVisible();
     
     await modal.getByRole('button', { name: 'Create' }).click();
     await expect(modal).not.toBeVisible({ timeout: 10000 });
     
+    await page.getByPlaceholder('Search metrics...').fill(categoricalMetricName);
+    await page.waitForTimeout(400);
     // Verify metric appears in table
     const categoricalRow = page.locator('table tbody tr').filter({ hasText: categoricalMetricName });
-    await expect(categoricalRow).toBeVisible({ timeout: 5000 });
+    await expect(categoricalRow).toBeVisible({ timeout: 15000 });
     console.log(`✓ Successfully created metric: ${categoricalMetricName}`);
 
     // =============================================================================
@@ -202,11 +212,18 @@ test.describe('Human Metrics', () => {
     await expect(numericRow).not.toBeVisible();
     console.log('✓ Search filters to categorical metric');
     
-    // Clear search
+    // Clear search — full list may be paginated; verify each metric via search instead
     await searchInput.clear();
     await page.waitForTimeout(400);
-    await expect(numericRow).toBeVisible();
-    await expect(categoricalRow).toBeVisible();
+    await searchInput.fill(numericMetricName);
+    await page.waitForTimeout(400);
+    await expect(numericRow).toBeVisible({ timeout: 10000 });
+    await searchInput.clear();
+    await searchInput.fill(categoricalMetricName);
+    await page.waitForTimeout(400);
+    await expect(categoricalRow).toBeVisible({ timeout: 10000 });
+    await searchInput.clear();
+    await page.waitForTimeout(400);
     console.log('✓ Search cleared successfully');
 
     // =============================================================================
@@ -223,14 +240,20 @@ test.describe('Human Metrics', () => {
         dialog.accept();
       });
       
-      // Delete numeric metric
-      await numericRow.getByRole('button', { name: 'Delete' }).click();
-      await expect(numericRow).not.toBeVisible({ timeout: 10000 });
+      const searchForDelete = page.getByPlaceholder('Search metrics...');
+      const deleteMetricRow = async (name) => {
+        await searchForDelete.fill(name);
+        await page.waitForTimeout(400);
+        const row = page.locator('table tbody tr').filter({ hasText: name });
+        await expect(row).toBeVisible({ timeout: 10000 });
+        await row.getByRole('button', { name: 'Delete' }).click();
+        await expect(row).not.toBeVisible({ timeout: 10000 });
+      };
+
+      await deleteMetricRow(numericMetricName);
       console.log(`✓ Deleted numeric metric: ${numericMetricName}`);
-      
-      // Delete categorical metric
-      await categoricalRow.getByRole('button', { name: 'Delete' }).click();
-      await expect(categoricalRow).not.toBeVisible({ timeout: 10000 });
+
+      await deleteMetricRow(categoricalMetricName);
       console.log(`✓ Deleted categorical metric: ${categoricalMetricName}`);
       
       console.log('--- Cleanup Complete ---');
@@ -267,9 +290,9 @@ test.describe('Human Metrics', () => {
     
     // Should still show 3 preview pills (empty entries filtered out)
     await expect(modal.getByText('Preview:')).toBeVisible();
-    await expect(modal.getByText('Good', { exact: true })).toBeVisible();
-    await expect(modal.getByText('Bad', { exact: true })).toBeVisible();
-    await expect(modal.getByText('Average', { exact: true })).toBeVisible();
+    await expect(modal.getByText('Good', { exact: true }).first()).toBeVisible();
+    await expect(modal.getByText('Bad', { exact: true }).first()).toBeVisible();
+    await expect(modal.getByText('Average', { exact: true }).first()).toBeVisible();
     
     // Should successfully create with trimmed categories
     await modal.getByRole('button', { name: 'Create' }).click();

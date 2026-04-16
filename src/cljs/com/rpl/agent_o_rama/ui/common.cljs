@@ -5,6 +5,29 @@
    [uix.core :as uix :refer [defhook defui $]]
    ["@heroicons/react/24/outline" :refer [ChevronDownIcon InformationCircleIcon]]))
 
+(defn has-more-pages?
+  "True when backend `pagination-params` indicates another page exists."
+  [pagination-params]
+  (boolean
+   (cond
+     (nil? pagination-params) false
+     (string? pagination-params) (seq pagination-params)
+     (map? pagination-params) (some some? (vals pagination-params))
+     (uuid? pagination-params) true
+     :else false)))
+
+(defn pagination-cursor-for-next-page
+  "Cursor for the next page request, or nil if none."
+  [pagination-params]
+  (when (has-more-pages? pagination-params)
+    pagination-params))
+
+(defn full-page-of-items?
+  "True when `items` has at least `limit` entries (Rama queries can return > limit)."
+  [items limit]
+  (and (pos? (or limit 0))
+       (>= (count items) limit)))
+
 ;; =============================================================================
 ;; EVALUATOR TYPE HELPERS (moved here to avoid circular dependencies)
 ;; =============================================================================

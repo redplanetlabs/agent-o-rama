@@ -140,8 +140,7 @@
     (let [thawed-data (from-ui-serializable ?data)
 
           ;; --- The rest of the function operates on thawed-data ---
-          decoded-module-id (when-let [mid (:module-id thawed-data)]
-                              (url-decode mid))
+          module-id (:module-id thawed-data)
           decoded-agent-name (when-let [aname (:agent-name thawed-data)]
                                (url-decode aname))
 
@@ -156,13 +155,12 @@
                                (if (string? iid) (parse-url-pair iid) iid))
 
           ;; --- Fetch Common Contextual Objects ---
-          manager (when decoded-module-id (get-manager decoded-module-id))
+          manager (when module-id (get-manager module-id))
           client (when (and manager decoded-agent-name)
-                   (get-client decoded-module-id decoded-agent-name))
+                   (get-client module-id decoded-agent-name))
 
           ;; --- Build the new, enriched data map ---
           enriched-data (cond-> thawed-data
-                          decoded-module-id (assoc :decoded-module-id decoded-module-id)
                           decoded-agent-name (assoc :decoded-agent-name decoded-agent-name)
                           parsed-dataset-id (assoc :dataset-id parsed-dataset-id)
                           parsed-experiment-id (assoc :experiment-id parsed-experiment-id)

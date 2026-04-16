@@ -1,9 +1,14 @@
 (ns com.rpl.agent-o-rama.ui.module-page
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [CpuChipIcon CircleStackIcon BeakerIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [com.rpl.agent-o-rama.impl.ui.rpc.evaluators :as rpc-evaluators]
+   [re-frame.query :as rfq]
    [reitit.frontend.easy :as rfe]))
 
 ;; --- Reusable Table Components (Extracted from existing pages) ---
@@ -84,15 +89,9 @@
 (defui index [{:keys [module-id]}]
   (let [decoded-module-id (common/url-decode module-id)
         ;; Fetch data for all three sections
-        agents-query (queries/use-sente-query
-                      {:query-key [:module-agents module-id]
-                       :sente-event [:agents/get-for-module {:module-id module-id}]})
-        datasets-query (queries/use-sente-query
-                        {:query-key [:datasets module-id]
-                         :sente-event [:datasets/get-all {:module-id module-id}]})
-        evaluators-query (queries/use-sente-query
-                          {:query-key [:evaluator-instances-list module-id]
-                           :sente-event [:evaluators/get-all-instances {:module-id module-id}]})]
+        agents-query (use-subscribe [::rfq/query ::rpc-agents/get-for-module!! {:module-id module-id}])
+        datasets-query (use-subscribe [::rfq/query ::rpc-datasets/get-all!! {:module-id module-id}])
+        evaluators-query (use-subscribe [::rfq/query ::rpc-evaluators/get-all-instances!! {:module-id module-id}])]
 
     ($ :div.p-6.space-y-8
        ($ :h2.text-2xl.font-bold.text-gray-900 (str "Module: " decoded-module-id))

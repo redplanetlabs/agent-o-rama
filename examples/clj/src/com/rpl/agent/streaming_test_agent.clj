@@ -20,5 +20,8 @@
            (doseq [chunk chunks]
              (aor/stream-chunk! agent-node chunk)
              (Thread/sleep (long delay-ms))))
-         (aor/result! agent-node {:status "complete" :chunk-count (count chunks)})))))
+         ;; Persist chunks on the result for UI replay after root :streaming is GC'd
+         (aor/result! agent-node {:status "complete"
+                                  :chunk-count (count chunks)
+                                  :streaming-chunks (mapv str chunks)})))))
 

@@ -1,10 +1,13 @@
 (ns com.rpl.agent-o-rama.ui.components.json-path-preview
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
+   [re-frame.query :as rfq]
    [clojure.string :as str]
    ["use-debounce" :refer [useDebounce]]))
 
@@ -41,17 +44,16 @@
   (let [[debounced-expression] (useDebounce expression 500)
         should-fetch? (and module-id dataset-id (not (str/blank? debounced-expression)))
 
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:preview-expression module-id dataset-id snapshot-name debounced-expression type source-field]
-          :sente-event [:datasets/preview-expression
+        {:keys [data error]
+         query-status :status}
+        (use-subscribe [::rfq/query ::rpc-datasets/preview-expression!!
                         {:module-id module-id
                          :dataset-id dataset-id
                          :snapshot-name snapshot-name
                          :expression debounced-expression
                          :type type
-                         :source-field source-field}]
-          :enabled? should-fetch?})]
+                         :source-field source-field}])
+        loading? (#{:loading :idle} query-status)]
 
     ($ PreviewBox
        {:result (:result data)
@@ -71,12 +73,9 @@
              {:module-id module-id
               :value selected-dataset
               :on-change set-selected-dataset
-              :sente-event-fn (fn [module-id search-string]
-                                [:datasets/get-all
-                                 {:module-id module-id
-                                  :filters {:search-string search-string}}])
+              :rfq-key ::rpc-datasets/get-all!!
               :items-key :datasets
-              :item-id-fn #(str (:dataset-id %))
+              :item-id-fn :dataset-id
               :item-label-fn :name
               :item-sublabel-fn #(str (:dataset-id %))
               :placeholder "Type to search datasets..."

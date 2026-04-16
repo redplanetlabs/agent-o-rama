@@ -17,6 +17,8 @@
    [com.rpl.agent-o-rama.ui.human-feedback.add-to-queue :as add-to-queue]
 
    [reitit.frontend.easy :as rfe]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
@@ -27,6 +29,35 @@
   ($ :div.p-6.space-y-4
      ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
         content)))
+
+(defn graph-node-data
+  "Look up a node in `graph-data`; React Flow may stringify `:node-id` while keys stay UUIDs."
+  [graph-data node-id]
+  (when (and graph-data node-id)
+    (or (get graph-data node-id)
+        (get graph-data (str node-id))
+        (let [sid (str node-id)]
+          (some (fn [[k v]] (when (= (str k) sid) v)) graph-data)))))
+
+(defn- streaming-replay-chunks
+  "Chunks for the Streaming Output panel: PState merge, result persistence, or node input (E2E)."
+  [raw-node-data flow-node-data]
+  (let [res (or (:result raw-node-data) (:result flow-node-data))
+        from-result (or (get-in res [:val :streaming-chunks])
+                        (get-in res ["val" "streaming-chunks"])
+                        (:streaming-chunks res))
+        from-pstate (or (:streaming-chunks raw-node-data)
+                        (:streaming-chunks flow-node-data))
+        inp (or (:input raw-node-data) (:input flow-node-data))
+        ;; Manual run often passes `[{\"chunks\": [...], \"delay-ms\": n}]`
+        from-input (when (vector? inp)
+                     (let [m (first inp)]
+                       (when (map? m)
+                         (or (:chunks m) (get m "chunks")))))
+        pick (or (when (seq from-pstate) from-pstate)
+                 (when (seq from-result) from-result)
+                 (when (seq from-input) (mapv str from-input)))]
+    pick))
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -289,7 +320,7 @@
              (if submitting? "Submitting..." "Submit Response"))))))
 
 (defui node-info-panel [{:keys [node-id node-name graph-data module-id agent-name invoke-id]}]
-  (let [raw-node-data (get graph-data node-id)
+  (let [raw-node-data (graph-node-data graph-data node-id)
         node-task-id (:node-task-id raw-node-data)]
     ($ :div {:className "bg-indigo-50 p-3 rounded-md mt-4"}
        ($ :div {:className "flex justify-between items-center"}
@@ -411,20 +442,25 @@
                     ($ generic-data-viewer {:data info :color "indigo" :depth 0})))))))))
 
 (defui node-streaming-panel
-  "Displays real-time streaming output from a node.
-   Only shown when the node is actively streaming (in progress and not complete)."
-  [{:keys [module-id agent-name invoke-id node-name node-invoke-id is-streaming?]}]
+  "Displays streaming output: replay chunks from the graph when present, else live hook (future)."
+  [{:keys [module-id agent-name invoke-id node-name node-invoke-id is-streaming? replay-chunks]}]
   (let [{:keys [text streaming? chunks reset-count]}
-        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id)
+        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id
+                                   {:replay-chunks replay-chunks
+                                    :is-live? is-streaming?})
 
         ;; Ref for auto-scrolling
         scroll-ref (uix/use-ref nil)]
 
-    ;; Auto-scroll to bottom when text changes
+    ;; Auto-scroll to bottom when text changes (defer so layout/scrollHeight is final)
     (uix/use-effect
      (fn []
        (when-let [el @scroll-ref]
-         (set! (.-scrollTop el) (.-scrollHeight el))))
+         (letfn [(scroll-end []
+                   (set! (.-scrollTop el) (.-scrollHeight el)))]
+           (js/requestAnimationFrame
+            (fn []
+              (js/requestAnimationFrame scroll-end))))))
      [text])
 
     ;; Only show the panel if we have chunks to display
@@ -462,7 +498,7 @@
        ($ :div {:className "space-y-2"}
           (for [[idx emit] (map-indexed vector (js->clj emits :keywordize-keys true))]
             (let [emit-id (str (:invoke-id emit))
-                  is-loaded (contains? graph-data (:invoke-id emit))
+                  is-loaded (boolean (graph-node-data graph-data (:invoke-id emit)))
                   border-class (if is-loaded "border-indigo-200" "border-dashed border-indigo-300")
                   cursor-class "cursor-pointer"
                   bg-class (if is-loaded "bg-gray-50" "bg-white hover:bg-indigo-50")]
@@ -497,7 +533,7 @@
                                         agent-invoke-id]}]
   (let [;; Determine if node is in progress (started but not finished)
         is-node-in-progress? (and start-time (not finish-time))
-        raw-node-data (get graph-data node-id)]
+        raw-node-data (graph-node-data graph-data node-id)]
     ($ :<>
        ;; Add to Dataset button (first, at top)
        ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.w-full.mb-4
@@ -536,7 +572,8 @@
                                   :invoke-id agent-invoke-id
                                   :node-name node-name
                                   :node-invoke-id node-id  ;; Specific node invocation ID
-                                  :is-streaming? is-node-in-progress?}))
+                                  :is-streaming? is-node-in-progress?
+                                  :replay-chunks (streaming-replay-chunks raw-node-data data)}))
 
        ($ node-exceptions-panel {:exceptions exceptions})
 
@@ -792,7 +829,7 @@
                     node-name (:node exc)
                     throwable-str (:throwable-str exc)
                     first-line (first (str/split-lines throwable-str))
-                    is-loaded? (contains? graph-data invoke-id)]
+                    is-loaded? (boolean (graph-node-data graph-data invoke-id))]
                 ($ :div {:key idx
                          :className "bg-white p-2 rounded border border-red-100"}
                    ;; Stack vertically instead of horizontal flex to prevent overflow
@@ -841,36 +878,30 @@
                       (try
                         ;; Test if it's valid JSON
                         (js/JSON.parse edit-value)
-                        (com.rpl.agent-o-rama.ui.sente/request!
-                         [:invocations/set-metadata {:module-id module-id
-                                                     :agent-name agent-name
-                                                     :invoke-id invoke-id
-                                                     :key m-key
-                                                     :value-str edit-value}]
-                         10000
-                         (fn [reply]
-                           (set-is-saving! false)
-                           (if (:success reply)
-                             (do
-                               (set-editing! false)
-                               (on-change))
-                             (set-error! (or (:error reply) "Save failed.")))))
+                        (-> (rpc/call ::rpc-invocations/set-metadata!!
+                         {:module-id module-id
+                          :agent-name agent-name
+                          :invoke-id invoke-id
+                          :key m-key
+                          :value-str edit-value})
+                        (.then (fn [_]
+                                 (set-is-saving! false)
+                                 (set-editing! false)
+                                 (on-change)))
+                        (.catch (fn [err]
+                                  (set-is-saving! false)
+                                  (set-error! (if (map? err) (or (:error err) "Save failed.") (str err))))))
                         (catch :default e
                           (set-is-saving! false)
                           (set-error! (str "Invalid JSON: " (.-message e))))))
 
         handle-delete (fn []
                         (when (js/confirm (str "Are you sure you want to remove the metadata key '" m-key "'?"))
-                          (com.rpl.agent-o-rama.ui.sente/request!
-                           [:invocations/remove-metadata {:module-id module-id
-                                                          :agent-name agent-name
-                                                          :invoke-id invoke-id
-                                                          :key m-key}]
-                           10000
-                           (fn [reply]
-                             (if (:success reply)
-                               (on-change)
-                               (js/alert (str "Failed to remove metadata: " (:error reply))))))))]
+                          (-> (rpc/call ::rpc-invocations/remove-metadata!!
+                           {:module-id module-id :agent-name agent-name :invoke-id invoke-id :key m-key})
+                          (.then (fn [_] (on-change)))
+                          (.catch (fn [err]
+                                    (js/alert (str "Failed: " (if (map? err) (or (:error err) (str err)) (str err)))))))))]
 
     ($ :div.py-2.sm:grid.sm:grid-cols-3.sm:gap-4.sm:px-0
        ($ :dt.text-sm.font-medium.leading-6.text-gray-900.font-mono.truncate {:title m-key} m-key)
@@ -997,7 +1028,7 @@
        ;; Changed nodes list
        ($ :div {:data-id "changed-nodes-list"}
           (for [[node-id new-input] changed-nodes]
-            (let [node-data (get graph-data node-id)
+            (let [node-data (graph-node-data graph-data node-id)
                   node-name (:node node-data)
                   is-overridden (contains? affected-nodes node-id)
                   handle-select-node (fn [e]
@@ -1216,7 +1247,7 @@
                                              remaining (disj to-visit current)]
                                          (if (visited current)
                                            (recur remaining visited downstream)
-                                           (let [node-data (get graph-data current)
+                                           (let [node-data (graph-node-data graph-data current)
                                                  emitted-ids (set (map :invoke-id (:emits node-data)))
                                                  ;; Add emitted nodes to downstream (but not the starting node)
                                                  new-downstream (if (= current start-node-id)

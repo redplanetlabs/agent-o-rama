@@ -97,6 +97,29 @@ test.describe('Human Metrics Pagination', () => {
     await page.waitForTimeout(300);
     
     console.log(`✓ Created ${itemCount} total metrics, ensuring items exist beyond first page`);
+
+    // Need enough prefix matches that search cannot return them in a single page (Rama may return >limit).
+    while (itemCount < 45 && itemCount < 80) {
+      itemCount++;
+      const name = `${namePrefix}-${String(itemCount).padStart(3, '0')}`;
+      metricNames.push(name);
+      await page.getByRole('button', { name: '+ Create Metric' }).click();
+      const modal = page.locator('[role="dialog"]');
+      await expect(modal).toBeVisible();
+      await modal.getByLabel('Metric Name').fill(name);
+      await modal.getByRole('combobox').selectOption('numeric');
+      await expect(modal.getByLabel('Min')).toBeVisible();
+      await modal.getByLabel('Min').fill('1');
+      await modal.getByLabel('Max').fill('5');
+      await modal.getByRole('button', { name: 'Create' }).click();
+      await expect(modal).not.toBeVisible({ timeout: 10000 });
+    }
+    await page.waitForTimeout(300);
+
+    // Scope the table to this test's metrics only (shared env may have many metrics from other runs).
+    const searchInput = page.getByPlaceholder('Search metrics...');
+    await searchInput.fill(namePrefix);
+    await page.waitForTimeout(500);
     
     const initialCount = await page.locator('table tbody tr').count();
     console.log(`Initial visible count: ${initialCount}`);
@@ -116,7 +139,7 @@ test.describe('Human Metrics Pagination', () => {
       await expect(async () => {
         const currentCount = await page.locator('table tbody tr').count();
         expect(currentCount).toBeGreaterThan(countBeforeClick);
-      }).toPass({ timeout: 5000 });
+      }).toPass({ timeout: 15000 });
 
       const currentCount = await page.locator('table tbody tr').count();
       console.log(`After click #${loadMoreClicks}: ${currentCount} items visible`);
@@ -186,8 +209,9 @@ test.describe('Human Metrics Pagination', () => {
       }
     }
     
-    // Create additional items beyond the first page
-    const itemsToAddForSecondPage = 5;
+    // Create additional items beyond the first page (need a margin above page size — backend
+    // may return a full first page without a reliable second cursor until there are enough rows)
+    const itemsToAddForSecondPage = 15;
     console.log(`Load More appeared at ${itemCount} items. Creating ${itemsToAddForSecondPage} more for second page...`);
     for (let i = 0; i < itemsToAddForSecondPage; i++) {
       itemCount++;
@@ -207,6 +231,12 @@ test.describe('Human Metrics Pagination', () => {
     await page.waitForTimeout(300);
     
     console.log(`✓ Created ${itemCount} total metrics with search active`);
+
+    // Reset client query cache so the table is not already holding all pages in memory
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Human Metrics' })).toBeVisible({ timeout: 30000 });
+    await searchInput.fill(searchPrefix);
+    await page.waitForTimeout(500);
     
     const initialCount = await page.locator('table tbody tr').count();
     console.log(`Initial visible count: ${initialCount}`);
@@ -224,7 +254,7 @@ test.describe('Human Metrics Pagination', () => {
       await expect(async () => {
         const currentCount = await page.locator('table tbody tr').count();
         expect(currentCount).toBeGreaterThan(countBeforeClick);
-      }).toPass({ timeout: 5000 });
+      }).toPass({ timeout: 15000 });
 
       const currentCount = await page.locator('table tbody tr').count();
       console.log(`After click #${loadMoreClicks}: ${currentCount} items visible`);

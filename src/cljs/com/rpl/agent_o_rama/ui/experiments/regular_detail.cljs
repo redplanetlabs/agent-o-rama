@@ -1,13 +1,15 @@
 (ns com.rpl.agent-o-rama.ui.experiments.regular-detail
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [ArrowLeftIcon PlayIcon ChevronDownIcon ChevronUpIcon ArrowTopRightOnSquareIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.queries :as queries]
+   [com.rpl.agent-o-rama.impl.ui.rpc.experiments :as rpc-experiments]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]
+   [re-frame.query :as rfq]
    ;; NEW: Require the forms namespace to access the transformation function
    [com.rpl.agent-o-rama.ui.experiments.forms :as forms]))
 
@@ -561,15 +563,18 @@
                                  ($ :span.ml-2 "Running..."))))))))))))))
 
 (defui regular-experiment-detail-page [{:keys [module-id dataset-id experiment-id]}]
-  (let [{:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:experiment-results module-id dataset-id experiment-id]
-          :sente-event [:experiments/get-results {:module-id module-id
-                                                  :dataset-id dataset-id
-                                                  :experiment-id experiment-id}]
-          :refetch-interval-ms 2000})
+  (let [{:keys [data error]
+         query-status :status}
+        (use-subscribe
+         [::rfq/query
+          ::rpc-experiments/get-results!!
+          {:module-id module-id
+           :dataset-id dataset-id
+           :experiment-id experiment-id}])
         ;; NEW: State for the details panel visibility
         [show-info? set-show-info] (uix/use-state false)
+        loading? (#{:loading :idle} query-status)
+        error-message (when (= query-status :error) error)
         inv-error (:invocation-error data)
         status (cond
                  inv-error :failed
@@ -578,7 +583,7 @@
 
     (cond
       loading? ($ :div.p-6.text-center.py-12 ($ common/spinner {:size :large}))
-      error ($ :div.p-6.text-red-500.text-center.py-8 "Error loading experiment results: " error)
+      error-message ($ :div.p-6.text-red-500.text-center.py-8 "Error loading experiment results: " error-message)
 
       data ($ :div.p-6.space-y-6
               ($ ExperimentHeader {:info (:experiment-info data)

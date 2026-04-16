@@ -19,7 +19,8 @@
    - :module-id - The module ID for queries
    - :value - Current selected value (can be single value or vector for multi-select)
    - :on-change - Callback fn [new-value]
-   - :sente-event-fn - Function [module-id search-string] => sente event vector
+   - :rfq-key - `re-frame.query` registration keyword (HTTP RPC)
+   - :rpc-params-fn - Optional `(fn [module-id debounced-search] params-map)` for :rfq-key
    - :items-key - Keyword to extract items from query result (e.g. :datasets, :items)
    - :item-id-fn - Function to extract ID from item (e.g. :dataset-id, :name)
    - :item-label-fn - Function to extract display label from item (e.g. :name)
@@ -33,7 +34,7 @@
    - :multi-select? - If true, allows multiple selections
    - :with-icon? - If true, shows search icon in input
    - :data-testid - Test ID for the component"
-  [{:keys [module-id value on-change sente-event-fn items-key item-id-fn item-label-fn
+  [{:keys [module-id value on-change rfq-key rpc-params-fn items-key item-id-fn item-label-fn
            item-sublabel-fn placeholder label required? hide-label? error disabled?
            multi-select? with-icon? data-testid]
     :or {placeholder "Type to search..."
@@ -42,7 +43,10 @@
          item-id-fn :name
          item-label-fn :name
          multi-select? false
-         with-icon? false}}]
+         with-icon? false
+         rpc-params-fn (fn [mid s]
+                         {:module-id mid
+                          :filters {:search-string s}})}}]
 
   (let [[search-term set-search-term!] (uix/use-state "")
         [debounced-search] (useDebounce search-term 300)
@@ -52,12 +56,14 @@
         container-ref (uix/use-ref nil)
         [dropdown-pos set-dropdown-pos!] (uix/use-state nil)
 
-        ;; Query items
-        {:keys [data loading? error query-error refetch]}
-        (queries/use-sente-query
-         {:query-key [:searchable-selector module-id (str items-key) debounced-search]
-          :sente-event (sente-event-fn module-id debounced-search)
-          :enabled? true})
+        rpc-params (rpc-params-fn module-id debounced-search)
+
+        ;; Query items (HTTP RPC via re-frame.query)
+        {:keys [data loading? error refetch]}
+        (queries/use-rpc-query
+         {:rfq-key rfq-key
+          :params rpc-params
+          :enabled? (boolean (and rfq-key module-id))})
 
         items (or (get data items-key) [])
 
@@ -240,7 +246,7 @@
                   ($ common/spinner {:size :medium})
                   ($ :span.ml-2 "Loading..."))
 
-               query-error
+               error
                ($ :div.p-3.text-sm.text-red-500
                   {:data-testid (str data-testid "-error-state")}
                   "Error loading items.")

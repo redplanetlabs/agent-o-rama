@@ -2,6 +2,7 @@
   (:require
    [uix.core :as uix :refer [defui defhook $]]
    [uix.dom]
+   [uix.re-frame :refer [use-subscribe]]
    [clojure.string :as str]
 
    [com.rpl.agent-o-rama.ui.agents :as agents]
@@ -15,6 +16,10 @@
    [com.rpl.agent-o-rama.ui.experiments.regular-detail :as experiments-detail]
    [com.rpl.agent-o-rama.ui.experiments.comparative-detail :as comparative-experiments-detail]
    [com.rpl.agent-o-rama.ui.analytics :as analytics]
+   [com.rpl.agent-o-rama.impl.ui.rpc.hello-world :as rpc-hello-world]
+   [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
+   [re-frame.core :as re-frame]
+   [re-frame.query :as rfq]
    [reitit.core :as r]
    [reitit.frontend :as rf]
    [reitit.frontend.easy :as rfe]
@@ -24,7 +29,8 @@
                                           RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon BoltIcon UserIcon QueueListIcon]]
 
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.re-frame]
+   [com.rpl.agent-o-rama.ui.rpc]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -54,6 +60,7 @@
        ["/comparative-experiments/:experiment-id" {:name :module/dataset-detail.comparative-experiment-detail, :views [comparative-experiments-detail/detail-page]}]]]
      ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
      ["/human-metrics" {:name :module/human-metrics, :views [human-feedback-queues/metrics-index]}]
+     ["/rpc-hello" {:name :module/rpc-hello, :views [rpc-hello-world/page]}]
      ["/human-feedback-queues"
       ["" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
       ["/:queue-id"
@@ -162,11 +169,10 @@
 (defui module-context-nav [{:keys [module-id collapsed?]}]
   (let [location (or (get-in (state/use-sub [:route]) [:path]) "/")
         ;; Query for module-specific agents
-        {:keys [data loading? error]}
-        (queries/use-sente-query
-         {:query-key [:module-agents module-id]
-          :sente-event [:agents/get-for-module {:module-id module-id}]
-          :enabled? (boolean module-id)})]
+        {:keys [data error]
+         agents-status :status}
+        (use-subscribe [::rfq/query ::rpc-agents/get-for-module!! {:module-id module-id}])
+        loading? (#{:loading :idle} agents-status)]
     ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
        (when-not collapsed?
          ($ :div.px-3.text-xs.font-semibold.text-gray-500 "MODULE"))
@@ -415,8 +421,16 @@
 
 (defui app [] ($ with-router {:routes routes} ($ main-layout)))
 
+(re-frame/reg-event-db ::init-db
+  (fn [db [_ seed]]
+    (merge {:ui {:modal {:active nil :data {} :form {}}}
+            :forms {}}
+           db
+           seed)))
+
 (defn init []
-  (sente/init!)
+  ;; Seed re-frame app-db with base UI state (forms, modal) at startup
+  (re-frame/dispatch-sync [::init-db {}])
   (uix.dom/render-root
    ($ app)
    (uix.dom/create-root

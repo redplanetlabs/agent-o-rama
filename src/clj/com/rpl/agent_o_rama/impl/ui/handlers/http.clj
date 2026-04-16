@@ -1,10 +1,12 @@
 (ns com.rpl.agent-o-rama.impl.ui.handlers.http
   (:require
+   [cognitect.transit :as transit]
    [clojure.java.io :as io]
    [clojure.string :as str]
    [ring.util.response :as resp]
    [jsonista.core :as j]
    [com.rpl.agent-o-rama :as aor]
+   [com.rpl.agent-o-rama.impl.ui :as ui]
    [com.rpl.agent-o-rama.impl.ui.handlers.common :as common]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
    [com.rpl.agent-o-rama.impl.queries :as queries]
@@ -14,6 +16,74 @@
   (:use [com.rpl.rama]))
 
 (def ^:private mapper (j/object-mapper))
+(def ^:private transit-content-type "application/transit+json; charset=utf-8")
+(def ^:private rpc-allowlist-prefix "com.rpl.agent-o-rama.impl.ui.rpc.")
+
+(defn- parse-rpc-route
+  "Extract RPC var symbol from /api/rpc/:fully-qualified-ns/:method."
+  [uri]
+  (when-let [[_ namespace method]
+             (re-matches #"(?i)/api/rpc/(.+)/([^/]+)" uri)]
+    (symbol (str namespace "/" (common/url-decode method)))))
+
+(defn- allowlisted-rpc-symbol?
+  [sym]
+  (and (str/starts-with? (str (namespace sym)) rpc-allowlist-prefix)
+       (str/ends-with? (name sym) "!!")))
+
+(defn- resolve-rpc-var
+  [sym]
+  (when (allowlisted-rpc-symbol? sym)
+    (requiring-resolve sym)))
+
+(defn- preprocess-rpc-payload
+  [payload]
+  (common/from-ui-serializable payload))
+
+(defn invoke-rpc
+  "Invoke an allowlisted RPC var directly and return a standard reply envelope."
+  [{:keys [rpc-id data]}]
+  (try
+    (let [processed-data (preprocess-rpc-payload data)
+          rpc-var (resolve-rpc-var rpc-id)]
+      (cond
+        (nil? rpc-var)
+        {:success false
+         :error (str "RPC not allowlisted or not found: " rpc-id)
+         :http-status 404}
+
+        (not (fn? @rpc-var))
+        {:success false
+         :error (str "RPC target is not callable: " rpc-id)
+         :http-status 500}
+
+        :else
+        (try
+          {:success true
+           :data (common/->ui-serializable (@rpc-var @ui/system processed-data))}
+          (catch Throwable e
+            {:success false
+             :error (or (.getMessage e) (str e) "Unknown error occurred")
+             :http-status 500}))))
+    (catch Throwable e
+      {:success false
+       :error (str "Fatal error: " (.getMessage e))
+       :http-status 500})))
+
+(defn- parse-transit-body
+  [body]
+  (if body
+    (with-open [in body]
+      (transit/read (transit/reader in :json)))
+    nil))
+
+(defn- transit-response
+  [body]
+  (-> (resp/response
+       (let [out (java.io.ByteArrayOutputStream.)]
+         (transit/write (transit/writer out :json) body)
+         (.toString out "UTF-8")))
+      (resp/content-type transit-content-type)))
 
 (defn- parse-export-params
   "Extract module-id and dataset-id from export route: /api/datasets/:module-id/:dataset-id/export"
@@ -118,3 +188,20 @@
           (-> (resp/response body)
               (resp/status 200)
               (resp/content-type "application/json; charset=utf-8")))))))
+
+(defn handle-rpc
+  [request]
+  (let [{:keys [uri]} request
+        rpc-id (parse-rpc-route uri)
+        request-body (parse-transit-body (:body request))
+        payload (cond
+                  (map? request-body) request-body
+                  (nil? request-body) {}
+                  :else (throw (ex-info "RPC request body must be a map" {:body-type (type request-body)
+                                                                          :uri uri})))
+        reply (invoke-rpc {:rpc-id rpc-id
+                           :data payload})]
+    (if (:success reply)
+      (transit-response reply)
+      (-> (transit-response reply)
+          (resp/status (or (:http-status reply) 400))))))

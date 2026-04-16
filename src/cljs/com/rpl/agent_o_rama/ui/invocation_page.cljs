@@ -4,7 +4,8 @@
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.events] ;; Load event handlers
    [com.rpl.agent-o-rama.ui.invocation-graph-view :as view]
-   [com.rpl.agent-o-rama.ui.sente :as sente]
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.specter :as s]
    [reitit.frontend.easy :as rfe]))
@@ -30,9 +31,6 @@
         forking-mode? (state/use-sub [:ui :forking-mode?])
         changed-nodes (state/use-sub [:ui :changed-nodes])
 
-        ;; Connection state
-        connected? (state/use-sub [:sente :connected?])
-
         ;; Transform nodes to graph-data format
         graph-data (when nodes
                      (into {}
@@ -42,7 +40,7 @@
         ;; 2. The single useEffect to initiate data loading
         _ (uix/use-effect
            (fn []
-             (when (and invoke-id module-id agent-name connected?)
+             (when (and invoke-id module-id agent-name)
                (state/dispatch [:invocation/start-graph-loading
                                 {:invoke-id invoke-id
                                  :module-id module-id
@@ -50,7 +48,7 @@
              ;; Cleanup function
              (fn []
                (state/dispatch [:invocation/cleanup {:invoke-id invoke-id}])))
-           [invoke-id module-id agent-name connected?])
+           [invoke-id module-id agent-name])
 
         ;; Auto-select node when graph data loads
         ;; Priority: 1) node from query param, 2) root node, 3) any first node
@@ -83,21 +81,19 @@
 
         handle-execute-fork (fn []
                               (when (not (empty? changed-nodes))
-                                (sente/request!
-                                 [:invocations/execute-fork
-                                  {:module-id module-id
-                                   :agent-name agent-name
-                                   :invoke-id invoke-id
-                                   :changed-nodes changed-nodes}]
-                                 5000
-                                 (fn [reply]
-                                   (if (:success reply)
-                                     (let [{:keys [task-id agent-invoke-id]} (:data reply)
-                                           new-path (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name)
-                                                         "/invocations/" task-id "-" agent-invoke-id)]
-                                       (state/dispatch [:ui/clear-fork-state])
-                                       (rfe/push-state :agent/invocation-detail {:module-id module-id :agent-name agent-name :invoke-id (str task-id "-" agent-invoke-id)}))
-                                     (js/console.error "Fork failed:" (:error reply)))))))
+                                (-> (rpc/call ::rpc-invocations/execute-fork!!
+                                              {:module-id module-id
+                                               :agent-name agent-name
+                                               :invoke-id invoke-id
+                                               :changed-nodes changed-nodes})
+                                    (.then (fn [data]
+                                             (let [{:keys [task-id agent-invoke-id]} data]
+                                               (state/dispatch [:ui/clear-fork-state])
+                                               (rfe/push-state :agent/invocation-detail
+                                                               {:module-id module-id :agent-name agent-name
+                                                                :invoke-id (str task-id "-" agent-invoke-id)}))))
+                                    (.catch (fn [err]
+                                              (js/console.error "Fork failed:" (if (map? err) (or (:error err) (str err)) (str err))))))))
 
         handle-clear-fork (fn []
                             (state/dispatch [:ui/clear-fork-state]))
@@ -126,7 +122,7 @@
                     :implicit-edges (or implicit-edges [])
                     :is-complete is-complete
                     :is-live (not is-complete)
-                    :connected? connected?
+                    :connected? true
                     :selected-node-id selected-node-id
                     :forking-mode? forking-mode?
                     :changed-nodes changed-nodes

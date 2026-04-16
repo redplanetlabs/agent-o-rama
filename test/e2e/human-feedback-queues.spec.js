@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getBasicAgentRow, getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually } from './helpers.js';
+import { getBasicAgentRow, getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually, checkRubricRequired } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE: Human Feedback Queues
@@ -109,8 +109,7 @@ test.describe('Human Feedback Queues', () => {
     await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
     
     // Toggle required checkbox
-    await firstRubric.getByTestId('metric-required-checkbox').check();
-    await expect(firstRubric.getByTestId('metric-required-checkbox')).toBeChecked();
+    await checkRubricRequired(firstRubric);
     console.log('✓ Added first rubric with required checkbox');
 
     // Add a second rubric
@@ -157,7 +156,7 @@ test.describe('Human Feedback Queues', () => {
     await metricInput.fill(metricName1);
     await page.locator('[role="option"]').filter({ hasText: metricName1 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName1 }).click();
-    await rubric0.getByTestId('metric-required-checkbox').check();
+    await checkRubricRequired(rubric0);
     
     // Submit
     await createButton.click();
@@ -253,15 +252,21 @@ test.describe('Human Feedback Queues', () => {
     expect(visibleCount).toBe(1);
     console.log('✓ Search filtering works');
     
-    // Clear search
+    // Clear search, then narrow again — empty search is debounced/RPC-backed and the row
+    // locator from earlier in the test can briefly match nothing after `.clear()`.
     await searchInput.clear();
     await page.waitForTimeout(500);
+    await searchInput.fill(queueName1);
+    await page.waitForTimeout(500);
+    await expect(queue1Row).toBeVisible({ timeout: 10000 });
 
     // =============================================================================
     // TEST 8: Click queue to navigate to detail page
     // =============================================================================
     console.log('Test 8: Navigating to queue detail page');
-    await queue1Row.getByTestId('queue-name-link').click();
+    const queue1Link = queue1Row.getByTestId('queue-name-link');
+    await queue1Link.scrollIntoViewIfNeeded();
+    await queue1Link.click();
     await expect(page).toHaveURL(new RegExp(`human-feedback-queues/${encodeURIComponent(queueName1)}`));
     await expect(page.getByRole('heading', { name: queueName1 })).toBeVisible();
     console.log('✓ Queue detail page navigation works');
@@ -275,17 +280,23 @@ test.describe('Human Feedback Queues', () => {
     // =============================================================================
     if (!shouldSkipCleanup()) {
       console.log('Test 9: Deleting queues');
-      
-      // Delete first queue
-      page.once('dialog', dialog => dialog.accept());
-      await queue1Row.getByTestId('delete-queue-button').click();
-      await expect(queue1Row).not.toBeVisible({ timeout: 5000 });
+      const searchQueues = page.getByTestId('search-queues-input');
+
+      const deleteQueueByName = async (name) => {
+        await searchQueues.fill(name);
+        await page.waitForTimeout(500);
+        const row = page.getByTestId(`queue-row-${name}`);
+        await expect(row).toBeVisible({ timeout: 10000 });
+        await row.getByTestId('delete-queue-button').scrollIntoViewIfNeeded();
+        page.once('dialog', (dialog) => dialog.accept());
+        await row.getByTestId('delete-queue-button').click();
+        await expect(row).not.toBeVisible({ timeout: 10000 });
+      };
+
+      await deleteQueueByName(queueName1);
       console.log(`✓ Deleted queue: ${queueName1}`);
-      
-      // Delete second queue
-      page.once('dialog', dialog => dialog.accept());
-      await queue2Row.getByTestId('delete-queue-button').click();
-      await expect(queue2Row).not.toBeVisible({ timeout: 5000 });
+
+      await deleteQueueByName(queueName2);
       console.log(`✓ Deleted queue: ${queueName2}`);
       
       // Delete test metrics
@@ -401,8 +412,7 @@ test.describe('Human Feedback Queues', () => {
     await metricInput2.fill(metricName2);
     await page.locator('[role="option"]').filter({ hasText: metricName2 }).waitFor({ timeout: 10000 });
     await page.locator('[role="option"]').filter({ hasText: metricName2 }).click();
-    await newRubric.getByTestId('metric-required-checkbox').check();
-    await expect(newRubric.getByTestId('metric-required-checkbox')).toBeChecked();
+    await checkRubricRequired(newRubric);
     console.log('✓ Added new metric with required status');
     
     // Submit update
@@ -420,10 +430,17 @@ test.describe('Human Feedback Queues', () => {
     if (!shouldSkipCleanup()) {
       console.log('--- Cleanup ---');
       await page.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
-      page.once('dialog', dialog => dialog.accept());
-      await queueRow.getByTestId('delete-queue-button').click();
-      await expect(queueRow).not.toBeVisible({ timeout: 5000 });
-      
+      await expect(page).toHaveURL(/human-feedback-queues$/);
+      const searchQueues = page.getByTestId('search-queues-input');
+      await searchQueues.fill(queueName);
+      await page.waitForTimeout(500);
+      const row = page.getByTestId(`queue-row-${queueName}`);
+      await expect(row).toBeVisible({ timeout: 10000 });
+      await row.getByTestId('delete-queue-button').scrollIntoViewIfNeeded();
+      page.once('dialog', (dialog) => dialog.accept());
+      await row.getByTestId('delete-queue-button').click();
+      await expect(row).not.toBeVisible({ timeout: 10000 });
+
       await page.getByText('Human Metrics').click();
       await deleteHumanMetric(page, metricName1);
       await deleteHumanMetric(page, metricName2);
