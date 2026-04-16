@@ -1,12 +1,16 @@
 #!/bin/sh
+# Frontend release build — keep in sync with .github/workflows/test.yml
+# "Build frontend for UI tests" (NODE_ENV, npm ci, assets copy, shadow release :frontend).
 
-# Set NODE_ENV to production for React production builds
+set -e
+
+lein deps
 export NODE_ENV=production
 
-npm i
+npm ci
+
 rm -rf resource/public
 mkdir -p resource/public
 cp -r resource/assets/* resource/public
-# Use 'release' instead of 'compile' for production builds
-# This automatically enables advanced optimizations and NODE_ENV=production for npm
+
 lein with-profile +ui run -m shadow.cljs.devtools.cli release :frontend

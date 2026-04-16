@@ -1,14 +1,10 @@
- (ns com.rpl.agent-o-rama.impl.ui.rpc.experiments
-   (:require
-    [re-frame.query :as rfq]))
+(ns com.rpl.agent-o-rama.impl.ui.rpc.experiments
+  (:require
+   [re-frame.query :as rfq])
+  (:require-macros [com.rpl.agent-o-rama.impl.ui.rpc.query-macros :as rpcq]))
 
- (def ^:export _q1
-  (rfq/reg-query
-  ::get-results!!
-  {:query-fn (fn [params]
-               {:rpc/id ::get-results!!
-                :payload params})
-   :stale-time-ms 0
+(rpcq/defrpc-query ::get-results!!
+  {:stale-time-ms 0
    :polling-interval-ms 2000
    :tags (fn [{:keys [module-id dataset-id experiment-id]}]
-           [[:experiment-results module-id dataset-id experiment-id]])}))
+           [[:experiment-results module-id dataset-id experiment-id]])})

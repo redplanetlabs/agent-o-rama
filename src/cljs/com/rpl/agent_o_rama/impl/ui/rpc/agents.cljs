@@ -1,23 +1,14 @@
 (ns com.rpl.agent-o-rama.impl.ui.rpc.agents
   (:require
-   [re-frame.query :as rfq]))
+   [re-frame.query :as rfq])
+  (:require-macros [com.rpl.agent-o-rama.impl.ui.rpc.query-macros :as rpcq]))
 
-(def ^:export q-get-all
-  (rfq/reg-query
-   ::get-all!!
-   {:query-fn (fn [_params]
-                {:rpc/id ::get-all!!
-                 :payload {}})
-    :stale-time-ms 0
-    :polling-interval-ms 2000
-    :tags (constantly [[:agents]])}))
+(rpcq/defrpc-query ::get-all!!
+  {:stale-time-ms 0
+   :polling-interval-ms 2000
+   :tags (constantly [[:agents]])})
 
-(def ^:export q-get-for-module
-  (rfq/reg-query
-   ::get-for-module!!
-   {:query-fn (fn [{:keys [module-id] :as params}]
-                 {:rpc/id ::get-for-module!!
-                  :payload params})
-    :stale-time-ms 0
-    :tags (fn [{:keys [module-id]}]
-             [[:module-agents module-id]])}))
+(rpcq/defrpc-query ::get-for-module!!
+  {:stale-time-ms 0
+   :tags (fn [{:keys [module-id]}]
+           [[:module-agents module-id]])})

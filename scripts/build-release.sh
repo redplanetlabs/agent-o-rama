@@ -12,6 +12,7 @@ cp scripts/aor _release/
 cp scripts/log4j2.properties _release/
 cp VERSION _release/
 
+# UI: scripts/build-ui.sh matches CI frontend build (lein deps, npm ci, NODE_ENV=production, shadow release :frontend)
 sh scripts/build-ui.sh
 lein jar
 cp target/agent-o-rama*jar _release/agent-o-rama.jar
