@@ -79,6 +79,8 @@
   )
 
 (comment
+  (require '[snitch.core :refer [defn* defmethod* *fn *let]])
+  
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (def ipc (rtest/create-ipc))
   (launch-dev ipc)

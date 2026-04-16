@@ -76,7 +76,8 @@
                            [com.blockether/spel "0.7.11"]
                            [clj-test-containers/clj-test-containers "0.7.4"]
                            [org.testcontainers/testcontainers "2.0.3"]
-                           [clj-kondo "2025.09.22"]]}
+                           [clj-kondo "2025.09.22"]
+                           [org.clojars.abhinav/snitch "0.1.16"]]}
              :examples   {:test-paths   ["examples/clj/test"]
                           :source-paths ["examples/clj/src"]}
              :provided   {:dependencies [[com.rpl/rama "1.2.0"]
