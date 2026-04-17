@@ -845,6 +845,17 @@
    (<<ramafn %update-nil-time
      [*v]
      (:> (or> *v *curr-millis)))
+   (<<if (not= *value iclient/FINISHED-INVOKE)
+     (local-transform>
+      [(keypath *agent-id)
+       (selected?
+        (keypath :streaming *node)
+        :invokes
+        (keypath *invoke-id)
+        (nil->val -1)
+        (pred %correct-index?))
+       [:first-token-time-millis (term %update-nil-time)]]
+      $$root))
    (local-transform>
     [(keypath *agent-id)
      (selected?
@@ -853,12 +864,10 @@
       (keypath *invoke-id)
       (nil->val -1)
       (pred %correct-index?))
+     (keypath :streaming *node)
      (multi-path
-      [:first-token-time-millis (term %update-nil-time)]
-      [(keypath :streaming *node)
-       (multi-path
-        [:all AFTER-ELEM (termval *chunk)]
-        [:invokes (keypath *invoke-id) (termval *streaming-index)])])]
+      [:all AFTER-ELEM (termval *chunk)]
+      [:invokes (keypath *invoke-id) (termval *streaming-index)])]
     $$root)
   ))
 
