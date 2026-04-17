@@ -133,12 +133,9 @@
       
       :on-close
       (fn [_ch _status]
-        (try
-          (when-let [s @stream*]
-            (when (instance? java.io.Closeable s)
-              (.close ^java.io.Closeable s)))
-          (catch Throwable t
-            (.printStackTrace t))))})))
+        (when-let [s @stream*]
+          (when (instance? java.io.Closeable s)
+            (.close ^java.io.Closeable s))))})))
 
 (defn- parse-export-params
   "Extract module-id and dataset-id from export route: /api/datasets/:module-id/:dataset-id/export"
