@@ -202,6 +202,7 @@
     (aor/remove-metadata! client invoke key)
     {:success true}))
 
+
 (defn stream-node!!sse
   "SSE RPC: subscribes to [[com.rpl.agent-o-rama/agent-stream-specific]] for one node invocation.
    Invoked as (stream-node!!sse system payload on-event); returns a Closeable stream handle.
@@ -210,10 +211,13 @@
   (when-not (uuid? node-invoke-id)
     (throw (ex-info "node-invoke-id must be a UUID" {:node-invoke-id node-invoke-id})))
   (let [client (get-client system module-id agent-name)]
-    (if-not client
+    (cond
+      (not client)
       (do
         (on-event {:all-chunks [] :new-chunks [] :reset? false :complete? true})
         (reify java.io.Closeable (close [_])))
+
+      :else
       (let [[task-id agent-id] (common/parse-url-pair invoke-id)
             invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
         (aor/agent-stream-specific client invoke node-name node-invoke-id

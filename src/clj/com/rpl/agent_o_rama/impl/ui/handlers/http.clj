@@ -94,6 +94,8 @@
     (transit/write (transit/writer out :json) (common/->ui-serializable data))
     (.toString out "UTF-8")))
 
+(def stream* (atom nil))
+
 (defn- handle-sse-rpc [rpc-var system processed-data request]
   (cond
     (nil? rpc-var)
@@ -106,37 +108,37 @@
     (-> (transit-response {:success false
                            :error (str "RPC target is not callable: " rpc-var)
                            :http-status 500})
-        (resp/status http-status))
+        (resp/status 500))
 
     :else
-    (http-kit/with-channel request channel
-      (http-kit/send!
-       channel
-       {:headers {"Content-Type" "text/event-stream"
-                  "Cache-Control" "no-cache"
-                  "Connection" "keep-alive"
-                  "X-Accel-Buffering" "no"}
-        :status 200}
-       false)
-      (try
-        (let [emit (fn emit [data]
-                     (let [payload (str "data: " (write-transit-str data) "\n\n")
-                           close-after? (boolean (:complete? data))]
-                       ;; Close the HTTP chunk stream after the terminal event so the client fetch ends.
-                       (http-kit/send! channel payload close-after?)))
-              stream-obj (@rpc-var system processed-data emit)]
-          (http-kit/on-close channel
-                             (fn [_status]
-                               (try
-                                 (when (instance? java.io.Closeable stream-obj)
-                                   (.close ^java.io.Closeable stream-obj))
-                                 (catch Throwable t
-                                   (.printStackTrace t))))))
-        (catch Throwable t
-          (.printStackTrace t)
-          (try
-            (http-kit/close channel)
-            (catch Throwable _ _)))))))
+    (http-kit/as-channel
+     request
+     {:on-open
+      (fn [ch]
+        (http-kit/send! ch
+                        {:headers {"Content-Type" "text/event-stream"
+                                   "Cache-Control" "no-cache"
+                                   "Connection" "keep-alive"
+                                   "X-Accel-Buffering" "no"}
+                         :status 200}
+                        false)
+        (reset! stream*
+                (@rpc-var
+                 system
+                 processed-data
+                 (fn emit [data]
+                   (let [payload (str "data: " (write-transit-str data) "\n\n")
+                         close-after? (boolean (:complete? data))]
+                     (http-kit/send! ch payload close-after?))))))
+      
+      :on-close
+      (fn [_ch _status]
+        (try
+          (when-let [s @stream*]
+            (when (instance? java.io.Closeable s)
+              (.close ^java.io.Closeable s)))
+          (catch Throwable t
+            (.printStackTrace t))))})))
 
 (defn- parse-export-params
   "Extract module-id and dataset-id from export route: /api/datasets/:module-id/:dataset-id/export"
