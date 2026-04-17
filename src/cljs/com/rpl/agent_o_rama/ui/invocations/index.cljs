@@ -140,7 +140,7 @@
             ($ :div.text-gray-500 "No invocations found"))
 
          :else
-         ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-hidden.shadow-sm
+         ($ :div.bg-white.rounded-md.border.border-gray-200.overflow-x-auto.shadow-sm
             ($ :table.w-full.text-sm
                ($ :thead.bg-gray-50.border-b.border-gray-200
                   ($ :tr

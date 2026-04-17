@@ -280,6 +280,13 @@ test.describe('Invocations filters', () => {
         for (const runId of expected.exclude) {
           await expect(page.locator('tbody tr').filter({ hasText: runId })).toHaveCount(0);
         }
+
+        if (comparator === '<=') {
+          // Confirm feedback metric column renders and score values are shown in-row.
+          await expect(page.locator('thead th').filter({ hasText: metricName })).toBeVisible();
+          const feedbackThreeRow = page.locator('tbody tr').filter({ hasText: runIds.feedbackThree }).first();
+          await expect(feedbackThreeRow.locator('td').last()).toHaveText('3');
+        }
       }
     } finally {
       if (!shouldSkipCleanup()) {
