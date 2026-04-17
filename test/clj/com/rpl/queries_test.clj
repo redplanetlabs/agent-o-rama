@@ -4,6 +4,7 @@
         [com.rpl.rama]
         [com.rpl.rama.path])
   (:require
+   [clojure.string :as str]
    [clojure.set :as set]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.impl.evaluators :as evals]
@@ -294,6 +295,25 @@
      (bind err-rows (:agent-invokes err-res))
      (is (seq err-rows))
      (is (every? #(= :failure (:status %)) err-rows))
+
+     (bind args-search-res
+       (foreign-invoke-query q
+                             20
+                             100
+                             nil
+                             {:args-query "FAIL"}))
+     (bind args-search-rows (:agent-invokes args-search-res))
+     (is (= 2 (count args-search-rows)))
+     (is (every? #(str/includes? (-> % :invoke-args str str/lower-case) "fail")
+                 args-search-rows))
+
+     (bind args-search-empty-res
+       (foreign-invoke-query q
+                             20
+                             100
+                             nil
+                             {:args-query "definitely-not-present"}))
+     (is (empty? (:agent-invokes args-search-empty-res)))
 
      ;; Add human feedback scores for metric-filter testing.
      (bind fast-target

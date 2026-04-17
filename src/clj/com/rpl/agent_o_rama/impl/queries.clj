@@ -521,9 +521,26 @@
                 (some? (invoke-feedback-metric-value m metric)))
               metrics))))
 
+(defn invoke-args-matches?
+  [m args-query]
+  (cond
+    (nil? args-query)
+    true
+
+    (not (string? args-query))
+    (throw (ex-info "args-query must be a string" {:args-query args-query}))
+
+    :else
+    (let [normalized-query (-> args-query str/trim str/lower-case)]
+      (if (str/blank? normalized-query)
+        true
+        (let [args-text (some-> (:invoke-args m) str str/lower-case)]
+          (and (some? args-text)
+               (str/includes? args-text normalized-query)))))))
+
 (defn invoke-matches-filters?
   [m filters]
-  (let [{:keys [node-names has-error? latency-ms source source-not? feedback-metrics]} filters
+  (let [{:keys [node-names has-error? latency-ms source source-not? feedback-metrics args-query]} filters
         status (invoke-status m)
         latency (invoke-latency-millis m)
         {:keys [min max]} (or latency-ms {})
@@ -542,7 +559,8 @@
        (and (some? latency) (<= latency max))
        true)
      (invoke-source-matches? m source source-not?)
-     (invoke-feedback-matches? m feedback-metrics))))
+     (invoke-feedback-matches? m feedback-metrics)
+     (invoke-args-matches? m args-query))))
 
 (defn relevant-invoke-submap
   ([m]
