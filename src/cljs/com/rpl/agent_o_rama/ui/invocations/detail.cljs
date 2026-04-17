@@ -1,11 +1,11 @@
-(ns com.rpl.agent-o-rama.ui.invocation-page
+(ns com.rpl.agent-o-rama.ui.invocations.detail
   (:require
    [re-frame.core :as rf]
    [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [$ defui]]
    [com.rpl.agent-o-rama.ui.events] ;; Load event handlers
-   [com.rpl.agent-o-rama.ui.invocation-graph-view :as view]
+   [com.rpl.agent-o-rama.ui.invocations.graph-view :as view]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
    [com.rpl.agent-o-rama.ui.common :as common]

@@ -1,4 +1,4 @@
-(ns com.rpl.agent-o-rama.ui.invocation-graph-view
+(ns com.rpl.agent-o-rama.ui.invocations.graph-view
   (:require
    [re-frame.core :as rf]
    [uix.re-frame :refer [use-subscribe]]
@@ -336,7 +336,7 @@
                                   (.stopPropagation e)
                                   (rf/dispatch [:modal/show :exception-detail
                                                    {:title (str "Exception " (inc idx))
-                                                    :component ($ ExceptionDetailModal {:title (str "Exception " (inc idx)) :content exc-text})}]))
+                                                    :component ($ ExceptionDetailModal {:title (str "Exception " (inc idx)) :content exc-str})}]))
                        :title "Click to view full exception"}
                  ($ :div {:className "text-xs font-mono text-red-800"}
                     first-line))))))))

@@ -39,7 +39,8 @@
    [com.rpl.agent-o-rama.ui.rules :as rules]
    [com.rpl.agent-o-rama.ui.action-log :as action-log]
    [com.rpl.agent-o-rama.ui.human-feedback-queues :as human-feedback-queues]
-   [com.rpl.agent-o-rama.ui.invocations.filters]))
+   [com.rpl.agent-o-rama.ui.invocations.filters]
+   [com.rpl.agent-o-rama.ui.invocations.index :as inv-index]))
 
 (def routes
   [""
@@ -72,7 +73,7 @@
       ["" {:name :agent/detail, :views [agents/agent]}]
 
       ["/invocations"
-       ["" {:name :agent/invocations, :views [agents/invocations]
+       ["" {:name :agent/invocations, :views [inv-index/invocations]
             :parameters {:query [:map [:filters {:optional true} :string]]}}]
        ["/:invoke-id" {:name :agent/invocation-detail
                        :views [agents/invoke]
