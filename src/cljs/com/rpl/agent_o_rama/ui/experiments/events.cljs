@@ -1,39 +1,35 @@
 (ns com.rpl.agent-o-rama.ui.experiments.events
   (:require
-   [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.specter :as s]))
+   [re-frame.core :as rf]))
 
-(state/reg-event
+(rf/reg-event-db
  :form/set-experiment-target-type
- (fn [db form-id target-index new-type]
+ (fn [db [_ form-id target-index new-type]]
    (cond
-     ;; Handle experiment type changes (when target-index is 0 and new-type is :regular or :comparative)
      (and (= target-index 0) (#{:regular :comparative} new-type))
-     (s/multi-path
-      ;; Update the experiment type
-      [[:forms form-id :spec :type] (s/terminal-val new-type)]
-      ;; Ensure we have the right number of targets
-      [[:forms form-id :spec :targets] (s/terminal (fn [targets]
-                                                     (if (= new-type :regular)
-                                                       ;; For regular, ensure we have exactly 1 target
-                                                       (if (empty? targets)
-                                                         [{:target-spec {:type :agent :agent-name nil} :input->args [{:id (random-uuid) :value "$"}]}]
-                                                         [(first targets)])
-                                                       ;; For comparative, ensure we have at least 2 targets
-                                                       (if (< (count targets) 2)
-                                                         (vec (take 2 (concat targets (repeat {:target-spec {:type :agent :agent-name nil} :input->args [{:id (random-uuid) :value "$"}]}))))
-                                                         targets))))])
+     (let [targets-path [:forms form-id :spec :targets]
+           current-targets (get-in db targets-path [])
+           new-targets (if (= new-type :regular)
+                         (if (empty? current-targets)
+                           [{:target-spec {:type :agent :agent-name nil}
+                             :input->args [{:id (random-uuid) :value "$"}]}]
+                           [(first current-targets)])
+                         (if (< (count current-targets) 2)
+                           (vec (take 2 (concat current-targets
+                                               (repeat {:target-spec {:type :agent :agent-name nil}
+                                                        :input->args [{:id (random-uuid) :value "$"}]}))))
+                           current-targets))]
+       (-> db
+           (assoc-in [:forms form-id :spec :type] new-type)
+           (assoc-in targets-path new-targets)))
 
-     ;; Handle target type changes (when new-type is :agent or :node)
      (#{:agent :node} new-type)
-     (let [base-path [:forms form-id :spec :targets target-index :target-spec]]
-       (s/multi-path
-        ;; 1. Set the new type
-        [(into base-path [:type]) (s/terminal-val new-type)]
-        ;; 2. Atomically clean up the spec based on the new type
-        [base-path (s/terminal (fn [target-spec]
-                                 (if (= new-type :agent)
-                                   ;; If switching to agent, remove the :node key
-                                   (dissoc target-spec :node)
-                                   ;; If switching to node, ensure :node key exists
-                                   (assoc target-spec :node ""))))])))))
+     (let [base-path [:forms form-id :spec :targets target-index :target-spec]
+           cur (get-in db base-path {})]
+       (assoc-in db base-path
+                 (if (= new-type :agent)
+                   (-> cur (assoc :type :agent) (dissoc :node))
+                   (-> cur (assoc :type :node) (assoc :node (or (:node cur) ""))))))
+
+     :else db)))
+

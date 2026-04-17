@@ -3,7 +3,6 @@
             [uix.re-frame :refer [use-subscribe]]
             [re-frame.core :as rf]
             [re-frame.query :as rfq]
-            [com.rpl.agent-o-rama.ui.state :as state]
             [com.rpl.agent-o-rama.ui.common :as common]
             [com.rpl.specter :as s]))
 

@@ -29,7 +29,7 @@
                                           RectangleStackIcon ChartBarIcon BeakerIcon Cog6ToothIcon BoltIcon UserIcon QueueListIcon]]
 
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.re-frame]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-re-frame]
    [com.rpl.agent-o-rama.ui.rpc]
    [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
@@ -116,7 +116,7 @@
      #(do
         (reset! router-instance router)
         (rfe/start! router
-                    (fn [new-match] (state/dispatch [:route/navigated new-match]))
+                    (fn [new-match] (re-frame/dispatch [:route/navigated new-match]))
                     {:use-fragment false}))
      [router])
     ($ :<> children)))
@@ -425,9 +425,7 @@
 
 (re-frame/reg-event-db ::init-db
   (fn [db [_ seed]]
-    (merge {:ui {:modal {:active nil :data {} :form {}}}
-            :forms {}
-            :invocations-filters {}}
+    (merge aor-re-frame/default-app-db
            db
            seed)))
 
