@@ -147,12 +147,14 @@
 ;; --- Merge editor slice -> :applied ------------------------------------------
 
 (defn merge-node-into-applied [applied editor open-editor]
-  (let [names (:node-names editor)]
+  (let [names (filterv #(not (str/blank? (str %))) (:node-names editor))]
     (if (= :new (:mode open-editor))
       (if (seq names)
         (update applied :node-names (fn [o] (conj (vec o) (first names))))
         applied)
-      (assoc applied :node-names (vec names)))))
+      (if (seq names)
+        (assoc applied :node-names names)
+        (dissoc applied :node-names)))))
 
 (defn merge-latency-into-applied [applied editor]
   (let [lm (:latency-ms editor)]
@@ -465,7 +467,10 @@
                                           (fn [prev]
                                             (let [n (vec (:node-names prev))]
                                               (if (and (integer? idx) (<= 0 idx) (< idx (count n)))
-                                                (assoc prev :node-names (assoc n idx v))
+                                                (assoc prev :node-names
+                                                       (if (str/blank? v)
+                                                         (vec (concat (subvec n 0 idx) (subvec n (inc idx))))
+                                                         (assoc n idx v)))
                                                 prev)))))))}
                         ($ :option {:value ""} "Select node")
                         (for [node-name node-options
