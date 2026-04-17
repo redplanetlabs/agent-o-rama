@@ -14,7 +14,7 @@
    [re-frame.query :as rfq]
   [com.rpl.agent-o-rama.ui.common :as common]
   [com.rpl.agent-o-rama.ui.rpc :as rpc]
-  [com.rpl.agent-o-rama.ui.state :as ui-state]
+  [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
   [clojure.string :as str]
   [com.rpl.specter :as s]
   ["react-dom" :refer [createPortal]]))
@@ -331,20 +331,7 @@
   (fn [db [_ form-id path]]
     (get-in db (into [:forms form-id :errors] path))))
 
-;; Temporary shim — callers still using state/use-sub path directly
-;; will continue to work because re-frame and custom state share the :forms path
-;; via the legacy compat bridge below.
-
-;; =============================================================================
-;; LEGACY COMPAT BRIDGE
-;; =============================================================================
-;; The custom state/app-db atom and re-frame app-db are SEPARATE stores.
-;; Forms now live exclusively in re-frame.  Components that used
-;; (state/use-sub [:forms ...]) need to switch to (use-subscribe [::form ...])
-;; or (use-subscribe [::form-field ...]).
-;;
-;; The modal/show-form + modal/hide events need to dispatch to re-frame.
-;; We register them as plain re-frame events below.
+;; Forms and modal chrome live in re-frame at [:forms ...] and [:ui :modal].
 
 (rf/reg-event-fx :modal/show-form
   (fn [{:keys [db]} [_ form-id props]]
@@ -511,7 +498,7 @@
                     (:submit-text modal-data "Submit")))))))))
 
 (defui global-modal-component []
-  (let [modal-state  (use-subscribe [::ui-state/aor-global-modal])
+  (let [modal-state  (use-subscribe [::aor-rf/aor-global-modal])
         {:keys [active data]} modal-state
         form-id      (when active (:form-id data))
         form-state   (use-subscribe [::form form-id])

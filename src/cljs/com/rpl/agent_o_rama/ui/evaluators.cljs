@@ -545,23 +545,18 @@
             ($ :div.bg-green-50.rounded-md.p-4.border.border-green-200
                ($ :pre.text-sm.text-gray-900.whitespace-pre-wrap.font-mono (js/JSON.stringify (clj->js evaluation-result) nil 2))))))))
 
-;; Event handler to show the Try Evaluator modal with a pre-selected evaluator
-(state/reg-event
+(rf/reg-event-fx
  :evaluators/show-try-modal
- (fn [_db {:keys [evaluator module-id]}]
-   ;; Dispatch the generic :modal/show event with RunEvaluatorModal
-   ;; In :single mode with a nil example, which signals empty textareas
-   (state/dispatch [:modal/show :run-evaluator
-                    {:title (str "Try Evaluator: " (:name evaluator))
-                     :component ($ RunEvaluatorModal
-                                   {:module-id module-id
-                                    :mode :single ;; Testing a single run
-                                    :pre-selected-evaluator evaluator ;; Pre-select the evaluator
-                                    :example nil ;; nil example means "start from scratch"
-                                    :dataset-id nil
-                                    :selected-example-ids nil})}])
-   ;; Return nil to indicate no direct state change (the dispatched event handles it)
-   nil))
+ (fn [_ [_ {:keys [evaluator module-id]}]]
+   {:dispatch [:modal/show :run-evaluator
+               {:title (str "Try Evaluator: " (:name evaluator))
+                :component ($ RunEvaluatorModal
+                              {:module-id module-id
+                               :mode :single
+                               :pre-selected-evaluator evaluator
+                               :example nil
+                               :dataset-id nil
+                               :selected-example-ids nil})}]}))
 
  ;; =============================================================================
 ;; MAIN PAGE COMPONENT

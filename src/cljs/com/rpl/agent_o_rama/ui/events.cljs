@@ -1,13 +1,11 @@
 (ns com.rpl.agent-o-rama.ui.events
-  (:require [com.rpl.agent-o-rama.ui.state :as state]
-            [com.rpl.agent-o-rama.ui.common :as common]
-            [com.rpl.agent-o-rama.ui.rpc :as rpc]
+  (:require [com.rpl.agent-o-rama.ui.rpc :as rpc]
             [com.rpl.agent-o-rama.ui.forms :as forms]
             [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
             [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
             [com.rpl.agent-o-rama.impl.ui.rpc.config :as rpc-config]
             [re-frame.core :as rf]
-            [com.rpl.specter :as s]
+            [re-frame.db :as rdb]
             [clojure.string :as str]))
 
 ;; Orchestration events that perform side-effects (HTTP RPC),
@@ -42,8 +40,6 @@
             (let [node-data (get raw-nodes current-id)
                   node-name (:node node-data)]
 
-              ;; Skip incomplete nodes (race condition: node started but :node field not yet
-              ;; populated)
               (if-not node-name
                 (recur remaining-to-visit
                        drawable-nodes
@@ -52,21 +48,17 @@
                        (conj visited current-id))
 
                 (let [static-info (get-in historical-graph [:node-map node-name])
-
-                      ;; 1. FIND REAL EDGES & CHILDREN
-                      ;; Filter out incomplete nodes (no :node field) from children
                       emitted-ids (set (map :invoke-id (:emits node-data)))
                       drawable-children (filter (fn [child-id]
                                                   (and (contains? raw-nodes child-id)
                                                        (:node (get raw-nodes child-id))))
-                                         emitted-ids)
+                                                emitted-ids)
 
                       new-real-edges (for [child-id drawable-children]
                                        {:id     (str "real-" current-id "-" child-id)
                                         :source (str current-id)
                                         :target (str child-id)})
 
-                      ;; 2. FIND IMPLICIT EDGES (for aggregation contexts)
                       agg-context (:agg-context static-info)
                       is-agg-start? (and agg-context (not (:incomplete? node-data)))
 
@@ -82,16 +74,10 @@
                                                     (get-in historical-graph
                                                             [:node-map out-node-name :node-type]))
                                    agg-node-data (get raw-nodes agg-node-invoke-id)]
-                               ;; Only create implicit edge if:
-                               ;; - It's an agg node
-                               ;; - The agg node exists and is complete (has :node field)
-                               ;; - We haven't visited it yet
-                               ;; - There's no explicit emit to it already
-
                                (if (and is-agg-node?
                                         agg-node-invoke-id
                                         agg-node-data
-                                        (:node agg-node-data) ; ← Filter incomplete nodes
+                                        (:node agg-node-data)
                                         (not (contains? visited agg-node-invoke-id))
                                         (not (contains? emitted-ids agg-node-invoke-id)))
                                  {:targets (conj (:targets acc) agg-node-invoke-id)
@@ -111,269 +97,222 @@
                          (into implicit-edges implicit-edge-list)
                          (conj visited current-id)))))))))))
 
-;; =============================================================================
-;; ROBUST STREAMING LOOP WITH STATE MANAGEMENT
-;; =============================================================================
+(defn- nodes->map [nodes]
+  (cond
+    (map? nodes) nodes
+    (sequential? nodes) (into {} (map (juxt :invoke-id identity) nodes))
+    :else {}))
 
-;; Main entry point for loading any invocation (live or historical)
-;; This is the single entry point to start or restart polling
-(state/reg-event :invocation/start-graph-loading
-                 (fn [db {:keys [invoke-id module-id agent-name]}]
-                   (state/dispatch [:db/set-value [:current-invocation] {:invoke-id invoke-id
-                                                                        :module-id module-id
-                                                                        :agent-name agent-name}])
+(defn- apply-summary-kvps [db invoke-id page-data]
+  (let [{:keys [summary task-id forks fork-of historical-graph root-invoke-id]} page-data]
+    (if-not summary
+      db
+      (let [kvps (cond-> [[[:invocations-data invoke-id :summary] summary]
+                          [[:invocations-data invoke-id :task-id] task-id]
+                          [[:invocations-data invoke-id :forks] forks]
+                          [[:invocations-data invoke-id :fork-of] fork-of]
+                          [[:invocations-data invoke-id :status] :success]]
+                   (some? historical-graph)
+                   (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
 
-                   ;; Always fetch data on navigation to ensure fresh data
-                   ;; Set status to loading immediately to prevent stale data display
-                   (state/dispatch [:db/set-value [:invocations-data invoke-id :status] :loading])
-                   (state/dispatch [:invocation/fetch-graph-page
-                                    {:invoke-id invoke-id
-                                     :module-id module-id
-                                     :agent-name agent-name}])
-                   nil))
+                   (some? root-invoke-id)
+                   (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
+        (reduce (fn [d [p v]] (assoc-in d p v)) db kvps)))))
 
-;; =============================================================================
-;; UNIFIED STREAMING LOOP
-;; =============================================================================
+(defn- merge-nodes-and-complete-into-db [db invoke-id new-nodes-map root-invoke-id-from-payload is-complete]
+  (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
+        current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
+        merged-raw-nodes (merge current-raw-nodes new-nodes-map)
+        root-invoke-id (or root-invoke-id-from-payload
+                           (get-in db [:invocations-data invoke-id :root-invoke-id]))
+        {:keys [nodes edges implicit-edges]}
+        (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
+    (-> db
+        (assoc-in [:invocations-data invoke-id :graph :raw-nodes] merged-raw-nodes)
+        (assoc-in [:invocations-data invoke-id :graph :nodes] nodes)
+        (assoc-in [:invocations-data invoke-id :graph :edges] edges)
+        (assoc-in [:invocations-data invoke-id :implicit-edges] implicit-edges)
+        (assoc-in [:invocations-data invoke-id :is-complete] is-complete))))
 
-;; Kick off or continue fetching a page of graph data
-(state/reg-event :invocation/fetch-graph-page
-                 (fn [db {:keys [invoke-id module-id agent-name]}]
-                   (-> (rpc/call ::rpc-invocations/get-graph-page!!
-                                  {:invoke-id invoke-id
-                                   :module-id module-id
-                                   :agent-name agent-name})
-                       (.then (fn [data]
-                                (state/dispatch [:invocation/process-graph-page invoke-id data])))
-                       (.catch (fn [err]
-                                 (state/dispatch [:invocation/fetch-graph-error
-                                                  invoke-id
-                                                  (if (map? err) (or (:error err) (str err)) (str err))]))))
-                   nil))
+(rf/reg-event-fx :invocation/start-graph-loading
+  (fn [{:keys [db]} [_ {:keys [invoke-id module-id agent-name]}]]
+    {:db (-> db
+             (assoc :current-invocation {:invoke-id invoke-id
+                                         :module-id module-id
+                                         :agent-name agent-name})
+             (assoc-in [:invocations-data invoke-id :status] :loading))
+     :dispatch [:invocation/fetch-graph-page
+                {:invoke-id invoke-id
+                 :module-id module-id
+                 :agent-name agent-name}]}))
 
-(state/reg-event :invocation/fetch-graph-error
-                 (fn [db invoke-id error-info]
-                   [:invocations-data invoke-id (s/multi-path
-                                                 [:status (s/terminal-val :error)]
-                                                 [:error (s/terminal-val error-info)])]))
+(rf/reg-event-fx :invocation/fetch-graph-page
+  (fn [_ [_ {:keys [invoke-id module-id agent-name] :as current-invocation}]]
+    (-> (rpc/call ::rpc-invocations/get-graph-page!!
+                  {:invoke-id invoke-id
+                   :module-id module-id
+                   :agent-name agent-name})
+        (.then (fn [data]
+                  (rf/dispatch [:invocation/process-graph-page invoke-id data current-invocation])))
+        (.catch (fn [err]
+                  (rf/dispatch [:invocation/fetch-graph-error
+                                invoke-id
+                                (if (map? err) (or (:error err) (str err)) (str err))]))))
+    {}))
 
-(state/reg-event :invocation/process-graph-page
-                 (fn [db invoke-id page-data]
-                   (let [{:keys [nodes summary historical-graph root-invoke-id
-                                 task-id is-complete]} page-data
-                         current-invocation (get-in db [:current-invocation])]
+(rf/reg-event-db :invocation/fetch-graph-error
+  (fn [db [_ invoke-id error-info]]
+    (-> db
+        (assoc-in [:invocations-data invoke-id :status] :error)
+        (assoc-in [:invocations-data invoke-id :error] error-info))))
 
-                     ;; Update summary data
-                     (when summary
-                       (let [{:keys [forks fork-of]} summary
-                             kvps (cond-> [[[:invocations-data invoke-id :summary] summary]
-                                           [[:invocations-data invoke-id :task-id] task-id]
-                                           [[:invocations-data invoke-id :forks] forks]
-                                           [[:invocations-data invoke-id :fork-of] fork-of]
-                                           [[:invocations-data invoke-id :status] :success]]
-                                    (some? historical-graph)
-                                    (conj [[:invocations-data invoke-id :historical-graph] historical-graph])
+(rf/reg-event-db :invocation/merge-nodes-and-complete
+  (fn [db [_ invoke-id new-nodes-map root-invoke-id-from-payload is-complete]]
+    (merge-nodes-and-complete-into-db db invoke-id new-nodes-map root-invoke-id-from-payload is-complete)))
 
-                                    (some? root-invoke-id)
-                                    (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
-                         (state/dispatch (into [:db/set-values] kvps))))
+(rf/reg-event-fx :invocation/process-graph-page
+  (fn [{:keys [db]} [_ invoke-id page-data current-invocation]]
+    (let [{:keys [nodes is-complete root-invoke-id]} page-data
+          db-after-summary (apply-summary-kvps db invoke-id page-data)
+          new-nodes-map (nodes->map nodes)
+          db-after-graph (cond
+                           (and nodes (seq new-nodes-map))
+                           (merge-nodes-and-complete-into-db db-after-summary invoke-id new-nodes-map root-invoke-id is-complete)
 
-                     ;; ATOMIC UPDATE: Merge nodes AND set is-complete in single dispatch
-                     ;; This prevents React from rendering between updates
-                     (when (and nodes (seq nodes))
-                       (state/dispatch [:invocation/merge-nodes-and-complete
-                                        invoke-id
-                                        nodes
-                                        root-invoke-id
-                                        is-complete]))
+                           (and (not (seq new-nodes-map)) (contains? page-data :is-complete))
+                           (assoc-in db-after-summary [:invocations-data invoke-id :is-complete] is-complete)
 
-                     ;; If no nodes but we have is-complete, update it
-                     (when (and (not (seq nodes)) (contains? page-data :is-complete))
-                       (state/dispatch [:db/set-value [:invocations-data invoke-id :is-complete] is-complete]))
+                           :else db-after-summary)]
+      (when-not is-complete
+        (js/setTimeout
+         (fn []
+           (when-not (get-in @rdb/app-db [:invocations-data invoke-id :is-complete])
+             (println "[POLLING-SIMPLIFIED] Polling for updates...")
+             (rf/dispatch [:invocation/fetch-graph-page current-invocation])))
+         1000))
+      {:db db-after-graph})))
 
-                     ;; SIMPLIFIED POLLING: If not complete, schedule a simple poll
-                     (when-not is-complete
-                       (js/setTimeout
-                        (fn []
-                          (when-not (get-in @state/app-db [:invocations-data invoke-id :is-complete])
-                            (println "[POLLING-SIMPLIFIED] Polling for updates...")
-                            (state/dispatch [:invocation/fetch-graph-page current-invocation])))
-                        1000))
+(rf/reg-event-db :invocation/cleanup
+  (fn [db [_ _]]
+    (-> db
+        (assoc-in [:ui :changed-nodes] {})
+        (assoc-in [:ui :selected-node-id] nil)
+        (assoc-in [:ui :forking-mode?] false)
+        (assoc-in [:ui :active-tab] :info)
+        (assoc-in [:ui :hitl :responses] {}))))
 
-                     nil)))
+(rf/reg-event-db :ui/clear-fork-state
+  (fn [db _]
+    (-> db
+        (assoc-in [:ui :changed-nodes] {})
+        (assoc-in [:ui :selected-node-id] nil)
+        (assoc-in [:ui :forking-mode?] false)
+        (assoc-in [:ui :active-tab] :info)
+        (assoc-in [:ui :hitl :responses] {}))))
 
-(state/reg-event :invocation/merge-nodes-and-complete
-                 (fn [db invoke-id new-nodes-map root-invoke-id-from-payload is-complete]
-                   (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
-                         current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
-                         merged-raw-nodes (merge current-raw-nodes new-nodes-map)
-                         root-invoke-id (or root-invoke-id-from-payload
-                                            (get-in db [:invocations-data invoke-id :root-invoke-id]))
-
-                         {:keys [nodes edges implicit-edges]}
-                         (build-drawable-graph merged-raw-nodes root-invoke-id historical-graph)]
-
-                     ;; ATOMIC: Update both graph nodes AND is-complete in single transformation
-                     [:invocations-data invoke-id
-                      (s/multi-path
-                       [:graph :raw-nodes (s/terminal-val merged-raw-nodes)]
-                       [:graph :nodes (s/terminal-val nodes)]
-                       [:graph :edges (s/terminal-val edges)]
-                       [:implicit-edges (s/terminal-val implicit-edges)]
-                       [:is-complete (s/terminal-val is-complete)])])))
-
-(state/reg-event :invocation/cleanup
-                 (fn [db {:keys [invoke-id]}]
-                   (state/dispatch [:ui/clear-fork-state])
-                   [:ui :selected-node-id (s/terminal-val nil)]))
-
-(state/reg-event :ui/clear-fork-state
-                 (fn [db]
-                   [:ui (s/multi-path
-                         [:changed-nodes (s/terminal-val {})]
-                         [:selected-node-id (s/terminal-val nil)]
-                         [:forking-mode? (s/terminal-val false)]
-                         [:active-tab (s/terminal-val :info)]
-                         [:hitl :responses (s/terminal-val {})])]))
-
-;; =============================================================================
-;; HUMAN-IN-THE-LOOP (HITL) EVENTS
-;; =============================================================================
-
-(state/reg-event :hitl/submit
-                 (fn [db {:keys [module-id agent-name invoke-id request response]}]
-                   (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] true])
-
-                   (-> (rpc/call ::rpc-invocations/provide-human-input!!
+(rf/reg-event-fx :hitl/submit
+  (fn [{:keys [db]} [_ {:keys [module-id agent-name invoke-id request response]}]]
+    (let [rid (:invoke-id request)]
+      (-> (rpc/call ::rpc-invocations/provide-human-input!!
                     {:module-id module-id
                      :agent-name agent-name
                      :invoke-id invoke-id
                      :request request
                      :response response})
-                   (.then (fn [_]
-                            (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] false])
-                            (println "HITL response submitted successfully.")))
-                   (.catch (fn [err]
-                             (state/dispatch [:db/set-value [:ui :hitl :submitting (:invoke-id request)] false])
-                             (js/console.error "HITL submit failed" (if (map? err) (:error err) (str err))))))
-                   nil))
+          (.then (fn [_]
+                   (rf/dispatch [:db/set-value [:ui :hitl :submitting rid] false])
+                   (println "HITL response submitted successfully.")))
+          (.catch (fn [err]
+                    (rf/dispatch [:db/set-value [:ui :hitl :submitting rid] false])
+                    (js/console.error "HITL submit failed" (if (map? err) (:error err) (str err))))))
+      {:db (assoc-in db [:ui :hitl :submitting rid] true)})))
 
-;; =============================================================================
-;; CONFIGURATION EVENTS
-;; =============================================================================
+(rf/reg-event-fx :config/submit-change
+  (fn [{:keys [db]} [_ {:keys [module-id agent-name key value on-error]}]]
+    (let [state-path [:ui :config-page (keyword key)]]
+      (-> (rpc/call ::rpc-config/set!!
+                    {:module-id module-id :agent-name agent-name :key key :value value})
+          (.then (fn [_]
+                   (println "Config update success for" key)
+                   (rf/dispatch [:db/set-value state-path {:submitting? false :error nil}])))
+          (.catch (fn [err]
+                    (let [msg (if (map? err) (or (:error err) (str err)) (str err))]
+                      (js/console.error "Config update failed:" msg)
+                      (rf/dispatch [:db/set-value state-path {:submitting? false :error msg}])
+                      (when on-error (on-error msg))))))
+      {:db (assoc-in db state-path {:submitting? true :error nil})})))
 
-(state/reg-event :config/submit-change
-                 (fn [db {:keys [module-id agent-name key value on-success on-error]}]
-                   (let [state-path [:ui :config-page (keyword key)]]
-                     ;; Set loading state for this specific config item
-                     (state/dispatch [:db/set-value state-path {:submitting? true :error nil}])
+(rf/reg-event-fx :config/submit-global-change
+  (fn [{:keys [db]} [_ {:keys [module-id key value on-error]}]]
+    (let [state-path [:ui :global-config-page (keyword key)]]
+      (-> (rpc/call ::rpc-config/set-global!!
+                    {:module-id module-id :key key :value value})
+          (.then (fn [_]
+                   (println "Global config update success for" key)
+                   (rf/dispatch [:db/set-value state-path {:submitting? false :error nil}])))
+          (.catch (fn [err]
+                    (let [msg (if (map? err) (or (:error err) (str err)) (str err))]
+                      (js/console.error "Global config update failed:" msg)
+                      (rf/dispatch [:db/set-value state-path {:submitting? false :error msg}])
+                      (when on-error (on-error msg))))))
+      {:db (assoc-in db state-path {:submitting? true :error nil})})))
 
-                     (-> (rpc/call ::rpc-config/set!!
-                       {:module-id module-id :agent-name agent-name :key key :value value})
-                      (.then (fn [_]
-                               (println "Config update success for" key)
-                               (state/dispatch [:db/set-value state-path {:submitting? false :error nil}])))
-                      (.catch (fn [err]
-                                (let [msg (if (map? err) (or (:error err) (str err)) (str err))]
-                                  (js/console.error "Config update failed:" msg)
-                                  (state/dispatch [:db/set-value state-path {:submitting? false :error msg}])
-                                  (when on-error (on-error msg)))))))
-                   nil))
+(rf/reg-event-fx :dataset/edit-example
+  (fn [_ [_ {:keys [module-id dataset-id snapshot-name example-id form-fields]}]]
+    (let [input (get form-fields :input "")
+          output (get form-fields :output "")
+          form-id :edit-example]
+      (try
+        (when-not (str/blank? input) (js/JSON.parse input))
+        (when-not (str/blank? output) (js/JSON.parse output))
+        (-> (rpc/call ::rpc-datasets/edit-example!!
+                      {:module-id module-id
+                       :dataset-id dataset-id
+                       :snapshot-name snapshot-name
+                       :example-id example-id
+                       :input input
+                       :reference-output output})
+            (.then (fn [_]
+                     (forms/set-submitting! form-id false)
+                     (rf/dispatch [:modal/hide])
+                     (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                     (rf/dispatch [:re-frame.query/invalidate-tags [[:fetch-example module-id dataset-id example-id] [:dataset-examples module-id dataset-id snapshot-name]]])
+                     (forms/clear-form! form-id)))
+            (.catch (fn [err]
+                      (forms/set-submitting! form-id false)
+                      (forms/set-error! form-id (if (map? err) (or (:error err) "An unknown server error occurred.") (str err))))))
+        (catch js/Error e
+          (forms/set-submitting! form-id false)
+          (forms/set-error! form-id (str "Invalid JSON: " (.-message e))))))
+    {}))
 
-(state/reg-event :config/submit-global-change
-                 (fn [db {:keys [module-id key value on-success on-error]}]
-                   (let [state-path [:ui :global-config-page (keyword key)]]
-                     ;; Set loading state for this specific config item
-                     (state/dispatch [:db/set-value state-path {:submitting? true :error nil}])
+(rf/reg-event-fx :dataset/delete-selected
+  (fn [_ [_ {:keys [module-id dataset-id snapshot-name example-ids]}]]
+    (-> (rpc/call ::rpc-datasets/delete-examples!!
+                  {:module-id module-id
+                   :dataset-id dataset-id
+                   :snapshot-name snapshot-name
+                   :example-ids (vec example-ids)})
+        (.then (fn [_]
+                 (rf/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
+                 (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
+                 (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id snapshot-name]]])))
+        (.catch (fn [err]
+                  (js/alert (str "Failed to delete examples: " (if (map? err) (or (:error err) (str err)) (str err)))))))
+    {}))
 
-                     (-> (rpc/call ::rpc-config/set-global!!
-                       {:module-id module-id :key key :value value})
-                      (.then (fn [_]
-                               (println "Global config update success for" key)
-                               (state/dispatch [:db/set-value state-path {:submitting? false :error nil}])))
-                      (.catch (fn [err]
-                                (let [msg (if (map? err) (or (:error err) (str err)) (str err))]
-                                  (js/console.error "Global config update failed:" msg)
-                                  (state/dispatch [:db/set-value state-path {:submitting? false :error msg}])
-                                  (when on-error (on-error msg)))))))
-                   nil))
-
- ;; =============================================================================
-;; DATASET FORM EVENTS
-;; =============================================================================
-
-(state/reg-event :dataset/edit-example
-                 (fn [db {:keys [module-id dataset-id snapshot-name example-id form-fields]}]
-                   (let [input (get form-fields :input "")
-                         output (get form-fields :output "")
-                         form-id :edit-example]
-
-                     (try
-                       (when-not (str/blank? input) (js/JSON.parse input))
-                       (when-not (str/blank? output) (js/JSON.parse output))
-
-                       (-> (rpc/call ::rpc-datasets/edit-example!!
-                        {:module-id module-id
-                         :dataset-id dataset-id
-                         :snapshot-name snapshot-name
-                         :example-id example-id
-                         :input input
-                         :reference-output output})
-                       (.then (fn [_]
-                                (forms/set-submitting! form-id false)
-                                (rf/dispatch [:modal/hide])
-                                (do
-                                       (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                                       (rf/dispatch [:re-frame.query/invalidate-tags [[:fetch-example module-id dataset-id example-id] [:dataset-examples module-id dataset-id snapshot-name]]]))
-                                (forms/clear-form! form-id)))
-                       (.catch (fn [err]
-                                 (forms/set-submitting! form-id false)
-                                 (forms/set-error! form-id (if (map? err) (or (:error err) "An unknown server error occurred.") (str err))))))
-                       (catch js/Error e
-                         (forms/set-submitting! form-id false)
-                         (forms/set-error! form-id (str "Invalid JSON: " (.-message e))))))
-                   nil))
-;; =============================================================================
-;; BULK OPERATION EVENTS
-;; =============================================================================
-
-(state/reg-event :dataset/delete-selected
-                 (fn [db {:keys [module-id dataset-id snapshot-name example-ids]}]
-                   (-> (rpc/call ::rpc-datasets/delete-examples!!
-                    {:module-id module-id
-                     :dataset-id dataset-id
-                     :snapshot-name snapshot-name
-                     :example-ids (vec example-ids)})
-                   (.then (fn [_]
-                            (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])
-                            (do
-                            (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id snapshot-name]}])
-                            (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id snapshot-name]]]))))
-                   (.catch (fn [err]
-                             (js/alert (str "Failed to delete examples: " (if (map? err) (or (:error err) (str err)) (str err)))))))
-                   nil))
-
-;; =============================================================================
-;; STREAMING EVENTS
-;; =============================================================================
-
-;; Handle incoming chunks pushed from server via WebSocket
-(state/reg-event :stream/update
-  (fn [db {:keys [stream-id new-chunks reset? complete?]}]
-    ;; If reset? is true (node retry happened), wipe the buffer and start fresh
+(rf/reg-event-db :stream/update
+  (fn [db [_ {:keys [stream-id new-chunks reset? complete?]}]]
     (let [update-path [:streaming :buffers stream-id]]
       (if reset?
-        ;; Reset: replace chunks entirely
-        (s/multi-path
-         [update-path :chunks (s/terminal-val new-chunks)]
-         [update-path :reset-count (s/terminal #(inc (or % 0)))]
-         [update-path :complete? (s/terminal-val complete?)])
-        ;; Normal update: append new chunks
-        (s/multi-path
-         [update-path :chunks (s/terminal #(into (or % []) new-chunks))]
-         [update-path :complete? (s/terminal-val complete?)])))))
+        (-> db
+            (assoc-in (conj update-path :chunks) new-chunks)
+            (update-in (conj update-path :reset-count) (fn [c] (inc (or c 0))))
+            (assoc-in (conj update-path :complete?) complete?))
+        (-> db
+            (update-in (conj update-path :chunks) (fn [ch] (into (or ch []) new-chunks)))
+            (assoc-in (conj update-path :complete?) complete?))))))
 
-;; Clear buffer when component unmounts
-(state/reg-event :stream/cleanup
-  (fn [db {:keys [stream-id]}]
-    [:streaming :buffers (s/terminal #(dissoc % stream-id))]))
+(rf/reg-event-db :stream/cleanup
+  (fn [db [_ {:keys [stream-id]}]]
+    (update-in db [:streaming :buffers] dissoc stream-id)))
