@@ -179,6 +179,8 @@ test.describe('Invocations filters', () => {
 
       // Start filter assertions on full invocations page.
       await page.goto(`${agentBaseUrl}/invocations`);
+      // Clear default source filter (≠ Experiment) so assertions see the full invocation set.
+      await page.getByTestId('invocations-filter-chip-remove-source').click();
 
       // Node filter: long node.
       await openFilterPanel(page, 'Node');
@@ -233,14 +235,25 @@ test.describe('Invocations filters', () => {
 
       // Source filter with NOT toggle.
       await page.locator('button').filter({ hasText: 'Source' }).first().click();
-      await page.getByTestId('invocations-filter-source-not').check();
+      const sourceNotCheckbox = page.getByTestId('invocations-filter-source-not');
+      // Controlled checkbox + toggle semantics: setChecked(true) clicks when Playwright
+      // thinks the box is unchecked; if it was already checked (or timing disagrees),
+      // that click toggles OFF and verification fails. Only click when we need checked=true.
+      if (!(await sourceNotCheckbox.isChecked())) {
+        await sourceNotCheckbox.click();
+      }
+      await expect(sourceNotCheckbox).toBeChecked();
       await applyCurrentFilter(page);
       await expect(page.locator('tbody tr').filter({ hasText: runIds.nodeShort }).first()).toBeVisible();
       await expect(page.locator('tbody tr').filter({ hasText: runIds.experiment })).toHaveCount(0);
 
       // Reset source.
       await page.locator('button').filter({ hasText: 'Source' }).first().click();
-      await page.getByTestId('invocations-filter-source-not').uncheck();
+      const sourceNotCheckboxReset = page.getByTestId('invocations-filter-source-not');
+      if (await sourceNotCheckboxReset.isChecked()) {
+        await sourceNotCheckboxReset.click();
+      }
+      await expect(sourceNotCheckboxReset).not.toBeChecked();
       await page.getByTestId('invocations-filter-source-select').selectOption('all');
       await applyCurrentFilter(page);
 

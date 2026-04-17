@@ -429,7 +429,8 @@
                  ($ :span.text-blue-400.hover:text-blue-700.cursor-pointer
                     {:onClick (fn [e]
                                 (.stopPropagation e)
-                                (remove-chip! chip))}
+                                (remove-chip! chip))
+                     :data-testid (str "invocations-filter-chip-remove-" chip-id)}
                     "x")))
             ($ :div.text-xs.text-gray-500 "No filters added")))
        (when open-editor
