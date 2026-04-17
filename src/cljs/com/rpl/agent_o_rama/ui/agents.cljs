@@ -233,7 +233,7 @@
           :page-size 20
           :enabled? (boolean (and module-id agent-name))})]
 
-    ($ :div.p-4.space-y-4
+    ($ :div.p-4.space-y-4.h-screen
        ($ inv-filters/filter-bar
           {:module-id module-id
            :agent-name agent-name
