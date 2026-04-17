@@ -266,7 +266,7 @@
                              10
                              100
                              nil
-                             {:node-name "start"
+                             {:node-names ["start"]
                               :latency-ms {:min 80}
                               :has-error? false}))
      (bind slow-rows (:agent-invokes slow-res))
@@ -276,6 +276,14 @@
                    (let [lat (- (:finish-time-millis m) (:start-time-millis m))]
                      (>= lat 80)))
                  slow-rows))
+
+     (bind node-and-empty-res
+       (foreign-invoke-query q
+                             10
+                             100
+                             nil
+                             {:node-names ["start" "missing-node"]}))
+     (is (empty? (:agent-invokes node-and-empty-res)))
 
      (bind err-res
        (foreign-invoke-query q
@@ -298,22 +306,39 @@
         "foo"
         (:invoke (first (filter #(= :slow-exp (:name %)) created-runs)))
         nil))
-     (evals/add-human-feedback! global-actions-depot fast-target "reviewer-1" {"quality" 2} "bad")
-     (evals/add-human-feedback! global-actions-depot slow-exp-target "reviewer-2" {"quality" 8} "good")
+     (evals/add-human-feedback! global-actions-depot fast-target "reviewer-1" {"quality" 2 "consistency" 5} "bad")
+     (evals/add-human-feedback! global-actions-depot slow-exp-target "reviewer-2" {"quality" 8 "consistency" 5} "good")
 
      (bind feedback-res
        (foreign-invoke-query q
                              10
                              100
                              nil
-                             {:feedback-metric {:metric-name "quality"
-                                                :comparator :<=
-                                                :value 3
-                                                :source :human}}))
+                             {:feedback-metrics [{:metric-name "quality"
+                                                  :comparator :<=
+                                                  :value 3
+                                                  :source :human}]}))
      (bind feedback-rows (:agent-invokes feedback-res))
      (is (= 1 (count feedback-rows)))
-     (is (every? #(contains? % :feedback-metric-value) feedback-rows))
-     (is (every? #(number? (:feedback-metric-value %)) feedback-rows))
+     (is (every? #(contains? % :feedback-metric-values) feedback-rows))
+     (is (every? #(number? (get-in % [:feedback-metric-values "quality"])) feedback-rows))
+
+     (bind feedback-and-res
+       (foreign-invoke-query q
+                             10
+                             100
+                             nil
+                             {:feedback-metrics [{:metric-name "quality"
+                                                  :comparator :<=
+                                                  :value 3
+                                                  :source :human}
+                                                 {:metric-name "consistency"
+                                                  :comparator :=
+                                                  :value 5
+                                                  :source :human}]}))
+     (bind feedback-and-rows (:agent-invokes feedback-and-res))
+     (is (= 1 (count feedback-and-rows)))
+     (is (every? #(contains? % :feedback-metric-values) feedback-and-rows))
 
      (bind source-res
        (foreign-invoke-query q
