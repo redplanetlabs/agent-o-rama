@@ -77,7 +77,8 @@
 (defui invocations []
   (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         query-params (or (use-subscribe [::aor-rf/get-in [:route :parameters :query]]) {})
-        filters-query-param (:filters query-params)
+        filters-query-param (or (:filters query-params)
+                                (get query-params "filters"))
         applied-filters (inv-filters/applied-filters-from-url filters-query-param)
         {filter-options-data :data}
         (use-subscribe [::rfq/query ::rpc-invocations/get-filter-options!!

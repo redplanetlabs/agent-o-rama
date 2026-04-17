@@ -397,6 +397,7 @@
                           feedback-metric-option-names]}]
   (let [panel (or (use-subscribe [::panel module-id agent-name]) {})
         applied (or applied default-applied-filters)
+        args-query (or (:args-query applied) "")
         open-editor (:open-editor panel)
         editor (or (get-in panel [:editor :value]) {})
         active-types (derive-active-filter-types applied)
@@ -411,9 +412,24 @@
         update-editor! #(rf/dispatch [::update-editor module-id agent-name %])
         apply! #(rf/dispatch [::apply module-id agent-name])
         open-chip! #(rf/dispatch [::open-chip module-id agent-name %])
-        remove-chip! #(rf/dispatch [::remove-chip module-id agent-name %])]
+        remove-chip! #(rf/dispatch [::remove-chip module-id agent-name %])
+        update-args-query!
+        (fn [next-query]
+          (let [trimmed (str/trim (or next-query ""))
+                next-applied (if (str/blank? trimmed)
+                               (dissoc applied :args-query)
+                               (assoc applied :args-query next-query))]
+            (replace-invocations-filters-in-url! module-id agent-name next-applied)))]
     ($ :div.bg-white.rounded-md.border.border-gray-200.p-4.shadow-sm
        ($ :div.flex.flex-wrap.items-center.gap-2
+          ($ :div.w-80.max-w-full
+             ($ :input
+                {:type "text"
+                 :value args-query
+                 :onChange (fn [e] (update-args-query! (.. e -target -value)))
+                 :className "block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                 :placeholder "Search invocation arguments..."
+                 :data-testid "invocations-filter-args-query"}))
           ($ common/Dropdown
              {:label "Add filter"
               :display-text "Add filter"
