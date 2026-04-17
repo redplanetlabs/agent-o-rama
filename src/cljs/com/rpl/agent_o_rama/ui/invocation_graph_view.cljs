@@ -439,28 +439,27 @@
               (js/requestAnimationFrame scroll-end))))))
      [text])
 
-    ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4 border border-blue-200"}
-       ($ :div {:className "flex items-center justify-between mb-2"}
-          ($ :span {:className "text-sm font-medium text-blue-700"} "Streaming Output")
-          (when (pos? reset-count)
-            ($ :span {:className "text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded"}
-               (str "↻ Reset " reset-count "x"))))
+    (if (and complete? (empty? chunks))
+      nil
+      ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4 border border-blue-200"}
+         ($ :div {:className "flex items-center justify-between mb-2"}
+            ($ :span {:className "text-sm font-medium text-blue-700"} "Streaming Output")
+            (when (pos? reset-count)
+              ($ :span {:className "text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded"}
+                 (str "↻ Reset " reset-count "x"))))
 
-       ($ :div {:ref scroll-ref
-                :className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
-          (cond
-            waiting?
-            ($ :div {:className "text-sm text-gray-500"} "Connecting…")
+         ($ :div {:ref scroll-ref
+                  :className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
+            (cond
+              waiting?
+              ($ :div {:className "text-sm text-gray-500"} "Connecting…")
 
-            (and complete? (empty? chunks))
-            ($ :div {:className "text-sm text-gray-500"} "No streaming output.")
+              :else
+              ($ :pre {:className "text-sm text-gray-800 whitespace-pre-wrap font-mono"} text)))
 
-            :else
-            ($ :pre {:className "text-sm text-gray-800 whitespace-pre-wrap font-mono"} text)))
-
-       (when (seq chunks)
-         ($ :div {:className "mt-2 text-xs text-blue-500"}
-            (str (count chunks) " chunk" (when (not= (count chunks) 1) "s") " received"))))))
+         (when (seq chunks)
+           ($ :div {:className "mt-2 text-xs text-blue-500"}
+              (str (count chunks) " chunk" (when (not= (count chunks) 1) "s") " received")))))))
 
 (defui node-emits-panel [{:keys [emits graph-data flow-nodes on-select-node on-paginate-node]}]
   (when (and emits (> (count emits) 0))
