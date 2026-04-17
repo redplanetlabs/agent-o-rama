@@ -56,21 +56,11 @@
 
 ;; --- URL: transit + base64 (only :applied) ---------------------------------
 
-(defn encode-filters-param [filters]
-  (try
-    (-> filters (transit/write rpc/writer) js/btoa)
-    (catch :default _ nil)))
+(defn encode-filters-param [filters] (js/btoa (transit/write rpc/writer filters)))
 
-(defn decode-filters-param [encoded]
-  (try
-    (transit/read rpc/reader (js/atob encoded))
-    (catch :default _
-      default-applied-filters)))
+(defn decode-filters-param [encoded] (transit/read rpc/reader (js/atob encoded)))
 
-(defn applied-filters-from-url [encoded]
-  (if (nil? encoded)
-    default-applied-filters
-    (decode-filters-param encoded)))
+(defn applied-filters-from-url [encoded] (if (nil? encoded) default-applied-filters (decode-filters-param encoded)))
 
 ;; --- Small helpers -----------------------------------------------------------
 
