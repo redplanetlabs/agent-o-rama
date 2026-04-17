@@ -14,6 +14,7 @@
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
    [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
+   [com.rpl.agent-o-rama.ui.invocations.filters :as inv-filters]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [re-frame.core :as rf]
    [clojure.string :as str]))
@@ -82,13 +83,19 @@
    :else
    ($ :span.px-2.py-1.bg-green-100.text-green-800.rounded-full.text-xs.font-medium "Success")))
 
-(defui invocation-row [{:keys [invoke module-id agent-name on-click show-feedback-metric?]}]
+(defn- feedback-cell-value [invoke metric-name]
+  (let [m (:feedback-metric-values invoke)
+        v (or (get m metric-name)
+              (when m (get m (keyword metric-name))))]
+    (if (nil? v) "-" (str v))))
+
+(defui invocation-row [{:keys [invoke module-id agent-name on-click feedback-metric-names]}]
   (let [task-id (:task-id invoke)
         agent-id (:agent-id invoke)
         start-time (:start-time-millis invoke)
         href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/invocations/" task-id "-" agent-id)
-        invoke-id (str task-id "-" agent-id)
-        args-json (common/to-json (:invoke-args invoke))]
+        args-json (common/to-json (:invoke-args invoke))
+        metric-names (or feedback-metric-names [])]
     ($ :tr.hover:bg-gray-50.transition-colors.duration-150
        {:key href}
        ($ :td.px-4.py-3
@@ -112,10 +119,10 @@
        ($ :td.px-4.py-3.text-sm
           ($ result-badge {:status (:status invoke)
                            :human-request? (:human-request? invoke)}))
-       (when show-feedback-metric?
+       (for [mn metric-names]
          ($ :td.px-4.py-3.text-sm.text-gray-700.font-mono
-            (let [v (:feedback-metric-value invoke)]
-              (if (nil? v) "-" (str v))))))))
+            {:key (str "fb-" mn)}
+            (feedback-cell-value invoke mn))))))
 
 (defui index []
   (let [{:keys [data error]
@@ -162,150 +169,60 @@
 
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
-        default-draft-filters {:node-name ""
-                               :latency-min ""
-                               :latency-max ""
-                               :error-filter "all"
-                               :source "all"
-                               :source-not? false
-                               :feedback-metric-name ""
-                               :feedback-comparator "<="
-                               :feedback-value ""
-                               :feedback-source "any"}
-        filter-type-order [:node :latency :error :source :feedback]
-        filter-type-labels {:node "Node"
-                            :latency "Latency"
-                            :error "Error"
-                            :source "Source"
-                            :feedback "Feedback"}
-        [draft-filters set-draft-filters!] (uix/use-state default-draft-filters)
-        [applied-filters set-applied-filters!] (uix/use-state {})
-        [active-filter-types set-active-filter-types!] (uix/use-state [])
-        [open-filter-type set-open-filter-type!] (uix/use-state nil)
+        route (state/use-sub [:route])
+        query-params (or (:query-params route) (get-in route [:parameters :query]) {})
+        filters-query-param (:filters query-params)
+        panel (or (use-subscribe [::inv-filters/panel module-id agent-name]) {})
+        applied-filters (or (:applied panel) inv-filters/default-applied-filters)
         filter-key (common/to-json applied-filters)
         {filter-options-data :data}
         (use-subscribe [::rfq/query ::rpc-invocations/get-filter-options!!
                         {:module-id module-id :agent-name agent-name}])
         node-options (or (:nodes filter-options-data) [])
-        feedback-metric-options (or (:feedback-metrics filter-options-data) [])
-        show-feedback-metric-column? (contains? applied-filters :feedback-metric)
-
-        parse-filter-value
-        (fn [s]
-          (let [trimmed (str/trim (or s ""))
-                parsed (js/Number trimmed)]
-            (if (or (str/blank? trimmed) (js/isNaN parsed))
-              trimmed
-              parsed)))
-        build-filter-map
-        (fn [f]
-          (let [latency-min (parse-filter-value (:latency-min f))
-                latency-max (parse-filter-value (:latency-max f))
-                feedback-value (str/trim (or (:feedback-value f) ""))]
-            (cond-> {}
-              (not (str/blank? (:node-name f)))
-              (assoc :node-name (str/trim (:node-name f)))
-
-              (number? latency-min)
-              (assoc-in [:latency-ms :min] latency-min)
-
-              (number? latency-max)
-              (assoc-in [:latency-ms :max] latency-max)
-
-              (= "errors-only" (:error-filter f))
-              (assoc :has-error? true)
-
-              (= "no-errors" (:error-filter f))
-              (assoc :has-error? false)
-
-              (not= "all" (:source f))
-              (assoc :source (:source f))
-
-              (and (not= "all" (:source f))
-                   (:source-not? f))
-              (assoc :source-not? true)
-
-              (and (not (str/blank? (:feedback-metric-name f)))
-                   (not (str/blank? feedback-value)))
-              (assoc :feedback-metric
-                     (cond-> {:metric-name (str/trim (:feedback-metric-name f))
-                              :comparator (keyword (:feedback-comparator f))
-                              :value feedback-value}
-                       (not= "any" (:feedback-source f))
-                       (assoc :source (keyword (:feedback-source f))))))))
-        clear-filter-type!
-        (fn [filter-type]
-          (set-draft-filters!
-           (fn [prev]
-             (let [next-draft (case filter-type
-                                :node (assoc prev :node-name "")
-                                :latency (assoc prev :latency-min "" :latency-max "")
-                                :error (assoc prev :error-filter "all")
-                               :source (assoc prev :source "all" :source-not? false)
-                                :feedback (assoc prev
-                                                 :feedback-metric-name ""
-                                                 :feedback-comparator "<="
-                                                 :feedback-value ""
-                                                 :feedback-source "any")
-                                prev)]
-               (set-applied-filters! (build-filter-map next-draft))
-               next-draft)))
-          (set-active-filter-types!
-           (fn [types]
-             (vec (remove #(= % filter-type) types))))
-          (when (= open-filter-type filter-type)
-            (set-open-filter-type! nil)))
-        add-filter-type!
-        (fn [filter-type]
-          (set-active-filter-types!
-           (fn [types]
-             (if (some #(= % filter-type) types)
-               types
-               (conj (vec types) filter-type))))
-          (set-open-filter-type! filter-type))
-        chip-description
-        (fn [filter-type f]
-          (case filter-type
-            :node (if (str/blank? (:node-name f))
-                    "Any node"
-                    (str "Node: " (:node-name f)))
-            :latency (let [mn (str/trim (:latency-min f))
-                           mx (str/trim (:latency-max f))]
-                       (cond
-                         (and (str/blank? mn) (str/blank? mx)) "Any latency"
-                         (and (not (str/blank? mn)) (not (str/blank? mx))) (str mn "ms-" mx "ms")
-                         (not (str/blank? mn)) (str ">= " mn "ms")
-                         :else (str "<= " mx "ms")))
-            :error (case (:error-filter f)
-                     "errors-only" "Errors only"
-                     "no-errors" "No errors"
-                     "Any result")
-            :source (if (= "all" (:source f))
-                      "Any source"
-                      (str "Source "
-                           (if (:source-not? f) "!=" "=")
-                           " "
-                           (:source f)))
-            :feedback (let [metric (str/trim (:feedback-metric-name f))
-                            comparator (:feedback-comparator f)
-                            value (str/trim (:feedback-value f))
-                            source (:feedback-source f)]
-                        (if (or (str/blank? metric) (str/blank? value))
-                          "Metric unset"
-                          (str metric " " comparator " " value
-                               (when-not (= "any" source)
-                                 (str " (" source ")")))))
-            ""))
-        add-filter-items
-        (map (fn [filter-type]
-               {:key (name filter-type)
-                :label (get filter-type-labels filter-type)
-                :disabled? (boolean (some #(= % filter-type) active-filter-types))
-                :on-select #(add-filter-type! filter-type)})
-             filter-type-order)
-        apply-open-filter! (fn []
-                             (set-applied-filters! (build-filter-map draft-filters))
-                             (set-open-filter-type! nil))
+        raw-feedback-metric-options (or (:feedback-metrics filter-options-data) [])
+        feedback-metric-options
+        (->> raw-feedback-metric-options
+             (keep (fn [item]
+                     (let [name-value (cond
+                                         (string? item) item
+                                         :else (or (:name item)
+                                                   (get item "name")
+                                                   (:metric-name item)
+                                                   (get item "metric-name")))
+                           metric-value (when-not (string? item)
+                                          (or (:metric item)
+                                              (get item "metric")))
+                           normalized-name (some-> name-value str str/trim)]
+                       (when (and normalized-name (not (str/blank? normalized-name)))
+                         {:name normalized-name
+                          :metric metric-value}))))
+             vec)
+        feedback-metric-options-by-name (into {}
+                                              (map (fn [metric] [(:name metric) metric]))
+                                              feedback-metric-options)
+        feedback-metric-option-names (mapv :name feedback-metric-options)
+        applied-feedback-metrics (or (:feedback-metrics applied-filters) [])
+        feedback-metric-names (mapv :metric-name applied-feedback-metrics)
+        n-feedback-cols (count feedback-metric-names)
+        _init-filters (uix/use-effect
+                        (fn []
+                          (rf/dispatch [::inv-filters/init module-id agent-name filters-query-param])
+                          js/undefined)
+                        [filters-query-param module-id agent-name])
+        _sync-filters-to-url (uix/use-effect
+                              (fn []
+                                (when (and module-id agent-name)
+                                  (let [encoded (inv-filters/encode-filters-param applied-filters)
+                                        current-encoded filters-query-param]
+                                    (when (not= encoded current-encoded)
+                                      (rfe/replace-state :agent/invocations
+                                                         {:module-id module-id
+                                                          :agent-name agent-name}
+                                                         (if encoded
+                                                           {:filters encoded}
+                                                           {})))))
+                                js/undefined)
+                              [module-id agent-name applied-filters filters-query-param])
 
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
         (queries/use-infinite-rpc-query
@@ -317,144 +234,13 @@
           :enabled? (boolean (and module-id agent-name))})]
 
     ($ :div.p-4.space-y-4
-       ($ :div.bg-white.rounded-md.border.border-gray-200.p-4.shadow-sm
-          ($ :div.flex.flex-wrap.items-center.gap-2
-             ($ common/Dropdown
-                {:label "Add filter"
-                 :display-text "Add filter"
-                 :items add-filter-items
-                 :full-width? false
-                 :data-testid "add-invocations-filter"})
-             (if (seq active-filter-types)
-               (for [filter-type active-filter-types]
-                 ($ :button.inline-flex.items-center.gap-2.px-3.py-1.5.rounded-full.bg-blue-50.text-blue-700.text-xs.font-medium.border.border-blue-200.cursor-pointer.hover:bg-blue-100.transition-colors.duration-150
-                    {:key (name filter-type)
-                     :type "button"
-                     :onClick #(set-open-filter-type!
-                                (if (= open-filter-type filter-type)
-                                  nil
-                                  filter-type))}
-                    ($ :span (get filter-type-labels filter-type))
-                    ($ :span.text-blue-500 (chip-description filter-type draft-filters))
-                    ($ :span.text-blue-400.hover:text-blue-700.cursor-pointer
-                       {:onClick (fn [e]
-                                   (.stopPropagation e)
-                                   (clear-filter-type! filter-type))}
-                       "x")))
-               ($ :div.text-xs.text-gray-500 "No filters added")))
-          (when open-filter-type
-            ($ :div.mt-3.p-3.border.border-gray-200.rounded-md.bg-gray-50.max-w-2xl
-               ($ :div.flex.items-center.justify-between.mb-3
-                  ($ :div.text-sm.font-medium.text-gray-800
-                     (str "Edit " (get filter-type-labels open-filter-type) " filter"))
-                  ($ :button.text-xs.px-2.py-1.bg-blue-600.text-white.rounded.hover:bg-blue-700.cursor-pointer
-                    {:type "button"
-                     :data-testid "invocations-filter-apply"
-                      :onClick apply-open-filter!}
-                     "Apply"))
-               (case open-filter-type
-                 :node
-                 ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                    {:value (:node-name draft-filters)
-                     :data-testid "invocations-filter-node-select"
-                     :onChange #(set-draft-filters! (fn [prev]
-                                                      (assoc prev :node-name (.. % -target -value))))}
-                    ($ :option {:value ""} "Any node")
-                    (for [node-name node-options]
-                      ($ :option {:key node-name :value node-name} node-name)))
-
-                 :latency
-                 ($ :div.grid.grid-cols-1.md:grid-cols-2.gap-2
-                    ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                      {:type "number"
-                       :data-testid "invocations-filter-latency-min"
-                        :placeholder "Latency min (ms)"
-                        :value (:latency-min draft-filters)
-                        :onChange #(set-draft-filters! (fn [prev]
-                                                         (assoc prev :latency-min (.. % -target -value))))})
-                    ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                      {:type "number"
-                       :data-testid "invocations-filter-latency-max"
-                        :placeholder "Latency max (ms)"
-                        :value (:latency-max draft-filters)
-                        :onChange #(set-draft-filters! (fn [prev]
-                                                         (assoc prev :latency-max (.. % -target -value))))}))
-
-                 :error
-                 ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                    {:value (:error-filter draft-filters)
-                     :data-testid "invocations-filter-error-select"
-                     :onChange #(set-draft-filters! (fn [prev]
-                                                      (assoc prev :error-filter (.. % -target -value))))}
-                    ($ :option {:value "all"} "All results")
-                    ($ :option {:value "errors-only"} "Errors only")
-                    ($ :option {:value "no-errors"} "No errors"))
-
-                 :source
-                 ($ :div.space-y-2
-                    ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                       {:value (:source draft-filters)
-                        :data-testid "invocations-filter-source-select"
-                        :onChange #(set-draft-filters! (fn [prev]
-                                                         (assoc prev :source (.. % -target -value))))}
-                       ($ :option {:value "all"} "All sources")
-                       ($ :option {:value "API"} "API")
-                       ($ :option {:value "MANUAL"} "MANUAL")
-                       ($ :option {:value "EXPERIMENT"} "EXPERIMENT"))
-                    ($ :label.inline-flex.items-center.gap-2.text-sm.text-gray-700
-                       ($ :input.h-4.w-4.border.border-gray-300.rounded
-                          {:type "checkbox"
-                           :data-testid "invocations-filter-source-not"
-                           :checked (boolean (:source-not? draft-filters))
-                           :disabled (= "all" (:source draft-filters))
-                           :onChange #(set-draft-filters! (fn [prev]
-                                                            (assoc prev :source-not? (.. % -target -checked))))})
-                       ($ :span "Not selected source"))
-                    ($ :div.text-xs.text-gray-500
-                       "When enabled, returns invokes from all source types except the selected one."))
-
-                 :feedback
-                 ($ :div.space-y-2
-                    ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                       {:value (:feedback-metric-name draft-filters)
-                        :data-testid "invocations-filter-feedback-metric"
-                        :onChange #(set-draft-filters! (fn [prev]
-                                                         (assoc prev :feedback-metric-name (.. % -target -value))))}
-                       ($ :option {:value ""} "Select metric")
-                       (for [metric-name feedback-metric-options]
-                         ($ :option {:key metric-name :value metric-name} metric-name)))
-                    ($ :div.grid.grid-cols-1.md:grid-cols-3.gap-2
-                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                          {:value (:feedback-comparator draft-filters)
-                           :data-testid "invocations-filter-feedback-comparator"
-                           :onChange #(set-draft-filters! (fn [prev]
-                                                            (assoc prev :feedback-comparator (.. % -target -value))))}
-                          ($ :option {:value "<="} "<=")
-                          ($ :option {:value "<"} "<")
-                          ($ :option {:value "="} "=")
-                          ($ :option {:value "not="} "!=")
-                          ($ :option {:value ">"} ">")
-                          ($ :option {:value ">="} ">="))
-                       ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
-                          {:placeholder "Feedback value"
-                           :data-testid "invocations-filter-feedback-value"
-                           :value (:feedback-value draft-filters)
-                           :onChange #(set-draft-filters! (fn [prev]
-                                                            (assoc prev :feedback-value (.. % -target -value))))})
-                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                          {:value (:feedback-source draft-filters)
-                           :data-testid "invocations-filter-feedback-source"
-                           :onChange #(set-draft-filters! (fn [prev]
-                                                            (assoc prev :feedback-source (.. % -target -value))))}
-                          ($ :option {:value "any"} "Any source")
-                          ($ :option {:value "human"} "Human")
-                          ($ :option {:value "non-human"} "Non-human")))
-                    ($ :div.text-xs.text-gray-500
-                       "Matches invokes where any feedback entry satisfies this comparator."))
-
-                 ($ :div.text-sm.text-gray-500 "Unknown filter")))))
+       ($ inv-filters/filter-bar
+          {:module-id module-id
+           :agent-name agent-name
+           :node-options node-options
+           :feedback-metric-options-by-name feedback-metric-options-by-name
+           :feedback-metric-option-names feedback-metric-option-names})
        (cond
-         ;; Use isLoading for the initial loading state
          (and isLoading (empty? data))
          ($ :div.flex.justify-center.items-center.py-8
             ($ :div.text-gray-500 "Loading invocations..."))
@@ -477,24 +263,24 @@
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Arguments")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Version")
                      ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide "Result")
-                     (when show-feedback-metric-column?
+                     (for [mn feedback-metric-names]
                        ($ :th.px-4.py-3.text-left.font-semibold.text-gray-700.text-xs.uppercase.tracking-wide
-                          "Metric value"))))
+                          {:key (str "h-" mn)}
+                          (str mn)))))
                ($ :tbody.divide-y.divide-gray-200
                   (for [invoke data]
                     ($ invocation-row {:key (str (:task-id invoke) "-" (:agent-id invoke))
                                        :invoke invoke
                                        :module-id module-id
                                        :agent-name agent-name
-                                       :show-feedback-metric? show-feedback-metric-column?
+                                       :feedback-metric-names feedback-metric-names
                                        :on-click (fn [url] (set! (.-href (.-location js/window)) url))})))
 
-               ;; Load More button
                (when hasMore
                  ($ :tfoot.bg-gray-50.border-t.border-gray-200
                     ($ :tr.hover:bg-gray-100.transition-colors.duration-150
                        {:onClick (when-not isFetchingMore loadMore)}
-                       ($ :td.px-4.py-3.cursor-pointer {:colSpan (if show-feedback-metric-column? 6 5)}
+                       ($ :td.px-4.py-3.cursor-pointer {:colSpan (+ 5 n-feedback-cols)}
                           ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                              ($ :span.mr-2.text-sm.font-medium (if isFetchingMore "Loading..." "Load More"))
                              (when-not isFetchingMore
@@ -535,7 +321,7 @@
                                     :invoke invoke
                                     :module-id module-id
                                     :agent-name agent-name
-                                    :show-feedback-metric? false
+                                    :feedback-metric-names []
                                     :on-click (fn [url] (set! (.-href (.-location js/window)) url))})))
             ($ :tfoot.bg-gray-50.border-t.border-gray-200
                ($ :tr.hover:bg-gray-100.transition-colors.duration-150

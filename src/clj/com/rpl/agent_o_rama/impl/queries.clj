@@ -437,41 +437,59 @@
         [normalized-score normalized-value])
       [normalized-score normalized-value])))
 
+(defn normalized-allowed-values
+  [allowed-values]
+  (->> (or allowed-values [])
+       (map str)
+       (map str/trim)
+       (remove str/blank?)
+       set))
+
 (defn feedback-entry-matches?
-  [feedback {:keys [metric-name comparator value source]}]
-  (let [score-value (get (:scores feedback) metric-name ::missing)]
+  [feedback {:keys [metric-name comparator value source allowed-values match-any-value?]}]
+  (let [score-value (get (:scores feedback) metric-name ::missing)
+        allowed-set (normalized-allowed-values allowed-values)]
     (and (feedback-source-matches? feedback source)
          (not= ::missing score-value)
-         (if-let [[compare-score compare-value]
-                  (normalized-feedback-compare-values
-                   {:comparator comparator :value value}
-                   score-value)]
-           (try
-             (aor-types/comparator-spec-matches?
-              {:comparator comparator
-               :value      compare-value}
-              compare-score)
-             (catch Throwable _
-               false))
-           false))))
+         (if match-any-value?
+           true
+           (if (seq allowed-set)
+             (contains? allowed-set (str score-value))
+             (if-let [[compare-score compare-value]
+                      (normalized-feedback-compare-values
+                       {:comparator comparator :value value}
+                       score-value)]
+               (try
+                 (aor-types/comparator-spec-matches?
+                  {:comparator comparator
+                   :value      compare-value}
+                  compare-score)
+                 (catch Throwable _
+                   false))
+               false))))))
 
 (defn feedback-entry-matched-score
   [feedback feedback-metric]
-  (let [{:keys [metric-name]} feedback-metric
-        score-value (get (:scores feedback) metric-name ::missing)]
+  (let [{:keys [metric-name allowed-values match-any-value?]} feedback-metric
+        score-value (get (:scores feedback) metric-name ::missing)
+        allowed-set (normalized-allowed-values allowed-values)]
     (when (and (feedback-source-matches? feedback (:source feedback-metric))
                (not= ::missing score-value)
-               (if-let [[compare-score compare-value]
-                        (normalized-feedback-compare-values feedback-metric
-                                                           score-value)]
-                 (try
-                   (aor-types/comparator-spec-matches?
-                    {:comparator (:comparator feedback-metric)
-                     :value      compare-value}
-                    compare-score)
-                   (catch Throwable _
-                     false))
-                 false))
+               (if match-any-value?
+                 true
+                 (if (seq allowed-set)
+                   (contains? allowed-set (str score-value))
+                   (if-let [[compare-score compare-value]
+                            (normalized-feedback-compare-values feedback-metric
+                                                                score-value)]
+                     (try
+                       (aor-types/comparator-spec-matches?
+                        {:comparator (:comparator feedback-metric)
+                         :value      compare-value}
+                        compare-score)
+                       (catch Throwable _
+                         false))
+                     false))))
       (parse-number-like-value score-value))))
 
 (defn invoke-feedback-metric-value
@@ -482,22 +500,37 @@
         (some #(feedback-entry-matched-score % feedback-metric)
               results)))))
 
+(defn invoke-feedback-metric-values
+  [m feedback-metrics]
+  (let [metrics (or feedback-metrics [])]
+    (when (seq metrics)
+      (reduce
+       (fn [acc metric]
+         (let [metric-name (:metric-name metric)
+               matched-score (invoke-feedback-metric-value m metric)]
+           (assoc acc metric-name matched-score)))
+       {}
+       metrics))))
+
 (defn invoke-feedback-matches?
-  [m feedback-metric]
-  (if (nil? feedback-metric)
-    true
-    (some? (invoke-feedback-metric-value m feedback-metric))))
+  [m feedback-metrics]
+  (let [metrics (or feedback-metrics [])]
+    (if (empty? metrics)
+      true
+      (every? (fn [metric]
+                (some? (invoke-feedback-metric-value m metric)))
+              metrics))))
 
 (defn invoke-matches-filters?
   [m filters]
-  (let [{:keys [node-name has-error? latency-ms source source-not? feedback-metric]} filters
+  (let [{:keys [node-names has-error? latency-ms source source-not? feedback-metrics]} filters
         status (invoke-status m)
         latency (invoke-latency-millis m)
-        {:keys [min max]} latency-ms
+        {:keys [min max]} (or latency-ms {})
         node-stats (get-in m [:stats :basic-stats :node-stats])]
     (and
-     (if (some? node-name)
-       (contains? node-stats node-name)
+     (if (seq node-names)
+       (every? #(contains? node-stats %) node-names)
        true)
      (if (some? has-error?)
        (= has-error? (= status :failure))
@@ -509,7 +542,7 @@
        (and (some? latency) (<= latency max))
        true)
      (invoke-source-matches? m source source-not?)
-     (invoke-feedback-matches? m feedback-metric))))
+     (invoke-feedback-matches? m feedback-metrics))))
 
 (defn relevant-invoke-submap
   ([m]
@@ -519,8 +552,8 @@
      (let [ret (select-keys m
                             [:start-time-millis :finish-time-millis
                              :invoke-args :graph-version])
-           feedback-metric (:feedback-metric filters)
-           feedback-metric-value (invoke-feedback-metric-value m feedback-metric)]
+           feedback-metrics (:feedback-metrics filters)
+           feedback-metric-values (invoke-feedback-metric-values m feedback-metrics)]
        (cond-> (assoc ret
                  :human-request?
                  (-> m
@@ -529,8 +562,8 @@
                      not)
                  :status
                  (invoke-status m))
-         (some? feedback-metric)
-         (assoc :feedback-metric-value feedback-metric-value))))))
+         (seq feedback-metrics)
+         (assoc :feedback-metric-values feedback-metric-values))))))
 
 (defn filter-invokes-task-page
   [m filters]

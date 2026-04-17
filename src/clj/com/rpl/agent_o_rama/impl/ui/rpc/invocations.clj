@@ -35,7 +35,6 @@
   [system {:keys [module-id agent-name]}]
   (let [client (get-client system module-id agent-name)
         manager (get-manager system module-id)
-        decoded-agent-name (common/url-decode agent-name)
         graph-nodes (let [graph-res (foreign-invoke-query
                                      (:current-graph-query (aor-types/underlying-objects client)))]
                       (-> graph-res
@@ -47,8 +46,7 @@
                                                         (aor-types/underlying-objects manager))
                             metric-res (foreign-invoke-query search-human-metrics-query {} 1000 nil)]
                         (->> (:items metric-res)
-                             (map :name)
-                             sort
+                             (sort-by (comp str :name))
                              vec))]
     {:nodes graph-nodes
      :feedback-metrics human-metrics}))

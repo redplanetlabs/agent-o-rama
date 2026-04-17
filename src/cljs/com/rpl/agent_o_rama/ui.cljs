@@ -39,7 +39,8 @@
    [com.rpl.agent-o-rama.ui.datasets.add-from-trace]
    [com.rpl.agent-o-rama.ui.rules :as rules]
    [com.rpl.agent-o-rama.ui.action-log :as action-log]
-   [com.rpl.agent-o-rama.ui.human-feedback-queues :as human-feedback-queues]))
+   [com.rpl.agent-o-rama.ui.human-feedback-queues :as human-feedback-queues]
+   [com.rpl.agent-o-rama.ui.invocations.filters]))
 
 (def routes
   [""
@@ -72,7 +73,8 @@
       ["" {:name :agent/detail, :views [agents/agent]}]
 
       ["/invocations"
-       ["" {:name :agent/invocations, :views [agents/invocations]}]
+       ["" {:name :agent/invocations, :views [agents/invocations]
+            :parameters {:query [:map [:filters {:optional true} :string]]}}]
        ["/:invoke-id" {:name :agent/invocation-detail
                        :views [agents/invoke]
                        :parameters {:query [:map
@@ -424,7 +426,8 @@
 (re-frame/reg-event-db ::init-db
   (fn [db [_ seed]]
     (merge {:ui {:modal {:active nil :data {} :form {}}}
-            :forms {}}
+            :forms {}
+            :invocations-filters {}}
            db
            seed)))
 
