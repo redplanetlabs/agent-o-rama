@@ -569,7 +569,7 @@
               ($ :button.inline-flex.items-center.gap-2.px-3.py-1.5.rounded-full.bg-blue-50.text-blue-700.text-xs.font-medium.border.border-blue-200.cursor-pointer.hover:bg-blue-100.transition-colors.duration-150
                  {:key chip-id :type "button" :onClick #(open-chip! chip)}
                  ($ :span (get filter-type-labels filter-type))
-                 ($ :span.text-blue-500 description)
+                 ($ :span.text-blue-500.truncate.max-w-48 description)
                  ($ :span.text-blue-400.hover:text-blue-700.cursor-pointer
                     {:onClick (fn [e]
                                 (.stopPropagation e)
@@ -591,12 +591,16 @@
               ($ :div.space-y-2
                  (if (seq node-options)
                    ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
-                      {:value (:node-current editor)
+                      {:value (str (or (:node-current editor) ""))
                        :data-testid "invocations-filter-node-select"
-                       :onChange #(update-editor! (fn [prev] (assoc prev :node-current (.. % -target -value))))}
+                       :onChange (fn [e]
+                                   (let [v (.. e -target -value)]
+                                     (update-editor! (fn [prev] (assoc prev :node-current v)))))}
                       ($ :option {:value ""} "Select node")
-                      (for [node-name node-options]
-                        ($ :option {:key node-name :value node-name} node-name)))
+                      (for [node-name node-options
+                            :when (some? node-name)]
+                        (let [v (str node-name)]
+                          ($ :option {:key v :value v} v))))
                    ($ :div.text-xs.text-gray-500 "No nodes available"))
                  ($ :div.text-xs.text-gray-500 "This filter adds one required node condition."))
 
@@ -605,17 +609,23 @@
                  ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
                     {:type "number" :data-testid "invocations-filter-latency-min"
                      :placeholder "Latency min (ms)" :value (:latency-min editor)
-                     :onChange #(update-editor! (fn [prev] (assoc prev :latency-min (.. % -target -value))))})
+                     :onChange (fn [e]
+                                 (let [v (.. e -target -value)]
+                                   (update-editor! (fn [prev] (assoc prev :latency-min v)))))})
                  ($ :input.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm
                     {:type "number" :data-testid "invocations-filter-latency-max"
                      :placeholder "Latency max (ms)" :value (:latency-max editor)
-                     :onChange #(update-editor! (fn [prev] (assoc prev :latency-max (.. % -target -value))))}))
+                     :onChange (fn [e]
+                                 (let [v (.. e -target -value)]
+                                   (update-editor! (fn [prev] (assoc prev :latency-max v)))))}))
 
               :error
               ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                  {:value (:error-filter editor)
                   :data-testid "invocations-filter-error-select"
-                  :onChange #(update-editor! (fn [prev] (assoc prev :error-filter (.. % -target -value))))}
+                  :onChange (fn [e]
+                              (let [v (.. e -target -value)]
+                                (update-editor! (fn [prev] (assoc prev :error-filter v)))))}
                  ($ :option {:value "all"} "All results")
                  ($ :option {:value "errors-only"} "Errors only")
                  ($ :option {:value "no-errors"} "No errors"))
@@ -625,7 +635,9 @@
                  ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                     {:value (:source editor)
                      :data-testid "invocations-filter-source-select"
-                     :onChange #(update-editor! (fn [prev] (assoc prev :source (.. % -target -value))))}
+                     :onChange (fn [e]
+                                 (let [v (.. e -target -value)]
+                                   (update-editor! (fn [prev] (assoc prev :source v)))))}
                     ($ :option {:value "all"} "All sources")
                     ($ :option {:value "API"} "API")
                     ($ :option {:value "MANUAL"} "Manual")
@@ -635,7 +647,9 @@
                        {:type "checkbox" :data-testid "invocations-filter-source-not"
                         :checked (boolean (:source-not? editor))
                         :disabled (= "all" (:source editor))
-                        :onChange #(update-editor! (fn [prev] (assoc prev :source-not? (.. % -target -checked))))})
+                        :onChange (fn [e]
+                                    (let [v (.. e -target -checked)]
+                                      (update-editor! (fn [prev] (assoc prev :source-not? v)))))})
                     ($ :span "Not selected source"))
                  ($ :div.text-xs.text-gray-500
                     "When enabled, returns invokes from all source types except the selected one."))
@@ -655,20 +669,21 @@
                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                          {:value selected-metric-name
                           :data-testid "invocations-filter-feedback-metric"
-                          :onChange #(let [selected-name (.. % -target -value)
-                                           metric-option (get feedback-metric-options-by-name selected-name)
-                                           next-type (if metric-option (metric-item->type metric-option) "numeric")
-                                           next-categories (if metric-option (metric-item->categories metric-option) [])]
-                                       (update-editor! (fn [prev]
-                                                         (assoc prev
-                                                                :metric-name selected-name
-                                                                :metric-type next-type
-                                                                :match-any-value? false
-                                                                :allowed-values []
-                                                                :categories next-categories
-                                                                :comparator "<="
-                                                                :value ""
-                                                                :source (or (:source prev) "any")))))}
+                          :onChange (fn [e]
+                                      (let [selected-name (.. e -target -value)
+                                            metric-option (get feedback-metric-options-by-name selected-name)
+                                            next-type (if metric-option (metric-item->type metric-option) "numeric")
+                                            next-categories (if metric-option (metric-item->categories metric-option) [])]
+                                        (update-editor! (fn [prev]
+                                                          (assoc prev
+                                                                 :metric-name selected-name
+                                                                 :metric-type next-type
+                                                                 :match-any-value? false
+                                                                 :allowed-values []
+                                                                 :categories next-categories
+                                                                 :comparator "<="
+                                                                 :value ""
+                                                                 :source (or (:source prev) "any"))))))}
                          ($ :option {:value ""} "Select metric")
                          (for [[idx metric-name] (map-indexed vector (or feedback-metric-option-names []))]
                            ($ :option {:key (str "feedback-metric-option-" idx "-" metric-name)
@@ -677,8 +692,9 @@
                       ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.text-sm.bg-white
                          {:value (:source editor)
                           :data-testid "invocations-filter-feedback-source"
-                          :onChange #(update-editor! (fn [prev]
-                                                       (assoc prev :source (.. % -target -value))))}
+                          :onChange (fn [e]
+                                      (let [v (.. e -target -value)]
+                                        (update-editor! (fn [prev] (assoc prev :source v)))))}
                          ($ :option {:value "any"} "Any source")
                          ($ :option {:value "human"} "Human")
                          ($ :option {:value "non-human"} "Non-human")))
@@ -686,8 +702,9 @@
                       ($ :input.h-4.w-4.border.border-gray-300.rounded
                          {:type "checkbox" :data-testid "invocations-filter-feedback-any-value"
                           :checked match-any?
-                          :onChange #(update-editor! (fn [prev]
-                                                       (update prev :match-any-value? not)))})
+                          :onChange (fn [_e]
+                                      (update-editor! (fn [prev]
+                                                        (update prev :match-any-value? not))))})
                       ($ :span "Match any value (metric exists)"))
                    ($ :div {:className (str "space-y-2 " (or form-class ""))}
                       (when match-any?
@@ -725,8 +742,9 @@
                               {:value (:comparator editor)
                                :data-testid "invocations-filter-feedback-comparator"
                                :disabled match-any?
-                               :onChange #(update-editor! (fn [prev]
-                                                            (assoc prev :comparator (.. % -target -value))))}
+                               :onChange (fn [e]
+                                           (let [v (.. e -target -value)]
+                                             (update-editor! (fn [prev] (assoc prev :comparator v)))))}
                               ($ :option {:value "<="} "<=")
                               ($ :option {:value "<"} "<")
                               ($ :option {:value "="} "=")
@@ -738,8 +756,9 @@
                                :data-testid "invocations-filter-feedback-value"
                                :disabled match-any?
                                :value (:value editor)
-                               :onChange #(update-editor! (fn [prev]
-                                                            (assoc prev :value (.. % -target -value))))})))
+                               :onChange (fn [e]
+                                           (let [v (.. e -target -value)]
+                                             (update-editor! (fn [prev] (assoc prev :value v)))))})))
                       ($ :div.text-xs.text-gray-500 "This filter adds one feedback condition."))))
 
               ($ :div.text-sm.text-gray-500 "Unknown filter")))))))
