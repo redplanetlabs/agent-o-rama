@@ -4,7 +4,6 @@
    [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
    [re-frame.query :as rfq]

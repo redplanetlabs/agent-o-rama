@@ -1,10 +1,10 @@
 (ns com.rpl.agent-o-rama.ui.experiments.comparative-detail
   (:require
+   [re-frame.core :as rf]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [BeakerIcon ArrowLeftIcon ChevronDownIcon ChevronUpIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.experiments.forms :as forms]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
@@ -136,7 +136,7 @@
                             ($ regular-detail/CellContent
                                {:content (:input run)
                                 :truncated? (not show-full-text?)
-                                :on-expand #(state/dispatch [:modal/show :content-detail
+                                :on-expand #(rf/dispatch [:modal/show :content-detail
                                                              {:title "Input"
                                                               :component ($ regular-detail/ContentModal {:content % :title "Input"})}])}))
                          ;; Reference Output Cell
@@ -144,7 +144,7 @@
                             ($ regular-detail/CellContent
                                {:content (:reference-output run)
                                 :truncated? (not show-full-text?)
-                                :on-expand #(state/dispatch [:modal/show :content-detail
+                                :on-expand #(rf/dispatch [:modal/show :content-detail
                                                              {:title "Reference Output"
                                                               :component ($ regular-detail/ContentModal {:content % :title "Reference Output"})}])}))
                          ;; Dynamic Output Columns
@@ -169,7 +169,7 @@
                                        ($ :div.space-y-2
                                           (if-let [throwable (get-in agent-result [:result :val :throwable])]
                                             ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
-                                               {:onClick #(state/dispatch [:modal/show :exception-detail
+                                               {:onClick #(rf/dispatch [:modal/show :exception-detail
                                                                            {:title "Error Details"
                                                                             :component ($ regular-detail/ExceptionModal {:throwable throwable})}])}
                                                "View Error")
@@ -177,7 +177,7 @@
                                        ($ regular-detail/CellContent
                                           {:content (get-in agent-result [:result :val])
                                            :truncated? (not show-full-text?)
-                                           :on-expand #(state/dispatch [:modal/show :content-detail
+                                           :on-expand #(rf/dispatch [:modal/show :content-detail
                                                                         {:title (str "Output " (inc i))
                                                                          :component ($ regular-detail/ContentModal {:content % :title (str "Output " (inc i))})}])}))
                                      (when (or duration-ms
@@ -252,7 +252,7 @@
                                                   forms/experiment-info->form-state
                                                   (assoc :module-id module-id
                                                          :dataset-id dataset-id))]
-                               (state/dispatch [:modal/show-form :create-experiment form-props]))
+                               (rf/dispatch [:modal/show-form :create-experiment form-props]))
                   :module-id module-id
                   :dataset-id dataset-id
                   :show-info? show-info?

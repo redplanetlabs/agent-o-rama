@@ -1,5 +1,8 @@
 (ns com.rpl.agent-o-rama.ui.invocation-graph-view
   (:require
+   [re-frame.core :as rf]
+   [uix.re-frame :refer [use-subscribe]]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [clojure.string :as str]
    [clojure.pprint]
    [goog.i18n.DateTimeFormat :as dtf]
@@ -8,7 +11,6 @@
    [uix.core :as uix :refer [defui defhook $]]
 
    [com.rpl.specter :as s]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.trace-analytics :as trace-analytics]
    [com.rpl.agent-o-rama.ui.feedback :as feedback]
@@ -132,7 +134,7 @@
        ($ :span {:className (str "break-words cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
                  :onClick (fn [e]
                             (.stopPropagation e)
-                            (state/dispatch [:modal/show :expandable-content
+                            (rf/dispatch [:modal/show :expandable-content
                                              {:title title
                                               :component ($ common/ContentDetailModal {:title title :content pretty-str})}]))
                  :title "Click to expand"}
@@ -280,7 +282,7 @@
                         :placeholder "Type your response..."
                         :value (or hitl-response "")
                         :disabled submitting?
-                        :onChange #(state/dispatch [:db/set-value
+                        :onChange #(rf/dispatch [:db/set-value
                                                     [:ui :hitl :responses hr-invoke-id]
                                                     (.. % -target -value)])})
           ($ :button {:className (common/cn "mt-2 px-3 py-2 rounded text-sm font-medium transition-colors"
@@ -289,14 +291,14 @@
                       :disabled (or submitting? (empty? (str/trim (or hitl-response ""))))
                       :onClick #(when (and (not submitting?)
                                            (not (empty? (str/trim (or hitl-response "")))))
-                                  (state/dispatch [:hitl/submit
+                                  (rf/dispatch [:hitl/submit
                                                    {:module-id module-id
                                                     :agent-name agent-name
                                                     :invoke-id invoke-id
                                                     :request hr
                                                     :response (str/trim hitl-response)}])
                                   ;; Clear the response after submission
-                                  (state/dispatch [:db/set-value [:ui :hitl :responses hr-invoke-id] ""]))}
+                                  (rf/dispatch [:db/set-value [:ui :hitl :responses hr-invoke-id] ""]))}
              (if submitting? "Submitting..." "Submit Response"))))))
 
 (defui node-info-panel [{:keys [node-id node-name graph-data module-id agent-name invoke-id]}]
@@ -332,7 +334,7 @@
                        :className "bg-white p-2 rounded border border-red-100 cursor-pointer hover:bg-red-50 transition-colors"
                        :onClick (fn [e]
                                   (.stopPropagation e)
-                                  (state/dispatch [:modal/show :exception-detail
+                                  (rf/dispatch [:modal/show :exception-detail
                                                    {:title (str "Exception " (inc idx))
                                                     :component ($ ExceptionDetailModal {:title (str "Exception " (inc idx)) :content exc-text})}]))
                        :title "Click to view full exception"}
@@ -510,7 +512,7 @@
                       (.stopPropagation e)
                       (let [input-data (transform-node-input-for-dataset raw-node-data node-name)
                             output-data (transform-node-data-for-dataset raw-node-data node-name)]
-                        (state/dispatch [:modal/show-form :add-from-trace
+                        (rf/dispatch [:modal/show-form :add-from-trace
                                          {:module-id module-id
                                           :title (str "Add Node '" node-name "' to Dataset")
                                           :source-type :node
@@ -578,20 +580,20 @@
         hr (:human-request data)
 
         hr-invoke-id (when hr (:invoke-id hr))
-        hitl-response (state/use-sub (if hr-invoke-id
+        hitl-response (use-subscribe [::aor-rf/get-in (if hr-invoke-id
                                        [:ui :hitl :responses hr-invoke-id]
-                                       [:ui :hitl :responses :placeholder]))
-        submitting? (state/use-sub (if hr-invoke-id
+                                       [:ui :hitl :responses :placeholder])])
+        submitting? (use-subscribe [::aor-rf/get-in (if hr-invoke-id
                                      [:ui :hitl :submitting hr-invoke-id]
-                                     [:ui :hitl :submitting :placeholder]))
+                                     [:ui :hitl :submitting :placeholder])])
 
-        active-tab (state/use-sub [:ui :node-details :active-tab])]
+        active-tab (use-subscribe [::aor-rf/get-in [:ui :node-details :active-tab]])]
 
     ;; Default to :info tab
     (uix/use-effect
      (fn []
        (when (nil? active-tab)
-         (state/dispatch [:db/set-value [:ui :node-details :active-tab] :info])))
+         (rf/dispatch [:db/set-value [:ui :node-details :active-tab] :info])))
      [active-tab])
 
     (when selected-node
@@ -604,13 +606,13 @@
                                                  {"bg-white text-gray-900 shadow-sm" (= active-tab :info)
                                                   "text-gray-600 hover:text-gray-900" (not= active-tab :info)})
                            :data-id "node-info-tab"
-                           :onClick #(state/dispatch [:db/set-value [:ui :node-details :active-tab] :info])}
+                           :onClick #(rf/dispatch [:db/set-value [:ui :node-details :active-tab] :info])}
                   "Info")
                ($ :button {:className (common/cn "flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors"
                                                  {"bg-white text-gray-900 shadow-sm" (= active-tab :feedback)
                                                   "text-gray-600 hover:text-gray-900" (not= active-tab :feedback)})
                            :data-id "node-feedback-tab"
-                           :onClick #(state/dispatch [:db/set-value [:ui :node-details :active-tab] :feedback])}
+                           :onClick #(rf/dispatch [:db/set-value [:ui :node-details :active-tab] :feedback])}
                   "Feedback")))
 
          ;; Tab content
@@ -805,7 +807,7 @@
                          ($ :div {:className "text-xs font-mono text-red-600 mt-1 break-words cursor-pointer hover:bg-red-100 px-1 py-0.5 rounded transition-colors"
                                   :onClick (fn [e]
                                              (.stopPropagation e)
-                                             (state/dispatch [:modal/show :exception-detail
+                                             (rf/dispatch [:modal/show :exception-detail
                                                               {:title (str "Exception in " node-name)
                                                                :component ($ ExceptionDetailModal {:title (str "Exception in " node-name) :content throwable-str})}]))
                                   :title "Click to view full exception"}
@@ -931,7 +933,7 @@
                                          :modal-title "Final Result Details"
                                          :truncate-length 200
                                          :on-expand (fn [{:keys [title content]}]
-                                                      (state/dispatch [:modal/show :content-detail
+                                                      (rf/dispatch [:modal/show :content-detail
                                                                        {:title title
                                                                         :component ($ common/ContentDetailModal {:title title :content content})}]))}))))))
 
@@ -945,7 +947,7 @@
           {:onClick (fn []
                       (let [input-data (:invoke-args summary-data)
                             output-data (:val (:result summary-data))]
-                        (state/dispatch [:modal/show-form :add-from-trace
+                        (rf/dispatch [:modal/show-form :add-from-trace
                                          {:module-id module-id
                                           :title "Add Agent Invocation to Dataset"
                                           :source-type :agent
@@ -976,7 +978,7 @@
                           :invoke-id invoke-id
                           :on-change
                           (fn []
-                            (state/dispatch [:invocation/start-graph-loading
+                            (rf/dispatch [:invocation/start-graph-loading
                                              {:invoke-id invoke-id
                                               :module-id module-id
                                               :agent-name agent-name}]))
@@ -1048,7 +1050,7 @@
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes flow-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
                             module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change]}]
   (let [;; Read tab from URL query params, default to :info
-        query-params (state/use-sub [:route :query-params])
+        query-params (use-subscribe [::aor-rf/get-in [:route :query-params]])
         tab-param (get query-params :tab)
         active-tab (case tab-param
                      "feedback" :feedback

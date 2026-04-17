@@ -1,8 +1,8 @@
 (ns com.rpl.agent-o-rama.ui.analytics
   (:require
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.chart :as chart]
@@ -763,9 +763,9 @@
              :variant-opts actual-variant-opts})))))
 
 (defui analytics-page []
-  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         ;; Get coerced parameters from Reitit - these are already typed correctly
-        coerced-params (state/use-sub [:route :parameters :query])
+        coerced-params (use-subscribe [::aor-rf/get-in [:route :parameters :query]])
         decoded-agent-name (common/url-decode agent-name)
 
         ;; Use coerced values with defaults - Reitit handles type conversion for us

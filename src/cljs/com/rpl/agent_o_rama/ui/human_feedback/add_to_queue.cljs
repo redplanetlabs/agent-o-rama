@@ -1,9 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback.add-to-queue
   (:require
+   [re-frame.core :as rf]
    [uix.core :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :refer [SearchableSelector]]
    [com.rpl.agent-o-rama.impl.ui.rpc.human-feedback :as rpc-hf]
    ["@heroicons/react/24/outline" :refer [ArrowDownIcon]]))
@@ -115,5 +115,4 @@
    - :node-task-id - node task ID (UUID)
    - :node-invoke-id - node invoke ID (UUID)"
   [props]
-  (state/dispatch [:modal/show-form :add-to-feedback-queue props]))
-
+  (rf/dispatch [:modal/show-form :add-to-feedback-queue props]))

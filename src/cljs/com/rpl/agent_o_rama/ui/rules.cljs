@@ -1,5 +1,8 @@
 (ns com.rpl.agent-o-rama.ui.rules
   (:require
+   [re-frame.core :as rf]
+   [uix.re-frame :refer [use-subscribe]]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    ["@heroicons/react/24/outline" :refer [TrashIcon]]
    [clojure.string :as str]
    [reitit.frontend.easy :as rfe]
@@ -7,7 +10,6 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.rules-forms :as rules-forms :refer [action-friendly-name]]))
 
 (defn process-eval-action-info
@@ -310,11 +312,11 @@
 (defui rules-page
   "Display rules and actions for an agent as a table."
   []
-  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         [rules set-rules!] (uix/use-state nil)
         [loading? set-loading!] (uix/use-state true)
         [error set-error!] (uix/use-state nil)
-        refetch-trigger (state/use-sub [:ui :rules :refetch-trigger module-id agent-name])]
+        refetch-trigger (use-subscribe [::aor-rf/get-in [:ui :rules :refetch-trigger module-id agent-name]])]
 
     (uix/use-effect
      (fn []
@@ -378,7 +380,7 @@
                         :on-delete
                         (fn []
                           (let [current-val (or refetch-trigger 0)]
-                            (state/dispatch
+                            (rf/dispatch
                              [:db/set-value
                               [:ui :rules :refetch-trigger module-id agent-name]
                               (inc current-val)])))})))))))))

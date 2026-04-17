@@ -1,12 +1,12 @@
 (ns com.rpl.agent-o-rama.ui.datasets
   (:require
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [defui defhook $]]
    [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentDuplicateIcon MagnifyingGlassIcon]]
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
@@ -43,7 +43,7 @@
                              {:module-id module-id :dataset-id dataset-id
                               :snapshot-name snapshot-name :example-id example-id})
                             (.then (fn [_]
-                                     (do (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                     (do (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                    (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
                                      (when on-delete-success (on-delete-success))))
                             (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
@@ -89,7 +89,7 @@
                                          (set-saving! false)
                                          (set-editing! false)
                                          (set-edit-value! "")
-                                         (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                         (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                          (rf/dispatch [:re-frame.query/invalidate-tags
                                                        [[:fetch-example module-id dataset-id example-id]
                                                         [:dataset-examples module-id dataset-id]]])
@@ -176,12 +176,12 @@
                  {:className "inline-flex items-center px-3 py-1 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer"
                   :onClick (fn []
                              (when (js/confirm "Are you sure you want to delete this example?")
-                               (state/dispatch [:modal/hide]) ; Close modal before deleting
+                               (rf/dispatch [:modal/hide]) ; Close modal before deleting
                                (-> (rpc/call ::rpc-datasets/delete-example!!
                                       {:module-id module-id :dataset-id dataset-id
                                        :snapshot-name snapshot-name :example-id example-id})
                                   (.then (fn [_]
-                                           (do (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                           (do (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                    (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
                                            (when on-delete-success (on-delete-success))))
                                   (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
@@ -248,7 +248,7 @@
                             (.then (fn [_]
                                      (set-is-adding false)
                                      (set-input-value "")
-                                     (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                     (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                      (rf/dispatch [:re-frame.query/invalidate-tags
                                                    [[:fetch-example module-id dataset-id example-id]
                                                     [:dataset-examples module-id dataset-id]]])
@@ -272,7 +272,7 @@
                                :example-id example-id
                                :tag tag-name})
                              (.then (fn [_]
-                                      (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                      (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                       (rf/dispatch [:re-frame.query/invalidate-tags
                                                     [[:fetch-example module-id dataset-id example-id]
                                                      [:dataset-examples module-id dataset-id]]])
@@ -437,7 +437,7 @@
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
                 {:onClick #(when (seq selected-example-ids)
                              ;; Show the new unified modal in :multi mode
-                             (state/dispatch [:modal/show :run-evaluator
+                             (rf/dispatch [:modal/show :run-evaluator
                                               {:title "Run Summary Evaluation"
                                                :component ($ evaluators/RunEvaluatorModal {:module-id module-id
                                                                                            :dataset-id dataset-id
@@ -447,7 +447,7 @@
 
 ;; Run Experiment button
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
-                {:onClick #(state/dispatch [:modal/show-form :create-experiment
+                {:onClick #(rf/dispatch [:modal/show-form :create-experiment
                                             {:module-id module-id
                                              :dataset-id dataset-id
                                              :snapshot snapshot-name
@@ -459,7 +459,7 @@
 
 ;; Run Comparative Experiment button
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
-                {:onClick #(state/dispatch [:modal/show-form :create-experiment
+                {:onClick #(rf/dispatch [:modal/show-form :create-experiment
                                             {:module-id module-id
                                              :dataset-id dataset-id
                                              :snapshot snapshot-name
@@ -528,7 +528,7 @@
                  ($ :tr {:key example-id
                          :className (common/cn "hover:bg-gray-50 cursor-pointer"
                                                {"bg-blue-50" is-selected?})
-                         :onClick #(state/dispatch [:modal/show :example-viewer
+                         :onClick #(rf/dispatch [:modal/show :example-viewer
                                                     {:title "Example Details"
                                                      :component ($ EditableExampleModal
                                                                    {:example-id example-id
@@ -608,7 +608,7 @@
                                         :onClick (fn [e]
                                                    (.stopPropagation e)
                                                    (set-open-dropdown nil)
-                                                   (state/dispatch [:modal/show :run-evaluator
+                                                   (rf/dispatch [:modal/show :run-evaluator
                                                                     {:title "Try Evaluator on Example"
                                                                      :component ($ evaluators/RunEvaluatorModal {:module-id module-id
                                                                                                                  :dataset-id dataset-id
@@ -629,7 +629,7 @@
                                                       :output (:reference-output example)
                                                       :tags (vec (:tags example))})
                                                    (.then (fn [_]
-                                                            (do (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                            (do (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                    (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))))
                                                    (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err))))))))}
                                        ($ DocumentDuplicateIcon {:className "mr-3 h-4 w-4 text-gray-400 group-hover:text-gray-500"})
@@ -645,7 +645,7 @@
                                                       {:module-id module-id :dataset-id dataset-id
                                                        :snapshot-name snapshot-name :example-id example-id})
                                                     (.then (fn [_]
-                                                             (do (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                             (do (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                    (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
                                                              (when on-delete-success (on-delete-success))))
                                                     (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
@@ -707,7 +707,7 @@
 
           ($ :div.flex.items-center.gap-2
              ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
-                {:onClick #(state/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
+                {:onClick #(rf/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
                 ($ PlusIcon {:className "h-5 w-5 mr-2"})
                 "Create Dataset")))
 
@@ -725,7 +725,7 @@
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No datasets yet")
             ($ :p.text-gray-500.mb-6 "Create your first dataset to get started.")
             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
-               {:onClick #(state/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
+               {:onClick #(rf/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
                ($ PlusIcon {:className "h-5 w-5 mr-2"})
                "Create Dataset"))
 
@@ -790,7 +790,7 @@
                                         {:onClick (fn [e]
                                                     (.preventDefault e)
                                                     (.stopPropagation e)
-                                                    (state/dispatch [:modal/show-form :edit-dataset
+                                                    (rf/dispatch [:modal/show-form :edit-dataset
                                                                      {:module-id module-id
                                                                       :dataset-id dsid
                                                                       :name name
@@ -806,7 +806,7 @@
                                                   (when (js/confirm (str "Are you sure you want to delete dataset '" name "'? This action cannot be undone."))
                                                     (-> (rpc/call ::rpc-datasets/delete!! {:module-id module-id :dataset-id dsid})
                                                     (.then (fn [_]
-                                                             (do (state/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
+                                                             (do (rf/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
                                                              (rf/dispatch [:re-frame.query/invalidate-tags [[:datasets module-id]]]))))
                                                     (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
                                       ($ TrashIcon {:className "h-4 w-4 mr-1"})
@@ -942,9 +942,9 @@
 
         ;; --- REFACTORED ---
         ;; State for selected snapshot now comes from app-db and is updated via dispatch
-        selected-snapshot-name (or (state/use-sub [:ui :datasets :selected-snapshot-per-dataset dataset-id]) "")
+        selected-snapshot-name (or (use-subscribe [::aor-rf/get-in [:ui :datasets :selected-snapshot-per-dataset dataset-id]]) "")
         set-selected-snapshot-name (fn [new-name]
-                                     (state/dispatch [:datasets/set-selected-snapshot
+                                     (rf/dispatch [:datasets/set-selected-snapshot
                                                       {:dataset-id dataset-id :snapshot-name new-name}]))
         is-read-only? (not (str/blank? selected-snapshot-name))
 
@@ -998,7 +998,7 @@
 
                 ;; Import button - next to export
                 ($ :button.inline-flex.items-center.px-3.py-2.text-sm.font-medium.rounded-md.bg-white.border.border-gray-300.hover:bg-gray-50.cursor-pointer.disabled:opacity-50.disabled:cursor-not-allowed
-                   {:onClick #(state/dispatch [:modal/show :dataset-import
+                   {:onClick #(rf/dispatch [:modal/show :dataset-import
                                                {:title "Import Examples from JSONL"
                                                 :component ($ datasets-forms/ImportDatasetModal
                                                               {:module-id module-id
@@ -1179,4 +1179,3 @@
                                                 "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "comparative")})}
                      "Comparative Experiments"))))
          :else ($ :div.p-6 "Dataset not found.")))))
-

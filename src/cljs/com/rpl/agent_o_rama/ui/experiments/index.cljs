@@ -6,7 +6,6 @@
    ["use-debounce" :refer [useDebounce]]
    ["react-datetime-picker" :default DateTimePicker]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.chart :as chart]
@@ -122,7 +121,7 @@
                     :placeholder "Search by name or ID..."})))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
-             {:onClick #(state/dispatch [:modal/show-form :create-experiment
+             {:onClick #(rf/dispatch [:modal/show-form :create-experiment
                                          {:module-id module-id
                                           :dataset-id dataset-id
                                           :spec {:type :regular}}])}

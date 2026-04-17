@@ -31,7 +31,6 @@
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.re-frame :as aor-re-frame]
    [com.rpl.agent-o-rama.ui.rpc]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :refer [global-modal-component]]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.events] ;; Ensure event handlers are registered at app startup
@@ -91,7 +90,7 @@
       ["/config" {:name :agent/config, :views [config-page/config-page]}]]]]])
 
 (defui ViewStack []
-  (let [match (state/use-sub [:route])
+  (let [match (use-subscribe [::aor-re-frame/get-in [:route]])
         ;; Get the stack of views to render from the route data.
         ;; Defaults to an empty vector if no views are defined for the route.
         view-stack (get-in match [:data :views] [])
@@ -142,7 +141,7 @@
 
 ;; Agent-specific navigation component
 (defui agent-context-nav [{:keys [module-id agent-name collapsed?]}]
-  (let [location (or (get-in (state/use-sub [:route]) [:path]) "/")]
+  (let [location (or (get-in (use-subscribe [::aor-re-frame/get-in [:route]]) [:path]) "/")]
     ($ :div.border-t.border-gray-300.my-3.pt-3.space-y-2
        (when-not collapsed?
          ($ :div.px-3.text-xs.font-semibold.text-gray-500 "AGENT"))
@@ -169,7 +168,7 @@
 
 ;; Module-specific navigation component
 (defui module-context-nav [{:keys [module-id collapsed?]}]
-  (let [location (or (get-in (state/use-sub [:route]) [:path]) "/")
+  (let [location (or (get-in (use-subscribe [::aor-re-frame/get-in [:route]]) [:path]) "/")
         ;; Query for module-specific agents
         {:keys [data error]
          agents-status :status}
@@ -238,7 +237,7 @@
                   ($ :span.ml-3.truncate decoded-agent-name)))))))))
 
 (defui sidebar-nav []
-  (let [match (state/use-sub [:route])
+  (let [match (use-subscribe [::aor-re-frame/get-in [:route]])
         location (or (:path match) "/")
         {:keys [module-id agent-name]} (or (:path-params match) {})
         route-name (get-in match [:data :name])
@@ -287,7 +286,7 @@
 ;; =============================================================================
 
 (defui breadcrumb []
-  (let [match (state/use-sub [:route])
+  (let [match (use-subscribe [::aor-re-frame/get-in [:route]])
         {:keys [module-id agent-name dataset-id invoke-id rule-name queue-id item-id]} (or (:path-params match) {})
         route-name (get-in match [:data :name])
 
@@ -436,4 +435,3 @@
    ($ app)
    (uix.dom/create-root
     (.getElementById js/document "root"))))
-

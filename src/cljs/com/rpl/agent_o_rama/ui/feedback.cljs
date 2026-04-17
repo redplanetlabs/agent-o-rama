@@ -1,8 +1,8 @@
 (ns com.rpl.agent-o-rama.ui.feedback
   (:require
+   [re-frame.core :as rf]
    [uix.core :as uix :refer [$ defui]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.impl.ui.rpc.human-feedback :as rpc-hf]
    [com.rpl.agent-o-rama.ui.human-feedback.manual-feedback :as manual-feedback]
@@ -84,7 +84,7 @@
                                                                    :value (str v)
                                                                    :required false})
                                                                 scores)]
-                                  (state/dispatch [:modal/show-form :add-manual-feedback
+                                  (rf/dispatch [:modal/show-form :add-manual-feedback
                                                    {:module-id module-id
                                                     :agent-name agent-name
                                                     :invoke-id invoke-id
@@ -107,7 +107,7 @@
                                    :node-task-id node-task-id :node-invoke-id node-invoke-id
                                    :feedback-id feedback-id})
                                  (.then (fn [_]
-                                          (state/dispatch [:invocation/start-graph-loading
+                                          (rf/dispatch [:invocation/start-graph-loading
                                                            {:invoke-id invoke-id :module-id module-id :agent-name agent-name}])))
                                  (.catch (fn [err] (js/console.error "Delete feedback failed" (if (map? err) (:error err) (str err)))))))}
                     ($ TrashIcon {:className "h-4 w-4"})))))
@@ -153,7 +153,7 @@
             ;; Add Feedback button (left half)
             ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.flex-1
                {:data-testid "add-feedback-button"
-                :onClick #(state/dispatch [:modal/show-form :add-manual-feedback
+                :onClick #(rf/dispatch [:modal/show-form :add-manual-feedback
                                            {:module-id module-id
                                             :agent-name agent-name
                                             :invoke-id invoke-id
@@ -205,5 +205,4 @@
          ($ :div {:className "text-gray-500 text-center py-8"
                   :data-id "feedback-empty-state"}
             "No feedback available")))))
-
 

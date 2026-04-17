@@ -2,8 +2,9 @@
   "Node streaming via a single path: POST SSE (`stream-node!!sse`) only.
   No graph-page replay; Rama proxy may be empty (stream ends) or return a final snapshot when complete."
   (:require
+   [re-frame.core :as rf]
+   [re-frame.db :as rdb]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [uix.core :as uix]))
 
 (defn use-node-stream
@@ -50,11 +51,11 @@
 
 (defn clear-stream-buffer!
   [stream-id]
-  (state/dispatch [:stream/cleanup {:stream-id stream-id}]))
+  (rf/dispatch [:stream/cleanup {:stream-id stream-id}]))
 
 (defn get-stream-state
   [stream-id]
-  (get-in @state/app-db [:streaming :buffers stream-id]))
+  (get-in @rdb/app-db [:streaming :buffers stream-id]))
 
 (defn ^:export test-stream-start!
   [_invoke-id _node-name]

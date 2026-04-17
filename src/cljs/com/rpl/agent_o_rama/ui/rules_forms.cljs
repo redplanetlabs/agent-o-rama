@@ -1,7 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.rules-forms
   (:require
+   [re-frame.core :as rf]
    [uix.core :as uix :refer [defui $]]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.filter-builder :as filter-builder]
    [com.rpl.agent-o-rama.ui.queries :as queries]
@@ -290,7 +290,7 @@
        ($ :label.block.text-sm.font-medium.text-gray-700 "Scope")
        ($ selectors/ScopeSelector
           {:value scope-type
-           :on-change #(state/dispatch [:form/set-rule-scope-type form-id %])})
+           :on-change #(rf/dispatch [:form/set-rule-scope-type form-id %])})
        (when (= scope-type :node)
          ($ selectors/NodeSelectorDropdown
             {:module-id module-id
@@ -467,8 +467,8 @@
    :on-success (fn [db {:keys [module-id agent-name]} _reply]
                  (let [current-val (get-in db [:ui :rules :refetch-trigger module-id agent-name] 0)
                        new-val (inc current-val)]
-                   (state/dispatch [:db/set-value [:ui :rules :refetch-trigger module-id agent-name] new-val])))}})
+                   (rf/dispatch [:db/set-value [:ui :rules :refetch-trigger module-id agent-name] new-val])))}})
 
 (defn show-add-rule-modal!
   [props]
-  (state/dispatch [:modal/show-form :add-rule props]))
+  (rf/dispatch [:modal/show-form :add-rule props]))
