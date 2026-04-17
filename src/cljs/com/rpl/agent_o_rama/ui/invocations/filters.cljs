@@ -1,5 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.invocations.filters
   (:require
+   ["@heroicons/react/24/outline" :refer [MagnifyingGlassIcon]]
+   ["use-debounce" :refer [useDebounce]]
    [re-frame.db :as rdb]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
@@ -398,6 +400,8 @@
   (let [panel (or (use-subscribe [::panel module-id agent-name]) {})
         applied (or applied default-applied-filters)
         args-query (or (:args-query applied) "")
+        [args-query-input set-args-query-input] (uix/use-state args-query)
+        [debounced-args-query] (useDebounce args-query-input 300)
         open-editor (:open-editor panel)
         editor (or (get-in panel [:editor :value]) {})
         active-types (derive-active-filter-types applied)
@@ -412,22 +416,31 @@
         update-editor! #(rf/dispatch [::update-editor module-id agent-name %])
         apply! #(rf/dispatch [::apply module-id agent-name])
         open-chip! #(rf/dispatch [::open-chip module-id agent-name %])
-        remove-chip! #(rf/dispatch [::remove-chip module-id agent-name %])
-        update-args-query!
-        (fn [next-query]
-          (let [trimmed (str/trim (or next-query ""))
-                next-applied (if (str/blank? trimmed)
-                               (dissoc applied :args-query)
-                               (assoc applied :args-query next-query))]
-            (replace-invocations-filters-in-url! module-id agent-name next-applied)))]
+        remove-chip! #(rf/dispatch [::remove-chip module-id agent-name %])]
+    (uix/use-effect
+     (fn []
+       (set-args-query-input args-query))
+     [args-query])
+    (uix/use-effect
+     (fn []
+       (let [trimmed-current (str/trim args-query)
+             trimmed-next (str/trim (or debounced-args-query ""))]
+         (when (not= trimmed-current trimmed-next)
+           (let [next-applied (if (str/blank? trimmed-next)
+                                (dissoc applied :args-query)
+                                (assoc applied :args-query debounced-args-query))]
+             (replace-invocations-filters-in-url! module-id agent-name next-applied)))))
+     [args-query debounced-args-query applied module-id agent-name])
     ($ :div.bg-white.rounded-md.border.border-gray-200.p-4.shadow-sm
        ($ :div.flex.flex-wrap.items-center.gap-2
-          ($ :div.w-80.max-w-full
+          ($ :div.relative.w-80.max-w-full
+             ($ :div.pointer-events-none.absolute.inset-y-0.left-0.flex.items-center.pl-3
+                ($ MagnifyingGlassIcon {:className "h-5 w-5 text-gray-400"}))
              ($ :input
                 {:type "text"
-                 :value args-query
-                 :onChange (fn [e] (update-args-query! (.. e -target -value)))
-                 :className "block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                 :value args-query-input
+                 :onChange (fn [e] (set-args-query-input (.. e -target -value)))
+                 :className "block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
                  :placeholder "Search invocation arguments..."
                  :data-testid "invocations-filter-args-query"}))
           ($ common/Dropdown
