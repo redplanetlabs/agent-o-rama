@@ -1,12 +1,12 @@
 (ns com.rpl.agent-o-rama.ui.evaluators
   (:require
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [PlusIcon BeakerIcon TrashIcon EllipsisVerticalIcon ChevronDownIcon XMarkIcon MagnifyingGlassIcon PlayIcon]]
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.components.json-path-preview :refer [ExpressionPreview]]
@@ -32,16 +32,16 @@
   (let [{:keys [name type description builder-name builder-params
                 input-json-path output-json-path reference-output-json-path]} spec
         ;; Get module-id from the route params to pass to the new event
-        module-id (state/use-sub [:route :path-params :module-id])]
+        module-id (use-subscribe [::aor-rf/get-in [:route :path-params :module-id]])]
     ($ :div.p-6.text-sm
        ;; NEW: Try Evaluator button at the top
        ($ :div.flex.justify-end.mb-4
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
              {:onClick (fn []
                          ;; Close the details modal first, then show try modal
-                         (state/dispatch [:modal/hide])
+                         (rf/dispatch [:modal/hide])
                          (js/setTimeout
-                          #(state/dispatch [:evaluators/show-try-modal {:evaluator spec :module-id module-id}])
+                          #(rf/dispatch [:evaluators/show-try-modal {:evaluator spec :module-id module-id}])
                           100))}
              ($ PlayIcon {:className "h-5 w-5 mr-2"})
              "Try Evaluator"))
@@ -80,7 +80,7 @@
                ($ :code.font-mono.bg-gray-100.px-2.py-1.rounded reference-output-json-path)))))))
 
 (defn show-evaluator-details-modal! [spec]
-  (state/dispatch [:modal/show :evaluator-details
+  (rf/dispatch [:modal/show :evaluator-details
                    {:title (str "Evaluator Details: " (:name spec))
                     :component ($ EvaluatorDetailsModal {:spec spec})}]))
 
@@ -563,7 +563,7 @@
 ;; =============================================================================
 
 (defui index []
-  (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         ;; Add state for search term and debounce it
         [search-term set-search-term] (useState "")
         [debounced-search-term] (useDebounce search-term 300)
@@ -623,7 +623,7 @@
                    ($ :option {:value "summary"} "Summary"))))
 
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
-             {:onClick #(state/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}
+             {:onClick #(rf/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}
              ($ PlusIcon {:className "h-5 w-5 mr-2"})
              "Create Evaluator"))
 
@@ -643,7 +643,7 @@
             ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No evaluators yet")
             ($ :p.text-gray-500.mb-6 "Create your first evaluator to get started.")
             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors
-               {:onClick #(state/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}
+               {:onClick #(rf/dispatch [:modal/show-form :create-evaluator {:module-id module-id}])}
                ($ PlusIcon {:className "h-5 w-5 mr-2"})
                "Create Evaluator"))
 

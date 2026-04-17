@@ -1,11 +1,11 @@
 (ns com.rpl.agent-o-rama.ui.experiments.forms
   (:require
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.experiments.events]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
    [com.rpl.agent-o-rama.ui.selectors :as selectors]
@@ -240,7 +240,7 @@
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Target Type")
           ($ selectors/ScopeSelector
              {:value (or (:value target-spec-type-field) :agent)
-              :on-change #(state/dispatch [:form/set-experiment-target-type form-id index %])}))
+              :on-change #(rf/dispatch [:form/set-experiment-target-type form-id index %])}))
 
        ($ :div.mb-4
           ($ :label.block.text-sm.font-medium.text-gray-700.mb-1 "Agent Name")
@@ -289,10 +289,10 @@
                           (str "Arg " (inc i)))
                        ($ :input.flex-1.p-1.border.border-gray-300.rounded-md.font-mono.text-sm
                           {:value value
-                           :on-change (fn [e] (state/dispatch [:form/update-field form-id (conj path :input->args i :value) (.. e -target -value)]))})
+                           :on-change (fn [e] (rf/dispatch [:form/update-field form-id (conj path :input->args i :value) (.. e -target -value)]))})
                        ($ :button.p-1.text-red-500.hover:text-red-700
                           {:type "button"
-                           :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (vec (remove #(= (:id %) id) input-mappings))]))}
+                           :onClick (fn [] (rf/dispatch [:form/update-field form-id (conj path :input->args) (vec (remove #(= (:id %) id) input-mappings))]))}
                           ($ TrashIcon {:className "h-4 w-4"})))
                     
                     ;; Add preview below the input
@@ -308,11 +308,11 @@
                              :source-field :input})))))))
           ($ :button.mt-2.text-sm.text-blue-600.hover:underline
              {:type "button"
-              :onClick (fn [] (state/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings {:id (random-uuid) :value "$"})]))}
+              :onClick (fn [] (rf/dispatch [:form/update-field form-id (conj path :input->args) (conj input-mappings {:id (random-uuid) :value "$"})]))}
              "Add Argument")))))
 
 (defui CreateExperimentForm [{:keys [form-id]}]
-  (let [{:keys [module-id dataset-id]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id dataset-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
 
         ;; Check if dataset is remote
         {dataset-props :data}
@@ -437,13 +437,13 @@
                           :title "Remove Target"
                           :onClick (fn []
                                      (let [new-targets (vec (remove #(= % (get targets i)) targets))]
-                                       (state/dispatch [:form/update-field form-id [:spec :targets] new-targets])))}
+                                       (rf/dispatch [:form/update-field form-id [:spec :targets] new-targets])))}
                          ($ TrashIcon {:className "h-4 w-4"})))))))
 
           (when (= spec-type :comparative)
             ($ :button.mt-4.flex.items-center.gap-2.text-sm.text-blue-600.hover:underline
                {:type "button"
-                :onClick (fn [] (state/dispatch [:form/update-field form-id [:spec :targets] (conj targets {:target-spec {:type :agent :agent-name nil} :input->args [{:id (random-uuid) :value "$"}]})]))}
+                :onClick (fn [] (rf/dispatch [:form/update-field form-id [:spec :targets] (conj targets {:target-spec {:type :agent :agent-name nil} :input->args [{:id (random-uuid) :value "$"}]})]))}
                ($ PlusIcon {:className "h-4 w-4"})
                "Add Another Target")))
 
@@ -462,7 +462,7 @@
                                  ;; Toggle the checkbox
                                  ((:on-change use-remote-evaluators-field) (.. % -target -checked))
                                  ;; Clear evaluators when toggling
-                                 (state/dispatch [:form/update-field form-id :evaluators []]))})
+                                 (rf/dispatch [:form/update-field form-id :evaluators []]))})
                ($ :label.ml-2.block.text-sm.text-gray-700
                   {:htmlFor "use-remote-evaluators"}
                   "Use remote evaluators")))
@@ -490,13 +490,13 @@
                 {:label "Number of Repetitions"
                  :type :number
                  :value (or (get form :num-repetitions) 1)
-                 :on-change #(state/dispatch [:form/update-field form-id :num-repetitions (js/parseInt %)])
+                 :on-change #(rf/dispatch [:form/update-field form-id :num-repetitions (js/parseInt %)])
                  :placeholder "1"})
              ($ forms/form-field
                 {:label "Concurrency"
                  :type :number
                  :value (or (get form :concurrency) 1)
-                 :on-change #(state/dispatch [:form/update-field form-id :concurrency (js/parseInt %)])
+                 :on-change #(rf/dispatch [:form/update-field form-id :concurrency (js/parseInt %)])
                  :placeholder "1"}))))))
 
 ;; =============================================================================

@@ -4,7 +4,6 @@
    [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [PlusIcon TrashIcon ChevronDownIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
@@ -26,7 +25,7 @@
 
         handle-create (fn []
                         (set-dropdown-open false)
-                        (state/dispatch
+                        (rf/dispatch
                          [:modal/show-form :new-snapshot
                           {:module-id module-id
                            :dataset-id dataset-id
@@ -40,7 +39,7 @@
                               (.then (fn [_]
                                        (when (= selected-snapshot snapshot-name)
                                          (on-select-snapshot ""))
-                                       (do (state/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
+                                       (do (rf/dispatch [:query/invalidate {:query-key-pattern [:snapshot-names module-id dataset-id]}])
                                        (rf/dispatch [:re-frame.query/invalidate-tags [[:snapshot-names module-id dataset-id]]]))))
                               (.catch (fn [err]
                                         (js/alert (str "Error deleting snapshot: "

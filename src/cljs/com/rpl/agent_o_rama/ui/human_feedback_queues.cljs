@@ -1,5 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback-queues
   (:require
+   [re-frame.db :as rdb]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [defui defhook $]]
    [uix.re-frame :refer [use-subscribe]]
    [reitit.frontend.easy :as rfe]
@@ -7,7 +9,6 @@
    ["react" :refer [useState]]
    ["use-debounce" :refer [useDebounce]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
@@ -85,7 +86,7 @@
 ;; =============================================================================
 
 (defui metrics-index []
-  (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         decoded-module-id (when module-id (common/url-decode module-id))
         ;; Search state
         [search-term set-search-term] (useState "")
@@ -105,7 +106,7 @@
                          (when (js/confirm (str "Delete metric '" metric-name "'?"))
                            (-> (rpc/call ::rpc-hf/delete-metric!! {:module-id decoded-module-id :name metric-name})
                            (.then (fn [_]
-                                    (state/dispatch [:query/invalidate {:query-key-pattern [:human-metrics module-id]}])
+                                    (rf/dispatch [:query/invalidate {:query-key-pattern [:human-metrics module-id]}])
                                     (rf/dispatch [:re-frame.query/invalidate-tags [[:human-feedback/metrics module-id]]])))
                            (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))
                        [decoded-module-id])]
@@ -120,7 +121,7 @@
             ($ :h2.text-2xl.font-bold.text-gray-900 "Human Metrics")
             ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
                {:data-testid "create-metric-button"
-                :onClick #(state/dispatch [:modal/show-form :create-human-metric {:module-id decoded-module-id}])}
+                :onClick #(rf/dispatch [:modal/show-form :create-human-metric {:module-id decoded-module-id}])}
                "+ Create Metric"))
 
          ;; Search
@@ -522,7 +523,7 @@
 ;; =============================================================================
 
 (defui index []
-  (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         decoded-module-id (common/url-decode module-id)
 
         ;; Search state
@@ -543,7 +544,7 @@
           ($ :h2.text-2xl.font-bold.text-gray-900 "Human Feedback Queues")
           ($ :button.bg-blue-600.text-white.px-4.py-2.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
              {:data-testid "create-queue-button"
-              :onClick #(state/dispatch [:modal/show-form :create-human-feedback-queue {:module-id decoded-module-id}])}
+              :onClick #(rf/dispatch [:modal/show-form :create-human-feedback-queue {:module-id decoded-module-id}])}
              "+ Create Queue"))
 
        ;; Search bar
@@ -610,7 +611,7 @@
                                            (when (js/confirm (str "Are you sure you want to delete queue \"" queue-name "\"?"))
                                              (-> (rpc/call ::rpc-hf/delete-queue!! {:module-id decoded-module-id :name queue-name})
                                              (.then (fn [_]
-                                                      (state/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queues module-id]}])
+                                                      (rf/dispatch [:query/invalidate {:query-key-pattern [:human-feedback-queues module-id]}])
                                                       (rf/dispatch [:re-frame.query/invalidate-tags [[:human-feedback/queues module-id]]])))
                                              (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
                                ($ TrashIcon {:className "h-5 w-5"})))))))
@@ -641,7 +642,7 @@
                                                       :metric (:name r)
                                                       :required (:required r)})
                                                    rubrics)]
-                        (state/dispatch [:modal/show-form :create-human-feedback-queue
+                        (rf/dispatch [:modal/show-form :create-human-feedback-queue
                                          {:module-id decoded-module-id
                                           :name queue-id
                                           :description (or (:description queue-info) "")
@@ -721,7 +722,7 @@
   (let [decoded-module-id (common/url-decode module-id)
         decoded-queue-id (common/url-decode queue-id)
         state-path [:queries :human-feedback-queue-items module-id queue-id]
-        query-state (state/use-sub state-path)
+        query-state (use-subscribe [::aor-rf/get-in state-path])
         should-refetch? (:should-refetch? query-state)
         data (or (:data query-state) [])
         pagination-params (:pagination-params query-state)
@@ -740,13 +741,13 @@
                         (when enabled?
                           (cond
                             reverse?
-                            (state/dispatch [:db/set-value (into state-path [:fetching-before?]) true])
+                            (rf/dispatch [:db/set-value (into state-path [:fetching-before?]) true])
 
                             append?
-                            (state/dispatch [:db/set-value (into state-path [:fetching-more?]) true])
+                            (rf/dispatch [:db/set-value (into state-path [:fetching-more?]) true])
 
                             :else
-                            (state/dispatch [:db/set-value (into state-path [:status]) :loading]))
+                            (rf/dispatch [:db/set-value (into state-path [:status]) :loading]))
 
                           (let [payload (cond-> {:module-id decoded-module-id
                                                   :queue-name decoded-queue-id
@@ -758,38 +759,38 @@
                             (-> (rpc/call ::rpc-hf/get-queue-items!! payload)
                                 (.then (fn [response-data]
                                          (if reverse?
-                                           (state/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
-                                           (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
+                                           (rf/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
+                                           (rf/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
                                          (let [new-items (or (:items response-data) [])
                                                new-pagination (:pagination-params response-data)
                                                new-has-more? (queries/has-more-pages? new-pagination)
-                                               current-data (or (get-in @state/app-db (into state-path [:data])) [])
+                                               current-data (or (get-in @rdb/app-db (into state-path [:data])) [])
                                                update-pagination? (not reverse?)]
                                            (cond
                                              append?
-                                             (state/dispatch [:db/set-value (into state-path [:data])
+                                             (rf/dispatch [:db/set-value (into state-path [:data])
                                                               (vec (concat current-data new-items))])
 
                                              (and merge? (seq current-data))
-                                             (state/dispatch [:db/set-value (into state-path [:data])
+                                             (rf/dispatch [:db/set-value (into state-path [:data])
                                                               (merge-queue-items current-data new-items)])
 
                                              :else
-                                             (state/dispatch [:db/set-value (into state-path [:data]) new-items]))
+                                             (rf/dispatch [:db/set-value (into state-path [:data]) new-items]))
                                            (if update-pagination?
                                              (do
-                                               (state/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
-                                               (state/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?]))
+                                               (rf/dispatch [:db/set-value (into state-path [:pagination-params]) new-pagination])
+                                               (rf/dispatch [:db/set-value (into state-path [:has-more?]) new-has-more?]))
                                              (do
-                                               (state/dispatch [:db/set-value (into state-path [:reverse-pagination-params]) new-pagination])
-                                               (state/dispatch [:db/set-value (into state-path [:has-more-before?]) new-has-more?])))
-                                           (state/dispatch [:db/set-value (into state-path [:status]) :success]))))
+                                               (rf/dispatch [:db/set-value (into state-path [:reverse-pagination-params]) new-pagination])
+                                               (rf/dispatch [:db/set-value (into state-path [:has-more-before?]) new-has-more?])))
+                                           (rf/dispatch [:db/set-value (into state-path [:status]) :success]))))
                                 (.catch (fn [err]
                                           (if reverse?
-                                            (state/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
-                                            (state/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
-                                          (state/dispatch [:db/set-value (into state-path [:status]) :error])
-                                          (state/dispatch [:db/set-value (into state-path [:error])
+                                            (rf/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
+                                            (rf/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
+                                          (rf/dispatch [:db/set-value (into state-path [:status]) :error])
+                                          (rf/dispatch [:db/set-value (into state-path [:error])
                                                            (if (map? err) (or (:error err) (str err)) (str err))])))))))
                       [enabled? decoded-module-id decoded-queue-id state-path])
 
@@ -808,7 +809,7 @@
 
           refetch (uix/use-callback
                    (fn []
-                     (state/dispatch [:db/set-value state-path
+                     (rf/dispatch [:db/set-value state-path
                                       {:status :idle
                                        :data []
                                        :pagination-params nil
@@ -845,7 +846,7 @@
       (uix/use-effect
        (fn []
          (when (and should-refetch? enabled?)
-           (state/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
+           (rf/dispatch [:db/set-value (into state-path [:should-refetch?]) false])
            (refetch)))
        [should-refetch? enabled? refetch state-path])
 
@@ -887,7 +888,7 @@
                (common/to-json value)))))))
 
 (defui detail []
-  (let [{:keys [module-id queue-id]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id queue-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         decoded-module-id (common/url-decode module-id)
         decoded-queue-id (common/url-decode queue-id)
 
@@ -994,7 +995,7 @@
         {:keys [text truncated? line-count]} (truncate-to-lines pretty-str max-lines)
         handle-expand (fn [e]
                         (.stopPropagation e)
-                        (state/dispatch [:modal/show :content-detail
+                        (rf/dispatch [:modal/show :content-detail
                                          {:title title
                                           :component ($ common/ContentDetailModal
                                                         {:title title
@@ -1021,7 +1022,7 @@
       :data-testid data-testid}))
 
 (defui item-detail []
-  (let [{:keys [module-id queue-id item-id]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id queue-id item-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         decoded-module-id (common/url-decode module-id)
         decoded-queue-id (common/url-decode queue-id)
         item-id-str (str item-id)
@@ -1400,7 +1401,7 @@
 
 ;; End of queue page
 (defui queue-end []
-  (let [{:keys [module-id queue-id]} (state/use-sub [:route :path-params])]
+  (let [{:keys [module-id queue-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])]
     ($ :div.p-6.max-w-2xl.mx-auto.text-center
        ($ :div.bg-white.border.border-gray-200.rounded-lg.p-12
           ($ :h2.text-2xl.font-bold.text-gray-900.mb-4
@@ -1412,4 +1413,3 @@
                                         {:module-id module-id
                                          :queue-id queue-id})}
              "Back to Queue")))))
-

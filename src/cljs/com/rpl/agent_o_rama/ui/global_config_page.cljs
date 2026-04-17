@@ -1,9 +1,10 @@
 (ns com.rpl.agent-o-rama.ui.global-config-page
   (:require
+   [re-frame.core :as rf]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [CheckIcon]]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.impl.ui.rpc.config :as rpc-config]
@@ -17,13 +18,13 @@
         is-dirty? (not= (str current-value) (str edit-value))
 
         ;; Use a different state path to avoid conflicts
-        item-state (state/use-sub [:ui :global-config-page (keyword key)])
+        item-state (use-subscribe [::aor-rf/get-in [:ui :global-config-page (keyword key)]])
         submitting? (:submitting? item-state)
         submit-error (:error item-state)]
 
     (uix/use-effect (fn [] (set-edit-value current-value)) [current-value])
 
-    (let [handle-save #(state/dispatch [:config/submit-global-change
+    (let [handle-save #(rf/dispatch [:config/submit-global-change
                                         {:module-id module-id
                                          :key key
                                          :value edit-value
@@ -63,7 +64,7 @@
 
 ;; Renamed to `page` to match convention
 (defui page []
-  (let [{:keys [module-id]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         {:keys [data error]
          query-status :status}
         (use-subscribe [::rfq/query ::rpc-config/get-all-global!! {:module-id module-id}])

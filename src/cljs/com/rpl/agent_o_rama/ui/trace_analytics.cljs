@@ -1,8 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.trace-analytics
   (:require
+   [uix.re-frame :refer [use-subscribe]]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    ["@heroicons/react/24/outline" :refer [ArrowPathIcon ChevronRightIcon ChevronDownIcon]]))
 
 ;;; Helper functions for stats aggregation
@@ -250,7 +251,7 @@
   (let [[subagent-expanded? set-subagent-expanded!] (uix/use-state false)
 
         ;; Subscribe to invocation data for reactive updates
-        invocation-state (state/use-sub [:invocations-data invoke-id])
+        invocation-state (use-subscribe [::aor-rf/get-in [:invocations-data invoke-id]])
         summary-data     (:summary invocation-state)
 
         retry-count          (:retry-num summary-data)

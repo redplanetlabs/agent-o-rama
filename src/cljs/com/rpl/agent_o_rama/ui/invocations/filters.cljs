@@ -1,5 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.invocations.filters
   (:require
+   [re-frame.db :as rdb]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    [clojure.string :as str]
@@ -7,8 +8,7 @@
    [reitit.frontend.easy :as rfe]
    [cognitect.transit :as transit]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.rpc :as rpc]
-   [com.rpl.agent-o-rama.ui.state :as state]))
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]))
 
 ;; =============================================================================
 ;; RE-FRAME DB PATH  [:invocations-filters module-id agent-name]
@@ -64,7 +64,7 @@
 (defn applied-filters-from-url [encoded] (if (nil? encoded) default-applied-filters (decode-filters-param encoded)))
 
 (defn- current-applied-from-route []
-  (applied-filters-from-url (get-in (state/get-db) [:route :parameters :query :filters])))
+  (applied-filters-from-url (get-in @rdb/app-db [:route :parameters :query :filters])))
 
 (defn- replace-invocations-filters-in-url! [module-id agent-name applied]
   (rfe/replace-state :agent/invocations

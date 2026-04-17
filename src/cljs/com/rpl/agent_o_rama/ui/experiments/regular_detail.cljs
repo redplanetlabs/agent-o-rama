@@ -1,10 +1,10 @@
 (ns com.rpl.agent-o-rama.ui.experiments.regular-detail
   (:require
+   [re-frame.core :as rf]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [ArrowLeftIcon PlayIcon ChevronDownIcon ChevronUpIcon ArrowTopRightOnSquareIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.impl.ui.rpc.experiments :as rpc-experiments]
    [com.rpl.agent-o-rama.ui.experiments.evaluators :as evaluators]
    [clojure.string :as str]
@@ -490,7 +490,7 @@
                             ($ :div.flex.flex-col.items-start.gap-2
                                ($ CellContent {:content (:input run)
                                                :truncated? (not show-full-text?)
-                                               :on-expand #(state/dispatch [:modal/show :content-detail
+                                               :on-expand #(rf/dispatch [:modal/show :content-detail
                                                                             {:title "Input"
                                                                              :component ($ ContentModal {:content % :title "Input"})}])})
                                (when (or duration-ms
@@ -519,7 +519,7 @@
                        ($ :td {:className (:td common/table-classes)}
                           ($ CellContent {:content (:reference-output run)
                                           :truncated? (not show-full-text?)
-                                          :on-expand #(state/dispatch [:modal/show :content-detail
+                                          :on-expand #(rf/dispatch [:modal/show :content-detail
                                                                        {:title "Reference Output"
                                                                         :component ($ ContentModal {:content % :title "Reference Output"})}])}))
                        ;; Output Cell with evaluator capsules
@@ -539,7 +539,7 @@
                                          ($ :div.space-y-2
                                             (if-let [throwable (get-in agent-result [:result :val :throwable])]
                                               ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-red-700.bg-red-50.border.border-red-200.rounded.hover:bg-red-100.cursor-pointer
-                                                 {:onClick #(state/dispatch [:modal/show :exception-detail
+                                                 {:onClick #(rf/dispatch [:modal/show :exception-detail
                                                                              {:title "Error Details"
                                                                               :component ($ ExceptionModal {:throwable throwable})}])}
                                                  "View Error")
@@ -550,7 +550,7 @@
                                               output-content
                                               (when (and is-long? (not show-full-text?))
                                                 ($ :button.absolute.top-0.right-0.opacity-0.group-hover:opacity-100.transition-opacity.bg-blue-500.text-white.rounded.text-xs.px-2.py-1.hover:bg-blue-600
-                                                   {:onClick #(state/dispatch [:modal/show :content-detail
+                                                   {:onClick #(rf/dispatch [:modal/show :content-detail
                                                                                {:title "Output"
                                                                                 :component ($ ContentModal {:content output-content :title "Output"})}])}
                                                    "↗"))))))
@@ -593,7 +593,7 @@
                                                                    forms/experiment-info->form-state
                                                                    (assoc :module-id module-id
                                                                           :dataset-id dataset-id))]
-                                                (state/dispatch [:modal/show-form :create-experiment form-props]))
+                                                (rf/dispatch [:modal/show-form :create-experiment form-props]))
                                    :module-id module-id
                                    :dataset-id dataset-id
                                    ;; NEW: Pass state and handler to header

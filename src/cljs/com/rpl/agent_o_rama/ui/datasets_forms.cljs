@@ -1,9 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.datasets-forms
   (:require
+   [re-frame.db :as rdb]
    [uix.core :as uix :refer [defui defhook $]]
    ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentArrowUpIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
@@ -285,7 +285,7 @@
                           [[:dataset-examples module-id dataset-id]])}})
 
 (defn show-add-example-modal! [props]
-  (state/dispatch [:modal/show-form :add-dataset-example props]))
+  (rf/dispatch [:modal/show-form :add-dataset-example props]))
 
 (forms/reg-form
  :new-snapshot
@@ -315,7 +315,7 @@
    :on-success (fn [_db {:keys [dataset-id]} reply]
                  (let [snapshot-name (or (get-in reply [:data :snapshot-name])
                                          (:snapshot-name reply))]
-                   (state/dispatch [:datasets/set-selected-snapshot
+                   (rf/dispatch [:datasets/set-selected-snapshot
                                     {:dataset-id dataset-id
                                      :snapshot-name snapshot-name}])))}})
 
@@ -355,7 +355,7 @@
                      ;; Legacy atom may still hold snapshot when not passed on the modal
                      snapshot-name' (or snapshot-name
                                         (when dataset-id
-                                          (get-in @state/app-db [:ui :datasets :selected-snapshot-per-dataset dataset-id])))]
+                                          (get-in @rdb/app-db [:ui :datasets :selected-snapshot-per-dataset dataset-id])))]
                  [::rpc-datasets/add-tag-to-examples!!
                   {:module-id module-id
                    :dataset-id dataset-id
@@ -370,10 +370,10 @@
                             [[:dataset-examples module-id dataset-id]]))
    :on-success (fn [_db form-state _reply]
                  (let [{:keys [dataset-id]} form-state]
-                   (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
+                   (rf/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
 
 (defn show-add-tag-modal! [props]
-  (state/dispatch [:modal/show-form :add-tag-to-selected props]))
+  (rf/dispatch [:modal/show-form :add-tag-to-selected props]))
 
 (forms/reg-form
  :remove-tag-from-selected
@@ -391,7 +391,7 @@
                (let [{:keys [module-id dataset-id snapshot-name tag-name example-ids]} form-state
                      snapshot-name' (or snapshot-name
                                         (when dataset-id
-                                          (get-in @state/app-db [:ui :datasets :selected-snapshot-per-dataset dataset-id])))]
+                                          (get-in @rdb/app-db [:ui :datasets :selected-snapshot-per-dataset dataset-id])))]
                  [::rpc-datasets/remove-tag-from-examples!!
                   {:module-id module-id
                    :dataset-id dataset-id
@@ -406,10 +406,10 @@
                             [[:dataset-examples module-id dataset-id]]))
    :on-success (fn [_db form-state _reply]
                  (let [{:keys [dataset-id]} form-state]
-                   (state/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
+                   (rf/dispatch [:datasets/clear-selection {:dataset-id dataset-id}])))}})
 
 (defn show-remove-tag-modal! [props]
-  (state/dispatch [:modal/show-form :remove-tag-from-selected props]))
+  (rf/dispatch [:modal/show-form :remove-tag-from-selected props]))
 
 (defui AddTagForm [{:keys [form-id]}]
   (let [{:keys [field-errors]} (forms/use-form form-id)
@@ -447,7 +447,7 @@
 
 (defn handle-delete-selected! [module-id dataset-id snapshot-name example-ids]
   (when (js/confirm (str "Are you sure you want to delete " (count example-ids) " selected examples? This action cannot be undone."))
-    (state/dispatch [:dataset/delete-selected
+    (rf/dispatch [:dataset/delete-selected
                      {:module-id module-id
                       :dataset-id dataset-id
                       :snapshot-name snapshot-name
@@ -473,12 +473,12 @@
                                                   (throw (js/Error. (str "Upload failed with status: " (.-status resp)))))))
                                        (.then (fn [data]
                                                 (set-uploading! false)
-                                                (state/dispatch [:modal/hide])
+                                                (rf/dispatch [:modal/hide])
                                                 ;; Invalidate query to refresh the example list
-                                                (state/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                                (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
                                                 (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]])
                                                 ;; Show the results modal
-                                                (state/dispatch [:modal/show :import-results
+                                                (rf/dispatch [:modal/show :import-results
                                                                  {:title "Import Results"
                                                                   :component ($ :div.p-6
                                                                                 ;; Summary section

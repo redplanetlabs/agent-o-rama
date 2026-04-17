@@ -1,9 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.components.conversation
   "Components and utilities for displaying LangChain4j conversation data"
   (:require
+   [re-frame.core :as rf]
    [clojure.string :as str]
-   [uix.core :refer [defui $]]
-   [com.rpl.agent-o-rama.ui.state :as state]))
+   [uix.core :refer [defui $]]))
 
 (defn get-flexible
   "Get a value from a map using either a string or keyword key"
@@ -160,7 +160,7 @@
         display-modal
         (fn [e]
           (.stopPropagation e)
-          (state/dispatch
+          (rf/dispatch
            [:modal/show :conversation
             {:title (str "Conversation (" num-messages " messages)")
              :component
@@ -171,7 +171,7 @@
         (fn [e]
           (.stopPropagation e)
           (let [json-str (js/JSON.stringify (clj->js messages) nil 2)]
-            (state/dispatch
+            (rf/dispatch
              [:modal/show :conversation-json
               {:title "Conversation (JSON)"
                :component

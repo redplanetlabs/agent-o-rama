@@ -1,5 +1,6 @@
 (ns com.rpl.agent-o-rama.ui.agents
   (:require
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [com.rpl.agent-o-rama.ui.invocation-page :as invocation-page]
    [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
 
@@ -9,7 +10,6 @@
    [re-frame.query :as rfq]
 
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
@@ -108,7 +108,7 @@
        ($ :td.px-4.py-3.max-w-md.cursor-pointer.hover:bg-gray-100.rounded
           {:onClick (fn [e]
                       (. e stopPropagation)
-                      (state/dispatch [:modal/show :arguments-detail
+                      (rf/dispatch [:modal/show :arguments-detail
                                        {:title "Invocation Arguments"
                                         :component ($ common/ContentDetailModal
                                                       {:title "Invocation Arguments"
@@ -168,8 +168,8 @@
                                      ($ :td {:className (:td common/table-classes)} agent-name))))))))))))
 
 (defui invocations []
-  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
-        query-params (or (state/use-sub [:route :parameters :query]) {})
+  (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
+        query-params (or (use-subscribe [::aor-rf/get-in [:route :parameters :query]]) {})
         filters-query-param (:filters query-params)
         applied-filters (inv-filters/applied-filters-from-url filters-query-param)
         {filter-options-data :data}
@@ -269,7 +269,7 @@
                                             :clipRule "evenodd"}))))))))))))))
 
 (defui mini-invocations []
-  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         {:keys [data error]
          query-status :status}
         (use-subscribe [::rfq/query ::rpc-invocations/get-page!!
@@ -316,7 +316,7 @@
                                      :clipRule "evenodd"})))))))))))
 
 (defui evaluations []
-  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])]
+  (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])]
     ($ :div
        ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
        ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
@@ -414,7 +414,7 @@
                 (str "No data for \"" node-id "\" at " time-label))))))))
 
 (defui agent-graph [{:keys [selected-node set-selected-node granularity selected-stat]}]
-  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         decoded-agent-name (common/url-decode agent-name)
 
         ;; Fetch graph topology
@@ -556,7 +556,7 @@
             ($ :div.text-red-700.text-sm (:error form)))))))
 
 (defui agent []
-  (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         ;; Use a simple keyword for the form-id (schema expects Keyword, not vector)
         form-id :manual-run-agent
 
@@ -629,7 +629,7 @@
           ($ mini-invocations)))))
 
 (defui invoke []
-  (let [{:keys [module-id agent-name invoke-id]} (state/use-sub [:route :path-params])]
+  (let [{:keys [module-id agent-name invoke-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])]
 
     ($ :div
        ;; Graph content

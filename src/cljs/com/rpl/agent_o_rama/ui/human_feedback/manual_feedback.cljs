@@ -1,9 +1,9 @@
 (ns com.rpl.agent-o-rama.ui.human-feedback.manual-feedback
   (:require
+   [re-frame.core :as rf]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.searchable-selector :as ss]
    [com.rpl.agent-o-rama.ui.human-feedback.metric-input :as metric-input]
    [com.rpl.agent-o-rama.ui.human-feedback.common :as hf-common]
@@ -268,5 +268,5 @@
                        :reviewer-name reviewer-name :scores scores :comment comment}]))))
    :on-success (fn [_db form-state _reply]
                  (let [{:keys [invoke-id module-id agent-name]} form-state]
-                   (state/dispatch [:invocation/start-graph-loading
+                   (rf/dispatch [:invocation/start-graph-loading
                                     {:invoke-id invoke-id :module-id module-id :agent-name agent-name}])))}})

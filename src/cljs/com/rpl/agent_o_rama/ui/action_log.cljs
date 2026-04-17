@@ -1,11 +1,13 @@
 (ns com.rpl.agent-o-rama.ui.action-log
   (:require
+   [re-frame.core :as rf]
+   [uix.re-frame :refer [use-subscribe]]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [uix.core :as uix :refer [defui $]]
    [clojure.string :as str]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]
-   [com.rpl.agent-o-rama.ui.state :as state]
    ["@heroicons/react/24/outline" :refer [ArrowTopRightOnSquareIcon]]))
 
 (defn format-action-field
@@ -29,7 +31,7 @@
         eval-invoke (get info-map "eval-invoke")
 
         show-modal (fn []
-                     (state/dispatch
+                     (rf/dispatch
                       [:modal/show
                        :info-map
                        {:title "Action Info"
@@ -99,7 +101,7 @@
 (defui action-log-page
   "Display action log for a specific rule with pagination."
   []
-  (let [{:keys [module-id agent-name rule-name]} (state/use-sub [:route :path-params])
+  (let [{:keys [module-id agent-name rule-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         [actions set-actions!] (uix/use-state [])
         [pagination-params set-pagination-params!] (uix/use-state nil)
         [has-more? set-has-more!] (uix/use-state false)

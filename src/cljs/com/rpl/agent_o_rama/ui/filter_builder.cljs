@@ -3,7 +3,6 @@
    [clojure.string :as str]
    [uix.core :as uix :refer [defui $]]
    [com.rpl.agent-o-rama.ui.forms :as forms]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.impl.ui.rpc.analytics :as rpc-analytics]))
 

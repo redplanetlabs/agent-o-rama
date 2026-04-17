@@ -1,15 +1,14 @@
 (ns com.rpl.agent-o-rama.ui.state-test
   (:require
    [cljs.test :refer-macros [deftest is]]
-   [com.rpl.agent-o-rama.ui.state :as state]
-   [com.rpl.agent-o-rama.ui.re-frame]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [com.rpl.agent-o-rama.ui.events]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
    [com.rpl.agent-o-rama.ui.dom])) ; Load DOM setup before tests
 
 (deftest test-initial-db
-  (let [db state/initial-db]
+  (let [db aor-rf/default-app-db]
     (is (contains? db :current-invocation))
     (is (contains? (:current-invocation db) :invoke-id))
     (is (contains? (:current-invocation db) :module-id))
@@ -35,21 +34,24 @@
         handler-fn (fn [db & _args]
                      (reset! handler-called true)
                      db)]
-    (state/reg-event test-event-id handler-fn)
+    (rf/reg-event-db test-event-id
+      (fn [db event-vec]
+        (let [result (apply handler-fn db (rest event-vec))]
+          (or result db))))
     (rf/dispatch-sync [test-event-id])
     (is @handler-called "Event handler should be called on dispatch")))
 
 (deftest test-db-set-value-event
-  (state/reset-db!)
+  (reset! rdb/app-db aor-rf/default-app-db)
   (let [test-uuid (random-uuid)]
     (rf/dispatch-sync [:db/set-value [:ui :selected-node-id] test-uuid])
     (is (= test-uuid (get-in @rdb/app-db [:ui :selected-node-id]))))
-  (state/reset-db!)
+  (reset! rdb/app-db aor-rf/default-app-db)
   (rf/dispatch-sync [:db/set-value [:current-invocation :invoke-id] "invoke-456"])
   (is (= "invoke-456" (get-in @rdb/app-db [:current-invocation :invoke-id]))))
 
 (deftest test-toggle-forking-mode
-  (state/reset-db!)
+  (reset! rdb/app-db aor-rf/default-app-db)
   (is (false? (get-in @rdb/app-db [:ui :forking-mode?])))
   (rf/dispatch-sync [:ui/toggle-forking-mode])
   (is (true? (get-in @rdb/app-db [:ui :forking-mode?])))

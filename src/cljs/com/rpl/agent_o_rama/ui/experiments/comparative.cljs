@@ -1,10 +1,10 @@
 (ns com.rpl.agent-o-rama.ui.experiments.comparative
   (:require
+   [re-frame.core :as rf]
    [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    ["@heroicons/react/24/outline" :refer [BeakerIcon PlusIcon]]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.state :as state]
    [com.rpl.agent-o-rama.ui.queries :as queries]
    [com.rpl.agent-o-rama.impl.ui.rpc.experiment-list :as rpc-experiment-list]
    [re-frame.query :as rfq]
@@ -26,7 +26,7 @@
        ($ :div.flex.justify-between.items-center.mb-6
           ($ :h2.text-2xl.font-bold "Comparative Experiments")
           ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.cursor-pointer
-             {:onClick #(state/dispatch [:modal/show-form :create-experiment
+             {:onClick #(rf/dispatch [:modal/show-form :create-experiment
                                          {:module-id module-id
                                           :dataset-id dataset-id
                                           :spec {:type :comparative
