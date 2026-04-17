@@ -169,12 +169,9 @@
 
 (defui invocations []
   (let [{:keys [module-id agent-name]} (state/use-sub [:route :path-params])
-        route (state/use-sub [:route])
-        query-params (or (:query-params route) (get-in route [:parameters :query]) {})
+        query-params (or (state/use-sub [:route :parameters :query]) {})
         filters-query-param (:filters query-params)
-        panel (or (use-subscribe [::inv-filters/panel module-id agent-name]) {})
-        applied-filters (or (:applied panel) inv-filters/default-applied-filters)
-        filter-key (common/to-json applied-filters)
+        applied-filters (inv-filters/applied-filters-from-url filters-query-param)
         {filter-options-data :data}
         (use-subscribe [::rfq/query ::rpc-invocations/get-filter-options!!
                         {:module-id module-id :agent-name agent-name}])
@@ -204,25 +201,6 @@
         applied-feedback-metrics (or (:feedback-metrics applied-filters) [])
         feedback-metric-names (mapv :metric-name applied-feedback-metrics)
         n-feedback-cols (count feedback-metric-names)
-        _init-filters (uix/use-effect
-                        (fn []
-                          (rf/dispatch [::inv-filters/init module-id agent-name filters-query-param])
-                          js/undefined)
-                        [filters-query-param module-id agent-name])
-        _sync-filters-to-url (uix/use-effect
-                              (fn []
-                                (when (and module-id agent-name)
-                                  (let [encoded (inv-filters/encode-filters-param applied-filters)
-                                        current-encoded filters-query-param]
-                                    (when (not= encoded current-encoded)
-                                      (rfe/replace-state :agent/invocations
-                                                         {:module-id module-id
-                                                          :agent-name agent-name}
-                                                         (if encoded
-                                                           {:filters encoded}
-                                                           {})))))
-                                js/undefined)
-                              [module-id agent-name applied-filters filters-query-param])
 
         {:keys [data isLoading isFetchingMore hasMore loadMore error]}
         (queries/use-infinite-rpc-query
@@ -237,6 +215,7 @@
        ($ inv-filters/filter-bar
           {:module-id module-id
            :agent-name agent-name
+           :applied applied-filters
            :node-options node-options
            :feedback-metric-options-by-name feedback-metric-options-by-name
            :feedback-metric-option-names feedback-metric-option-names})

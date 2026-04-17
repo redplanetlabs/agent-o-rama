@@ -4,15 +4,17 @@
    [uix.re-frame :refer [use-subscribe]]
    [clojure.string :as str]
    [re-frame.core :as rf]
+   [reitit.frontend.easy :as rfe]
    [cognitect.transit :as transit]
    [com.rpl.agent-o-rama.ui.common :as common]
-   [com.rpl.agent-o-rama.ui.rpc :as rpc]))
+   [com.rpl.agent-o-rama.ui.rpc :as rpc]
+   [com.rpl.agent-o-rama.ui.state :as state]))
 
 ;; =============================================================================
 ;; RE-FRAME DB PATH  [:invocations-filters module-id agent-name]
-;; :applied — backend filter map (also what RPC + URL encode)
-;; :editor {:value <slice>} — same shapes as server expects (no parallel form model)
-;; URL never contains :editor (only :applied, synced after Apply)
+;; :open-editor / :editor — ephemeral editor UI only.
+;; Applied filters live in the URL only (reitit :parameters :query :filters);
+;; parent decodes and passes :applied into filter-bar.
 ;; =============================================================================
 
 (def default-applied-filters
@@ -32,8 +34,7 @@
   [:invocations-filters module-id agent-name])
 
 (def panel-default-state
-  {:applied default-applied-filters
-   :open-editor nil
+  {:open-editor nil
    :editor nil})
 
 (rf/reg-sub ::panel
@@ -61,6 +62,14 @@
 (defn decode-filters-param [encoded] (transit/read rpc/reader (js/atob encoded)))
 
 (defn applied-filters-from-url [encoded] (if (nil? encoded) default-applied-filters (decode-filters-param encoded)))
+
+(defn- current-applied-from-route []
+  (applied-filters-from-url (get-in (state/get-db) [:route :parameters :query :filters])))
+
+(defn- replace-invocations-filters-in-url! [module-id agent-name applied]
+  (rfe/replace-state :agent/invocations
+                     {:module-id module-id :agent-name agent-name}
+                     {:filters (encode-filters-param applied)}))
 
 ;; --- Small helpers -----------------------------------------------------------
 
@@ -270,14 +279,6 @@
 ;; EVENTS
 ;; =============================================================================
 
-(rf/reg-event-db ::init
-  (fn [db [_ module-id agent-name filters-encoded]]
-    (assoc-in db
-              (panel-k module-id agent-name)
-              {:applied (applied-filters-from-url filters-encoded)
-               :open-editor nil
-               :editor nil})))
-
 (rf/reg-event-db ::update-editor
   (fn [db [_ module-id agent-name update-fn]]
     (update-in db (conj (panel-k module-id agent-name) :editor :value)
@@ -287,7 +288,7 @@
   (fn [db [_ module-id agent-name filter-type]]
     (let [pk (panel-k module-id agent-name)
           panel (merge panel-default-state (get-in db pk))
-          applied (:applied panel)
+          applied (current-applied-from-route)
           open-editor (case filter-type
                         :node {:chip-id "new-node" :filter-type :node :mode :new}
                         :feedback {:chip-id "new-feedback" :filter-type :feedback :mode :new}
@@ -304,37 +305,38 @@
                        {:open-editor open-editor
                         :editor {:value editor-value}})))))
 
-(rf/reg-event-db ::apply
-  (fn [db [_ module-id agent-name]]
+(rf/reg-event-fx ::apply
+  (fn [{:keys [db]} [_ module-id agent-name]]
     (let [pk (panel-k module-id agent-name)
           panel (merge panel-default-state (get-in db pk))
           open-editor (:open-editor panel)
-          applied (:applied panel)
+          applied (current-applied-from-route)
           editor-value (get-in panel [:editor :value])]
       (if open-editor
-        (assoc-in db pk
-                  (merge panel
-                         {:applied (merge-editor-into-applied applied open-editor editor-value)
-                          :open-editor nil
-                          :editor nil}))
-        db))))
+        (let [next-applied (merge-editor-into-applied applied open-editor editor-value)]
+          (replace-invocations-filters-in-url! module-id agent-name next-applied)
+          {:db (assoc-in db pk (merge panel {:open-editor nil :editor nil}))})
+        {}))))
 
-(rf/reg-event-db ::clear-type
-  (fn [db [_ module-id agent-name filter-type]]
+(rf/reg-event-fx ::clear-type
+  (fn [{:keys [db]} [_ module-id agent-name filter-type]]
     (let [pk (panel-k module-id agent-name)
           panel (merge panel-default-state (get-in db pk))
           open-editor (:open-editor panel)
-          close-editor? (= filter-type (:filter-type open-editor))]
-      (assoc-in db pk
-                (merge panel
-                       {:applied (clear-type-from-applied (:applied panel) filter-type)
-                        :open-editor (when-not close-editor? open-editor)
-                        :editor (when-not close-editor? (:editor panel))})))))
+          close-editor? (= filter-type (:filter-type open-editor))
+          applied (current-applied-from-route)
+          next-applied (clear-type-from-applied applied filter-type)]
+      (replace-invocations-filters-in-url! module-id agent-name next-applied)
+      {:db (assoc-in db pk
+                     (merge panel
+                            {:open-editor (when-not close-editor? open-editor)
+                             :editor (when-not close-editor? (:editor panel))}))})))
 
 (rf/reg-event-db ::open-chip
   (fn [db [_ module-id agent-name chip]]
     (let [pk (panel-k module-id agent-name)
           panel (merge panel-default-state (get-in db pk))
+          applied (current-applied-from-route)
           open-editor (:open-editor panel)
           next-open (chip->open-editor chip)]
       (if (= (:chip-id open-editor) (:chip-id next-open))
@@ -346,40 +348,41 @@
                   (merge panel
                          {:open-editor next-open
                           :editor {:value (initial-editor-slice (:filter-type chip)
-                                                                (:applied panel)
+                                                                applied
                                                                 next-open
                                                                 chip)}}))))))
 
 (rf/reg-event-fx ::remove-chip
-  (fn [{:keys [db]} [_ module-id agent-name {:keys [filter-type node-idx feedback-idx]}]]
-    (let [pk (panel-k module-id agent-name)
-          panel (merge panel-default-state (get-in db pk))]
+  (fn [_ [_ module-id agent-name {:keys [filter-type node-idx feedback-idx]}]]
+    (let [ft (cond
+               (keyword? filter-type) filter-type
+               (string? filter-type) (keyword filter-type)
+               :else filter-type)
+          applied (current-applied-from-route)]
       (cond
-        (or (= filter-type :node) (= filter-type "node"))
-        {:db (assoc-in db pk
-                       (update panel :applied
-                               (fn [applied]
-                                 (let [next-node-names (vec (remove-at-index (:node-names applied) node-idx))]
-                                   (if (seq next-node-names)
-                                     (assoc applied :node-names next-node-names)
-                                     (dissoc applied :node-names))))))}
+        (= ft :node)
+        (let [next-applied (let [next-node-names (vec (remove-at-index (:node-names applied) node-idx))]
+                             (if (seq next-node-names)
+                               (assoc applied :node-names next-node-names)
+                               (dissoc applied :node-names)))]
+          (replace-invocations-filters-in-url! module-id agent-name next-applied)
+          {})
 
-        (or (= filter-type :feedback) (= filter-type "feedback"))
-        {:db (assoc-in db pk
-                       (update panel :applied
-                               (fn [applied]
-                                 (let [next-feedback (vec (remove-at-index (:feedback-metrics applied) feedback-idx))]
-                                   (if (seq next-feedback)
-                                     (assoc applied :feedback-metrics next-feedback)
-                                     (dissoc applied :feedback-metrics))))))}
+        (= ft :feedback)
+        (let [next-applied (let [next-feedback (vec (remove-at-index (:feedback-metrics applied) feedback-idx))]
+                             (if (seq next-feedback)
+                               (assoc applied :feedback-metrics next-feedback)
+                               (dissoc applied :feedback-metrics)))]
+          (replace-invocations-filters-in-url! module-id agent-name next-applied)
+          {})
 
-        (or (= filter-type :source) (= filter-type "source"))
+        (= ft :source)
         {:dispatch [::clear-type module-id agent-name :source]}
 
-        (or (= filter-type :latency) (= filter-type "latency"))
+        (= ft :latency)
         {:dispatch [::clear-type module-id agent-name :latency]}
 
-        (or (= filter-type :error) (= filter-type "error"))
+        (= ft :error)
         {:dispatch [::clear-type module-id agent-name :error]}
 
         :else nil))))
@@ -388,10 +391,10 @@
 ;; COMPONENTS
 ;; =============================================================================
 
-(defui filter-bar [{:keys [module-id agent-name node-options feedback-metric-options-by-name
+(defui filter-bar [{:keys [module-id agent-name applied node-options feedback-metric-options-by-name
                           feedback-metric-option-names]}]
   (let [panel (or (use-subscribe [::panel module-id agent-name]) {})
-        applied (or (:applied panel) default-applied-filters)
+        applied (or applied default-applied-filters)
         open-editor (:open-editor panel)
         editor (or (get-in panel [:editor :value]) {})
         active-types (derive-active-filter-types applied)
