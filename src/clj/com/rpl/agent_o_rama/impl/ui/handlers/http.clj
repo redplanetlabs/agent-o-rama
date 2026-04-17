@@ -76,8 +76,10 @@
 
 (defn- parse-transit-body
   [body]
-  (with-open [in ^java.io.Closeable body]
-    (transit/read (transit/reader in :json))))
+  (if body
+    (with-open [in ^java.io.Closeable body]
+      (transit/read (transit/reader in :json)))
+    nil))
 
 (defn- transit-response
   [body]
@@ -92,15 +94,21 @@
     (transit/write (transit/writer out :json) (common/->ui-serializable data))
     (.toString out "UTF-8")))
 
-(defn- sse-rpc-transit-error-response [e-msg http-status]
-  (-> (transit-response {:success false
-                         :error e-msg
-                         :http-status http-status})
-      (resp/status http-status)))
-
 (defn- handle-sse-rpc [rpc-var system processed-data request]
-  (if-not (or (nil? @rpc-var) (fn? @rpc-var))
-    (sse-rpc-transit-error-response (str "RPC target is not callable: " rpc-var) 500)
+  (cond
+    (nil? rpc-var)
+    (-> (transit-response {:success false
+                           :error "RPC not allowlisted or not found"
+                           :http-status 404})
+        (resp/status 404))
+
+    (not (fn? @rpc-var))
+    (-> (transit-response {:success false
+                           :error (str "RPC target is not callable: " rpc-var)
+                           :http-status 500})
+        (resp/status http-status))
+
+    :else
     (http-kit/with-channel request channel
       (http-kit/send!
        channel
@@ -110,13 +118,25 @@
                   "X-Accel-Buffering" "no"}
         :status 200}
        false)
-      (let [emit (fn emit [data]
-                   (http-kit/send! channel (str "data: " (write-transit-str data) "\n\n") false))
-            stream-obj (@rpc-var system processed-data emit)]
-        (http-kit/on-close channel
-                           (fn [_status]
-                             (when (instance? java.io.Closeable stream-obj)
-                               (.close ^java.io.Closeable stream-obj))))))))
+      (try
+        (let [emit (fn emit [data]
+                     (let [payload (str "data: " (write-transit-str data) "\n\n")
+                           close-after? (boolean (:complete? data))]
+                       ;; Close the HTTP chunk stream after the terminal event so the client fetch ends.
+                       (http-kit/send! channel payload close-after?)))
+              stream-obj (@rpc-var system processed-data emit)]
+          (http-kit/on-close channel
+                             (fn [_status]
+                               (try
+                                 (when (instance? java.io.Closeable stream-obj)
+                                   (.close ^java.io.Closeable stream-obj))
+                                 (catch Throwable t
+                                   (.printStackTrace t))))))
+        (catch Throwable t
+          (.printStackTrace t)
+          (try
+            (http-kit/close channel)
+            (catch Throwable _ _)))))))
 
 (defn- parse-export-params
   "Extract module-id and dataset-id from export route: /api/datasets/:module-id/:dataset-id/export"
@@ -239,14 +259,9 @@
           (resp/status 404))
       (let [{:keys [sym is-sse?]} route]
         (if is-sse?
-          
-          ;; streaming case
-          (handle-sse-rpc (resolve-rpc-var sym)
-                          @ui/system
-                          (preprocess-rpc-payload payload)
-                          request)
-          
-          ;; call/response case
+          (let [processed-data (preprocess-rpc-payload payload)
+                rpc-var (resolve-rpc-var sym)]
+            (handle-sse-rpc rpc-var @ui/system processed-data request))
           (let [reply (invoke-rpc {:rpc-id sym
                                    :data payload})]
             (if (:success reply)

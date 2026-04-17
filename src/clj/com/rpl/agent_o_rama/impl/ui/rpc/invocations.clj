@@ -204,22 +204,24 @@
 
 (defn stream-node!!sse
   "SSE RPC: subscribes to [[com.rpl.agent-o-rama/agent-stream-specific]] for one node invocation.
-   Invoked as (stream-node!!sse system payload on-event); returns a Closeable stream handle."
+   Invoked as (stream-node!!sse system payload on-event); returns a Closeable stream handle.
+   If there is no client, emits one terminal event with empty chunks and `complete?` true."
   [system {:keys [module-id agent-name invoke-id node-name node-invoke-id]} on-event]
+  (when-not (uuid? node-invoke-id)
+    (throw (ex-info "node-invoke-id must be a UUID" {:node-invoke-id node-invoke-id})))
   (let [client (get-client system module-id agent-name)]
-    (when-not client
-      (throw (ex-info "No client available — module or agent may not be loaded"
-                      {:module-id module-id :agent-name agent-name})))
-    (when-not (uuid? node-invoke-id)
-      (throw (ex-info "node-invoke-id must be a UUID" {:node-invoke-id node-invoke-id})))
-    (let [[task-id agent-id] (common/parse-url-pair invoke-id)
-          invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
-      (aor/agent-stream-specific client invoke node-name node-invoke-id
-                                 (fn [all-chunks new-chunks reset? complete?]
-                                   (on-event {:all-chunks all-chunks
-                                              :new-chunks new-chunks
-                                              :reset? reset?
-                                              :complete? complete?}))))))
+    (if-not client
+      (do
+        (on-event {:all-chunks [] :new-chunks [] :reset? false :complete? true})
+        (reify java.io.Closeable (close [_])))
+      (let [[task-id agent-id] (common/parse-url-pair invoke-id)
+            invoke (aor-types/->AgentInvokeImpl task-id agent-id)]
+        (aor/agent-stream-specific client invoke node-name node-invoke-id
+                                   (fn [all-chunks new-chunks reset? complete?]
+                                     (on-event {:all-chunks all-chunks
+                                                :new-chunks new-chunks
+                                                :reset? reset?
+                                                :complete? complete?})))))))
 
 (defn get-node-stats!!
   [system {:keys [module-id agent-name granularity]}]

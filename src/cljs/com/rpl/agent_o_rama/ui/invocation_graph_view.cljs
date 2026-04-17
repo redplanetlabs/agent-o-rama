@@ -422,21 +422,13 @@
                     ($ generic-data-viewer {:data info :color "indigo" :depth 0})))))))))
 
 (defui node-streaming-panel
-  "Streaming output: replay from graph when the node is finished; live tokens only via SSE
-  (`stream-node!!sse`), not from the same graph snapshot used for replay."
-  [{:keys [module-id agent-name invoke-id node-name node-invoke-id is-streaming?]}]
-  (let [{:keys [text streaming? chunks reset-count]}
-        (streaming/use-node-stream module-id
-                                   agent-name
-                                   invoke-id
-                                   node-name
-                                   node-invoke-id
-                                   {:is-live? is-streaming?})
-
-        ;; Ref for auto-scrolling
+  "Streaming output from the Rama client only via SSE (`stream-node!!sse`); one code path."
+  [{:keys [module-id agent-name invoke-id node-name node-invoke-id]}]
+  (let [{:keys [text chunks reset-count complete?]}
+        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id)
+        waiting? (and (not complete?) (empty? chunks))
         scroll-ref (uix/use-ref nil)]
 
-    ;; Auto-scroll to bottom when text changes (defer so layout/scrollHeight is final)
     (uix/use-effect
      (fn []
        (when-let [el @scroll-ref]
@@ -447,32 +439,28 @@
               (js/requestAnimationFrame scroll-end))))))
      [text])
 
-    ;; Only show the panel if we have chunks to display
-    (when (seq chunks)
-      ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4 border border-blue-200"}
-         ($ :div {:className "flex items-center justify-between mb-2"}
-            ($ :div {:className "flex items-center gap-2"}
-               ($ :span {:className "text-sm font-medium text-blue-700"} "Streaming Output")
-               (when streaming?
-                 ($ :span {:className "flex items-center gap-1 text-xs text-blue-600"}
-                    ($ :span {:className "w-2 h-2 bg-blue-500 rounded-full animate-pulse"})
-                    "Live")))
-            (when (pos? reset-count)
-              ($ :span {:className "text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded"}
-                 (str "↻ Reset " reset-count "x"))))
+    ($ :div {:className "bg-blue-50 p-3 rounded-md mt-4 border border-blue-200"}
+       ($ :div {:className "flex items-center justify-between mb-2"}
+          ($ :span {:className "text-sm font-medium text-blue-700"} "Streaming Output")
+          (when (pos? reset-count)
+            ($ :span {:className "text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded"}
+               (str "↻ Reset " reset-count "x"))))
 
-         ;; Streaming content with auto-scroll
-         ($ :div {:ref scroll-ref
-                  :className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
-            ($ :pre {:className "text-sm text-gray-800 whitespace-pre-wrap font-mono"}
-               text
-               (when streaming?
-                 ($ :span {:className "inline-block w-2 h-4 bg-blue-500 animate-pulse ml-0.5"}))))
+       ($ :div {:ref scroll-ref
+                :className "bg-white rounded border border-blue-100 p-3 max-h-64 overflow-y-auto"}
+          (cond
+            waiting?
+            ($ :div {:className "text-sm text-gray-500"} "Connecting…")
 
-         ;; Chunk count
-         (when (seq chunks)
-           ($ :div {:className "mt-2 text-xs text-blue-500"}
-              (str (count chunks) " chunk" (when (not= (count chunks) 1) "s") " received")))))))
+            (and complete? (empty? chunks))
+            ($ :div {:className "text-sm text-gray-500"} "No streaming output.")
+
+            :else
+            ($ :pre {:className "text-sm text-gray-800 whitespace-pre-wrap font-mono"} text)))
+
+       (when (seq chunks)
+         ($ :div {:className "mt-2 text-xs text-blue-500"}
+            (str (count chunks) " chunk" (when (not= (count chunks) 1) "s") " received"))))))
 
 (defui node-emits-panel [{:keys [emits graph-data flow-nodes on-select-node on-paginate-node]}]
   (when (and emits (> (count emits) 0))
@@ -515,9 +503,7 @@
                                         node-id node-name result exceptions start-time finish-time duration input
                                         emits graph-data flow-nodes on-select-node on-paginate-node
                                         agent-invoke-id]}]
-  (let [;; Determine if node is in progress (started but not finished)
-        is-node-in-progress? (and start-time (not finish-time))
-        raw-node-data (graph-node-data graph-data node-id)]
+  (let [raw-node-data (graph-node-data graph-data node-id)]
     ($ :<>
        ;; Add to Dataset button (first, at top)
        ($ :button.inline-flex.items-center.justify-center.px-3.py-2.bg-white.text-gray-700.text-sm.font-medium.rounded-md.border.border-gray-300.hover:bg-gray-50.transition-colors.cursor-pointer.w-full.mb-4
@@ -548,15 +534,12 @@
                            :agent-name agent-name
                            :invoke-id invoke-id})
 
-       ;; Streaming panel - shown for nodes that are in progress or have streaming data
-       ;; Uses node-id (specific node invocation UUID) to stream from the correct node instance
        (when (and agent-invoke-id node-id)
          ($ node-streaming-panel {:module-id module-id
                                   :agent-name agent-name
                                   :invoke-id agent-invoke-id
                                   :node-name node-name
-                                  :node-invoke-id node-id  ;; Specific node invocation ID
-                                  :is-streaming? is-node-in-progress?}))
+                                  :node-invoke-id node-id}))
 
        ($ node-exceptions-panel {:exceptions exceptions})
 
@@ -862,18 +845,18 @@
                         ;; Test if it's valid JSON
                         (js/JSON.parse edit-value)
                         (-> (rpc/call ::rpc-invocations/set-metadata!!
-                         {:module-id module-id
-                          :agent-name agent-name
-                          :invoke-id invoke-id
-                          :key m-key
-                          :value-str edit-value})
-                        (.then (fn [_]
-                                 (set-is-saving! false)
-                                 (set-editing! false)
-                                 (on-change)))
-                        (.catch (fn [err]
-                                  (set-is-saving! false)
-                                  (set-error! (if (map? err) (or (:error err) "Save failed.") (str err))))))
+                                      {:module-id module-id
+                                       :agent-name agent-name
+                                       :invoke-id invoke-id
+                                       :key m-key
+                                       :value-str edit-value})
+                            (.then (fn [_]
+                                     (set-is-saving! false)
+                                     (set-editing! false)
+                                     (on-change)))
+                            (.catch (fn [err]
+                                      (set-is-saving! false)
+                                      (set-error! (if (map? err) (or (:error err) "Save failed.") (str err))))))
                         (catch :default e
                           (set-is-saving! false)
                           (set-error! (str "Invalid JSON: " (.-message e))))))
@@ -881,10 +864,10 @@
         handle-delete (fn []
                         (when (js/confirm (str "Are you sure you want to remove the metadata key '" m-key "'?"))
                           (-> (rpc/call ::rpc-invocations/remove-metadata!!
-                           {:module-id module-id :agent-name agent-name :invoke-id invoke-id :key m-key})
-                          (.then (fn [_] (on-change)))
-                          (.catch (fn [err]
-                                    (js/alert (str "Failed: " (if (map? err) (or (:error err) (str err)) (str err)))))))))]
+                                        {:module-id module-id :agent-name agent-name :invoke-id invoke-id :key m-key})
+                              (.then (fn [_] (on-change)))
+                              (.catch (fn [err]
+                                        (js/alert (str "Failed: " (if (map? err) (or (:error err) (str err)) (str err)))))))))]
 
     ($ :div.py-2.sm:grid.sm:grid-cols-3.sm:gap-4.sm:px-0
        ($ :dt.text-sm.font-medium.leading-6.text-gray-900.font-mono.truncate {:title m-key} m-key)
