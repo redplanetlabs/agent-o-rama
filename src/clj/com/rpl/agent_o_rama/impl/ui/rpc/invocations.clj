@@ -201,10 +201,33 @@
     {:success true}))
 
 
+(defn get-node-stream-snapshot!!
+  "One-shot fetch of buffered stream chunks for a node invocation (Closeable released in `finally`).
+   Used for completed traces so the UI need not keep an SSE connection open."
+  [system {:keys [module-id agent-name invoke-id node-name node-invoke-id]}]
+  (when-not (uuid? node-invoke-id)
+    (throw (ex-info "node-invoke-id must be a UUID" {:node-invoke-id node-invoke-id})))
+  (let [client (get-client system module-id agent-name)]
+    (if-not client
+      {:all-chunks [] :new-chunks [] :reset? false :complete? true}
+      (let [[task-id agent-id] (common/parse-url-pair invoke-id)
+            invoke (aor-types/->AgentInvokeImpl task-id agent-id)
+            ^java.io.Closeable stream
+            (aor/agent-stream-specific client invoke node-name node-invoke-id nil)]
+        (try
+          (let [chunks (vec @stream)]
+            {:all-chunks chunks
+             :new-chunks chunks
+             :reset? false
+             :complete? true})
+          (finally
+            (.close stream)))))))
+
 (defn stream-node!!sse
   "SSE RPC: subscribes to [[com.rpl.agent-o-rama/agent-stream-specific]] for one node invocation.
    Invoked as (stream-node!!sse system payload on-event); returns a Closeable stream handle.
-   If there is no client, emits one terminal event with empty chunks and `complete?` true."
+   If there is no client, emits one terminal event with empty chunks and `complete?` true.
+   For completed node traces use [[get-node-stream-snapshot!!]] instead so connections do not linger."
   [system {:keys [module-id agent-name invoke-id node-name node-invoke-id]} on-event]
   (when-not (uuid? node-invoke-id)
     (throw (ex-info "node-invoke-id must be a UUID" {:node-invoke-id node-invoke-id})))

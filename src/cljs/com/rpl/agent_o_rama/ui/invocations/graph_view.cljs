@@ -424,10 +424,11 @@
                     ($ generic-data-viewer {:data info :color "indigo" :depth 0})))))))))
 
 (defui node-streaming-panel
-  "Streaming output from the Rama client only via SSE (`stream-node!!sse`); one code path."
-  [{:keys [module-id agent-name invoke-id node-name node-invoke-id]}]
+  "Live runs: SSE (`stream-node!!sse`). Finished nodes: one-shot snapshot (no hung connection)."
+  [{:keys [module-id agent-name invoke-id node-name node-invoke-id replay-traced-node?]}]
   (let [{:keys [text chunks reset-count complete?]}
-        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id)
+        (streaming/use-node-stream module-id agent-name invoke-id node-name node-invoke-id
+                                   (boolean replay-traced-node?))
         waiting? (and (not complete?) (empty? chunks))
         scroll-ref (uix/use-ref nil)]
 
@@ -540,7 +541,8 @@
                                   :agent-name agent-name
                                   :invoke-id agent-invoke-id
                                   :node-name node-name
-                                  :node-invoke-id node-id}))
+                                  :node-invoke-id node-id
+                                  :replay-traced-node? (some? finish-time)}))
 
        ($ node-exceptions-panel {:exceptions exceptions})
 
