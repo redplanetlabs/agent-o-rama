@@ -11,10 +11,12 @@
   [set-stream-data data]
   (set-stream-data
    (fn [prev]
-     (if (:reset? data)
+     (if (or (:replace? data) (:reset? data))
        {:chunks (mapv str (:new-chunks data))
         :text (apply str (map str (:new-chunks data)))
-        :reset-count (inc (:reset-count prev 0))
+        :reset-count (if (:reset? data)
+                       (inc (:reset-count prev 0))
+                       (:reset-count prev 0))
         :complete? (boolean (:complete? data))
         :streaming? (not (:complete? data))}
        (let [n (mapv str (:new-chunks data))
@@ -51,8 +53,9 @@
                    :invoke-id invoke-id
                    :node-name node-name
                    :node-invoke-id node-invoke-id})
-                 (.then (fn [data]
-                          (apply-stream-event! set-stream-data data)))
+                (.then (fn [data]
+                         ;; Snapshot is authoritative for completed traces; replace without reset badge.
+                         (apply-stream-event! set-stream-data (assoc data :replace? true))))
                  (.catch (fn [_err]
                            (set-stream-data
                             (fn [prev]
