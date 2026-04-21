@@ -98,7 +98,8 @@
   "Per-tab SSE subscription handles: key = client `:sse-client-id` string from the UI (sessionStorage per tab)."
   (atom {}))
 
-(defn- handle-sse-rpc [rpc-var system processed-data request]
+
+(defn handle-sse-rpc [rpc-var system processed-data request]
   (cond
     (nil? rpc-var)
     (-> (transit-response {:success false
@@ -139,11 +140,8 @@
               (swap! sse-stream-handles*
                      (fn [m]
                        (when-let [old (get m client-id)]
-                         (when (and (instance? java.io.Closeable old)
-                                    (not (identical? old closeable)))
-                           (try
-                             (.close ^java.io.Closeable old)
-                             (catch Throwable _))))
+                         (when (not (identical? old closeable))
+                           (.close ^java.io.Closeable old)))
                        (assoc m client-id closeable)))))
 
           :on-close
@@ -153,10 +151,7 @@
                      (fn [m]
                        (if (identical? (get m client-id) c)
                          (do
-                           (when (instance? java.io.Closeable c)
-                             (try
-                               (.close ^java.io.Closeable c)
-                               (catch Throwable _)))
+                           (.close ^java.io.Closeable c)
                            (dissoc m client-id))
                          m)))))})))))
 
