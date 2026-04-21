@@ -94,7 +94,9 @@
     (transit/write (transit/writer out :json) (common/->ui-serializable data))
     (.toString out "UTF-8")))
 
-(def stream* (atom nil))
+(def ^:private sse-stream-handles*
+  "Per-tab SSE subscription handles: key = client `:sse-client-id` string from the UI (sessionStorage per tab)."
+  (atom {}))
 
 (defn- handle-sse-rpc [rpc-var system processed-data request]
   (cond
@@ -111,31 +113,52 @@
         (resp/status 500))
 
     :else
-    (http-kit/as-channel
-     request
-     {:on-open
-      (fn [ch]
-        (http-kit/send! ch
-                        {:headers {"Content-Type" "text/event-stream"
-                                   "Cache-Control" "no-cache"
-                                   "Connection" "keep-alive"
-                                   "X-Accel-Buffering" "no"}
-                         :status 200}
-                        false)
-        (reset! stream*
-                (@rpc-var
-                 system
-                 processed-data
-                 (fn emit [data]
-                   (let [payload (str "data: " (write-transit-str data) "\n\n")
-                         close-after? (boolean (:complete? data))]
-                     (http-kit/send! ch payload close-after?))))))
-      
-      :on-close
-      (fn [_ch _status]
-        (when-let [s @stream*]
-          (when (instance? java.io.Closeable s)
-            (.close ^java.io.Closeable s))))})))
+    (let [client-id (str (or (:sse-client-id processed-data)
+                             (str (UUID/randomUUID))))]
+      (http-kit/as-channel
+       request
+       (let [this-closeable (atom nil)]
+         {:on-open
+          (fn [ch]
+            (http-kit/send! ch
+                            {:headers {"Content-Type" "text/event-stream"
+                                       "Cache-Control" "no-cache"
+                                       "Connection" "keep-alive"
+                                       "X-Accel-Buffering" "no"}
+                             :status 200}
+                            false)
+            (let [closeable
+                  (@rpc-var
+                   system
+                   processed-data
+                   (fn emit [data]
+                     (let [payload (str "data: " (write-transit-str data) "\n\n")
+                           close-after? (boolean (:complete? data))]
+                       (http-kit/send! ch payload close-after?))))]
+              (reset! this-closeable closeable)
+              (swap! sse-stream-handles*
+                     (fn [m]
+                       (when-let [old (get m client-id)]
+                         (when (and (instance? java.io.Closeable old)
+                                    (not (identical? old closeable)))
+                           (try
+                             (.close ^java.io.Closeable old)
+                             (catch Throwable _))))
+                       (assoc m client-id closeable)))))
+
+          :on-close
+          (fn [_ch _status]
+            (when-let [c @this-closeable]
+              (swap! sse-stream-handles*
+                     (fn [m]
+                       (if (identical? (get m client-id) c)
+                         (do
+                           (when (instance? java.io.Closeable c)
+                             (try
+                               (.close ^java.io.Closeable c)
+                               (catch Throwable _)))
+                           (dissoc m client-id))
+                         m)))))})))))
 
 (defn- parse-export-params
   "Extract module-id and dataset-id from export route: /api/datasets/:module-id/:dataset-id/export"

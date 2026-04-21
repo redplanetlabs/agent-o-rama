@@ -3,6 +3,16 @@
    [clojure.string :as str]
    [cognitect.transit :as transit]))
 
+(def ^:private sse-client-id-storage-key "aor_sse_client_id")
+
+(defn sse-client-id!
+  "Stable UUID string per browser tab (sessionStorage). Used so concurrent tabs each keep their own server SSE subscription."
+  []
+  (or (js/sessionStorage.getItem sse-client-id-storage-key)
+      (let [id (str (random-uuid))]
+        (js/sessionStorage.setItem sse-client-id-storage-key id)
+        id)))
+
 (def transit-content-type "application/transit+json")
 
 (def uuid-write-handler
@@ -96,7 +106,9 @@
                         :credentials "same-origin"
                         :headers #js {"Content-Type" transit-content-type
                                       "Accept" "text/event-stream"}
-                        :body (transit/write writer (or payload {}))
+                        :body (transit/write writer
+                                            (assoc (or payload {})
+                                                   :sse-client-id (sse-client-id!)))
                         :signal signal})
          (.then (fn [^js resp]
                   (if-not (.-ok resp)
@@ -129,3 +141,4 @@
                             (.then step))))))))
      (fn abort []
        (.abort controller)))))
+
