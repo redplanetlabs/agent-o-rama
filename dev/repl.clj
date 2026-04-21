@@ -83,8 +83,14 @@
   
   (def ipc (open-cluster-manager-internal {"conductor.host" "localhost"}))
   (def ipc (rtest/create-ipc))
+  
   (launch-dev ipc)
   (launch-no-frontend-build ipc)
+  
+  (rtest/update-module!
+   ipc
+   e2e-test-agent/E2ETestAgentModule
+   {:tasks 1 :threads 1})
   
   (aor/stop-ui)
 
@@ -184,7 +190,7 @@
    ipc
    com.rpl.agent.basic.tools-agent/ToolsAgentModule
    {:tasks 1 :threads 1})
-
+  
   (rtest/destroy-module!
    ipc
    (get-module-name com.rpl.agent.basic.tools-agent/ToolsAgentModule))

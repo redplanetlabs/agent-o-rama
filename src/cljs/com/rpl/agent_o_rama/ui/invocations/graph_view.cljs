@@ -124,21 +124,18 @@
 
 (defui expandable-item-component [{:keys [item color title truncate-length]
                                    :or {truncate-length 50}}]
-  (let [item-str (if (string? item) item (pr-str item))
-        pretty-str (common/pretty-format item)
-        is-long? (> (count item-str) truncate-length)
-        truncated-str (if is-long?
-                        (str (subs item-str 0 (- truncate-length 3)) "...")
-                        item-str)]
+  (let [{:keys [text truncated?]} (common/preview-line item truncate-length)]
     ($ :div {:className (str "text-" color "-500")}
        ($ :span {:className (str "break-words cursor-pointer hover:bg-" color "-100 px-1 py-0.5 rounded")
                  :onClick (fn [e]
                             (.stopPropagation e)
                             (rf/dispatch [:modal/show :expandable-content
-                                             {:title title
-                                              :component ($ common/ContentDetailModal {:title title :content pretty-str})}]))
+                                          {:title title
+                                           :component ($ common/ContentDetailModal
+                                                         {:title title
+                                                          :content (common/pretty-format item)})}]))
                  :title "Click to expand"}
-          truncated-str))))
+          text))))
 
 ;; Declare generic-data-viewer first to avoid circular dependency
 (declare generic-data-viewer)

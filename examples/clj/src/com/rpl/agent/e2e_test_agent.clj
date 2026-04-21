@@ -17,6 +17,14 @@
 
 (defonce E2E_RETRY_STORE "$$e2e-retries")
 
+(def ^:private e2e-stress-500kb-byte-array
+  "500KB `byte[]` — serializes to a large Transit payload (vector of numbers; issue #299).
+  Enabled when agent input includes {\"e2e-large-trace-payload\" true}."
+  (let [ba (byte-array (* 500 1024))]
+    (dotimes [i (alength ba)]
+      (aset-byte ba i (byte (mod i 128))))
+    ba))
+
 (defn- maybe-sleep!
   [params]
   (when-let [timeout-ms (get params "timeout-ms")]
@@ -187,4 +195,11 @@
        nil
        (fn [agent-node params]
          (check-for-failure! agent-node params "final_result_node")
-         (aor/result! agent-node (get params "output-value"))))))
+         (let [base (get params "output-value")
+               out (if (get params "e2e-large-trace-payload")
+                     (if (map? base)
+                       (merge base {:e2e-stress-data e2e-stress-500kb-byte-array})
+                       {:output-value base
+                        :e2e-stress-data e2e-stress-500kb-byte-array})
+                     base)]
+           (aor/result! agent-node out))))))

@@ -165,7 +165,10 @@
 
 (defn pending-human-request
   [^AgentNodeExecutorTaskGlobal node-exec invoke-id]
-  (.getHumanRequest node-exec invoke-id))
+  ;; ConcurrentHashMap forbids a null key; trace walks can still encounter a nil
+  ;; child invoke id in pathological emit data (e.g. huge payloads / storage edge cases).
+  (when invoke-id
+    (.getHumanRequest node-exec invoke-id)))
 
 (defn declare-tracing-query-topology
   [topologies]
