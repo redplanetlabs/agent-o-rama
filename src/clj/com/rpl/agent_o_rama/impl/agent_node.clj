@@ -128,20 +128,19 @@
          )))
      StreamingRecorderInternal
      (waitFinish [this]
-       ;; Always emit FINISHED-INVOKE so client streams get a terminal callback even when
-       ;; the node never called streamChunk (index-vol stays 0).
-       (vswap! outstanding-queue-vol
-               conj
-               (foreign-append-async!
-                streaming-depot
-                (aor-types/->valid-NodeStreamingResult
-                 agent-task-id
-                 agent-id
-                 node
-                 invoke-id
-                 (identity-retry-num retry-num)
-                 (identity-streaming-index @index-vol)
-                 iclient/FINISHED-INVOKE)))
+       (when (> @index-vol 0)
+         (vswap! outstanding-queue-vol
+                 conj
+                 (foreign-append-async!
+                  streaming-depot
+                  (aor-types/->valid-NodeStreamingResult
+                   agent-task-id
+                   agent-id
+                   node
+                   invoke-id
+                   (identity-retry-num retry-num)
+                   (identity-streaming-index @index-vol)
+                   iclient/FINISHED-INVOKE))))
        (doseq [cf @outstanding-queue-vol]
          (verify-successful-cf! cf)))
     )))
