@@ -48,8 +48,8 @@
         metric-names (or feedback-metric-names [])]
     ($ :tr.hover:bg-gray-50.transition-colors.duration-150
        {:key href}
-       ($ :td.px-4.py-3
-          ($ :a.px-3.py-1.bg-blue-100.text-blue-700.rounded.text-xs.font-medium.hover:bg-blue-200.transition-colors.duration-150.cursor-pointer
+       ($ :td.px-3.py-3.whitespace-nowrap
+          ($ :a.inline-block.px-2.py-1.sm:px-3.bg-blue-100.text-blue-700.rounded.text-xs.font-medium.hover:bg-blue-200.transition-colors.duration-150.cursor-pointer
              {:href href}
              "View trace"))
        ($ :td.px-4.py-3.text-sm.text-gray-600.font-mono
