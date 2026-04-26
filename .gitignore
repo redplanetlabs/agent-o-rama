@@ -50,3 +50,6 @@ CLAUDE.md
 # playwright
 test-results/
 playwright-report/
+
+# local UI capture outputs (see scripts/capture_gantt_trace.mjs)
+dev/screenshots/

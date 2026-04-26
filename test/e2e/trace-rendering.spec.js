@@ -79,6 +79,17 @@ test.describe('Invocation Trace Page Rendering', () => {
     const successBadge = page.locator('.bg-green-100.text-green-800').filter({ hasText: 'Success' });
     await expect(successBadge).toBeVisible();
     console.log('Success badge is visible.');
+
+    // 3e. Gantt / timeline trace view toggles and shows the hierarchical timeline.
+    await page.getByTestId('trace-view-gantt').click();
+    const gantt = page.getByTestId('gantt-trace-view');
+    await expect(gantt).toBeVisible({ timeout: 15000 });
+    await expect(gantt).toContainText(/node/);
+    console.log('Gantt trace view is visible.');
+
+    await page.getByTestId('trace-view-graph').click();
+    await expect(page.locator('.react-flow')).toBeVisible();
+    console.log('Graph trace view restored.');
     
     console.log('--- Test successfully verified trace page renders final result immediately. ---');
   });

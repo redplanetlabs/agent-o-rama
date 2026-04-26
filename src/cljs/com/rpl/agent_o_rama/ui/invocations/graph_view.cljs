@@ -21,6 +21,8 @@
    [reitit.frontend.easy :as rfe]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
    [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
+   [com.rpl.agent-o-rama.ui.invocations.graph-node :as gn]
+   [com.rpl.agent-o-rama.ui.invocations.gantt-trace :as gantt]
 
    ["react" :refer [useState useCallback useEffect]]
    ["@xyflow/react" :refer [ReactFlow Background Controls useNodesState useEdgesState Handle MiniMap]]
@@ -32,14 +34,7 @@
      ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
         content)))
 
-(defn graph-node-data
-  "Look up a node in `graph-data`; React Flow may stringify `:node-id` while keys stay UUIDs."
-  [graph-data node-id]
-  (when (and graph-data node-id)
-    (or (get graph-data node-id)
-        (get graph-data (str node-id))
-        (let [sid (str node-id)]
-          (some (fn [[k v]] (when (= (str k) sid) v)) graph-data)))))
+(def graph-node-data gn/graph-node-data)
 
 (defn format-ms [ms]
   (let [date (js/Date. ms)
@@ -56,11 +51,9 @@
         millis (.padStart (str (.getMilliseconds date)) 3 "0")]
     (str base "." millis)))
 
-(defn starter-node? [node]
-  (not (nil? (:started-agg? node))))
+(def starter-node? gn/starter-node?)
 
-(defn agg-node? [node]
-  (not (nil? (:agg-state node))))
+(def agg-node? gn/agg-node?)
 
 (defui node-status-bar
   "Renders a horizontal status bar showing all active node states.
@@ -1230,7 +1223,7 @@
             modified-node-ids)))
 
 (defui graph-view [{:keys [module-id agent-name invoke-id task-id
-                           forks fork-of
+                           forks fork-of root-invoke-id
                            graph-data real-edges summary-data implicit-edges
                            is-complete is-live connected?
                            selected-node-id forking-mode? changed-nodes
@@ -1239,6 +1232,8 @@
                            on-toggle-forking-mode on-paginate-node]}]
   (let [;; Convert selected-node-id to actual node object when needed
         [selected-node set-selected-node-internal] (uix/use-state nil)
+
+        [trace-view-mode set-trace-view-mode] (common/use-local-storage "invocation-trace-view-mode" :graph)
 
         ;; Sidebar width state (default 320px)
         [sidebar-width set-sidebar-width] (common/use-local-storage "graph-sidebar-width" 320)
@@ -1289,8 +1284,35 @@
          ;; Main content area with right margin for the stats panel
          ($ :div {:style {:marginRight (str sidebar-width "px")}
                   :data-id "agent-graph-panel"}
-            ($ :div {:style {:width "100%" :height "500px"}}
-               ($ ReactFlow {:nodes flow-nodes
+            ($ :div {:className "flex items-center gap-2 mb-2 px-1"}
+               ($ :span {:className "text-xs font-medium text-gray-600"} "Trace view")
+               ($ :div {:className "inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5 text-xs"}
+                  ($ :button {:type "button"
+                              :className (common/cn "px-2 py-1 rounded transition-colors"
+                                                    (if (= trace-view-mode :graph)
+                                                      "bg-white shadow text-gray-900"
+                                                      "text-gray-600 hover:text-gray-900"))
+                              :data-testid "trace-view-graph"
+                              :onClick #(set-trace-view-mode :graph)}
+                     "Graph")
+                  ($ :button {:type "button"
+                              :className (common/cn "px-2 py-1 rounded transition-colors"
+                                                    (if (= trace-view-mode :gantt)
+                                                      "bg-white shadow text-gray-900"
+                                                      "text-gray-600 hover:text-gray-900"))
+                              :data-testid "trace-view-gantt"
+                              :onClick #(set-trace-view-mode :gantt)}
+                     "Timeline")))
+            (if (= trace-view-mode :gantt)
+              ($ gantt/gantt-trace-view {:graph-data graph-data
+                                         :real-edges real-edges
+                                         :implicit-edges implicit-edges
+                                         :root-invoke-id root-invoke-id
+                                         :selected-node-id selected-node-id
+                                         :on-select-node on-select-node
+                                         :is-complete is-complete})
+              ($ :div {:style {:width "100%" :height "500px"}}
+                 ($ ReactFlow {:nodes flow-nodes
                              :edges flow-edges
                              :onNodesChange on-nodes-change
                              :onEdgesChange on-edges-change
@@ -1365,7 +1387,7 @@
                              :onNodeClick (fn [_ node] (handle-select-node-click node))}
                   ($ MiniMap {:position "bottom-right" :pannable true :zoomable true})
                   ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
-                  ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
+                  ($ Controls {:className "fill-gray-500 stroke-gray-500"}))))
 
             ;; Show selected node details or forking input component
             (when selected-node

@@ -116,6 +116,7 @@
                     :agent-name agent-name
                     :invoke-id invoke-id
                     :task-id task-id
+                    :root-invoke-id root-invoke-id
                     :forks forks
                     :fork-of fork-of
                     :graph-data graph-data
