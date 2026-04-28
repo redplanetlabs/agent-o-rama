@@ -17,6 +17,61 @@
           {}
           edges))
 
+(defn- parents-by-target [edges target-id]
+  "All source node ids with an edge to `target-id` (real or implicit)."
+  (let [tid (node-key-str target-id)]
+    (->> edges
+         (filter #(= (node-key-str (:target %)) tid))
+         (map :source)
+         distinct
+         vec)))
+
+(defn- canonical-fan-in-parent
+  "When many nodes emit to the same agg, the drawable graph adds an implicit edge from
+  each agg-start output to the agg. That is correct for React Flow but duplicates the agg
+  as a child under every parallel branch in a naive tree. Pick one parent: prefer the
+  agg-start (`starter-node?`), else the earliest-start parent."
+  [graph-data parent-ids]
+  (when (seq parent-ids)
+    (let [starters (filter #(gn/starter-node? (gn/graph-node-data graph-data %)) parent-ids)]
+      (if (seq starters)
+        (apply min-key str starters)
+        (->> parent-ids
+             (sort-by (fn [p]
+                        [(or (:start-time-millis (gn/graph-node-data graph-data p))
+                             js/Number.POSITIVE_INFINITY)
+                         (str p)]))
+             first)))))
+
+(defn- collapse-fan-in-agg-children
+  "For each agg node, if multiple parents point at it in `edges`, keep only one parent→child
+  link in `children-map` so the Gantt shows a single fan-in subtree (matches mental model:
+  one agg collecting many parallel workers)."
+  [graph-data edges children-map]
+  (let [agg-ids (->> (keys graph-data)
+                    (filter #(gn/agg-node? (gn/graph-node-data graph-data %))))]
+    (reduce (fn [m agg-id]
+              (let [parents (parents-by-target edges agg-id)]
+                (if (<= (count parents) 1)
+                  m
+                  (if-let [keeper (canonical-fan-in-parent graph-data parents)]
+                    (reduce (fn [m2 p]
+                              (if (= (str p) (str keeper))
+                                m2
+                                (update m2 (node-key-str p)
+                                        (fn [chs]
+                                          (vec (remove #(= (str %) (str agg-id)) (or chs [])))))))
+                            m
+                            parents)
+                    m))))
+            children-map
+            agg-ids)))
+
+(defn- gantt-children-map [graph-data real-edges implicit-edges]
+  (let [edges (concat (or real-edges []) (or implicit-edges []))
+        raw (children-by-parent edges)]
+    (collapse-fan-in-agg-children graph-data edges raw)))
+
 (defn- sort-child-ids [graph-data child-ids]
   (sort-by (fn [id]
              (let [n (gn/graph-node-data graph-data id)]
@@ -110,8 +165,8 @@
             selected-node-id on-select-node is-complete]}]
   (let [[collapsed set-collapsed] (useState #{})
         [now-ms set-now-ms!] (useState (js/Date.now))
-        children-map (useMemo (fn [] (children-by-parent (concat (or real-edges []) (or implicit-edges []))))
-                              [real-edges implicit-edges])
+        children-map (useMemo (fn [] (gantt-children-map graph-data real-edges implicit-edges))
+                              [graph-data real-edges implicit-edges])
         rows (useMemo (fn [] (if (and graph-data root-invoke-id)
                                (collect-visible-rows graph-data children-map root-invoke-id collapsed)
                                []))
