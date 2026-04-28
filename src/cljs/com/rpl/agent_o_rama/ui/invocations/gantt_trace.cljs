@@ -137,7 +137,7 @@
           total-ms (or (total-root-ms rows) span)]
       ($ :div {:className "flex flex-col border border-gray-200 rounded-lg bg-white overflow-hidden"
                :data-testid "gantt-trace-view"}
-         ($ :div {:className "flex items-center justify-between px-3 py-2 border-b border-gray-200 bg-gray-50"}
+         ($ :div {:className "flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200 bg-gray-50"}
             ($ :div {:className "text-xs font-mono text-gray-600"}
                (str (count rows) " node" (when (not= 1 (count rows)) "s")))
             ($ :div {:className "text-xs font-mono text-gray-700"}
