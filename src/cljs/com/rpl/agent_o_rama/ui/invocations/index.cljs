@@ -39,6 +39,19 @@
               (when m (get m (keyword metric-name))))]
     (if (nil? v) "-" (str v))))
 
+(defn- dedupe-invokes-preserving-order
+  "Infinite scroll pages can overlap at boundaries; React keys are task-id+agent-id."
+  [rows]
+  (let [[deduped _seen]
+        (reduce (fn [[acc seen] inv]
+                  (let [k (str (:task-id inv) "-" (:agent-id inv))]
+                    (if (contains? seen k)
+                      [acc seen]
+                      [(conj acc inv) (conj seen k)])))
+                [[] #{}]
+                rows)]
+    deduped))
+
 (defui invocation-row [{:keys [invoke module-id agent-name on-click feedback-metric-names]}]
   (let [task-id (:task-id invoke)
         agent-id (:agent-id invoke)
@@ -117,7 +130,10 @@
                    :agent-name agent-name
                    :filters applied-filters}
           :page-size 20
-          :enabled? (boolean (and module-id agent-name))})]
+          :enabled? (boolean (and module-id agent-name))
+          :flatten-items-fn (fn [pages]
+                              (dedupe-invokes-preserving-order
+                               (vec (apply concat (map :items pages)))))})]
 
     ($ :div.p-4.space-y-4.h-screen
        ($ inv-filters/filter-bar
@@ -166,7 +182,8 @@
                (when hasMore
                  ($ :tfoot.bg-gray-50.border-t.border-gray-200
                     ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                       {:onClick (when-not isFetchingMore loadMore)}
+                       {:data-testid "invocations-load-more"
+                        :onClick (when-not isFetchingMore loadMore)}
                        ($ :td.px-4.py-3.cursor-pointer {:colSpan (+ 5 n-feedback-cols)}
                           ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                              ($ :span.mr-2.text-sm.font-medium (if isFetchingMore "Loading..." "Load More"))

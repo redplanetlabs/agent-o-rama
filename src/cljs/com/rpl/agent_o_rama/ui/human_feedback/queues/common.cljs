@@ -65,7 +65,7 @@
         data (or (:data query-state) [])
         pagination-params (:pagination-params query-state)
         reverse-pagination-params (:reverse-pagination-params query-state)
-        has-more? (get query-state :has-more? true)
+        has-more? (get query-state :has-more? false)
         has-more-before? (get query-state :has-more-before? false)
         is-loading? (= (:status query-state) :loading)
         is-fetching-more? (:fetching-more? query-state)
@@ -122,11 +122,21 @@
                                              (do
                                                (rf/dispatch [:db/set-value (into state-path [:reverse-pagination-params]) new-pagination])
                                                (rf/dispatch [:db/set-value (into state-path [:has-more-before?]) new-has-more?])))
-                                           (rf/dispatch [:db/set-value (into state-path [:status]) :success]))))
+                                           (let [bidir-path (into state-path [:initial-bidir-outstanding])
+                                                 bidir (get-in @rdb/app-db bidir-path)]
+                                             (if (number? bidir)
+                                               (let [n' (dec bidir)]
+                                                 (if (pos? n')
+                                                   (rf/dispatch [:db/set-value bidir-path n'])
+                                                   (do
+                                                     (rf/dispatch [:db/set-value bidir-path nil])
+                                                     (rf/dispatch [:db/set-value (into state-path [:status]) :success]))))
+                                               (rf/dispatch [:db/set-value (into state-path [:status]) :success]))))))
                                 (.catch (fn [err]
                                           (if reverse?
                                             (rf/dispatch [:db/set-value (into state-path [:fetching-before?]) false])
                                             (rf/dispatch [:db/set-value (into state-path [:fetching-more?]) false]))
+                                          (rf/dispatch [:db/set-value (into state-path [:initial-bidir-outstanding]) nil])
                                           (rf/dispatch [:db/set-value (into state-path [:status]) :error])
                                           (rf/dispatch [:db/set-value (into state-path [:error])
                                                            (if (map? err) (or (:error err) (str err)) (str err))])))))))
@@ -156,6 +166,7 @@
                                        :has-more-before? false
                                        :fetching-more? false
                                        :fetching-before? false
+                                       :initial-bidir-outstanding nil
                                        :error nil
                                        :should-refetch? false}])
                      (fetch-page nil false false false false))
@@ -175,6 +186,7 @@
                     (or (empty? data) initial-needed?))
            (if (and initial-needed? initial-cursor include-initial-cursor?)
              (do
+               (rf/dispatch [:db/set-value (into state-path [:initial-bidir-outstanding]) 2])
                (fetch-page initial-cursor false true true false)
                (fetch-page initial-cursor false true true true))
              (fetch-page initial-cursor false include-initial-cursor? false false)))

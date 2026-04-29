@@ -48,13 +48,13 @@ test.describe('Invocations pagination', () => {
     await expect(page.locator('table tbody')).toBeVisible({ timeout: 30000 });
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 30000 });
 
-    const loadMoreRow = page.locator('tfoot tr').filter({ hasText: 'Load More' });
     let loadMoreClicks = 0;
     let noProgressClicks = 0;
-    while (await loadMoreRow.isVisible()) {
+    await expect(page.getByTestId('invocations-load-more')).toBeVisible('Load More button is visible');
+    while (await page.getByTestId('invocations-load-more').isVisible()) {
       loadMoreClicks++;
       const beforeHrefs = await visibleTraceHrefs(page);
-      await loadMoreRow.click();
+      await page.getByTestId('invocations-load-more').click();
 
       await expect(page.locator('tfoot').filter({ hasText: 'Loading...' })).not.toBeVisible({ timeout: 15000 });
       const afterHrefs = await visibleTraceHrefs(page);

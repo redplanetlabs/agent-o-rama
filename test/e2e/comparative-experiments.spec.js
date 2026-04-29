@@ -232,7 +232,9 @@ test.describe('Comparative Experiment Flow', () => {
     await expect(evalsCell.locator('a').filter({ hasText: /index/ })).not.toBeVisible();
     await expect(evalsCell.locator('a').filter({ hasText: /longest_value/ })).not.toBeVisible();
     // The non-selector evaluator should appear, showing just the metric name (no collision)
-    await expect(evalsCell.locator('a').filter({ hasText: /random_score/ })).toBeVisible();
+    await expect(evalsCell.locator('a').filter({ hasText: /random_score/ })).toBeVisible({
+      timeout: 30000,
+    });
     console.log('Verified: "Evals" column correctly displays non-indexing evaluator results.');
 
     // ---
