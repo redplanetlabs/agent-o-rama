@@ -1,6 +1,19 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getBasicAgentRow, getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually, checkRubricRequired, createDataset, deleteDataset, addQueueItemToDatasetFromReview } from './helpers.js';
+import {
+  getBasicAgentRow,
+  getE2ETestAgentRow,
+  shouldSkipCleanup,
+  createHumanMetric,
+  deleteHumanMetric,
+  invokeAgentManually,
+  checkRubricRequired,
+  createDataset,
+  deleteDataset,
+  addQueueItemToDatasetFromReview,
+  expectQueueItemDetailLoaded,
+  selectQueueInAddToQueueModal,
+} from './helpers.js';
 
 // =============================================================================
 // TEST SUITE: Human Feedback Queues
@@ -531,9 +544,7 @@ test.describe('Human Feedback Queues', () => {
     
     // Select queue from modal using searchable selector
     await expect(modal).toBeVisible();
-    await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
-    await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
-    await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+    await selectQueueInAddToQueueModal(page, modal, queueName);
     
     // Click "Add to Queue" submit button
     await modal.getByRole('button', { name: 'Add to Queue' }).click();
@@ -557,9 +568,7 @@ test.describe('Human Feedback Queues', () => {
     
     // Select queue from modal using searchable selector
     await expect(modal).toBeVisible();
-    await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
-    await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
-    await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+    await selectQueueInAddToQueueModal(page, modal, queueName);
     
     // Click "Add to Queue" submit button
     await modal.getByRole('button', { name: 'Add to Queue' }).click();
@@ -614,7 +623,7 @@ test.describe('Human Feedback Queues', () => {
     await expect(page).toHaveURL(/item/);
     
     // Verify item detail page elements
-    await expect(page.getByText('Target Information')).toBeVisible();
+    await expectQueueItemDetailLoaded(page);
     await expect(page.getByTestId('add-to-dataset-button')).toBeVisible();
     await expect(page.getByText('Input')).toBeVisible();
     await expect(page.locator('[data-id="item-output"]').getByRole('heading', { name: 'Output' })).toBeVisible();
@@ -634,7 +643,7 @@ test.describe('Human Feedback Queues', () => {
     await page.getByRole('link', { name: 'Examples' }).click();
     await expect(page.locator('table tbody tr').filter({ hasText: 'test query for queue' })).toBeVisible({ timeout: 15000 });
     await page.goto(reviewItemUrl);
-    await expect(page.getByText('Target Information')).toBeVisible();
+    await expectQueueItemDetailLoaded(page);
     console.log('✓ Added queue review item to dataset from review page');
     
     // Fill out the review form
@@ -660,7 +669,7 @@ test.describe('Human Feedback Queues', () => {
     
     // Should already be on the next item's review page
     await expect(page).toHaveURL(/item/);
-    await expect(page.getByText('Target Information')).toBeVisible();
+    await expectQueueItemDetailLoaded(page);
     
     // Fill out the review form
     const metricDropdown2 = page.getByTestId('metric-value-0');
@@ -763,9 +772,7 @@ test.describe('Human Feedback Queues', () => {
       await page.locator('[data-id="feedback-tab"]').click();
       await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).toBeVisible();
-      await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
-      await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
-      await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+      await selectQueueInAddToQueueModal(page, modal, queueName);
       await modal.getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).not.toBeVisible({ timeout: 5000 });
       
@@ -904,9 +911,7 @@ test.describe('Human Feedback Queues', () => {
       await page.locator('[data-id="feedback-tab"]').click();
       await page.locator('[data-id="agent-feedback-container"]').getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).toBeVisible();
-      await modal.getByPlaceholder(/Type to search queues/).fill(queueName);
-      await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 10000 });
-      await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+      await selectQueueInAddToQueueModal(page, modal, queueName);
       await modal.getByRole('button', { name: 'Add to Queue' }).click();
       await expect(modal).not.toBeVisible({ timeout: 5000 });
       if (i < 1) {

@@ -81,7 +81,8 @@ const examples = [
 test.describe('Full Experiment Flow with E2E Test Agent', () => {
   test.setTimeout(5 * 60 * 1000); // 5 minutes for the entire flow
 
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async ({ page }, testInfo) => {
+    testInfo.setTimeout(8 * 60 * 1000);
     console.log('--- Starting Cleanup ---');
     page.on('dialog', (dialog) => dialog.accept());
 
@@ -94,7 +95,8 @@ test.describe('Full Experiment Flow with E2E Test Agent', () => {
     await deleteDataset(page, datasetName);
 
     // Delete evaluators
-    await page.getByText('Evaluators').click();
+    await page.getByRole('navigation').getByRole('link', { name: 'Evaluators' }).click();
+    await expect(page).toHaveURL(/evaluations/, { timeout: 30000 });
     await deleteEvaluator(page, randomFloatEvaluator.name);
     await deleteEvaluator(page, failingEvaluator.name);
     

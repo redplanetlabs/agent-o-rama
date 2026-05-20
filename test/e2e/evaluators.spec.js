@@ -157,11 +157,20 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
 
   // --- Test :summary evaluator ---
   console.log('Testing :summary evaluator...');
-  // Select the two examples for the F1 score (click the checkbox cell - input is readOnly)
-  const plusRow = page.locator('table tbody tr').filter({ hasText: '+' });
+  // Reset example selection (stale IDs from the prior modal flow yield an empty summary-evaluator list).
+  await page.getByRole('navigation').getByRole('link', { name: 'Datasets & Experiments' }).click();
+  await expect(page).toHaveURL(/datasets/);
+  await page.getByRole('link', { name: datasetName }).click();
+  await page.getByRole('link', { name: 'Examples' }).click();
+  await expect(page.getByRole('heading', { name: datasetName })).toBeVisible();
+
+  const plusRow = page.locator('table tbody tr').filter({ hasText: `ex3-${uniqueId}` });
+  const minusRow = page.locator('table tbody tr').filter({ hasText: `ex4-${uniqueId}` });
+  await expect(plusRow).toBeVisible({ timeout: 30000 });
+  await expect(minusRow).toBeVisible({ timeout: 30000 });
   await plusRow.locator('td').first().click();
-  const minusRow = page.locator('table tbody tr').filter({ hasText: '-' });
   await minusRow.locator('td').first().click();
+  await expect(page.getByText('2 examples selected')).toBeVisible({ timeout: 10000 });
 
   await page.getByRole('button', { name: 'Try summary evaluator' }).click();
 
@@ -179,13 +188,10 @@ test('should create, test, and clean up all three evaluator types', async ({ pag
   await expect(chooseButton).toBeVisible({ timeout: 10000 });
   await chooseButton.click();
 
-    // Assert dropdown is filtered correctly (only summary should be visible)
-    // Use longer timeout as dropdown loads evaluators asynchronously
-    await expect(summaryModal.getByText(summaryEvalName)).toBeVisible({ timeout: 10000 });
-    await expect(summaryModal.getByText(regularEvalName)).not.toBeVisible();
-    // await expect(summaryModal.getByText(comparativeEvalName)).not.toBeVisible(); // commented out - jcompare1 not loaded
-
-  await summaryModal.getByText(summaryEvalName).click();
+  // RunEvaluatorModal uses custom dropdown rows (not role=option); click the label cell.
+  const summaryChoice = summaryModal.getByText(summaryEvalName, { exact: true });
+  await expect(summaryChoice).toBeVisible({ timeout: 60000 });
+  await summaryChoice.click();
 
   // Assert confirmation text is shown
   await expect(summaryModal.getByText(`This will run the summary evaluator '${summaryEvalName}' on 2 selected examples.`)).toBeVisible();

@@ -314,12 +314,16 @@
         [loading? set-loading] (uix/use-state false)
         [dropdown-open? set-dropdown-open] (uix/use-state false)
 
-        ;; Fetch all evaluator instances
+        ;; Fetch evaluator instances for this modal (do not shadow `loading?` / `error` used for Run)
+        instances-query-params {:module-id module-id
+                                :limit 2000
+                                :filters {:types (if (= mode :multi)
+                                                   #{:summary}
+                                                   #{:regular :comparative})}}
         {instances-data :data instances-error :error instances-status :status}
-        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-instances!! {:module-id module-id}])
+        (use-subscribe [::rfq/query ::rpc-evaluators/get-all-instances!! instances-query-params])
         data instances-data
-        loading? (= instances-status :loading)
-        error instances-error
+        instances-loading? (= instances-status :loading)
 
         ;; Fetch evaluator builders to get their options for conditional rendering
         {builders-data :data}
@@ -423,8 +427,8 @@
                   {:className (common/get-evaluator-type-badge-style (:type pre-selected-evaluator))}
                   (common/get-evaluator-type-display (:type pre-selected-evaluator))))
 
-            loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
-            error ($ :div.text-sm.text-red-600 "Error loading evaluators")
+            instances-loading? ($ :div.text-sm.text-gray-500 "Loading evaluators...")
+            instances-error ($ :div.text-sm.text-red-600 "Error loading evaluators") ; RPC fetch error
             (empty? evaluators) ($ :div.text-sm.text-gray-500 (if (= mode :single) "No regular or comparative evaluators available." "No summary evaluators available."))
             :else
             ($ :div.relative
@@ -533,6 +537,7 @@
              {:onClick handle-run
               :disabled (or (not selected-evaluator)
                             loading?
+                            instances-loading?
                             has-validation-errors?
                             (and (= evaluator-type :summary)
                                  (zero? (count selected-example-ids))))}

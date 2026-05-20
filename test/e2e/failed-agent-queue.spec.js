@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually } from './helpers.js';
+import { getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually, selectQueueInAddToQueueModal } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE: Failed Agent Traces in Human Feedback Queue
@@ -92,15 +92,7 @@ test.describe('Failed Agent Traces in Human Feedback Queue', () => {
     // Select action: Add to human feedback queue
     await modal.locator('[data-id="action-selector"]').selectOption('aor/add-to-human-feedback-queue');
     
-    // Wait for queue selector to appear and select the queue
-    const queueSelector = modal.getByPlaceholder(/Type to search queues/);
-    await expect(queueSelector).toBeVisible({ timeout: 5000 });
-    // Click to open dropdown, then type to filter
-    await queueSelector.click();
-    await queueSelector.pressSequentially(queueName, { delay: 50 });
-    // Wait for option to appear and click it
-    await page.locator('[role="option"]').filter({ hasText: queueName }).waitFor({ timeout: 15000 });
-    await page.locator('[role="option"]').filter({ hasText: queueName }).click();
+    await selectQueueInAddToQueueModal(page, modal, queueName, 'queue-name-selector');
     
     // Submit rule
     await modal.getByRole('button', { name: 'Add Rule' }).click();
