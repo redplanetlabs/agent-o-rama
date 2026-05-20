@@ -131,10 +131,17 @@
 ;; NAVIGATION COMPONENTS
 ;; =============================================================================
 
+(defn- location-under-href? [location href]
+  (and (not= href "/")
+       (.startsWith location href)
+       (let [n (count href)]
+         (or (= (count location) n)
+             (= (.charAt location n) "/")))))
+
 ;; Reusable nav-link component (changed from wouter/Link to anchor tag)
 (defui nav-link [{:keys [href location collapsed? title children]}]
   (let [is-active? (or (= location href)
-                       (and (not= href "/") (.startsWith location href)))
+                       (location-under-href? location href))
         link-classes (common/cn
                       "flex items-center rounded-md transition-colors text-sm font-medium"
                       {"justify-center p-2 w-10 h-10" collapsed?
