@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getBasicAgentRow, getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually, checkRubricRequired } from './helpers.js';
+import { getBasicAgentRow, getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually, checkRubricRequired, createDataset, deleteDataset, addQueueItemToDatasetFromReview } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE: Human Feedback Queues
@@ -615,9 +615,27 @@ test.describe('Human Feedback Queues', () => {
     
     // Verify item detail page elements
     await expect(page.getByText('Target Information')).toBeVisible();
+    await expect(page.getByTestId('add-to-dataset-button')).toBeVisible();
     await expect(page.getByText('Input')).toBeVisible();
     await expect(page.locator('[data-id="item-output"]').getByRole('heading', { name: 'Output' })).toBeVisible();
     await expect(page.getByText(metricName)).toBeVisible();
+
+    // Add queue item to a new dataset via the review page dialog
+    const datasetName = `e2e-hf-queue-dataset-${uniqueId}`;
+    const reviewItemUrl = page.url();
+    await page.getByRole('navigation').getByRole('link', { name: 'Datasets & Experiments' }).click();
+    await expect(page).toHaveURL(/datasets/);
+    await createDataset(page, datasetName);
+    await page.goto(reviewItemUrl);
+    await expect(page.getByTestId('add-to-dataset-button')).toBeVisible();
+    await addQueueItemToDatasetFromReview(page, { datasetName });
+    await page.getByRole('navigation').getByRole('link', { name: 'Datasets & Experiments' }).click();
+    await page.getByRole('link', { name: datasetName }).click();
+    await page.getByRole('link', { name: 'Examples' }).click();
+    await expect(page.locator('table tbody tr').filter({ hasText: 'test query for queue' })).toBeVisible({ timeout: 15000 });
+    await page.goto(reviewItemUrl);
+    await expect(page.getByText('Target Information')).toBeVisible();
+    console.log('✓ Added queue review item to dataset from review page');
     
     // Fill out the review form
     const metricDropdown = page.getByTestId('metric-value-0');
@@ -693,6 +711,9 @@ test.describe('Human Feedback Queues', () => {
       // Delete metric
       await page.getByText('Human Metrics').click();
       await deleteHumanMetric(page, metricName);
+
+      await page.getByRole('navigation').getByRole('link', { name: 'Datasets & Experiments' }).click();
+      await deleteDataset(page, `e2e-hf-queue-dataset-${uniqueId}`);
       console.log('✓ Cleanup complete');
     }
   });

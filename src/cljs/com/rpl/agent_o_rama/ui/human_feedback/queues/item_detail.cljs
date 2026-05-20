@@ -42,10 +42,10 @@
         handle-expand (fn [e]
                         (.stopPropagation e)
                         (rf/dispatch [:modal/show :content-detail
-                                         {:title title
-                                          :component ($ common/ContentDetailModal
-                                                        {:title title
-                                                         :content pretty-str})}]))]
+                                      {:title title
+                                       :component ($ common/ContentDetailModal
+                                                     {:title title
+                                                      :content pretty-str})}]))]
     ($ :div
        ($ :pre.text-xs.bg-gray-50.p-3.rounded.overflow-auto.max-h-64.font-mono.whitespace-pre
           text)
@@ -210,43 +210,43 @@
                               (hf-common/save-reviewer-name! reviewer-name)
                               ;; Submit to backend
                               (-> (rpc/call ::rpc-hf/resolve-queue-item!!
-                               {:module-id decoded-module-id
-                                :queue-name decoded-queue-id
-                                :item-id item-id-str
-                                :target (:target current-item)
-                                :reviewer-name reviewer-name
-                                :scores scores
-                                :comment comment})
-                              (.then (fn [_]
-                                       (rf/dispatch [:re-frame.query/invalidate-tags
-                                                     [[:human-feedback/queue-items module-id queue-id]]])
-                                       (set-scores {})
-                                       (set-comment "")
-                                       (set-errors {})
-                                       (if has-next?
-                                         (handle-next)
-                                         (rfe/push-state :module/human-feedback-queue-end
-                                                         {:module-id module-id :queue-id queue-id}))))
-                              (.catch (fn [err] (js/alert (str "Error submitting: " (if (map? err) (or (:error err) (str err)) (str err))))))))
+                                            {:module-id decoded-module-id
+                                             :queue-name decoded-queue-id
+                                             :item-id item-id-str
+                                             :target (:target current-item)
+                                             :reviewer-name reviewer-name
+                                             :scores scores
+                                             :comment comment})
+                                  (.then (fn [_]
+                                           (rf/dispatch [:re-frame.query/invalidate-tags
+                                                         [[:human-feedback/queue-items module-id queue-id]]])
+                                           (set-scores {})
+                                           (set-comment "")
+                                           (set-errors {})
+                                           (if has-next?
+                                             (handle-next)
+                                             (rfe/push-state :module/human-feedback-queue-end
+                                                             {:module-id module-id :queue-id queue-id}))))
+                                  (.catch (fn [err] (js/alert (str "Error submitting: " (if (map? err) (or (:error err) (str err)) (str err))))))))
                             (set-errors validation-errors))))
 
         handle-dismiss (fn []
                          (when (js/confirm "Dismiss this item? This will remove it from the queue without adding feedback. This action cannot be undone.")
                            ;; Dismiss via backend
                            (-> (rpc/call ::rpc-hf/dismiss-queue-item!!
-                            {:module-id decoded-module-id :queue-name decoded-queue-id :item-id item-id-str})
-                           (.then (fn [_]
-                                    (rf/dispatch [:re-frame.query/invalidate-tags
-                                                  [[:human-feedback/queue-items module-id queue-id]]])
-                                    (set-scores {})
-                                    (set-comment "")
-                                    (set-errors {})
-                                    (if has-next?
-                                      (rfe/push-state :module/human-feedback-queue-item
-                                                      {:module-id module-id :queue-id queue-id :item-id next-item-id})
-                                      (rfe/push-state :module/human-feedback-queue-detail
-                                                      {:module-id module-id :queue-id queue-id}))))
-                           (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))]
+                                         {:module-id decoded-module-id :queue-name decoded-queue-id :item-id item-id-str})
+                               (.then (fn [_]
+                                        (rf/dispatch [:re-frame.query/invalidate-tags
+                                                      [[:human-feedback/queue-items module-id queue-id]]])
+                                        (set-scores {})
+                                        (set-comment "")
+                                        (set-errors {})
+                                        (if has-next?
+                                          (rfe/push-state :module/human-feedback-queue-item
+                                                          {:module-id module-id :queue-id queue-id :item-id next-item-id})
+                                          (rfe/push-state :module/human-feedback-queue-detail
+                                                          {:module-id module-id :queue-id queue-id}))))
+                               (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))]
 
     (uix/use-effect
      (fn []
@@ -302,6 +302,11 @@
 
          ;; Target Info Panel (Agent/Node with trace link)
          (let [target (:target current-item)
+               item-input (:input current-item)
+               item-output (:output current-item)
+               input-unavailable? (= item-input q-common/TARGET-DOES-NOT-EXIST)
+               output-unavailable? (= item-output q-common/TARGET-DOES-NOT-EXIST)
+               output-for-dataset (:value (q-common/unwrap-agent-output item-output target))
                agent-name (:agent-name target)
                agent-invoke (:agent-invoke target)
                node-invoke (:node-invoke target)
@@ -319,19 +324,39 @@
                                  node-invoke-id (:node-invoke-id node-invoke)
                                  node-id (str node-task-id "-" node-invoke-id)]
                              (str base-url "?node=" (common/url-encode node-id)))
-                           base-url)]
+                           base-url)
+               handle-add-to-dataset
+               (fn []
+                 (when (and (not input-unavailable?) (not output-unavailable?))
+                   (rf/dispatch
+                    [:modal/show-form :add-from-trace
+                     (merge {:module-id decoded-module-id
+                             :title "Add to Dataset"}
+                            (if (q-common/agent-target? target)
+                              {:source-args item-input
+                               :source-result output-for-dataset}
+                              {:source-args item-input
+                               :source-emits output-for-dataset}))])))]
            ($ :div.bg-gray-50.border.border-gray-200.rounded-md.p-4.mb-6
               {:data-testid "target-info-panel"}
               ($ :div.space-y-3
-                 ($ :div.flex.items-center.justify-between
+                 ($ :div.flex.items-start.justify-between
                     ($ :div.text-sm.font-semibold.text-gray-900 "Target Information")
-                    ;; Link to trace
-                    ($ :a.inline-flex.items-center.gap-1.px-3.py-1.text-xs.font-medium.text-blue-600.hover:text-blue-800.hover:bg-blue-50.rounded.transition-colors
-                       {:href trace-url
-                        :target "_blank"
-                        :data-testid "trace-link"}
-                       "View Trace"
-                       ($ ArrowTopRightOnSquareIcon {:className "h-3.5 w-3.5"})))
+                    ($ :div.flex.flex-col.items-end.gap-2
+                       ($ :a.inline-flex.items-center.gap-1.px-3.py-1.text-xs.font-medium.text-blue-600.hover:text-blue-800.hover:bg-blue-50.rounded.transition-colors
+                          {:href trace-url
+                           :target "_blank"
+                           :data-testid "trace-link"}
+                          "View Trace"
+                          ($ ArrowTopRightOnSquareIcon {:className "h-3.5 w-3.5"}))
+                       ($ :button.inline-flex.items-center.justify-center.px-3.py-1.text-xs.font-medium.text-gray-700.bg-white.border.border-gray-300.rounded.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
+                          {:type "button"
+                           :data-testid "add-to-dataset-button"
+                           :disabled (or input-unavailable? output-unavailable?)
+                           :title (when (or input-unavailable? output-unavailable?)
+                                    "Input/output data is not available for this item")
+                           :onClick handle-add-to-dataset}
+                          "Add to Dataset")))
                  ($ :div.flex.flex-col.gap-2
                     ;; Target type
                     ($ :div.flex.items-start.gap-2

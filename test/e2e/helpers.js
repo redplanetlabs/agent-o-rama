@@ -285,6 +285,29 @@ export async function createDataset(page, name) {
 }
 
 /**
+ * Opens the Add to Dataset dialog on a human feedback queue review item,
+ * selects a dataset, and submits the prefilled example.
+ * @param {import('@playwright/test').Page} page
+ * @param {{ datasetName: string }} options
+ */
+export async function addQueueItemToDatasetFromReview(page, { datasetName }) {
+  const modal = page.locator('[role="dialog"]');
+  await page.getByTestId('add-to-dataset-button').click();
+  await expect(modal).toBeVisible();
+  await expect(modal.getByRole('heading', { name: 'Add to Dataset' })).toBeVisible();
+
+  const datasetInput = modal.getByTestId('dataset-selector-input');
+  await datasetInput.click();
+  await datasetInput.fill(datasetName);
+  await page.locator('[role="option"]').filter({ hasText: datasetName }).first().waitFor({ timeout: 15000 });
+  await page.locator('[role="option"]').filter({ hasText: datasetName }).first().click();
+
+  await modal.getByRole('button', { name: 'Add Example' }).click();
+  await expect(modal).not.toBeVisible({ timeout: 15000 });
+  console.log(`Added queue item to dataset: ${datasetName}`);
+}
+
+/**
  * Deletes a dataset via the UI.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @param {string} name - The name of the dataset to delete.
