@@ -40,10 +40,33 @@ export async function selectQueueInAddToQueueModal(page, modal, queueName, selec
 export async function expectQueueItemDetailLoaded(page, options = {}) {
   const { timeout = 60000 } = options;
   await page.waitForFunction(
-    () => /Review Item:/.test(document.body?.innerText || ''),
+    () => {
+      const text = document.body?.innerText || '';
+      return /Review Item:/.test(text)
+        && !!document.querySelector('[data-testid="target-info-panel"]');
+    },
     null,
     { timeout }
   );
+}
+
+/** URL path prefix for the E2E test agent module (encoded module id). */
+export const E2E_TEST_MODULE_PATH =
+  '/agents/com.rpl.agent.e2e-test-agent%2FE2ETestAgentModule';
+
+/**
+ * Opens the Human Feedback Queues list for the E2E test module (avoids flaky sidebar clicks on cold tabs).
+ * @param {import('@playwright/test').Page} page
+ */
+export async function gotoE2ETestModuleHumanFeedbackQueues(page) {
+  await page.goto(`${E2E_TEST_MODULE_PATH}/human-feedback-queues`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000,
+  });
+  await expect(page).toHaveURL(/human-feedback-queues/);
+  await expect(page.getByRole('heading', { name: 'Human Feedback Queues' })).toBeVisible({
+    timeout: 60000,
+  });
 }
 
 /**

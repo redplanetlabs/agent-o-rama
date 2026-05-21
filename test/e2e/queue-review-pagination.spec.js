@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually, expectQueueItemDetailLoaded, openQueueItemDetailUrl, selectQueueInAddToQueueModal } from './helpers.js';
+import { getE2ETestAgentRow, shouldSkipCleanup, createHumanMetric, deleteHumanMetric, invokeAgentManually, expectQueueItemDetailLoaded, openQueueItemDetailUrl, selectQueueInAddToQueueModal, gotoE2ETestModuleHumanFeedbackQueues } from './helpers.js';
 
 // =============================================================================
 // TEST SUITE: Human Feedback Queue Item Review Pagination
@@ -426,11 +426,7 @@ test.describe('Queue Review Pagination', () => {
     
     // Open new page and navigate to item #15 (middle of dataset)
     const page4 = await page.context().newPage();
-    await page4.goto('/');
-    const agentRow4 = await getE2ETestAgentRow(page4);
-    await agentRow4.click();
-    
-    await page4.getByRole('navigation').getByRole('link', { name: 'Human Feedback Queues' }).click();
+    await gotoE2ETestModuleHumanFeedbackQueues(page4);
     await page4.getByPlaceholder('Search queues...').fill(queueName);
     await page4.waitForTimeout(500);
     

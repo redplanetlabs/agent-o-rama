@@ -12,6 +12,7 @@ import {
   deleteDataset,
   addQueueItemToDatasetFromReview,
   expectQueueItemDetailLoaded,
+  openQueueItemDetailUrl,
   selectQueueInAddToQueueModal,
 } from './helpers.js';
 
@@ -635,15 +636,14 @@ test.describe('Human Feedback Queues', () => {
     await page.getByRole('navigation').getByRole('link', { name: 'Datasets & Experiments' }).click();
     await expect(page).toHaveURL(/datasets/);
     await createDataset(page, datasetName);
-    await page.goto(reviewItemUrl);
-    await expect(page.getByTestId('add-to-dataset-button')).toBeVisible();
+    await openQueueItemDetailUrl(page, reviewItemUrl);
+    await expect(page.getByTestId('add-to-dataset-button')).toBeVisible({ timeout: 60000 });
     await addQueueItemToDatasetFromReview(page, { datasetName });
     await page.getByRole('navigation').getByRole('link', { name: 'Datasets & Experiments' }).click();
     await page.getByRole('link', { name: datasetName }).click();
     await page.getByRole('link', { name: 'Examples' }).click();
     await expect(page.locator('table tbody tr').filter({ hasText: 'test query for queue' })).toBeVisible({ timeout: 15000 });
-    await page.goto(reviewItemUrl);
-    await expectQueueItemDetailLoaded(page);
+    await openQueueItemDetailUrl(page, reviewItemUrl);
     console.log('✓ Added queue review item to dataset from review page');
     
     // Fill out the review form
