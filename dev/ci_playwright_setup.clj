@@ -40,7 +40,8 @@
     (rtest/launch-module!
      ipc
      gantt-stress/GanttStressModule
-     {:tasks 1 :threads 1})
+     ;; Fan-out stress needs parallelism so E2E demos finish in reasonable time.
+     {:tasks 4 :threads 4})
 
     (println "Launching E2ETestAgentModule...")
     (rtest/launch-module!

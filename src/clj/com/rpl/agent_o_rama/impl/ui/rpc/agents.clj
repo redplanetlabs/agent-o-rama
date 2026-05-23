@@ -10,8 +10,8 @@
   [system _payload]
   (for [[module-name agent-name]
         (select [ALL (collect-one FIRST) LAST :clients MAP-KEYS] (:aor-cache system))]
-    {:module-id  (common/url-encode module-name)
-     :agent-name (common/url-encode agent-name)}))
+    {:module-id  module-name
+     :agent-name agent-name}))
 
 (defn get-for-module!!
   [system {:keys [module-id]}]

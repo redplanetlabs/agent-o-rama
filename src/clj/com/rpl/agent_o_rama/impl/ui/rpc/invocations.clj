@@ -60,6 +60,40 @@
                 (aor-types/underlying-objects client)))}
       {:graph nil})))
 
+(def ^:private trace-chunk-limit 10000)
+(def ^:private max-trace-chunks 100)
+
+(defn- clean-trace-invokes-map
+  [m]
+  (when m
+    (->> m
+         common/remove-implicit-nodes
+         (transform
+          [MAP-VALS :feedback :results ALL]
+          (fn [feedback-result]
+            (let [feedback-map (into {} feedback-result)
+                  source (:source feedback-map)]
+              (if source
+                (assoc feedback-map :source-string (aor-types/source-string source))
+                feedback-map))))
+         (transform [MAP-VALS :feedback :results ALL :scores MAP-KEYS] name)
+         (transform [MAP-VALS :feedback :actions MAP-KEYS] name))))
+
+(defn- fetch-all-trace-invokes
+  "Paginate the tracing query until all task-invoke pairs are consumed."
+  [tracing-query agent-task-id start-pairs]
+  (loop [pairs start-pairs
+         merged {}
+         pages 0]
+    (let [{:keys [invokes-map next-task-invoke-pairs]}
+          (foreign-invoke-query tracing-query agent-task-id pairs trace-chunk-limit)
+          merged' (merge merged (or invokes-map {}))
+          next-pairs (seq next-task-invoke-pairs)]
+      (if (or (nil? next-pairs) (>= pages (dec max-trace-chunks)))
+        {:invokes-map merged'
+         :trace-truncated? (boolean (and next-pairs (>= pages (dec max-trace-chunks))))}
+        (recur next-task-invoke-pairs merged' (inc pages))))))
+
 (defn get-graph-page!!
   [system {:keys [module-id agent-name invoke-id]}]
   (let [client (get-client system module-id agent-name)]
@@ -107,18 +141,33 @@
                                (foreign-select-one [:history (keypath graph-version)]
                                                    stream-shared-pstate
                                                    {:pkey 0}))
-            {:keys [invokes-map trace-truncated?]}
-            (fetch-all-trace-invokes tracing-query
-                                     agent-task-id
-                                     [[agent-task-id root-invoke-id]])
-            cleaned-nodes (clean-trace-invokes-map invokes-map)
+            dynamic-trace (foreign-invoke-query tracing-query
+                                                agent-task-id
+                                                [[agent-task-id root-invoke-id]]
+                                                10000)
+            cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
+                            (->> m
+                                 common/remove-implicit-nodes
+                                 (transform
+                                  [MAP-VALS :feedback :results ALL]
+                                  (fn [feedback-result]
+                                    (let [feedback-map (into {} feedback-result)
+                                          source (:source feedback-map)]
+                                      (if source
+                                        (assoc feedback-map :source-string (aor-types/source-string source))
+                                        feedback-map))))
+                                 (transform
+                                  [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
+                                  name)
+                                 (transform
+                                  [MAP-VALS :feedback :actions MAP-KEYS]
+                                  name)))
 
             agent-is-complete? (boolean (or (:finish-time-millis summary-info)
                                             (:result summary-info)))]
 
         {:is-complete agent-is-complete?
          :nodes cleaned-nodes
-         :trace-truncated? trace-truncated?
          :summary summary-info
          :task-id agent-task-id
          :agent-id agent-id
