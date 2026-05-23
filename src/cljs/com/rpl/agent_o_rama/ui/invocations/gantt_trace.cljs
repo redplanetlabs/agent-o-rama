@@ -162,7 +162,7 @@
 
 (defui gantt-trace-view
   [{:keys [graph-data real-edges implicit-edges root-invoke-id
-            selected-node-id on-select-node is-complete]}]
+            selected-node-id on-select-node is-complete is-live]}]
   (let [[collapsed set-collapsed] (useState #{})
         [now-ms set-now-ms!] (useState (js/Date.now))
         children-map (useMemo (fn [] (gantt-children-map graph-data real-edges implicit-edges))
@@ -171,18 +171,18 @@
                                (collect-visible-rows graph-data children-map root-invoke-id collapsed)
                                []))
                       [graph-data children-map root-invoke-id collapsed])
-        ;; tick clock while any row is in-progress
         has-in-progress? (some (fn [r]
                                  (let [d (:data r)]
                                    (and (:start-time-millis d) (not (:finish-time-millis d)))))
-                               rows)]
+                               rows)
+        should-tick? (or is-live has-in-progress?)]
     (useEffect
      (fn []
-       (if has-in-progress?
+       (if should-tick?
          (let [id (js/setInterval #(set-now-ms! (js/Date.now)) 500)]
            (fn [] (js/clearInterval id)))
          js/undefined))
-     [has-in-progress?])
+     [should-tick?])
     (let [now now-ms
           [t0 t1] (or (trace-time-bounds rows now) [0 1])
           span (- t1 t0)
@@ -224,15 +224,17 @@
                         end (:finish-time-millis data)
                         row-in-progress? (and start (not end))
                         dur (when start (if end (- end start) (- now start)))
-                        selected? (= (str selected-node-id) nid)
+                        selected? (gn/node-ids-equal? selected-node-id node-id)
                         bar (when start
                               (row-bar-style {:start-ms start :end-ms end :t0 t0 :t1 t1
                                               :row-in-progress? row-in-progress?
                                               :now-ms now}))]]
               ($ :div {:key nid
+                       :data-node-id nid
                        :className (common/cn "grid grid-cols-[minmax(200px,32%)_1fr_minmax(72px,10%)] gap-2 items-center px-2 py-1.5 border-b border-gray-100 hover:bg-gray-50/80 cursor-pointer"
                                              (when selected? "bg-blue-50/80"))
-                       :onClick #(when on-select-node (on-select-node node-id))}
+                       :onClick #(when on-select-node
+                                   (on-select-node (gn/canonical-node-id graph-data node-id)))}
                  ($ :div {:className "flex items-center gap-1 min-w-0 font-mono text-xs text-gray-800"
                           :style {:paddingLeft (str (* depth 12) "px")}}
                     (if has-children?

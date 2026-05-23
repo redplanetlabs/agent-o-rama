@@ -45,6 +45,13 @@ test.describe('Invocation Trace Page Rendering', () => {
     await expect(page).toHaveURL(/\/invocations\//, { timeout: 120000 });
     console.log('On invocation trace page.');
 
+    // Timeline view should receive live graph updates while the run is in flight
+    await page.getByTestId('trace-view-gantt').click();
+    const ganttLive = page.getByTestId('gantt-trace-view');
+    await expect(ganttLive).toBeVisible({ timeout: 30000 });
+    await expect(ganttLive).toContainText('stress-fanout', { timeout: 120000 });
+    console.log('Gantt timeline shows fan-out nodes during live run.');
+
     const finalResultHeader = page.getByText('Final Result', { exact: true });
     await expect(finalResultHeader).toBeVisible({ timeout: 120000 });
     console.log('Final Result panel is visible.');

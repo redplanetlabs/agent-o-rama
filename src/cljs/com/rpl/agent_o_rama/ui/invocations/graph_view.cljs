@@ -1259,23 +1259,20 @@
                                          edge)))))))
            [graph-data real-edges implicit-edges set-nodes set-edges])
 
-        ;; Update selected node when selected-node-id changes
+        ;; Sync details panel from graph-data (works in Graph or Timeline mode)
         _ (uix/use-effect
            (fn []
-             (when selected-node-id
-               (let [nodes (js->clj flow-nodes :keywordize-keys true)
-                     target-node (->> nodes
-                                      (filter #(= (-> % :data :node-id) selected-node-id))
-                                      first)]
-                 (when target-node
-                   (set-selected-node-internal (clj->js target-node))))))
-           [selected-node-id flow-nodes])
+             (if selected-node-id
+               (when-let [n (gn/flow-node-for-selection graph-data selected-node-id)]
+                 (set-selected-node-internal n))
+               (set-selected-node-internal nil)))
+           [selected-node-id graph-data])
 
         ;; Use callbacks passed as props
         handle-select-node-click (fn [node]
                                    (when on-select-node
                                      (let [node-data (js->clj (aget node "data") :keywordize-keys true)]
-                                       (on-select-node (:node-id node-data)))))]
+                                       (on-select-node (gn/canonical-node-id graph-data (:node-id node-data))))))]
 
     (if (empty? graph-data)
       ($ :div.flex.justify-center.items-center.py-8
@@ -1303,16 +1300,10 @@
                               :data-testid "trace-view-gantt"
                               :onClick #(set-trace-view-mode :gantt)}
                      "Timeline")))
-            (if (= trace-view-mode :gantt)
-              ($ gantt/gantt-trace-view {:graph-data graph-data
-                                         :real-edges real-edges
-                                         :implicit-edges implicit-edges
-                                         :root-invoke-id root-invoke-id
-                                         :selected-node-id selected-node-id
-                                         :on-select-node on-select-node
-                                         :is-complete is-complete})
-              ($ :div {:style {:width "100%" :height "500px"}}
-                 ($ ReactFlow {:nodes flow-nodes
+            ($ :div.relative {:style {:width "100%" :minHeight "500px"}}
+               ($ :div {:className (common/cn "w-full" {:hidden (= trace-view-mode :gantt)})
+                        :style {:height "500px"}}
+                  ($ ReactFlow {:nodes flow-nodes
                              :edges flow-edges
                              :onNodesChange on-nodes-change
                              :onEdgesChange on-edges-change
@@ -1323,7 +1314,8 @@
                                                      (let [data (js->clj data :keywordize-keys true)
                                                            label (:label data)
                                                            node-id (:node-id data)
-                                                           selected (= (when selected-node (aget selected-node "id")) id)
+                                                           selected (or (gn/node-ids-equal? selected-node-id node-id)
+                                                                        (= (when selected-node (aget selected-node "id")) id))
                                                            has-changes (contains? changed-nodes node-id)
                                                            is-affected (and forking-mode? (contains? affected-nodes node-id))
                                                            ;; Check if node is in progress
@@ -1387,7 +1379,16 @@
                              :onNodeClick (fn [_ node] (handle-select-node-click node))}
                   ($ MiniMap {:position "bottom-right" :pannable true :zoomable true})
                   ($ Background {:variant "dots" :gap 12 :size 1 :color "#e0e0e0"})
-                  ($ Controls {:className "fill-gray-500 stroke-gray-500"}))))
+                  ($ Controls {:className "fill-gray-500 stroke-gray-500"})))
+               ($ :div {:className (common/cn "w-full" {:hidden (= trace-view-mode :graph)})}
+                  ($ gantt/gantt-trace-view {:graph-data graph-data
+                                             :real-edges real-edges
+                                             :implicit-edges implicit-edges
+                                             :root-invoke-id root-invoke-id
+                                             :selected-node-id selected-node-id
+                                             :on-select-node on-select-node
+                                             :is-complete is-complete
+                                             :is-live is-live})))
 
             ;; Show selected node details or forking input component
             (when selected-node
