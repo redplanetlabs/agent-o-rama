@@ -119,6 +119,19 @@
                    (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
         (reduce (fn [d [p v]] (assoc-in d p v)) db kvps)))))
 
+(defn- node-needs-finish-time?
+  "Drawable node that started but has no finish time yet (trace still settling)."
+  [node-data]
+  (and (:node node-data)
+       (:start-time-millis node-data)
+       (not (:finish-time-millis node-data))))
+
+(defn- graph-needs-poll?
+  [raw-nodes trace-truncated?]
+  (or trace-truncated?
+      (some (fn [[_ node-data]] (node-needs-finish-time? node-data))
+            raw-nodes)))
+
 (defn- merge-nodes-and-complete-into-db [db invoke-id new-nodes-map root-invoke-id-from-payload is-complete]
   (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
         current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])

@@ -107,33 +107,18 @@
                                (foreign-select-one [:history (keypath graph-version)]
                                                    stream-shared-pstate
                                                    {:pkey 0}))
-            dynamic-trace (foreign-invoke-query tracing-query
-                                                agent-task-id
-                                                [[agent-task-id root-invoke-id]]
-                                                10000)
-            cleaned-nodes (when-let [m (:invokes-map dynamic-trace)]
-                            (->> m
-                                 common/remove-implicit-nodes
-                                 (transform
-                                  [MAP-VALS :feedback :results ALL]
-                                  (fn [feedback-result]
-                                    (let [feedback-map (into {} feedback-result)
-                                          source (:source feedback-map)]
-                                      (if source
-                                        (assoc feedback-map :source-string (aor-types/source-string source))
-                                        feedback-map))))
-                                 (transform
-                                  [MAP-VALS :feedback :results ALL :scores MAP-KEYS]
-                                  name)
-                                 (transform
-                                  [MAP-VALS :feedback :actions MAP-KEYS]
-                                  name)))
+            {:keys [invokes-map trace-truncated?]}
+            (fetch-all-trace-invokes tracing-query
+                                     agent-task-id
+                                     [[agent-task-id root-invoke-id]])
+            cleaned-nodes (clean-trace-invokes-map invokes-map)
 
             agent-is-complete? (boolean (or (:finish-time-millis summary-info)
                                             (:result summary-info)))]
 
         {:is-complete agent-is-complete?
          :nodes cleaned-nodes
+         :trace-truncated? trace-truncated?
          :summary summary-info
          :task-id agent-task-id
          :agent-id agent-id

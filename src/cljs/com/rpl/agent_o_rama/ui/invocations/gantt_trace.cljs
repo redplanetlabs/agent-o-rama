@@ -175,7 +175,7 @@
                                  (let [d (:data r)]
                                    (and (:start-time-millis d) (not (:finish-time-millis d)))))
                                rows)
-        should-tick? (or is-live has-in-progress?)]
+        should-tick? (boolean is-live)]
     (useEffect
      (fn []
        (if should-tick?
