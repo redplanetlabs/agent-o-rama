@@ -119,19 +119,6 @@
                    (conj [[:invocations-data invoke-id :root-invoke-id] root-invoke-id]))]
         (reduce (fn [d [p v]] (assoc-in d p v)) db kvps)))))
 
-(defn- node-needs-finish-time?
-  "Drawable node that started but has no finish time yet (trace still settling)."
-  [node-data]
-  (and (:node node-data)
-       (:start-time-millis node-data)
-       (not (:finish-time-millis node-data))))
-
-(defn- graph-needs-poll?
-  [raw-nodes trace-truncated?]
-  (or trace-truncated?
-      (some (fn [[_ node-data]] (node-needs-finish-time? node-data))
-            raw-nodes)))
-
 (defn- merge-nodes-and-complete-into-db [db invoke-id new-nodes-map root-invoke-id-from-payload is-complete]
   (let [historical-graph (get-in db [:invocations-data invoke-id :historical-graph])
         current-raw-nodes (get-in db [:invocations-data invoke-id :graph :raw-nodes])
@@ -195,15 +182,25 @@
                            (and (not (seq new-nodes-map)) (contains? page-data :is-complete))
                            (assoc-in db-after-summary [:invocations-data invoke-id :is-complete] is-complete)
 
-                           :else db-after-summary)]
-      (when-not is-complete
+                           :else db-after-summary)
+          db-with-trace-flag (assoc-in db-after-graph
+                                       [:invocations-data invoke-id :trace-truncated?]
+                                       (:trace-truncated? page-data))
+          merged-raw (get-in db-with-trace-flag [:invocations-data invoke-id :graph :raw-nodes])
+          keep-polling? (or (not is-complete)
+                            (graph-needs-poll? merged-raw (:trace-truncated? page-data)))]
+      (when keep-polling?
         (js/setTimeout
          (fn []
-           (when-not (get-in @rdb/app-db [:invocations-data invoke-id :is-complete])
-             (println "[POLLING-SIMPLIFIED] Polling for updates...")
-             (rf/dispatch [:invocation/fetch-graph-page current-invocation])))
+           (let [db @rdb/app-db
+                 raw (get-in db [:invocations-data invoke-id :graph :raw-nodes])
+                 truncated? (get-in db [:invocations-data invoke-id :trace-truncated?])]
+             (when (or (not (get-in db [:invocations-data invoke-id :is-complete]))
+                       (graph-needs-poll? raw truncated?))
+               (println "[POLLING] Fetching graph page updates...")
+               (rf/dispatch [:invocation/fetch-graph-page current-invocation]))))
          1000))
-      {:db db-after-graph})))
+      {:db db-with-trace-flag})))
 
 (rf/reg-event-db :invocation/cleanup
   (fn [db [_ _]]
