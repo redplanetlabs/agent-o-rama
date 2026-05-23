@@ -162,7 +162,7 @@
 
 (defui gantt-trace-view
   [{:keys [graph-data real-edges implicit-edges root-invoke-id
-            selected-node-id on-select-node is-complete is-live]}]
+            selected-node-id on-select-node is-live]}]
   (let [[collapsed set-collapsed] (useState #{})
         [now-ms set-now-ms!] (useState (js/Date.now))
         children-map (useMemo (fn [] (gantt-children-map graph-data real-edges implicit-edges))
@@ -272,7 +272,7 @@
                     (format-duration-ms dur)
                     (when row-in-progress?
                       ($ :div {:className "text-[9px] text-amber-700 normal-case mt-0.5"}
-                         (if is-complete "In progress (stuck?)" "In progress…"))))))
+                         "In progress…")))))
          (when (empty? rows)
            ($ :div {:className "p-8 text-center text-sm text-gray-500"}
               "No timed node data to display yet.")))))))

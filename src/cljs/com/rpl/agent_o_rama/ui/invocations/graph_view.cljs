@@ -1387,7 +1387,6 @@
                                              :root-invoke-id root-invoke-id
                                              :selected-node-id selected-node-id
                                              :on-select-node on-select-node
-                                             :is-complete is-complete
                                              :is-live is-live})))
 
             ;; Show selected node details or forking input component
