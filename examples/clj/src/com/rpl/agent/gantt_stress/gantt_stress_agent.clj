@@ -1,7 +1,6 @@
 (ns com.rpl.agent.gantt-stress.gantt-stress-agent
-  "Stress agent for Timeline (Gantt) visualization: 30-way agg fan-out, each branch
-   runs a nested agent that fans out 10 sub-invokes with pseudo-random sleeps so
-   bar lengths differ."
+  "Stress agent for Timeline (Gantt) visualization: 30-way outer agg fan-out; each
+   slot runs a nested 10-way agg with pseudo-random sleeps so bar lengths differ."
   (:require
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.rama :as rama]
@@ -25,16 +24,20 @@
   [topology]
 
   (-> topology
-      (aor/new-agent "LeafAgent")
-      (aor/node
-       "leaf-wait"
-       nil
-       (fn [agent-node {:keys [sleep-ms leaf-key]}]
-         (sleep-ms! (long (or sleep-ms 1)))
-         (aor/result! agent-node {:leaf-key leaf-key :slept-ms sleep-ms}))))
+      (aor/new-agent "GanttStressAgent")
+      (aor/agg-start-node
+       "stress-fanout"
+       "stress-worker"
+       (fn [agent-node seed]
+         (doseq [i (range 30)]
+           (aor/emit! agent-node "stress-worker" {:slot i :seed (long seed)}))))
 
-  (-> topology
-      (aor/new-agent "BranchAgent")
+      (aor/node
+       "stress-worker"
+       "branch-fanout"
+       (fn [agent-node {:keys [slot seed]}]
+         (aor/emit! agent-node "branch-fanout" {:outer-slot slot :seed (long seed)})))
+
       (aor/agg-start-node
        "branch-fanout"
        "branch-leaf-worker"
@@ -50,43 +53,26 @@
        "branch-leaf-worker"
        "branch-collect"
        (fn [agent-node {:keys [outer-slot branch-idx seed]}]
-         (let [ms (pseudo-random-sleep-ms (long seed) (long outer-slot) (long branch-idx))
-               leaf (aor/agent-client agent-node "LeafAgent")
-               r (aor/agent-invoke leaf {:sleep-ms ms
-                                         :leaf-key [outer-slot branch-idx]})]
-           (aor/emit! agent-node "branch-collect" {:outer-slot outer-slot
-                                                   :branch-idx branch-idx
-                                                   :seed (long seed)
-                                                   :leaf r}))))
+         (let [ms (pseudo-random-sleep-ms (long seed) (long outer-slot) (long branch-idx))]
+           (sleep-ms! ms)
+           (aor/emit! agent-node "branch-collect"
+                      {:outer-slot outer-slot
+                       :branch-idx branch-idx
+                       :seed (long seed)
+                       :slept-ms ms
+                       :leaf-key [outer-slot branch-idx]}))))
 
       (aor/agg-node
        "branch-collect"
-       nil
+       "stress-collect"
        aggs/+vec-agg
        (fn [agent-node rows _agg-start-res]
          (let [sorted (vec (sort-by :branch-idx rows))]
-           (aor/result! agent-node {:outer-slot (:outer-slot (first sorted))
-                                    :branches (count sorted)
-                                    :rows sorted})))))
-
-  (-> topology
-      (aor/new-agent "GanttStressAgent")
-      (aor/agg-start-node
-       "stress-fanout"
-       "stress-worker"
-       (fn [agent-node seed]
-         (doseq [i (range 30)]
-           (aor/emit! agent-node "stress-worker" {:slot i :seed (long seed)}))))
-
-      (aor/node
-       "stress-worker"
-       "stress-collect"
-       (fn [agent-node {:keys [slot seed]}]
-         (let [branch (aor/agent-client agent-node "BranchAgent")
-               r (aor/agent-invoke branch {:outer-slot slot :seed (long seed)})]
-           (aor/emit! agent-node "stress-collect" {:slot slot
-                                                   :seed (long seed)
-                                                   :branch r}))))
+           (aor/emit! agent-node "stress-collect"
+                      {:slot (:outer-slot (first sorted))
+                       :seed (:seed (first sorted))
+                       :branches (count sorted)
+                       :rows sorted}))))
 
       (aor/agg-node
        "stress-collect"
@@ -100,7 +86,7 @@
                          :seed (long (:seed (first sorted)))
                          :outer-branches n
                          :slots (mapv (fn [p] {:slot (:slot p)
-                                               :branches (get-in p [:branch :branches])})
+                                               :branches (:branches p)})
                                       sorted)}))))))
 
 (defn -main
