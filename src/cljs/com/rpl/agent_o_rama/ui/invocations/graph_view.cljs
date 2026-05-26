@@ -1233,7 +1233,7 @@
   (let [;; Convert selected-node-id to actual node object when needed
         [selected-node set-selected-node-internal] (uix/use-state nil)
 
-        [trace-view-mode set-trace-view-mode] (common/use-local-storage "invocation-trace-view-mode" :graph)
+        [trace-view-mode set-trace-view-mode] (common/use-local-storage "invocation-trace-view-mode" "graph")
 
         ;; Sidebar width state (default 320px)
         [sidebar-width set-sidebar-width] (common/use-local-storage "graph-sidebar-width" 320)
@@ -1289,21 +1289,21 @@
                ($ :div {:className "inline-flex rounded-md border border-gray-200 bg-gray-50 p-0.5 text-xs"}
                   ($ :button {:type "button"
                               :className (common/cn "px-2 py-1 rounded transition-colors"
-                                                    (if (= trace-view-mode :graph)
+                                                    (if (= trace-view-mode "graph")
                                                       "bg-white shadow text-gray-900"
                                                       "text-gray-600 hover:text-gray-900"))
                               :data-testid "trace-view-graph"
-                              :onClick #(set-trace-view-mode :graph)}
+                              :onClick #(set-trace-view-mode "graph")}
                      "Graph")
                   ($ :button {:type "button"
                               :className (common/cn "px-2 py-1 rounded transition-colors"
-                                                    (if (= trace-view-mode :gantt)
+                                                    (if (= trace-view-mode "gantt")
                                                       "bg-white shadow text-gray-900"
                                                       "text-gray-600 hover:text-gray-900"))
                               :data-testid "trace-view-gantt"
-                              :onClick #(set-trace-view-mode :gantt)}
+                              :onClick #(set-trace-view-mode "gantt")}
                      "Timeline")))
-            (if (= trace-view-mode :gantt)
+            (if (= trace-view-mode "gantt")
               ($ gantt/gantt-trace-view {:graph-data graph-data
                                          :real-edges real-edges
                                          :implicit-edges implicit-edges
