@@ -60,7 +60,7 @@
                 (aor-types/underlying-objects client)))}
       {:graph nil})))
 
-(defn- trace-graph-complete?
+(defn trace-graph-complete?
   "True when every reachable drawable node in the trace has :finish-time-millis."
   [nodes root-invoke-id]
   (when (and (seq nodes) root-invoke-id (contains? nodes root-invoke-id))
@@ -87,7 +87,7 @@
                                                       (:node (get nodes %)))
                                                 emitted-ids)]
                   (recur (into remaining drawable-children)
-                         (conj visited current-id))))))))))
+                         (conj visited current-id)))))))))))
 
 (defn get-graph-page!!
   [system {:keys [module-id agent-name invoke-id]}]

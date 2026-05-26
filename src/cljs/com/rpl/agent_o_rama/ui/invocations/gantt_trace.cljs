@@ -68,7 +68,9 @@
             children-map
             agg-ids)))
 
-(defn- gantt-children-map [graph-data real-edges implicit-edges]
+(defn gantt-children-map
+  "Build parent→children map for Gantt rows, collapsing duplicate agg fan-in edges."
+  [graph-data real-edges implicit-edges]
   (let [edges (concat (or real-edges []) (or implicit-edges []))
         raw (children-by-parent edges)]
     (collapse-fan-in-agg-children graph-data edges raw)))
@@ -91,7 +93,7 @@
                          :label (str (or (:node data) "?"))
                          :data data}
                     child-rows (when-not (contains? collapsed nid)
-                                 (mapcat walk children))]
+                                 (mapcat #(walk % (inc depth)) children))]
                 (cons row child-rows))))]
     (vec (walk root-id 0))))
 

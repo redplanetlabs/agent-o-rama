@@ -40,13 +40,15 @@
   (fn [{:keys [storage-key value]}]
     (write-local-storage storage-key value)))
 
-(defn- graph-has-in-progress-nodes? [db invoke-id]
+(defn graph-has-in-progress-nodes?
+  [db invoke-id]
   (some (fn [node-data]
           (and (:start-time-millis node-data)
                (not (:finish-time-millis node-data))))
         (vals (get-in db [:invocations-data invoke-id :graph :nodes] {}))))
 
-(defn- should-schedule-poll? [db invoke-id page-is-complete]
+(defn should-schedule-poll?
+  [db invoke-id page-is-complete]
   (or (not page-is-complete)
       (graph-has-in-progress-nodes? db invoke-id)))
 

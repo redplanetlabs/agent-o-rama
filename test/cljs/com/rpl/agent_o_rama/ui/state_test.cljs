@@ -55,7 +55,7 @@
 (deftest test-toggle-forking-mode
   (reset! rdb/app-db aor-rf/default-app-db)
   (let [invoke-id "test-invoke"]
-    (is (false? (get-in @rdb/app-db [:ui :invocations invoke-id :forking-mode?])))
+    (is (not (get-in @rdb/app-db [:ui :invocations invoke-id :forking-mode?])))
     (rf/dispatch-sync [:ui/toggle-forking-mode invoke-id])
     (is (true? (get-in @rdb/app-db [:ui :invocations invoke-id :forking-mode?])))
     (rf/dispatch-sync [:ui/toggle-forking-mode invoke-id])

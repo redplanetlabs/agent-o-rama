@@ -30,6 +30,13 @@
     (when-not (or (not (exists? js/cancelAnimationFrame))
                   (not js/cancelAnimationFrame))
       (set! js/cancelAnimationFrame
-            (fn [id] (js/clearTimeout id))))))
+            (fn [id] (js/clearTimeout id))))
+
+    ;; localStorage for re-frame UI preference fx in tests
+    (when-not (exists? js/localStorage)
+      (set! js/localStorage
+            #js {:getItem (fn [_key] nil)
+                 :setItem (fn [_key _val] nil)
+                 :removeItem (fn [_key] nil)}))))
 
 (setup-dom!)
