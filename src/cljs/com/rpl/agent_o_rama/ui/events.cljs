@@ -1,12 +1,61 @@
 (ns com.rpl.agent-o-rama.ui.events
   (:require [com.rpl.agent-o-rama.ui.rpc :as rpc]
             [com.rpl.agent-o-rama.ui.forms :as forms]
+            [com.rpl.agent-o-rama.ui.invocations.subs :as inv-subs]
             [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
             [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
             [com.rpl.agent-o-rama.impl.ui.rpc.config :as rpc-config]
             [re-frame.core :as rf]
             [re-frame.db :as rdb]
             [clojure.string :as str]))
+
+(def ^:private poll-timeout-ids (atom {}))
+
+(defn- read-local-storage [key default]
+  (try
+    (let [item (js/localStorage.getItem key)]
+      (if (some? item) (js/JSON.parse item) default))
+    (catch js/Error _ default)))
+
+(defn- write-local-storage [key value]
+  (try
+    (js/localStorage.setItem key (js/JSON.stringify (clj->js value)))
+    (catch js/Error e
+      (.error js/console "Error saving to localStorage:" e))))
+
+(rf/reg-fx :invocation/poll-schedule
+  (fn [{:keys [invoke-id delay-ms dispatch-event]}]
+    (when-let [old-id (get @poll-timeout-ids invoke-id)]
+      (js/clearTimeout old-id))
+    (let [timeout-id (js/setTimeout #(rf/dispatch dispatch-event) delay-ms)]
+      (swap! poll-timeout-ids assoc invoke-id timeout-id))))
+
+(rf/reg-fx :invocation/poll-cancel
+  (fn [invoke-id]
+    (when-let [timeout-id (get @poll-timeout-ids invoke-id)]
+      (js/clearTimeout timeout-id)
+      (swap! poll-timeout-ids dissoc invoke-id))))
+
+(rf/reg-fx :invocation/persist-ui-preference
+  (fn [{:keys [storage-key value]}]
+    (write-local-storage storage-key value)))
+
+(defn- graph-has-in-progress-nodes? [db invoke-id]
+  (some (fn [node-data]
+          (and (:start-time-millis node-data)
+               (not (:finish-time-millis node-data))))
+        (vals (get-in db [:invocations-data invoke-id :graph :nodes] {}))))
+
+(defn- should-schedule-poll? [db invoke-id page-is-complete]
+  (or (not page-is-complete)
+      (graph-has-in-progress-nodes? db invoke-id)))
+
+(defn- init-invocation-ui-from-storage [db invoke-id]
+  (let [ui-path (inv-subs/invocation-ui-path invoke-id)
+        trace-mode (read-local-storage "invocation-trace-view-mode" "graph")
+        sidebar-width (read-local-storage "graph-sidebar-width" 320)]
+    (update-in db ui-path merge {:trace-view-mode trace-mode
+                                 :sidebar-width sidebar-width})))
 
 ;; Orchestration events that perform side-effects (HTTP RPC),
 ;; keeping React components pure.
@@ -140,11 +189,29 @@
              (assoc :current-invocation {:invoke-id invoke-id
                                          :module-id module-id
                                          :agent-name agent-name})
-             (assoc-in [:invocations-data invoke-id :status] :loading))
+             (assoc-in [:invocations-data invoke-id :status] :loading)
+             (init-invocation-ui-from-storage invoke-id))
+     :fx [[:invocation/poll-cancel invoke-id]]
      :dispatch [:invocation/fetch-graph-page
                 {:invoke-id invoke-id
                  :module-id module-id
                  :agent-name agent-name}]}))
+
+(rf/reg-event-fx :invocation/set-trace-view-mode
+  (fn [{:keys [db]} [_ invoke-id mode]]
+    {:db (assoc-in db (conj (inv-subs/invocation-ui-path invoke-id) :trace-view-mode) mode)
+     :fx [[:invocation/persist-ui-preference {:storage-key "invocation-trace-view-mode"
+                                            :value mode}]]}))
+
+(rf/reg-event-fx :invocation/set-sidebar-width
+  (fn [{:keys [db]} [_ invoke-id width]]
+    {:db (assoc-in db (conj (inv-subs/invocation-ui-path invoke-id) :sidebar-width) width)
+     :fx [[:invocation/persist-ui-preference {:storage-key "graph-sidebar-width"
+                                            :value width}]]}))
+
+(rf/reg-event-db :invocation/select-node
+  (fn [db [_ invoke-id node-id]]
+    (assoc-in db (conj (inv-subs/invocation-ui-path invoke-id) :selected-node-id) node-id)))
 
 (rf/reg-event-fx :invocation/fetch-graph-page
   (fn [_ [_ {:keys [invoke-id module-id agent-name] :as current-invocation}]]
@@ -182,33 +249,44 @@
                            (and (not (seq new-nodes-map)) (contains? page-data :is-complete))
                            (assoc-in db-after-summary [:invocations-data invoke-id :is-complete] is-complete)
 
-                           :else db-after-summary)]
-      (when-not is-complete
-        (js/setTimeout
-         (fn []
-           (when-not (get-in @rdb/app-db [:invocations-data invoke-id :is-complete])
-             (println "[POLLING-SIMPLIFIED] Polling for updates...")
-             (rf/dispatch [:invocation/fetch-graph-page current-invocation])))
-         1000))
-      {:db db-after-graph})))
+                           :else db-after-summary)
+          continue-poll? (should-schedule-poll? db-after-graph invoke-id is-complete)]
+      (when continue-poll?
+        (println "[POLLING] Scheduling poll for" invoke-id
+                 (if is-complete "(drain: in-progress nodes remain)" "")))
+      {:db db-after-graph
+       :fx (when continue-poll?
+             [[:invocation/poll-schedule
+               {:invoke-id invoke-id
+                :delay-ms 1000
+                :dispatch-event [:invocation/poll-tick current-invocation]}]])})))
 
-(rf/reg-event-db :invocation/cleanup
-  (fn [db [_ _]]
-    (-> db
-        (assoc-in [:ui :changed-nodes] {})
-        (assoc-in [:ui :selected-node-id] nil)
-        (assoc-in [:ui :forking-mode?] false)
-        (assoc-in [:ui :active-tab] :info)
-        (assoc-in [:ui :hitl :responses] {}))))
+(rf/reg-event-fx :invocation/poll-tick
+  (fn [{:keys [db]} [_ current-invocation]]
+    (let [{:keys [invoke-id]} current-invocation
+          still-active? (= invoke-id (get-in db [:current-invocation :invoke-id]))]
+      (if still-active?
+        {:dispatch [:invocation/fetch-graph-page current-invocation]}
+        {:fx [[:invocation/poll-cancel invoke-id]]}))))
+
+(rf/reg-event-fx :invocation/cleanup
+  (fn [{:keys [db]} [_ {:keys [invoke-id]}]]
+    {:db (-> db
+             (update-in [:ui :invocations] dissoc invoke-id)
+             (update-in [:invocations-data] dissoc invoke-id)
+             (assoc-in [:ui :active-tab] :info)
+             (assoc-in [:ui :hitl :responses] {}))
+     :fx [[:invocation/poll-cancel invoke-id]]}))
 
 (rf/reg-event-db :ui/clear-fork-state
-  (fn [db _]
-    (-> db
-        (assoc-in [:ui :changed-nodes] {})
-        (assoc-in [:ui :selected-node-id] nil)
-        (assoc-in [:ui :forking-mode?] false)
-        (assoc-in [:ui :active-tab] :info)
-        (assoc-in [:ui :hitl :responses] {}))))
+  (fn [db [_ invoke-id]]
+    (let [ui-path (inv-subs/invocation-ui-path invoke-id)]
+      (-> db
+          (assoc-in (conj ui-path :changed-nodes) {})
+          (assoc-in (conj ui-path :selected-node-id) nil)
+          (assoc-in (conj ui-path :forking-mode?) false)
+          (assoc-in [:ui :active-tab] :info)
+          (assoc-in [:ui :hitl :responses] {})))))
 
 (rf/reg-event-fx :hitl/submit
   (fn [{:keys [db]} [_ {:keys [module-id agent-name invoke-id request response]}]]
