@@ -42,6 +42,7 @@
    [com.rpl.agent-o-rama.ui.invocations.filters]
    [com.rpl.agent-o-rama.ui.invocations.index :as inv-index]))
 
+
 (def routes
   [""
    ["/" {:name :home, :views [agents/index]}]

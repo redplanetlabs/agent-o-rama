@@ -169,11 +169,11 @@
   (let [[collapsed set-collapsed] (useState #{})
         [now-ms set-now-ms!] (useState (js/Date.now))
         children-map (useMemo (fn [] (gantt-children-map graph-data real-edges implicit-edges))
-                              [graph-data real-edges implicit-edges])
+                              #js [graph-data real-edges implicit-edges])
         rows (useMemo (fn [] (if (and graph-data root-invoke-id)
                                (collect-visible-rows graph-data children-map root-invoke-id collapsed)
                                []))
-                      [graph-data children-map root-invoke-id collapsed])
+                      #js [graph-data children-map root-invoke-id collapsed])
         ;; tick clock while any row is in-progress
         has-in-progress? (some (fn [r]
                                  (let [d (:data r)]
@@ -185,7 +185,7 @@
          (let [id (js/setInterval #(set-now-ms! (js/Date.now)) 500)]
            (fn [] (js/clearInterval id)))
          js/undefined))
-     [has-in-progress?])
+     #js [has-in-progress?])
     (let [now now-ms
           [t0 t1] (or (trace-time-bounds rows now) [0 1])
           span (- t1 t0)

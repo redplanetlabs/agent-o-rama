@@ -962,6 +962,22 @@
                       :onClick on-clear-fork}
              "Clear All Changes")))))
 
+(def ^:private default-sidebar-width 320)
+(def ^:private min-sidebar-width 280)
+(def ^:private max-sidebar-width 800)
+(def ^:private expanded-app-sidebar-width 256)
+(def ^:private min-trace-panel-width 320)
+
+(defn- clamp-sidebar-width [width]
+  (let [max-for-viewport (max min-sidebar-width
+                              (- (.-innerWidth js/window)
+                                 expanded-app-sidebar-width
+                                 min-trace-panel-width))
+        max-width (min max-sidebar-width max-for-viewport)]
+    (-> width
+        (max min-sidebar-width)
+        (min max-width))))
+
 (defui right-panel [{:keys [graph-data summary-data changed-nodes on-remove-node-change affected-nodes on-select-node on-execute-fork on-clear-fork forking-mode? on-toggle-forking-mode is-live
                             module-id agent-name task-id forks fork-of invoke-id sidebar-width on-sidebar-width-change]}]
   (let [;; Read tab from URL query params, default to :info
@@ -1098,15 +1114,16 @@
         affected-nodes (use-subscribe [:invocation/affected-nodes invoke-id])
         is-complete (use-subscribe [:invocation/is-complete invoke-id])
         is-live (not is-complete)
+        effective-sidebar-width (clamp-sidebar-width (or sidebar-width default-sidebar-width))
         set-trace-view-mode! (fn [mode]
                                (rf/dispatch [:invocation/set-trace-view-mode invoke-id mode]))
         set-sidebar-width! (fn [width]
-                             (rf/dispatch [:invocation/set-sidebar-width invoke-id width]))]
+                             (rf/dispatch [:invocation/set-sidebar-width invoke-id (clamp-sidebar-width width)]))]
     (if (empty? graph-data)
       ($ :div.flex.justify-center.items-center.py-8
          ($ :div.text-gray-500 "No graph data available"))
       ($ :<>
-         ($ :div {:style {:marginRight (str sidebar-width "px")}
+         ($ :div {:style {:marginRight (str effective-sidebar-width "px")}
                   :data-id "agent-graph-panel"}
             ($ :div {:className "flex items-center gap-2 mb-2 px-1"}
                ($ :span {:className "text-xs font-medium text-gray-600"} "Trace view")
@@ -1163,5 +1180,5 @@
                          :forks forks
                          :fork-of fork-of
                          :invoke-id invoke-id
-                         :sidebar-width sidebar-width
+                         :sidebar-width effective-sidebar-width
                          :on-sidebar-width-change set-sidebar-width!})))))
