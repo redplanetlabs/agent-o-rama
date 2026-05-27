@@ -2,6 +2,7 @@
   "Row / timeline (Gantt-style) visualization of agent node invocations."
   (:require
    [uix.core :as uix :refer [defui $]]
+   [uix.re-frame :refer [use-subscribe]]
    ["react" :refer [useState useMemo useEffect]]
    [com.rpl.agent-o-rama.ui.invocations.graph-node :as gn]
    [com.rpl.agent-o-rama.ui.common :as common]))
@@ -67,7 +68,9 @@
             children-map
             agg-ids)))
 
-(defn- gantt-children-map [graph-data real-edges implicit-edges]
+(defn gantt-children-map
+  "Build parent→children map for Gantt rows, collapsing duplicate agg fan-in edges."
+  [graph-data real-edges implicit-edges]
   (let [edges (concat (or real-edges []) (or implicit-edges []))
         raw (children-by-parent edges)]
     (collapse-fan-in-agg-children graph-data edges raw)))
@@ -90,7 +93,7 @@
                          :label (str (or (:node data) "?"))
                          :data data}
                     child-rows (when-not (contains? collapsed nid)
-                                 (mapcat walk children))]
+                                 (mapcat #(walk % (inc depth)) children))]
                 (cons row child-rows))))]
     (vec (walk root-id 0))))
 
@@ -274,3 +277,20 @@
          (when (empty? rows)
            ($ :div {:className "p-8 text-center text-sm text-gray-500"}
               "No timed node data to display yet.")))))))
+
+(defui gantt-trace-view-connected
+  "Subscribes to re-frame graph data for the given invocation."
+  [{:keys [invoke-id on-select-node]}]
+  (let [graph-data (use-subscribe [:invocation/graph-data invoke-id])
+        real-edges (use-subscribe [:invocation/real-edges invoke-id])
+        implicit-edges (use-subscribe [:invocation/implicit-edges invoke-id])
+        root-invoke-id (use-subscribe [:invocation/root-invoke-id invoke-id])
+        selected-node-id (use-subscribe [:invocation/selected-node-id invoke-id])
+        is-complete (use-subscribe [:invocation/is-complete invoke-id])]
+    ($ gantt-trace-view {:graph-data graph-data
+                         :real-edges real-edges
+                         :implicit-edges implicit-edges
+                         :root-invoke-id root-invoke-id
+                         :selected-node-id selected-node-id
+                         :on-select-node on-select-node
+                         :is-complete is-complete})))

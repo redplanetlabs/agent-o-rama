@@ -60,6 +60,35 @@
                 (aor-types/underlying-objects client)))}
       {:graph nil})))
 
+(defn trace-graph-complete?
+  "True when every reachable drawable node in the trace has :finish-time-millis."
+  [nodes root-invoke-id]
+  (when (and (seq nodes) root-invoke-id (contains? nodes root-invoke-id))
+    (loop [to-visit #{root-invoke-id}
+           visited #{}]
+      (if (empty? to-visit)
+        true
+        (let [current-id (first to-visit)
+              remaining (disj to-visit current-id)]
+          (if (visited current-id)
+            (recur remaining visited)
+            (let [node-data (get nodes current-id)
+                  node-name (:node node-data)]
+              (cond
+                (not node-name)
+                (recur remaining (conj visited current-id))
+
+                (not (:finish-time-millis node-data))
+                false
+
+                :else
+                (let [emitted-ids (set (map :invoke-id (:emits node-data)))
+                      drawable-children (filter #(and (contains? nodes %)
+                                                      (:node (get nodes %)))
+                                                emitted-ids)]
+                  (recur (into remaining drawable-children)
+                         (conj visited current-id)))))))))))
+
 (defn get-graph-page!!
   [system {:keys [module-id agent-name invoke-id]}]
   (let [client (get-client system module-id agent-name)]
@@ -129,8 +158,12 @@
                                   [MAP-VALS :feedback :actions MAP-KEYS]
                                   name)))
 
-            agent-is-complete? (boolean (or (:finish-time-millis summary-info)
-                                            (:result summary-info)))]
+            agent-summary-complete? (boolean (or (:finish-time-millis summary-info)
+                                                 (:result summary-info)))
+            graph-complete? (and (seq cleaned-nodes)
+                                 root-invoke-id
+                                 (trace-graph-complete? cleaned-nodes root-invoke-id))
+            agent-is-complete? (and agent-summary-complete? graph-complete?)]
 
         {:is-complete agent-is-complete?
          :nodes cleaned-nodes

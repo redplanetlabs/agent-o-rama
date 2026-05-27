@@ -3,6 +3,7 @@
    [cljs.test :refer-macros [deftest is]]
    [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [com.rpl.agent-o-rama.ui.events]
+   [com.rpl.agent-o-rama.ui.invocations.subs]
    [re-frame.core :as rf]
    [re-frame.db :as rdb]
    [com.rpl.agent-o-rama.ui.dom])) ; Load DOM setup before tests
@@ -25,8 +26,8 @@
       (is (boolean? (:loading? inv))))
     (is (contains? db :ui))
     (let [ui (:ui db)]
-      (is (contains? ui :forking-mode?))
-      (is (boolean? (:forking-mode? ui))))))
+      (is (contains? ui :invocations))
+      (is (map? (:invocations ui))))))
 
 (deftest test-event-system
   (let [test-event-id ::test-event
@@ -43,17 +44,19 @@
 
 (deftest test-db-set-value-event
   (reset! rdb/app-db aor-rf/default-app-db)
-  (let [test-uuid (random-uuid)]
-    (rf/dispatch-sync [:db/set-value [:ui :selected-node-id] test-uuid])
-    (is (= test-uuid (get-in @rdb/app-db [:ui :selected-node-id]))))
+  (let [test-uuid (random-uuid)
+        invoke-id "test-invoke"]
+    (rf/dispatch-sync [:invocation/select-node invoke-id test-uuid])
+    (is (= test-uuid (get-in @rdb/app-db [:ui :invocations invoke-id :selected-node-id]))))
   (reset! rdb/app-db aor-rf/default-app-db)
   (rf/dispatch-sync [:db/set-value [:current-invocation :invoke-id] "invoke-456"])
   (is (= "invoke-456" (get-in @rdb/app-db [:current-invocation :invoke-id]))))
 
 (deftest test-toggle-forking-mode
   (reset! rdb/app-db aor-rf/default-app-db)
-  (is (false? (get-in @rdb/app-db [:ui :forking-mode?])))
-  (rf/dispatch-sync [:ui/toggle-forking-mode])
-  (is (true? (get-in @rdb/app-db [:ui :forking-mode?])))
-  (rf/dispatch-sync [:ui/toggle-forking-mode])
-  (is (false? (get-in @rdb/app-db [:ui :forking-mode?]))))
+  (let [invoke-id "test-invoke"]
+    (is (not (get-in @rdb/app-db [:ui :invocations invoke-id :forking-mode?])))
+    (rf/dispatch-sync [:ui/toggle-forking-mode invoke-id])
+    (is (true? (get-in @rdb/app-db [:ui :invocations invoke-id :forking-mode?])))
+    (rf/dispatch-sync [:ui/toggle-forking-mode invoke-id])
+    (is (false? (get-in @rdb/app-db [:ui :invocations invoke-id :forking-mode?])))))
