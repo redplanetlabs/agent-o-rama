@@ -34,7 +34,9 @@
 (deftest invocation-graph-data-sub-test
   (reset! rdb/app-db (db-with-graph (sample-nodes)))
   (is (= (sample-nodes)
-         (get-in @rdb/app-db [:invocations-data invoke-id :graph :nodes]))))
+         (get-in @rdb/app-db [:invocations-data invoke-id :graph :nodes])))
+  (is (= (sample-nodes)
+         @(rf/subscribe [:invocation/graph-data invoke-id]))))
 
 (deftest invocation-selected-node-data-test
   (let [nodes (sample-nodes)
@@ -51,6 +53,14 @@
   (testing "poll while agent not complete"
     (let [db (db-with-graph (sample-nodes) :is-complete false)]
       (is (events/should-schedule-poll? db invoke-id false))))
+
+  (testing "poll until graph payload merged"
+    (let [db (assoc-in aor-rf/default-app-db
+                       [:invocations-data invoke-id]
+                       {:status :loading
+                        :summary {}
+                        :is-complete true})]
+      (is (events/should-schedule-poll? db invoke-id true))))
 
   (testing "drain poll when agent complete but worker in progress"
     (let [nodes (assoc (sample-nodes) worker-id
@@ -75,6 +85,37 @@
   (reset! rdb/app-db aor-rf/default-app-db)
   (rf/dispatch-sync [:invocation/set-trace-view-mode invoke-id "gantt"])
   (is (= "gantt" (get-in @rdb/app-db [:ui :invocations invoke-id :trace-view-mode]))))
+
+(deftest build-drawable-graph-string-keys-test
+  (let [root-id #uuid "00000000-0000-0000-0000-000000000010"
+        worker-id #uuid "00000000-0000-0000-0000-000000000011"
+        raw {"00000000-0000-0000-0000-000000000010"
+             {:node "root"
+              :start-time-millis 100
+              :finish-time-millis 500
+              :emits [{:invoke-id "00000000-0000-0000-0000-000000000011"}]}
+             "00000000-0000-0000-0000-000000000011"
+             {:node "worker"
+              :start-time-millis 200
+              :finish-time-millis 400}}
+        {:keys [nodes edges]} (events/build-drawable-graph raw root-id nil)]
+    (is (= 2 (count nodes)))
+    (is (contains? nodes root-id))
+    (is (contains? nodes worker-id))
+    (is (= 1 (count edges)))))
+
+(deftest build-drawable-graph-root-without-node-test
+  (let [root-id #uuid "00000000-0000-0000-0000-000000000020"
+        worker-id #uuid "00000000-0000-0000-0000-000000000021"
+        raw {root-id {:started-agg? true
+                      :emits [{:invoke-id worker-id}]}
+             worker-id {:node "stress-worker"
+                        :start-time-millis 100
+                        :finish-time-millis 200}}
+        {:keys [nodes edges]} (events/build-drawable-graph raw root-id nil)]
+    (is (= 1 (count nodes)))
+    (is (contains? nodes worker-id))
+    (is (= 1 (count edges)))))
 
 (deftest invocation-ui-path-test
   (is (= [:ui :invocations invoke-id :selected-node-id]

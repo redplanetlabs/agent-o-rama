@@ -95,7 +95,7 @@
 
 (rf/reg-event-db :invocation/update-node
   (fn [db [_ invoke-id node-id node-data]]
-    (update-in db [:invocations-data invoke-id :graph :nodes]
+    (update-in db [:invocations-data (str invoke-id) :graph :nodes]
                (fn [nodes]
                  (assoc (or nodes {}) node-id node-data)))))
 

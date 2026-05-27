@@ -28,6 +28,7 @@
         (or invocation-state {:status :loading})
 
         summary-data summary
+        graph-ready? (contains? (:graph (or invocation-state {})) :nodes)
 
         _ (uix/use-effect
            (fn []
@@ -106,10 +107,13 @@
          ($ :div.text-red-500 "Failed to load invocation: "
             (or (when error (str error)) "Unknown error - module or agent may not be loaded")))
 
-      (and (= status :success) (not graph-data))
+      (and (not graph-ready?) (not= status :error))
       ($ :div.flex.items-center.justify-center.p-8
          ($ common/spinner {:size :medium})
-         ($ :div.text-gray-500.ml-2 "Loading graph data..."))
+         ($ :div.text-gray-500.ml-2
+            (if (= status :loading)
+              "Loading invocation data..."
+              "Loading graph data...")))
 
       :else
       ($ view/graph-view {:module-id module-id
