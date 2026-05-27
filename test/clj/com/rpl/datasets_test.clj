@@ -1106,6 +1106,12 @@
                                     :info)
                                 "$: integer found, string expected"))))
 
+       ;; nil reference-output updates must not fail schema construction (#289)
+       (aor/set-dataset-example-reference-output! manager ds-id3 id1 nil)
+       (aor/set-dataset-example-reference-output! manager ds-id3 id1 "ww")
+       (aor/set-dataset-example-input! manager ds-id3 id2 {"p1" [] "p2" "abc"})
+       (aor/set-dataset-example-reference-output! manager ds-id3 id2 nil)
+
        (bind {:keys [examples pagination-params]}
          (get-examples-page ds-id3 nil 10 nil))
        (is (nil? pagination-params))
