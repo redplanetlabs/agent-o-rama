@@ -90,6 +90,46 @@
   [graph-data child-ids]
   (sort-by #(child-sort-key graph-data %) child-ids))
 
+(defn- node-time-summary
+  [data]
+  (let [start (:start-time-millis data)
+        finish (:finish-time-millis data)]
+    (when start
+      {:start-time-millis start
+       :finish-time-millis finish
+       :in-progress? (nil? finish)})))
+
+(defn- merge-time-summary
+  [a b]
+  (cond
+    (nil? a) b
+    (nil? b) a
+    :else
+    {:start-time-millis (min (:start-time-millis a)
+                             (:start-time-millis b))
+     :finish-time-millis (cond
+                           (and (:finish-time-millis a) (:finish-time-millis b))
+                           (max (:finish-time-millis a) (:finish-time-millis b))
+
+                           (:finish-time-millis a)
+                           (:finish-time-millis a)
+
+                           :else
+                           (:finish-time-millis b))
+     :in-progress? (or (:in-progress? a) (:in-progress? b))}))
+
+(defn descendant-time-summary
+  "Timing summary for descendants of `node-id`, excluding the node itself."
+  [graph-data children-map node-id]
+  (letfn [(subtree-summary [id]
+            (when-let [data (gn/graph-node-data graph-data id)]
+              (reduce merge-time-summary
+                      (node-time-summary data)
+                      (map subtree-summary (get children-map id [])))))]
+    (reduce merge-time-summary
+            nil
+            (map subtree-summary (get children-map node-id [])))))
+
 (defn collect-visible-rows
   "DFS flattening of the invocation tree.
 
@@ -105,7 +145,10 @@
                          :depth depth
                          :label (str (or (:node data) "?"))
                          :data data
-                         :child-ids children}
+                         :child-ids children
+                         :descendant-time-summary (descendant-time-summary graph-data
+                                                                            children-map
+                                                                            node-id)}
                     child-rows (when-not (contains? collapsed node-id)
                                  (mapcat #(walk % (inc depth)) children))]
                 (cons row child-rows))))]
@@ -122,12 +165,16 @@
 (defn trace-time-bounds
   "Returns [t0-ms t1-ms] covering all rows that have at least a start time."
   [rows now-ms]
-  (let [starts (keep (comp :start-time-millis :data) rows)
-        ends (for [r rows
-                   :let [d (:data r)
-                         f (:finish-time-millis d)
-                         s (:start-time-millis d)]]
-               (or f (when s now-ms)))
+  (let [row-time-summaries (map (fn [r]
+                                  (node-time-summary (:data r)))
+                                rows)
+        descendant-time-summaries (map :descendant-time-summary rows)
+        time-summaries (concat row-time-summaries descendant-time-summaries)
+        starts (keep :start-time-millis time-summaries)
+        ends (for [{:keys [start-time-millis finish-time-millis in-progress?]} time-summaries]
+               (or (when (and start-time-millis in-progress?) now-ms)
+                   finish-time-millis
+                   start-time-millis))
         t0 (when (seq starts) (apply min starts))
         t1 (when (seq ends) (apply max ends))]
     (when (and t0 t1 (>= t1 t0))

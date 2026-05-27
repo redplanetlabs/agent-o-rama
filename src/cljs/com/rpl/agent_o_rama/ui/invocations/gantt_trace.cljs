@@ -33,7 +33,7 @@
 (defn- row-bar-style
   [{:keys [start-ms end-ms t0 t1 row-in-progress? now-ms]}]
   (let [span (max (- t1 t0) 1)
-        end (or end-ms (when row-in-progress? now-ms) start-ms)
+        end (or (when row-in-progress? now-ms) end-ms start-ms)
         left-pct (* 100.0 (/ (- start-ms t0) span))
         width-pct (* 100.0 (/ (max (- end start-ms) 1) span))]
     {:left (str (.toFixed (min 100 (max 0 left-pct)) 2) "%")
@@ -110,7 +110,7 @@
          ;; rows
          ($ :div {:className "max-h-[min(560px,calc(100vh-14rem))] overflow-y-auto overflow-x-hidden"}
             (for [row rows
-                  :let [{:keys [node-id depth label data child-ids]} row
+                  :let [{:keys [node-id depth label data child-ids descendant-time-summary]} row
                         nid (node-key-str node-id)
                         has-children? (seq child-ids)
                         is-collapsed? (contains? collapsed node-id)
@@ -122,7 +122,22 @@
                         bar (when start
                               (row-bar-style {:start-ms start :end-ms end :t0 t0 :t1 t1
                                               :row-in-progress? row-in-progress?
-                                              :now-ms now}))]]
+                                              :now-ms now}))
+                        collapsed-descendant-start (:start-time-millis descendant-time-summary)
+                        collapsed-descendant-finish (:finish-time-millis descendant-time-summary)
+                        collapsed-descendant-in-progress? (:in-progress? descendant-time-summary)
+                        collapsed-descendant-dur (when collapsed-descendant-start
+                                                   (if collapsed-descendant-in-progress?
+                                                     (- now collapsed-descendant-start)
+                                                     (- collapsed-descendant-finish collapsed-descendant-start)))
+                        collapsed-descendant-bar
+                        (when (and is-collapsed? collapsed-descendant-start)
+                          (row-bar-style {:start-ms collapsed-descendant-start
+                                          :end-ms collapsed-descendant-finish
+                                          :t0 t0
+                                          :t1 t1
+                                          :row-in-progress? collapsed-descendant-in-progress?
+                                          :now-ms now}))]]
               ($ :div {:key nid
                        :className (common/cn "grid grid-cols-[minmax(200px,32%)_1fr_minmax(72px,10%)] gap-2 items-center px-2 py-1.5 border-b border-gray-100 hover:bg-gray-50/80 cursor-pointer"
                                              (when selected? "bg-blue-50/80"))
@@ -159,7 +174,14 @@
                                        :minWidth "2px"}}
                          (when (and dur (> dur 400))
                            ($ :span {:className "text-[10px] font-mono text-white drop-shadow-sm truncate"}
-                              (format-duration-ms dur))))))
+                              (format-duration-ms dur)))))
+                    (when collapsed-descendant-bar
+                      ($ :div {:className "absolute top-1 bottom-1 rounded-sm border-2 border-gray-600 bg-transparent pointer-events-none"
+                               :title (str "Collapsed children span: "
+                                           (format-duration-ms collapsed-descendant-dur))
+                               :style {:left (:left collapsed-descendant-bar)
+                                       :width (:width collapsed-descendant-bar)
+                                       :minWidth "2px"}})))
                  ($ :div {:className "text-right font-mono text-[11px] text-gray-600 tabular-nums"}
                     (format-duration-ms dur)
                     (when row-in-progress?

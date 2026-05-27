@@ -94,3 +94,47 @@
                                            #{}))]
     (is (= [0 100] (model/trace-time-bounds rows 50)))
     (is (= 100 (model/total-root-ms rows)))))
+
+(deftest rows-include-descendant-time-summary
+  (let [rows (:rows (model/build-row-model graph-data
+                                           real-edges
+                                           implicit-edges
+                                           root-id
+                                           #{}))
+        rows-by-id (into {} (map (juxt :node-id identity) rows))]
+    (is (= {:start-time-millis 20
+            :finish-time-millis 80
+            :in-progress? false}
+           (:descendant-time-summary (get rows-by-id start-id))))
+    (is (= {:start-time-millis 21
+            :finish-time-millis 22
+            :in-progress? false}
+           (:descendant-time-summary (get rows-by-id branch-a-id))))
+    (is (nil? (:descendant-time-summary (get rows-by-id after-agg-id))))))
+
+(deftest collapsed-descendant-times-extend-visible-bounds
+  (let [parent-id #uuid "00000000-0000-0000-0000-000000000101"
+        child-id #uuid "00000000-0000-0000-0000-000000000102"
+        grandchild-id #uuid "00000000-0000-0000-0000-000000000103"
+        graph {parent-id {:node "parent"
+                          :start-time-millis 0
+                          :finish-time-millis 10}
+               child-id {:node "child"
+                         :start-time-millis 20
+                         :finish-time-millis 40}
+               grandchild-id {:node "grandchild"
+                              :start-time-millis 50}}
+        edges [{:source (str parent-id) :target (str child-id)}
+               {:source (str child-id) :target (str grandchild-id)}]
+        rows (:rows (model/build-row-model graph
+                                           edges
+                                           []
+                                           parent-id
+                                           #{parent-id}))
+        parent-row (first rows)]
+    (is (= [parent-id] (mapv :node-id rows)))
+    (is (= {:start-time-millis 20
+            :finish-time-millis 40
+            :in-progress? true}
+           (:descendant-time-summary parent-row)))
+    (is (= [0 100] (model/trace-time-bounds rows 100)))))
