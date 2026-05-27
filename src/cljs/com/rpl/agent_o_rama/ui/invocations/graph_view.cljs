@@ -1106,7 +1106,7 @@
            on-toggle-forking-mode on-paginate-node]}]
   (let [graph-data (use-subscribe [:invocation/graph-data invoke-id])
         summary-data (use-subscribe [:invocation/summary invoke-id])
-        trace-view-mode (use-subscribe [:invocation/trace-view-mode invoke-id])
+        [trace-view-mode set-trace-view-mode!] (common/use-local-storage "invocation-trace-view-mode" "graph")
         sidebar-width (use-subscribe [:invocation/sidebar-width invoke-id])
         selected-node-data (use-subscribe [:invocation/selected-node-data invoke-id])
         changed-nodes (use-subscribe [:invocation/changed-nodes invoke-id])
@@ -1115,8 +1115,6 @@
         is-complete (use-subscribe [:invocation/is-complete invoke-id])
         is-live (not is-complete)
         effective-sidebar-width (clamp-sidebar-width (or sidebar-width default-sidebar-width))
-        set-trace-view-mode! (fn [mode]
-                               (rf/dispatch [:invocation/set-trace-view-mode invoke-id mode]))
         set-sidebar-width! (fn [width]
                              (rf/dispatch [:invocation/set-sidebar-width invoke-id (clamp-sidebar-width width)]))]
     (if (empty? graph-data)
