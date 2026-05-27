@@ -132,6 +132,9 @@
                       q3        (aor/get-query-topology-client agent-node "q")
                       q1        (aor/get-mirror-query-topology-client agent-node module1-name "q")
                       q2        (aor/get-mirror-query-topology-client agent-node module2-name "q")
+                      retriever (.getClusterRetriever agent-node)
+                      manager   (aor/agent-manager retriever module2-name)
+                      foo-via-retriever (aor/agent-client manager "foo")
                       res       (volatile! [])]
                   (foreign-append! depot1 k)
                   (vswap! res conj (store/pstate-select-one (keypath k) p1))
@@ -142,6 +145,11 @@
                   (vswap! res conj (foreign-invoke-query q1 "."))
                   (vswap! res conj (foreign-invoke-query q2 "."))
                   (vswap! res conj (foreign-invoke-query q3 "."))
+                  (vswap! res conj
+                          (foreign-invoke-query
+                           (foreign-query retriever module1-name "q")
+                           "r"))
+                  (vswap! res conj (aor/agent-invoke foo-via-retriever :via-retriever))
                   (aor/agent-invoke foo-m2 k)
                   (vswap! res conj (h/contains-string? (str (class m2-kv)) "mk_kv_store"))
                   (vswap! res conj (h/contains-string? (str (class m2-doc)) "mk_doc_store"))
@@ -180,7 +188,7 @@
      (bind res (aor/agent-result foo inv))
 
      (is (= res
-            [1 :abc :def ".!" ".!!" ".!!!" true true true 1 {:a 1} 1
+            [1 :abc :def ".!" ".!!" ".!!!" "r!" :done true true true 1 {:a 1} 1
              {:name "*depot" :module-name module1-name :num-partitions 1}
              {:start-offset 0 :end-offset 4} [:a :x :y]]
          ))

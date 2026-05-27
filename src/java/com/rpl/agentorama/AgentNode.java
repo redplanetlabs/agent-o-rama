@@ -49,6 +49,8 @@ public interface AgentNode extends AgentObjectFetcher, IFetchAgentClient {
 
   AgentClient getMirrorAgentClient(String moduleName, String agentName);
 
+  com.rpl.rama.cluster.ClusterManagerBase getClusterRetriever();
+
   /**
    * Gets a store by name for persistent data access.
    *

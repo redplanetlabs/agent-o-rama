@@ -556,6 +556,8 @@
                         (.getMirrorAgentClient declared-objects-tg module-name name)
                         module-name
                         name))
+     (getClusterRetriever [this]
+       (.getClusterRetriever declared-objects-tg))
      (getStore [this name]
        (mk-store (:store-info store-info)
                  (.getThisModuleName declared-objects-tg)
