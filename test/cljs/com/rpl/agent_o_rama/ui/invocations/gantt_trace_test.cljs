@@ -1,6 +1,7 @@
 (ns com.rpl.agent-o-rama.ui.invocations.gantt-trace-test
   (:require
    [cljs.test :refer-macros [deftest testing is]]
+   [com.rpl.agent-o-rama.ui.invocations.gantt-model :as gantt-model]
    [com.rpl.agent-o-rama.ui.invocations.gantt-trace :as gantt]))
 
 (def root-id #uuid "00000000-0000-0000-0000-000000000001")
@@ -25,6 +26,7 @@
             :finish-time-millis 1900}
    agg-id {:node "stress-agg"
            :agg-state {}
+           :agg-start-invoke-id starter-id
            :start-time-millis 2000
            :finish-time-millis 4500}})
 
@@ -47,8 +49,8 @@
   (testing "DFS row order and labels"
     (let [graph (stress-like-graph)
           {:keys [real implicit]} (stress-like-edges)
-          children (gantt/gantt-children-map graph real implicit)
-          rows (gantt/collect-visible-rows graph children root-id #{})]
+          children (gantt-model/gantt-children-map graph real implicit)
+          rows (gantt-model/collect-visible-rows graph children root-id #{})]
       (is (= 5 (count rows)))
       (is (= "stress-root" (:label (first rows))))
       (is (= #{"stress-root" "stress-fanout" "stress-worker" "stress-agg"}
@@ -59,9 +61,8 @@
   (testing "collapse hides descendant rows"
     (let [graph (stress-like-graph)
           {:keys [real implicit]} (stress-like-edges)
-          children (gantt/gantt-children-map graph real implicit)
-          root-str (str root-id)
-          rows-collapsed (gantt/collect-visible-rows graph children root-id #{root-str})]
+          children (gantt-model/gantt-children-map graph real implicit)
+          rows-collapsed (gantt-model/collect-visible-rows graph children root-id #{root-id})]
       (is (= 1 (count rows-collapsed)))
       (is (= "stress-root" (:label (first rows-collapsed)))))))
 
@@ -69,25 +70,24 @@
   (testing "agg appears under only one parent when multiple edges exist"
     (let [graph (stress-like-graph)
           {:keys [real implicit]} (stress-like-edges)
-          children (gantt/gantt-children-map graph real implicit)
-          agg-str (str agg-id)
+          children (gantt-model/gantt-children-map graph real implicit)
           parents-with-agg (->> children
                                 (filter (fn [[_ child-ids]]
-                                          (some #(= (str %) agg-str) child-ids)))
+                                          (some #(= % agg-id) child-ids)))
                                 (map first)
                                 vec)]
       (is (= 1 (count parents-with-agg))
           "agg should be listed once in the children map")
-      (is (contains? #{(str starter-id) (str child-a) (str child-b)}
+      (is (contains? #{starter-id child-a child-b}
                      (first parents-with-agg))))))
 
 (deftest trace-time-bounds-test
   (testing "bounds span finished nodes"
     (let [graph (stress-like-graph)
           {:keys [real implicit]} (stress-like-edges)
-          children (gantt/gantt-children-map graph real implicit)
-          rows (gantt/collect-visible-rows graph children root-id #{})
-          [t0 t1] (gantt/trace-time-bounds rows 99999)]
+          children (gantt-model/gantt-children-map graph real implicit)
+          rows (gantt-model/collect-visible-rows graph children root-id #{})
+          [t0 t1] (gantt-model/trace-time-bounds rows 99999)]
       (is (= 1000 t0))
       (is (= 5000 t1))))
 
@@ -99,13 +99,13 @@
                  in-progress-id {:node "worker"
                                  :start-time-millis 1500}}
           edges [{:source (str root-id) :target (str in-progress-id)}]
-          children (gantt/gantt-children-map graph edges [])
-          rows (gantt/collect-visible-rows graph children root-id #{})
+          children (gantt-model/gantt-children-map graph edges [])
+          rows (gantt-model/collect-visible-rows graph children root-id #{})
           now 5000
-          [t0 t1] (gantt/trace-time-bounds rows now)]
+          [t0 t1] (gantt-model/trace-time-bounds rows now)]
       (is (= 1000 t0))
       (is (= now t1)))))
 
 (deftest empty-graph-rows-test
   (testing "no root yields empty rows"
-    (is (empty? (gantt/collect-visible-rows {} {} nil #{})))))
+    (is (empty? (gantt-model/collect-visible-rows {} {} nil #{})))))

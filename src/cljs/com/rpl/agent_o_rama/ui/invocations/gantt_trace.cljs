@@ -5,113 +5,11 @@
    [uix.re-frame :refer [use-subscribe]]
    ["react" :refer [useState useMemo useEffect]]
    [com.rpl.agent-o-rama.ui.invocations.graph-node :as gn]
+   [com.rpl.agent-o-rama.ui.invocations.gantt-model :as gantt-model]
    [com.rpl.agent-o-rama.ui.common :as common]))
 
 (defn- node-key-str [id]
   (str id))
-
-(defn- children-by-parent [edges]
-  (reduce (fn [m {:keys [source target]}]
-            (let [s (node-key-str source)
-                  t (node-key-str target)]
-              (update m s (fnil conj []) t)))
-          {}
-          edges))
-
-(defn- parents-by-target [edges target-id]
-  "All source node ids with an edge to `target-id` (real or implicit)."
-  (let [tid (node-key-str target-id)]
-    (->> edges
-         (filter #(= (node-key-str (:target %)) tid))
-         (map :source)
-         distinct
-         vec)))
-
-(defn- canonical-fan-in-parent
-  "When many nodes emit to the same agg, the drawable graph adds an implicit edge from
-  each agg-start output to the agg. That is correct for React Flow but duplicates the agg
-  as a child under every parallel branch in a naive tree. Pick one parent: prefer the
-  agg-start (`starter-node?`), else the earliest-start parent."
-  [graph-data parent-ids]
-  (when (seq parent-ids)
-    (let [starters (filter #(gn/starter-node? (gn/graph-node-data graph-data %)) parent-ids)]
-      (if (seq starters)
-        (apply min-key str starters)
-        (->> parent-ids
-             (sort-by (fn [p]
-                        [(or (:start-time-millis (gn/graph-node-data graph-data p))
-                             js/Number.POSITIVE_INFINITY)
-                         (str p)]))
-             first)))))
-
-(defn- collapse-fan-in-agg-children
-  "For each agg node, if multiple parents point at it in `edges`, keep only one parent→child
-  link in `children-map` so the Gantt shows a single fan-in subtree (matches mental model:
-  one agg collecting many parallel workers)."
-  [graph-data edges children-map]
-  (let [agg-ids (->> (keys graph-data)
-                    (filter #(gn/agg-node? (gn/graph-node-data graph-data %))))]
-    (reduce (fn [m agg-id]
-              (let [parents (parents-by-target edges agg-id)]
-                (if (<= (count parents) 1)
-                  m
-                  (if-let [keeper (canonical-fan-in-parent graph-data parents)]
-                    (reduce (fn [m2 p]
-                              (if (= (str p) (str keeper))
-                                m2
-                                (update m2 (node-key-str p)
-                                        (fn [chs]
-                                          (vec (remove #(= (str %) (str agg-id)) (or chs [])))))))
-                            m
-                            parents)
-                    m))))
-            children-map
-            agg-ids)))
-
-(defn gantt-children-map
-  "Build parent→children map for Gantt rows, collapsing duplicate agg fan-in edges."
-  [graph-data real-edges implicit-edges]
-  (let [edges (concat (or real-edges []) (or implicit-edges []))
-        raw (children-by-parent edges)]
-    (collapse-fan-in-agg-children graph-data edges raw)))
-
-(defn- sort-child-ids [graph-data child-ids]
-  (sort-by (fn [id]
-             (let [n (gn/graph-node-data graph-data id)]
-               (or (:start-time-millis n) js/Number.POSITIVE_INFINITY)))
-           child-ids))
-
-(defn collect-visible-rows
-  "DFS flattening of the invocation tree. `collapsed` is a set of node-id strings whose children are hidden."
-  [graph-data children-map root-id collapsed]
-  (letfn [(walk [node-id depth]
-            (when-let [data (gn/graph-node-data graph-data node-id)]
-              (let [nid (node-key-str node-id)
-                    children (sort-child-ids graph-data (distinct (get children-map nid [])))
-                    row {:node-id node-id
-                         :depth depth
-                         :label (str (or (:node data) "?"))
-                         :data data}
-                    child-rows (when-not (contains? collapsed nid)
-                                 (mapcat #(walk % (inc depth)) children))]
-                (cons row child-rows))))]
-    (vec (walk root-id 0))))
-
-(defn trace-time-bounds
-  "Returns [t0-ms t1-ms] covering all rows that have at least a start time."
-  [rows now-ms]
-  (let [starts (keep (comp :start-time-millis :data) rows)
-        ends (for [r rows
-                   :let [d (:data r)
-                         f (:finish-time-millis d)
-                         s (:start-time-millis d)]]
-               (or f (when s now-ms)))
-        t0 (when (seq starts) (apply min starts))
-        t1 (when (seq ends) (apply max ends))]
-    (when (and t0 t1 (>= t1 t0))
-      (if (= t0 t1)
-        [t0 (+ t0 1)]
-        [t0 t1]))))
 
 (defn format-duration-ms [ms]
   (cond
@@ -120,14 +18,6 @@
     (< ms 1000) (str (int (js/Math.round ms)) "ms")
     (< ms 60000) (str (.toFixed (/ ms 1000) 2) "s")
     :else (str (.toFixed (/ ms 60000) 2) "m")))
-
-(defn- total-root-ms [rows]
-  (when-let [root (first rows)]
-    (let [d (:data root)
-          s (:start-time-millis d)
-          f (:finish-time-millis d)]
-      (when (and s f)
-        (- f s)))))
 
 (defn- nice-tick-step [span-ms max-ticks]
   (let [span-ms (max span-ms 1)
@@ -168,12 +58,14 @@
             selected-node-id on-select-node is-complete]}]
   (let [[collapsed set-collapsed] (useState #{})
         [now-ms set-now-ms!] (useState (js/Date.now))
-        children-map (useMemo (fn [] (gantt-children-map graph-data real-edges implicit-edges))
-                              #js [graph-data real-edges implicit-edges])
-        rows (useMemo (fn [] (if (and graph-data root-invoke-id)
-                               (collect-visible-rows graph-data children-map root-invoke-id collapsed)
-                               []))
-                      #js [graph-data children-map root-invoke-id collapsed])
+        row-model (useMemo (fn []
+                             (gantt-model/build-row-model graph-data
+                                                          real-edges
+                                                          implicit-edges
+                                                          root-invoke-id
+                                                          collapsed))
+                           #js [graph-data real-edges implicit-edges root-invoke-id collapsed])
+        rows (:rows row-model)
         ;; tick clock while any row is in-progress
         has-in-progress? (some (fn [r]
                                  (let [d (:data r)]
@@ -187,12 +79,12 @@
          js/undefined))
      #js [has-in-progress?])
     (let [now now-ms
-          [t0 t1] (or (trace-time-bounds rows now) [0 1])
+          [t0 t1] (or (gantt-model/trace-time-bounds rows now) [0 1])
           span (- t1 t0)
           tick-step (nice-tick-step span 8)
           ticks (vec (take 24 (iterate #(+ % tick-step) t0)))
           root-label (:node (:data (first rows)))
-          total-ms (or (total-root-ms rows) span)]
+          total-ms (or (gantt-model/total-root-ms rows) span)]
       ($ :div {:className "flex flex-col border border-gray-200 rounded-lg bg-white overflow-hidden"
                :data-testid "gantt-trace-view"}
          ($ :div {:className "flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200 bg-gray-50"}
@@ -218,16 +110,15 @@
          ;; rows
          ($ :div {:className "max-h-[min(560px,calc(100vh-14rem))] overflow-y-auto overflow-x-hidden"}
             (for [row rows
-                  :let [{:keys [node-id depth label data]} row
+                  :let [{:keys [node-id depth label data child-ids]} row
                         nid (node-key-str node-id)
-                        ch (get children-map nid [])
-                        has-children? (seq ch)
-                        is-collapsed? (contains? collapsed nid)
+                        has-children? (seq child-ids)
+                        is-collapsed? (contains? collapsed node-id)
                         start (:start-time-millis data)
                         end (:finish-time-millis data)
                         row-in-progress? (and start (not end))
                         dur (when start (if end (- end start) (- now start)))
-                        selected? (= (str selected-node-id) nid)
+                        selected? (= selected-node-id node-id)
                         bar (when start
                               (row-bar-style {:start-ms start :end-ms end :t0 t0 :t1 t1
                                               :row-in-progress? row-in-progress?
@@ -245,9 +136,9 @@
                                   :onClick (fn [e]
                                              (.stopPropagation e)
                                              (set-collapsed (fn [s]
-                                                              (if (contains? s nid)
-                                                                (disj s nid)
-                                                                (conj s nid)))))}
+                                                              (if (contains? s node-id)
+                                                                (disj s node-id)
+                                                                (conj s node-id)))))}
                          (if is-collapsed? "▸" "▾"))
                       ($ :span {:className "w-5 inline-block flex-shrink-0"}))
                     ($ :span {:className "truncate" :title label} label)
