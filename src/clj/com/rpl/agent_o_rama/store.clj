@@ -23,7 +23,23 @@ Example:\n
   (:use [com.rpl.rama path])
   (:refer-clojure :exclude [get contains?])
   (:require
-   [com.rpl.agent-o-rama.impl.store-impl :as simpl]))
+   [com.rpl.agent-o-rama.impl.store-impl :as simpl])
+  (:import
+   [com.rpl.agentorama.store PStateStore]
+   [com.rpl.rama PState]))
+
+(defn get-underlying-pstate
+  "Returns the underlying Rama PState for a store.\n
+\n
+Enables standard Rama foreign operations (e.g. `foreign-select-one-async`) on agent stores.\n
+\n
+Args:\n
+  - store - Store instance obtained from [[com.rpl.agent-o-rama/get-store]]
+\n
+Returns:\n
+  - The underlying PState client"
+  ^PState [^PStateStore store]
+  (.getUnderlyingPState store))
 
 (defn get
   "Gets a value from a key-value store.\n

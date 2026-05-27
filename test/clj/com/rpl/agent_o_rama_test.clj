@@ -1075,7 +1075,7 @@
                             :c (store/get kv :c)
                             :d (store/get kv :d)
                             :e (store/pstate-select [:b ALL] kv)
-                            :f (store/pstate-select-one :a kv)
+                            :f (.get (foreign-select-one-async :a (store/get-underlying-pstate kv)))
                             :g [(store/pstate-select :zz kv :e)
                                 (store/pstate-select :zz kv)]
                             :h [(store/pstate-select-one :zz kv :e)
@@ -1119,7 +1119,7 @@
                        :mc    (store/get-document-field doc :m :c)
                        :ma?   (store/contains-document-field? doc :m :a)
                        :mc?   (store/contains-document-field? doc :m :c)
-                       :psa   (store/pstate-select-one [:s :a] doc)
+                       :psa   (.get (foreign-select-one-async [:s :a] (store/get-underlying-pstate doc)))
                        :psb   (store/pstate-select [:s :b ALL] doc)
                        :pzz   [(store/pstate-select :zz doc :e)
                                (store/pstate-select :zz doc)]
@@ -1156,10 +1156,10 @@
                  res
                  :pstate {:ks   (store/pstate-select [:a MAP-KEYS] p)
                           :kv   (store/pstate-select [:a MAP-VALS] p)
-                          :k0   (store/pstate-select-one [:a 0] p)
+                          :k0   (.get (foreign-select-one-async [:a 0] (store/get-underlying-pstate p) {:pkey :a}))
                           :zz0  [(store/pstate-select [:zz 0] p :e)
                                  (store/pstate-select [:zz 0] p)]
-                          :zz02 [(store/pstate-select-one [:zz 0] p :e)
+                          :zz02 [(.get (foreign-select-one-async [:zz 0] (store/get-underlying-pstate p) {:pkey :e}))
                                  (store/pstate-select-one [:zz 0] p)]
                          }))
              )))
