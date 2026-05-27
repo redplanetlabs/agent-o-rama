@@ -319,10 +319,10 @@
                     ($ :div {:className "flex-1"}
                        ($ :div {:className "flex items-center gap-2"}
                           ($ :span {:className "text-sm font-medium text-indigo-800 bg-indigo-100 px-2 py-1 rounded"}
-                             op-type)
+                              (str op-type))
                           (when (:objectName info)
                             ($ :span {:className "text-sm font-mono text-indigo-700"}
-                               (:objectName info)))))
+                                (str (:objectName info))))))
                     ($ :div {:className "flex items-center gap-2"}
                        (when duration
                          ($ :div {:className "text-xs text-indigo-500 font-mono"
