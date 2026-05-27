@@ -87,13 +87,7 @@
           total-ms (or (gantt-model/total-root-ms rows) span)]
       ($ :div {:className "flex flex-col border border-gray-200 rounded-lg bg-white overflow-hidden"
                :data-testid "gantt-trace-view"}
-         ($ :div {:className "flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200 bg-gray-50"}
-            ($ :div {:className "text-xs font-mono text-gray-600"}
-               (str (count rows) " node" (when (not= 1 (count rows)) "s")))
-            ($ :div {:className "text-xs font-mono text-gray-700"}
-               (when root-label
-                 ($ :span {:className "font-semibold text-gray-900 mr-2"} root-label))
-               (str "total " (format-duration-ms total-ms))))
+         ($ :div {:className "flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200 bg-gray-50"})
          ;; header: time axis
          ($ :div {:className "grid grid-cols-[minmax(200px,32%)_1fr_minmax(72px,10%)] gap-2 px-2 py-1 border-b border-gray-100 text-[10px] font-mono text-gray-500"}
             ($ :span "Node")
@@ -146,7 +140,7 @@
                           :style {:paddingLeft (str (* depth 12) "px")}}
                     (if has-children?
                       ($ :button {:type "button"
-                                  :className "flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-800 rounded"
+                                  :className "flex-shrink-0 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-800 rounded cursor-pointer"
                                   :aria-label (if is-collapsed? "Expand nested nodes" "Collapse nested nodes")
                                   :onClick (fn [e]
                                              (.stopPropagation e)
