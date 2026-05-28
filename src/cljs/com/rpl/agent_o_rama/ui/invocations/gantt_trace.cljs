@@ -162,13 +162,10 @@
                              :style {:background (str "repeating-linear-gradient(90deg, transparent, transparent calc(12.5% - 1px), #ddd calc(12.5% - 1px), #ddd 12.5%)")}})
                     (when bar
                       ($ :div {:className (common/cn "absolute top-1 bottom-1 flex items-center justify-end px-1"
-                                                    (bar-color-classes data selected?))
+                                                     (bar-color-classes data selected?))
                                :style {:left (:left bar)
                                        :width (:width bar)
-                                       :minWidth "2px"}}
-                         (when (and dur (> dur 400))
-                           ($ :span {:className "text-[10px] font-mono text-white drop-shadow-sm truncate"}
-                              (format-duration-ms dur)))))
+                                       :minWidth "2px"}}))
                     (when collapsed-descendant-bar
                       ($ :div {:className "absolute top-1 bottom-1 rounded-sm border-2 border-gray-600 bg-transparent pointer-events-none"
                                :title (str "Collapsed children span: "
