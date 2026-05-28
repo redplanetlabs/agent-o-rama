@@ -313,25 +313,22 @@ export async function deleteDataset(page, name) {
     }
   };
   page.once('dialog', dialogHandler);
-  
-  // Search for the dataset to ensure it's visible
+
+  // Search input only exists on the datasets index — wait for navigation to finish
+  // (teardown often clicks "Datasets & Experiments" immediately before this call).
   const searchInput = page.getByPlaceholder('Search datasets...');
-  if (await searchInput.isVisible()) {
-    await searchInput.fill(name);
-    await page.waitForTimeout(500);
-  }
-  
+  await expect(searchInput).toBeVisible({ timeout: 15000 });
+
+  await searchInput.fill(name);
   const datasetRow = page.locator('table tbody tr').filter({ hasText: name });
+  await expect(datasetRow).toBeVisible({ timeout: 30000 });
+
   await datasetRow.getByRole('button', { name: 'Delete' }).click();
   
   // Wait a bit for dialog to appear and be handled
   await page.waitForTimeout(500);
   
-  // Clear search to avoid false positives from similar dataset names
-  if (await searchInput.isVisible()) {
-    await searchInput.clear();
-    await page.waitForTimeout(300);
-  }
+  await searchInput.clear();
   
   // Wait for the row to disappear after deletion
   await expect(datasetRow).not.toBeVisible({ timeout: 10000 });

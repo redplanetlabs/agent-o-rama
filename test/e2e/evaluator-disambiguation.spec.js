@@ -129,6 +129,7 @@ test.describe('Evaluator Metric Name Disambiguation', () => {
     page.on('dialog', dialog => dialog.accept());
 
     await page.getByText('Datasets & Experiments').click();
+    await expect(page).toHaveURL(/\/datasets\/?(\?.*)?$/, { timeout: 15000 });
     await deleteDataset(page, datasetName);
 
     await page.getByText('Evaluators').click();
