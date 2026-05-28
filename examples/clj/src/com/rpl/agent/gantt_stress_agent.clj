@@ -1,4 +1,4 @@
-(ns com.rpl.agent.gantt-stress.gantt-stress-agent
+(ns com.rpl.agent.gantt-stress-agent
   "Stress agent for Timeline (Gantt) visualization: 30-way outer agg fan-out; each
    slot runs a nested 10-way agg with pseudo-random sleeps so bar lengths differ."
   (:require

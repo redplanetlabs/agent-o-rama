@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  * @param {import('@playwright/test').Page} page
  */
 async function getGanttStressAgentRow(page) {
-  const moduleNs = 'com.rpl.agent.gantt-stress.gantt-stress-agent';
+  const moduleNs = 'com.rpl.agent.gantt-stress-agent';
   const moduleName = 'GanttStressModule';
   const agentName = 'GanttStressAgent';
 
@@ -32,7 +32,7 @@ test.describe('Invocation Trace Page Rendering', () => {
     await agentRow.click();
 
     const agentDetailUrlRegex =
-      /agents\/.*com\.rpl\.agent\.gantt-stress\.gantt-stress-agent.*GanttStressModule\/agent\/GanttStressAgent/;
+      /agents\/.*com\.rpl\.agent\.gantt-stress-agent.*GanttStressModule\/agent\/GanttStressAgent/;
     await expect(page).toHaveURL(agentDetailUrlRegex);
     console.log('Navigated to GanttStressAgent detail page.');
 

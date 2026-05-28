@@ -11,7 +11,7 @@
    [com.rpl.agent.research-agent :as research-agent]
    [com.rpl.agent.e2e-test-agent :as e2e-test-agent]
    [com.rpl.agent.streaming-test-agent :as streaming-test-agent]
-   [com.rpl.agent.gantt-stress.gantt-stress-agent :as gantt])
+   [com.rpl.agent.gantt-stress-agent :as gantt-stress-agent])
   (:import
    [dev.langchain4j.data.message
     SystemMessage
@@ -111,7 +111,7 @@
   
   (rtest/launch-module!
    ipc
-   gantt/GanttStressModule
+   gantt-stress-agent/GanttStressModule
    {:tasks 1 :threads 1})
 
   ;; (shadow/watch :dev2)

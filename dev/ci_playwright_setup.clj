@@ -6,8 +6,8 @@
    [shadow.cljs.devtools.api :as shadow]
    [shadow.cljs.devtools.server]
    [com.rpl.agent.basic.basic-agent :as basic-agent]
-   [com.rpl.agent.gantt-stress.gantt-stress-agent :as gantt-stress]
    [com.rpl.agent.e2e-test-agent :as e2e-test-agent]
+   [com.rpl.agent.gantt-stress-agent :as gantt-stress-agent]
    [com.rpl.agent.streaming-test-agent :as streaming-test-agent]))
 
 (defn -main [& args]
@@ -36,16 +36,16 @@
      basic-agent/BasicAgentModule
      {:tasks 1 :threads 1})
 
-    (println "Launching GanttStressModule...")
-    (rtest/launch-module!
-     ipc
-     gantt-stress/GanttStressModule
-     {:tasks 1 :threads 1})
-
     (println "Launching E2ETestAgentModule...")
     (rtest/launch-module!
      ipc
      e2e-test-agent/E2ETestAgentModule
+     {:tasks 1 :threads 1})
+
+    (println "Launching GanttStressModule...")
+    (rtest/launch-module!
+     ipc
+     gantt-stress-agent/GanttStressModule
      {:tasks 1 :threads 1})
 
     (println "Launching StreamingTestAgentModule...")
