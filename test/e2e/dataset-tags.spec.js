@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { randomUUID } from 'crypto';
-import { getE2ETestAgentRow, addExample, deleteDataset, createEvaluator, deleteEvaluator, addEvaluatorToExperiment, selectCommonDropdownOption, shouldSkipCleanup} from './helpers.js';
+import { getE2ETestAgentRow, addExample, deleteDataset, createDataset, openDatasetByName, createEvaluator, deleteEvaluator, addEvaluatorToExperiment, selectCommonDropdownOption, shouldSkipCleanup} from './helpers.js';
 
 // =============================================================================
 // TEST SUITE
@@ -25,16 +25,9 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
     await page.getByText('Datasets & Experiments').click();
     await expect(page).toHaveURL(new RegExp(`/agents/.*com\\.rpl\\.agent\\.e2e-test-agent.*E2ETestAgentModule.*/datasets`));
 
-    // Create a new dataset
-    await page.getByRole('button', { name: 'Create Dataset' }).first().click();
-    const createModal = page.locator('[role="dialog"]');
-    await createModal.getByLabel('Name').fill(datasetName);
-    await createModal.getByRole('button', { name: 'Create Dataset' }).click();
-    await expect(createModal).not.toBeVisible();
-    await expect(page.getByText(datasetName)).toBeVisible();
-    console.log(`Created dataset: ${datasetName}`);
+    await createDataset(page, datasetName);
 
-    // Navigate into the new dataset
+    // Navigate into the new dataset (search filter left from createDataset)
     await page.getByRole('link', { name: datasetName }).click();
     await page.getByRole('link', { name: 'Examples' }).click();
     await expect(page.getByRole('heading', { name: datasetName })).toBeVisible();
@@ -170,12 +163,8 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
 
     // Create dataset and examples
     await page.getByText('Datasets & Experiments').click();
-    await page.getByRole('button', { name: 'Create Dataset' }).first().click();
-    const createModal = page.locator('[role="dialog"]');
-    await createModal.getByLabel('Name').fill(datasetName);
-    await createModal.getByRole('button', { name: 'Create Dataset' }).click();
-    await expect(createModal).not.toBeVisible();
-
+    await expect(page).toHaveURL(/\/datasets\/?(\?.*)?$/, { timeout: 15000 });
+    await createDataset(page, datasetName);
     await page.getByRole('link', { name: datasetName }).click();
     await page.getByRole('link', { name: 'Examples' }).click();
 
@@ -237,7 +226,8 @@ test.describe('Dataset Example Tagging and Bulk Operations', () => {
 
     // Navigate back to examples
     await page.getByText('Datasets & Experiments').click();
-    await page.getByRole('link', { name: datasetName }).click();
+    await expect(page).toHaveURL(/\/datasets\/?(\?.*)?$/, { timeout: 15000 });
+    await openDatasetByName(page, datasetName);
     await page.getByRole('link', { name: 'Examples' }).click();
 
     // --- 4. TEST RUN COMPARATIVE EXPERIMENT BUTTON ---

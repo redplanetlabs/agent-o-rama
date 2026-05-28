@@ -267,21 +267,28 @@ export async function createDataset(page, name) {
   await modal.getByRole('button', { name: 'Create Dataset' }).click();
   
   await expect(modal).not.toBeVisible();
-  
-  // Verify dataset was created by searching for it (in case it's not on the first page)
+
+  // Paginated index (page size 3) + parallel E2E — search to find the new row.
   const searchInput = page.getByPlaceholder('Search datasets...');
-  if (await searchInput.isVisible()) {
-    await searchInput.fill(name);
-    await page.waitForTimeout(500); // Wait for debounced search
-    await expect(page.getByText(name)).toBeVisible();
-    await searchInput.clear();
-    await page.waitForTimeout(500); // Wait for search to clear
-  } else {
-    // If no search box, just verify it appears somewhere
-    await expect(page.getByText(name)).toBeVisible();
-  }
-  
+  await expect(searchInput).toBeVisible({ timeout: 15000 });
+  await searchInput.fill(name);
+  await expect(page.getByRole('link', { name })).toBeVisible({ timeout: 30000 });
+
   console.log(`Successfully created dataset: ${name}`);
+}
+
+/**
+ * Opens a dataset from the datasets index (uses search — required under pagination).
+ * @param {import('@playwright/test').Page} page
+ * @param {string} name - Dataset name (exact link text)
+ */
+export async function openDatasetByName(page, name) {
+  const searchInput = page.getByPlaceholder('Search datasets...');
+  await expect(searchInput).toBeVisible({ timeout: 15000 });
+  await searchInput.fill(name);
+  const link = page.getByRole('link', { name });
+  await expect(link).toBeVisible({ timeout: 30000 });
+  await link.click();
 }
 
 /**
