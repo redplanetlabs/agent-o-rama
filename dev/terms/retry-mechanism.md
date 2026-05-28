@@ -37,5 +37,5 @@ machine, it continues from the failed node.
 - Used by: [Agent Client](agent-client.md)
 
 ## Examples
-- Clojure: `examples/clj/src/com/rpl/agent/fail_agent.clj`
+- Clojure: `test/clj/com/rpl/agent/fail_agent.clj`
 - Java: Applied automatically on failures
