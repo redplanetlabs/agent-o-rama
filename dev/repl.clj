@@ -47,6 +47,11 @@
    ipc
    streaming-test-agent/StreamingTestAgentModule
    {:tasks 1 :threads 1})
+  
+  (rtest/launch-module!
+   ipc
+   gantt-stress-agent/GanttStressModule
+   {:tasks 1 :threads 1})
 
   ;; Start REPL/UI server AFTER modules are ready
   (println "All modules launched. Starting UI server...")
