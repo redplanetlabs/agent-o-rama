@@ -132,17 +132,18 @@ test.describe('Pagination Tests', () => {
     
     const datasetNames = [];
     const namePrefix = `pagination-test-ds-${uniqueId}`;
+    const searchInput = page.getByPlaceholder('Search datasets...');
     
-    // Note: Dataset search doesn't support pagination on the backend, so we can't use search
-    // to filter. We'll create datasets until Load More appears in the general list.
-    console.log('Creating datasets until pagination is triggered...');
+    console.log('Creating datasets until pagination is triggered (filtered list)...');
     
     let itemCount = 0;
     const loadMoreButton = page.locator('tfoot tr').filter({ hasText: 'Load More' });
+    const minDatasetsForPagination = 25;
 
-    // Ensure we create at least 1 dataset for verification, even if Load More is already visible
-    const minDatasets = 1;
-    while ((!(await loadMoreButton.isVisible()) || itemCount < minDatasets) && itemCount < 50) {
+    await searchInput.fill(namePrefix);
+    await page.waitForTimeout(500);
+
+    while (itemCount < minDatasetsForPagination && itemCount < 50) {
       itemCount++;
       const name = `${namePrefix}-${String(itemCount).padStart(3, '0')}`;
       datasetNames.push(name);
@@ -155,10 +156,15 @@ test.describe('Pagination Tests', () => {
       }
     }
     
-    console.log(`✓ Created ${itemCount} datasets, Load More button is now visible`);
+    console.log(`✓ Created ${itemCount} datasets for pagination test`);
+
+    await page.reload();
+    await expect(page).toHaveURL(/datasets/);
+    await searchInput.fill(namePrefix);
+    await page.waitForTimeout(500);
     
     const initialCount = await page.locator('table tbody tr').count();
-    console.log(`Initial visible count: ${initialCount} (includes datasets from other tests)`);
+    console.log(`Initial visible count: ${initialCount}`);
     
     // Keep clicking "Load More" until exhausted
     let loadMoreClicks = 0;
@@ -182,8 +188,8 @@ test.describe('Pagination Tests', () => {
       const currentCount = await page.locator('table tbody tr').count();
       console.log(`After click #${loadMoreClicks}: ${currentCount} items visible`);
 
-      // Safety check to prevent infinite loop
-      if (loadMoreClicks > 5) {
+      // Safety check to prevent infinite loop (many pages if the DB has lots of matching rows)
+      if (loadMoreClicks > 20) {
         throw new Error('Too many Load More clicks - possible infinite loop');
       }
     }

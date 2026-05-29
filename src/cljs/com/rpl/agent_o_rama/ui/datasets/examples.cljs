@@ -1,25 +1,22 @@
-(ns com.rpl.agent-o-rama.ui.datasets
+(ns com.rpl.agent-o-rama.ui.datasets.examples
   (:require
-   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
-   [uix.core :as uix :refer [defui defhook $]]
+   [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
-   ["@heroicons/react/24/outline" :refer [CircleStackIcon PlusIcon TrashIcon PencilIcon ChevronDownIcon ChevronUpIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentDuplicateIcon MagnifyingGlassIcon]]
-   ["react" :refer [useState]]
+   ["@heroicons/react/24/outline" :refer [TrashIcon PencilIcon EllipsisVerticalIcon PlayIcon XMarkIcon LockClosedIcon InformationCircleIcon DocumentDuplicateIcon PlusIcon]]
    ["use-debounce" :refer [useDebounce]]
+   [clojure.set]
+   [clojure.string :as str]
+   [re-frame.core :as rf]
+   [re-frame.query :as rfq]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.queries :as queries]
-   [com.rpl.agent-o-rama.ui.forms :as forms]
    [com.rpl.agent-o-rama.ui.datasets-forms :as datasets-forms]
    [com.rpl.agent-o-rama.ui.datasets.snapshot-selector :as snapshot-selector]
+   [com.rpl.agent-o-rama.ui.datasets.common :refer [pretty-print-json]]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
-   [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
-   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
-   [re-frame.query :as rfq]
-   [re-frame.core :as rf]
-   [reitit.frontend.easy :as rfe]
-   [clojure.string :as str]
-   [com.rpl.specter :as s]))
+   [com.rpl.agent-o-rama.impl.ui.rpc.datasets :as rpc-datasets]))
 
 (defui SourceDisplay [{:keys [example]}]
   (let [source-string (:source-string example)]
@@ -27,30 +24,7 @@
        ($ :div.flex.items-center
           source-string))))
 
-;; =============================================================================
-;; EXAMPLE ACTIONS AND EDITING
-;; =============================================================================
-(defui ExampleActionButtons [{:keys [example-id module-id dataset-id snapshot-name on-delete-success]}]
-  (let [delete-icon-classes "mr-2 h-4 w-4 text-gray-400 group-hover:text-red-500"]
-
-    ($ :div.flex.items-center.space-x-2
-       ;; Delete button
-       ($ :button.group.flex.items-center.px-2.py-1.text-xs.text-gray-700.hover:bg-red-100.hover:text-red-800.rounded.cursor-pointer
-          {:onClick (fn [e]
-                      (.stopPropagation e)
-                      (when (js/confirm "Are you sure you want to delete this example?")
-                        (-> (rpc/call ::rpc-datasets/delete-example!!
-                             {:module-id module-id :dataset-id dataset-id
-                              :snapshot-name snapshot-name :example-id example-id})
-                            (.then (fn [_]
-                                     (do (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                                   (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
-                                     (when on-delete-success (on-delete-success))))
-                            (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
-          ($ TrashIcon {:className delete-icon-classes})
-          "Delete"))))
-
-(defui EditableField [{:keys [label value field-key example-id module-id dataset-id snapshot-name on-save current-example read-only?]}] ;; Add read-only?
+(defui EditableField [{:keys [label value field-key example-id module-id dataset-id snapshot-name on-save current-example read-only?]}]
   (let [[editing? set-editing!] (uix/use-state false)
         [edit-value set-edit-value!] (uix/use-state "")
         [saving? set-saving!] (uix/use-state false)
@@ -149,90 +123,7 @@
                  (pretty-print-json value))
               ($ :div.text-sm.text-gray-500.italic "No value")))))))
 
-(defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success is-read-only?]}] ;; Add is-read-only?
-  (let [;; Fetch the specific example data
-        {:keys [data loading? error refetch]}
-        (queries/use-rpc-query
-         {:rfq-key ::rpc-datasets/get-example!!
-          :params {:module-id module-id
-                   :dataset-id dataset-id
-                   :snapshot-name snapshot-name
-                   :example-id example-id}
-          :enabled? (boolean (and module-id dataset-id example-id))})
-
-        example (:example data)]
-
-    (cond
-      loading? ($ :div.p-6 "Loading example details...")
-      error ($ :div.p-6.text-red-500 "Error loading example details")
-      (not example) ($ :div.p-6.text-gray-500 "Example not found")
-      :else
-      ($ :div.p-6.space-y-6
-         ;; --- Header with Delete Button ---
-         ($ :div.flex.items-center.justify-between
-            ($ :div)
-            (when-not is-read-only? ;; Only show delete button if not read-only
-              ($ :button
-                 {:className "inline-flex items-center px-3 py-1 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer"
-                  :onClick (fn []
-                             (when (js/confirm "Are you sure you want to delete this example?")
-                               (rf/dispatch [:modal/hide]) ; Close modal before deleting
-                               (-> (rpc/call ::rpc-datasets/delete-example!!
-                                      {:module-id module-id :dataset-id dataset-id
-                                       :snapshot-name snapshot-name :example-id example-id})
-                                  (.then (fn [_]
-                                           (do (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
-                                   (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
-                                           (when on-delete-success (on-delete-success))))
-                                  (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
-                 ($ TrashIcon {:className "mr-2 h-4 w-4"})
-                 "Delete")))
-
-         ;; --- Editable Fields ---
-         ($ :div.space-y-6
-            ;; Input field
-            ($ EditableField {:label "Input"
-                              :value (:input example)
-                              :field-key :input
-                              :example-id example-id
-                              :module-id module-id
-                              :dataset-id dataset-id
-                              :snapshot-name snapshot-name
-                              :on-save refetch
-                              :current-example example
-                              :read-only? is-read-only?}) ;; Pass read-only state
-
-            ;; Reference Output field
-            ($ EditableField {:label "Reference Output"
-                              :value (:reference-output example)
-                              :field-key :reference-output
-                              :example-id example-id
-                              :module-id module-id
-                              :dataset-id dataset-id
-                              :snapshot-name snapshot-name
-                              :on-save refetch
-                              :current-example example
-                              :read-only? is-read-only?}) ;; Pass read-only state
-
-;; Tags section
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
-               ($ :div.bg-gray-50.rounded-md.p-4.border
-                  ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only? :on-tags-change refetch})))
-
-            ;; Source section
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Source")
-               ($ :div.bg-gray-50.rounded-md.p-4.border
-                  ($ SourceDisplay {:example example})))
-
-            ;; Example ID (read-only)
-            ($ :div
-               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
-               ($ :div.bg-gray-50.rounded-md.p-2.border
-                  ($ :code.text-xs.text-gray-600 (str example-id)))))))))
-
-(defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change read-only?]}] ;; Add read-only?
+(defui TagInput [{:keys [tags module-id dataset-id snapshot-name example-id on-tags-change read-only?]}]
   (let [[input-value set-input-value] (uix/use-state "")
         [is-adding set-is-adding] (uix/use-state false)
 
@@ -320,80 +211,88 @@
             (when is-adding
               ($ :div.text-sm.text-gray-500 "Adding...")))))))
 
-;; =============================================================================
-;; EVALUATOR UTILITIES
-;; =============================================================================
+(defui EditableExampleModal [{:keys [example-id module-id dataset-id snapshot-name on-delete-success is-read-only?]}]
+  (let [;; Fetch the specific example data
+        {:keys [data loading? error refetch]}
+        (queries/use-rpc-query
+         {:rfq-key ::rpc-datasets/get-example!!
+          :params {:module-id module-id
+                   :dataset-id dataset-id
+                   :snapshot-name snapshot-name
+                   :example-id example-id}
+          :enabled? (boolean (and module-id dataset-id example-id))})
 
-(defn get-evaluator-type-display [evaluator-type]
-  (case evaluator-type
-    :llm-as-judge "LLM as Judge"
-    :simple-string-match "String Match"
-    :json-field-match "JSON Field Match"
-    :custom-function "Custom Function"
-    (str evaluator-type)))
+        example (:example data)]
 
-(defn get-evaluator-type-badge-style [evaluator-type]
-  (case evaluator-type
-    :llm-as-judge "bg-purple-100 text-purple-800"
-    :simple-string-match "bg-green-100 text-green-800"
-    :json-field-match "bg-blue-100 text-blue-800"
-    :custom-function "bg-orange-100 text-orange-800"
-    "bg-gray-100 text-gray-800"))
+    (cond
+      loading? ($ :div.p-6 "Loading example details...")
+      error ($ :div.p-6.text-red-500 "Error loading example details")
+      (not example) ($ :div.p-6.text-gray-500 "Example not found")
+      :else
+      ($ :div.p-6.space-y-6
+         ;; --- Header with Delete Button ---
+         ($ :div.flex.items-center.justify-between
+            ($ :div)
+            (when-not is-read-only? ;; Only show delete button if not read-only
+              ($ :button
+                 {:className "inline-flex items-center px-3 py-1 text-sm text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer"
+                  :onClick (fn []
+                             (when (js/confirm "Are you sure you want to delete this example?")
+                               (rf/dispatch [:modal/hide]) ; Close modal before deleting
+                               (-> (rpc/call ::rpc-datasets/delete-example!!
+                                      {:module-id module-id :dataset-id dataset-id
+                                       :snapshot-name snapshot-name :example-id example-id})
+                                  (.then (fn [_]
+                                           (do (rf/dispatch [:query/invalidate {:query-key-pattern [:dataset-examples module-id dataset-id]}])
+                                   (rf/dispatch [:re-frame.query/invalidate-tags [[:dataset-examples module-id dataset-id]]]))
+                                           (when on-delete-success (on-delete-success))))
+                                  (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
+                 ($ TrashIcon {:className "mr-2 h-4 w-4"})
+                 "Delete")))
 
-(defui EvaluatorDropdown [{:keys [evaluators on-select selected-evaluator]}]
-  (let [[open? set-open] (uix/use-state false)]
+         ;; --- Editable Fields ---
+         ($ :div.space-y-6
+            ;; Input field
+            ($ EditableField {:label "Input"
+                              :value (:input example)
+                              :field-key :input
+                              :example-id example-id
+                              :module-id module-id
+                              :dataset-id dataset-id
+                              :snapshot-name snapshot-name
+                              :on-save refetch
+                              :current-example example
+                              :read-only? is-read-only?})
 
-    ;; Close dropdown when clicking outside
-    (uix/use-effect
-     (fn []
-       (let [handle-click (fn [e]
-                            (when open?
-                              (set-open false)))]
-         (.addEventListener js/document "click" handle-click)
-         #(.removeEventListener js/document "click" handle-click)))
-     [open?])
+            ;; Reference Output field
+            ($ EditableField {:label "Reference Output"
+                              :value (:reference-output example)
+                              :field-key :reference-output
+                              :example-id example-id
+                              :module-id module-id
+                              :dataset-id dataset-id
+                              :snapshot-name snapshot-name
+                              :on-save refetch
+                              :current-example example
+                              :read-only? is-read-only?})
 
-    ($ :div.relative.inline-block.text-left
-       ;; Main dropdown button
-       ($ :button.inline-flex.items-center.justify-between.w-64.px-3.py-2.text-sm.bg-white.border.border-gray-300.rounded-md.shadow-sm.hover:bg-gray-50.focus:outline-none.focus:ring-2.focus:ring-offset-2.focus:ring-blue-500.cursor-pointer
-          {:onClick (fn [e]
-                      (.stopPropagation e)
-                      (set-open (not open?)))}
-          ($ :span.truncate
-             (if selected-evaluator
-               (:name selected-evaluator)
-               "Select evaluator..."))
-          ($ ChevronDownIcon {:className "ml-2 h-4 w-4 text-gray-400"}))
+            ;; Tags section
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tags")
+               ($ :div.bg-gray-50.rounded-md.p-4.border
+                  ($ TagInput {:tags (:tags example) :module-id module-id :dataset-id dataset-id :snapshot-name snapshot-name :example-id example-id :read-only? is-read-only? :on-tags-change refetch})))
 
-       ;; Dropdown menu
-       (when open?
-         ($ :div.origin-top-right.absolute.right-0.mt-1.w-full.rounded-md.shadow-lg.bg-white.ring-1.ring-black.ring-opacity-5.z-50
-            {:onClick #(.stopPropagation %)}
-            ($ :div.py-1
-               ;; Default option
-               ($ common/DropdownRow {:label "Select evaluator..."
-                                      :selected? (nil? selected-evaluator)
-                                      :on-select #(do
-                                                    (set-open false)
-                                                    (on-select nil))
-                                      :delete-button nil})
+            ;; Source section
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Source")
+               ($ :div.bg-gray-50.rounded-md.p-4.border
+                  ($ SourceDisplay {:example example})))
 
-               ;; Evaluator options
-               (for [evaluator evaluators]
-                 ($ common/DropdownRow {:key (:id evaluator)
-                                        :label (:name evaluator)
-                                        :selected? (= (:id selected-evaluator) (:id evaluator))
-                                        :on-select #(do
-                                                      (set-open false)
-                                                      (on-select evaluator))
-                                        :delete-button nil
-                                        :extra-content ($ :div.px-4.pb-2.text-xs.text-gray-500
-                                                          ($ :span.inline-flex.items-center.px-2.py-0.5.rounded-full.text-xs.font-medium
-                                                             {:className (get-evaluator-type-badge-style (:type evaluator))}
-                                                             (get-evaluator-type-display (:type evaluator))))}))))))))
-;; =============================================================================
-;; CONTEXTUAL ACTION BAR
-;; =============================================================================
+            ;; Example ID (read-only)
+            ($ :div
+               ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Example ID")
+               ($ :div.bg-gray-50.rounded-md.p-2.border
+                  ($ :code.text-xs.text-gray-600 (str example-id)))))))))
 
 (defui ContextualActionBar [{:keys [module-id dataset-id snapshot-name selected-example-ids examples is-read-only?]}]
   (let [example-count (count selected-example-ids)
@@ -445,7 +344,7 @@
                                                                                            :selected-example-ids selected-example-ids})}]))}
                 "Try summary evaluator")
 
-;; Run Experiment button
+             ;; Run Experiment button
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
                 {:onClick #(rf/dispatch [:modal/show-form :create-experiment
                                             {:module-id module-id
@@ -457,7 +356,7 @@
                  :title "Run a regular experiment with the selected examples"}
                 "Run Experiment")
 
-;; Run Comparative Experiment button
+             ;; Run Comparative Experiment button
              ($ :button.px-3.py-1.text-sm.bg-white.border.border-gray-300.rounded-md.hover:bg-gray-50.cursor-pointer
                 {:onClick #(rf/dispatch [:modal/show-form :create-experiment
                                             {:module-id module-id
@@ -492,7 +391,7 @@
     ;; Close dropdown when clicking outside
     (uix/use-effect
      (fn []
-       (let [handle-click (fn [e]
+       (let [handle-click (fn [_]
                             (when open-dropdown
                               (set-open-dropdown nil)))]
          (.addEventListener js/document "click" handle-click)
@@ -503,7 +402,7 @@
        ($ :table.min-w-full.divide-y.divide-gray-200
           ($ :thead.bg-gray-50
              ($ :tr
-               ;; Checkbox column header - entire cell is clickable
+                ;; Checkbox column header - entire cell is clickable
                 ($ :th.px-4.py-3.text-left.cursor-pointer.hover:bg-blue-100
                    {:onClick #(set-selected-ids
                                (if all-selected?
@@ -571,7 +470,7 @@
                            (->> tags
                                 (map name)
                                 (sort)
-                                (clojure.string/join ", "))
+                                (str/join ", "))
                            ($ :span.italic "no tags"))))
                     ;; Created timestamp column
                     ($ :td.px-6.py-4.text-sm.text-gray-600
@@ -666,227 +565,6 @@
                                        :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
                                        :clipRule "evenodd"}))))))))))))
 
-(defn get-dataset-path [module-id dataset-id]
-  (rfe/href :module/dataset-detail.examples
-            {:module-id module-id
-             :dataset-id dataset-id}))
-
-;; =============================================================================
-;; MAIN DATASETS INDEX PAGE
-;; =============================================================================
-
-(defui index [{:keys [module-id]}]
-  (let [;; Add state for search term and debounce it
-        [search-term set-search-term] (useState "")
-        [debounced-search-term] (useDebounce search-term 300)
-
-        {:keys [data isLoading isFetchingMore hasMore loadMore error]}
-        (queries/use-infinite-rpc-query
-         {:rfq-key ::rpc-datasets/get-all-inf!!
-          :params {:module-id module-id
-                   :filters (when-not (str/blank? debounced-search-term)
-                              {:search-string debounced-search-term})}
-          :page-size 3
-          :enabled? (boolean module-id)})]
-
-    ($ :div.p-6
-       ;; Header with search input
-       ($ :div.flex.justify-between.items-center.mb-6
-          ($ :div.flex.items-center.gap-3
-             ($ CircleStackIcon {:className "h-8 w-8 text-indigo-600"})
-             ;; Search input field
-             ($ :div.relative.ml-4
-                ($ :div.pointer-events-none.absolute.inset-y-0.left-0.flex.items-center.pl-3
-                   ($ MagnifyingGlassIcon {:className "h-5 w-5 text-gray-400"}))
-                ($ :input
-                   {:type "text"
-                    :value search-term
-                    :onChange #(set-search-term (.. % -target -value))
-                    :className "block w-full rounded-md border-0 py-1.5 pl-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                    :placeholder "Search datasets..."})))
-
-          ($ :div.flex.items-center.gap-2
-             ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
-                {:onClick #(rf/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
-                ($ PlusIcon {:className "h-5 w-5 mr-2"})
-                "Create Dataset")))
-
-       ;; Content
-       (cond
-         (and isLoading (empty? data))
-         ($ :div.flex.items-center.justify-center.h-full ($ :div "Loading datasets..."))
-
-         error
-         ($ :div.flex.items-center.justify-center.h-full ($ :div.text-red-500 "Error loading datasets"))
-
-         (empty? data)
-         ($ :div.text-center.py-12
-            ($ CircleStackIcon {:className "mx-auto h-12 w-12 text-gray-400 mb-4"})
-            ($ :h3.text-lg.font-medium.text-gray-900.mb-2 "No datasets yet")
-            ($ :p.text-gray-500.mb-6 "Create your first dataset to get started.")
-            ($ :button.inline-flex.items-center.px-4.py-2.bg-blue-600.text-white.rounded-md.hover:bg-blue-700.transition-colors.cursor-pointer
-               {:onClick #(rf/dispatch [:modal/show-form :create-dataset {:module-id module-id}])}
-               ($ PlusIcon {:className "h-5 w-5 mr-2"})
-               "Create Dataset"))
-
-         :else
-         ($ :div {:className (:container common/table-classes)}
-            ($ :table {:className (:table common/table-classes)}
-               ($ :thead {:className (:thead common/table-classes)}
-                  ($ :tr
-                     ($ :th {:className (:th common/table-classes)} "Name")
-                     ($ :th {:className (:th common/table-classes)} "Description")
-                     ($ :th {:className (:th common/table-classes)} "Created")
-                     ($ :th {:className (:th common/table-classes)} "Modified")
-                     ($ :th {:className (:th common/table-classes)} "Actions")))
-               ($ :tbody
-                  (into []
-                        (for [dataset data
-                              :let [is-remote? (:remote? dataset)
-                                    name (:name dataset)
-                                    desc (:description dataset)
-                                    dsid (:dataset-id dataset)
-                                    href (get-dataset-path module-id dsid)
-                                    ;; Format remote description
-                                    remote-desc (when is-remote?
-                                                  (let [host (:remote-host dataset)
-                                                        port (:remote-port dataset)
-                                                        module (:remote-module-name dataset)]
-                                                    (cond
-                                                      (and host port) (str host ":" port " " module)
-                                                      host (str host " " module)
-                                                      :else module)))]]
-                          ($ :tr {:key dsid
-                                  :className (common/cn "hover:bg-gray-50 cursor-pointer"
-                                                        {"bg-purple-50" is-remote?})
-                                  :onClick (fn [_]
-                                             (rfe/push-state :module/dataset-detail.examples
-                                                             {:module-id module-id
-                                                              :dataset-id dsid}))}
-                             ($ :td {:className (:td common/table-classes)}
-                                (if is-remote?
-                                  ($ :div.flex.flex-col.gap-1
-                                     ($ :span.text-purple-700.font-semibold.uppercase.text-xs "REMOTE DATASET")
-                                     ($ :span.text-xs.text-gray-600 name))
-                                  ($ :a.text-indigo-600.hover:text-indigo-800 {:href href} name)))
-                             ($ :td {:className (:td common/table-classes)}
-                                (if is-remote?
-                                  ($ :span.text-sm.text-purple-600.font-mono remote-desc)
-                                  (if (seq (str desc))
-                                    ($ :span.text-sm.text-gray-600.desc.truncate {:title desc} desc)
-                                    ($ :span.text-sm.text-gray-400.italic "—"))))
-                             ($ :td {:className (:td common/table-classes)}
-                                (when-not is-remote?
-                                  ($ :span.text-sm.text-gray-600 {:title (common/format-timestamp (:created-at dataset))}
-                                     (common/format-relative-time (:created-at dataset)))))
-                             ($ :td {:className (:td common/table-classes)}
-                                (when-not is-remote?
-                                  ($ :span.text-sm.text-gray-600 {:title (common/format-timestamp (:modified-at dataset))}
-                                     (common/format-relative-time (:modified-at dataset)))))
-                             ($ :td {:className (:td-right common/table-classes)}
-                                ($ :div.flex.items-center.space-x-2
-                                   (when-not is-remote?
-                                     ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-gray-700.cursor-pointer
-                                        {:onClick (fn [e]
-                                                    (.preventDefault e)
-                                                    (.stopPropagation e)
-                                                    (rf/dispatch [:modal/show-form :edit-dataset
-                                                                     {:module-id module-id
-                                                                      :dataset-id dsid
-                                                                      :name name
-                                                                      :description desc
-                                                                      :initial-name name
-                                                                      :initial-description desc}]))}
-                                        ($ PencilIcon {:className "h-4 w-4 mr-1"})
-                                        "Edit"))
-                                   ($ :button.inline-flex.items-center.px-2.py-1.text-xs.text-gray-500.hover:text-red-700.cursor-pointer
-                                      {:onClick (fn [e]
-                                                  (.preventDefault e)
-                                                  (.stopPropagation e)
-                                                  (when (js/confirm (str "Are you sure you want to delete dataset '" name "'? This action cannot be undone."))
-                                                    (-> (rpc/call ::rpc-datasets/delete!! {:module-id module-id :dataset-id dsid})
-                                                    (.then (fn [_]
-                                                             (do (rf/dispatch [:query/invalidate {:query-key-pattern [:datasets module-id]}])
-                                                             (rf/dispatch [:re-frame.query/invalidate-tags [[:datasets module-id]]]))))
-                                                    (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))}
-                                      ($ TrashIcon {:className "h-4 w-4 mr-1"})
-                                      "Delete")))))))
-
-               ;; Load More button
-               (when hasMore
-                 ($ :tfoot.bg-gray-50.border-t.border-gray-200
-                    ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                       {:onClick (when-not isFetchingMore loadMore)}
-                       ($ :td.px-4.py-3.cursor-pointer {:colSpan 5}
-                          ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
-                             ($ :span.mr-2.text-sm.font-medium (if isFetchingMore "Loading..." "Load More"))
-                             (when-not isFetchingMore
-                               ($ :svg.w-4.h-4 {:viewBox "0 0 20 20" :fill "currentColor"}
-                                  ($ :path {:fillRule "evenodd"
-                                            :d "M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                            :clipRule "evenodd"}))))))))))))))
-
-;; =============================================================================
-;; PRETTY PRINT UTILITY
-;; =============================================================================
-
-(defn pretty-print-json [json-data]
-  (try
-    (js/JSON.stringify (clj->js json-data) nil 2)
-    (catch js/Error _
-      (str json-data))))
-
-(defui ImportResultsModal [{:keys [success_count failure_count errors]}]
-  ($ :div.p-6
-     ;; Summary section
-     ($ :div.mb-6
-        ($ :div.flex.items-center.gap-4.mb-4
-           (if (zero? failure_count)
-             ($ :div.flex.items-center.gap-2.text-green-700
-                ($ :svg.h-6.w-6.text-green-600 {:fill "currentColor" :viewBox "0 0 20 20"}
-                   ($ :path {:fillRule "evenodd"
-                             :d "M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                             :clipRule "evenodd"}))
-                ($ :h3.text-lg.font-semibold "Import Successful"))
-             ($ :div.flex.items-center.gap-2.text-yellow-700
-                ($ :svg.h-6.w-6.text-yellow-600 {:fill "currentColor" :viewBox "0 0 20 20"}
-                   ($ :path {:fillRule "evenodd"
-                             :d "M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                             :clipRule "evenodd"}))
-                ($ :h3.text-lg.font-semibold "Import Completed with Errors"))))
-
-        ;; Stats
-        ($ :div.grid.grid-cols-2.gap-4.text-sm
-           ($ :div.bg-green-50.border.border-green-200.rounded-lg.p-3
-              ($ :div.text-green-800.font-medium "Successful")
-              ($ :div.text-2xl.font-bold.text-green-900 success_count))
-           ($ :div.bg-red-50.border.border-red-200.rounded-lg.p-3
-              ($ :div.text-red-800.font-medium "Failed")
-              ($ :div.text-2xl.font-bold.text-red-900 failure_count))))
-
-     ;; Errors section (only show if there are errors)
-     (when (and (seq errors) (> failure_count 0))
-       ($ :div.mt-6
-          ($ :h4.text-md.font-semibold.text-gray-900.mb-3 "Error Details")
-          ($ :div.max-h-96.overflow-y-auto.border.border-gray-200.rounded-lg
-             ($ :div.divide-y.divide-gray-200
-                (for [[idx error] (map-indexed vector errors)]
-                  ($ :div.p-4.hover:bg-gray-50 {:key idx}
-                     ($ :div.text-sm.font-medium.text-gray-900.mb-2
-                        (str "Line " (inc idx) ":"))
-                     ($ :div.text-xs.font-mono.text-gray-600.bg-gray-100.p-2.rounded.mb-2.break-all
-                        (:line_content error))
-                     ($ :div.text-sm.text-red-600
-                        (:error error))))))))))
-
-;; =============================================================================
-;; DATASET DETAIL EXAMPLES TAB COMPONENT
-;; =============================================================================
-
-;; =============================================================================
-;; REMOTE DATASET VIEW COMPONENT
-;; =============================================================================
-
 (defui remote-detail-view [{:keys [dataset]}]
   ($ :div.h-full.flex.items-center.justify-center.p-6
      ($ :div.max-w-2xl.bg-purple-50.border.border-purple-200.rounded-lg.p-8
@@ -917,30 +595,10 @@
                               ($ :span.font-medium "Port:")
                               ($ :span.font-mono.text-purple-700 (str port)))))))))))))
 
-;; =============================================================================
-;; EXAMPLES TAB ROUTER (for local vs remote datasets)
-;; =============================================================================
-
-(defui detail-examples-router [{:keys [module-id dataset-id]}]
-  (let [{:keys [data error]
-         query-status :status}
-        (use-subscribe [::rfq/query ::rpc-datasets/get-props!!
-                        {:module-id module-id :dataset-id dataset-id}])
-        loading? (#{:loading :idle} query-status)
-        dataset data
-        is-remote? (boolean (:module-name dataset))]
-    (cond
-      loading? ($ :div.p-6 "Loading dataset details...")
-      error ($ :div.p-6.text-red-500 "Error loading dataset details")
-      (not dataset) ($ :div.p-6.text-gray-500 "Dataset not found")
-      is-remote? ($ remote-detail-view {:dataset dataset})
-      :else ($ detail-examples {:module-id module-id :dataset-id dataset-id}))))
-
 (defui detail-examples [{:keys [module-id dataset-id]}]
-  (let [;; --- CHANGED: Use local state instead of app-db for selection ---
+  (let [;; Local state for selected example IDs
         [selected-example-ids set-selected-example-ids] (uix/use-state #{})
 
-        ;; --- REFACTORED ---
         ;; State for selected snapshot now comes from app-db and is updated via dispatch
         selected-snapshot-name (or (use-subscribe [::aor-rf/get-in [:ui :datasets :selected-snapshot-per-dataset dataset-id]]) "")
         set-selected-snapshot-name (fn [new-name]
@@ -952,7 +610,7 @@
         [search-string set-search-string] (uix/use-state "")
         [debounced-search-string] (useDebounce search-string 300)
 
-        {:keys [data isLoading isFetchingMore hasMore loadMore error refetch]}
+        {:keys [data isLoading isFetchingMore hasMore loadMore error]}
         (queries/use-infinite-rpc-query
          {:rfq-key ::rpc-datasets/search-examples-inf!!
           :params {:module-id module-id
@@ -972,7 +630,6 @@
              ;; Left side - Snapshot Manager and Search
              ($ :div.flex.items-center.space-x-4
                 ($ :span.text-sm.font-medium.text-gray-700 "Snapshot:")
-                ;; --- REPLACED ---
                 ($ snapshot-selector/SnapshotManager {:module-id module-id
                                                       :dataset-id dataset-id
                                                       :selected-snapshot selected-snapshot-name
@@ -1031,14 +688,14 @@
                                  :selected-example-ids selected-example-ids
                                  :examples examples
                                  :is-read-only? is-read-only?})
-         ($ :div.h-10)) ;; Placeholder to maintain layout height 
+         ($ :div.h-10)) ;; Placeholder to maintain layout height
 
        ;; Examples Content
        ($ :div.flex-1.overflow-hidden
           ($ :div.h-full.flex.flex-col
              ($ :div.flex-1.overflow-hidden
                 (cond
-                  (and isLoading (empty? examples)) ;; Only show full loading if no data exists yet
+                  (and isLoading (empty? examples))
                   ($ :div.flex.items-center.justify-center.h-full
                      ($ common/spinner {:size :large})
                      ($ :div.ml-2.text-gray-500 "Loading examples..."))
@@ -1063,119 +720,17 @@
                                             :is-fetching-more? isFetchingMore
                                             :load-more loadMore})))))))))
 
-;; =============================================================================
-;; DATASET DETAIL LAYOUT COMPONENT
-;; =============================================================================
-
-(defui detail [{:keys [match module-id dataset-id]}]
-  (let [route-name (get-in match [:data :name])
-        experiments-routes #{:module/dataset-detail
-                             :module/dataset-detail.experiments
-                             :module/dataset-detail.experiment-detail}
-        comparative-routes #{:module/dataset-detail.comparative-experiments
-                             :module/dataset-detail.comparative-experiment-detail}
-        active-tab (cond
-                     (contains? comparative-routes route-name)
-                     "comparative"
-
-                     (contains? experiments-routes route-name)
-                     "experiments"
-
-                     :else "examples")
-        [show-info? set-show-info] (uix/use-state false)
-        {:keys [data error]
+(defui detail-examples-router [{:keys [module-id dataset-id]}]
+  (let [{:keys [data error]
          query-status :status}
         (use-subscribe [::rfq/query ::rpc-datasets/get-props!!
                         {:module-id module-id :dataset-id dataset-id}])
         loading? (#{:loading :idle} query-status)
         dataset data
         is-remote? (boolean (:module-name dataset))]
-    ($ :div.h-full.flex.flex-col
-       (cond
-         loading? ($ :div.p-6 "Loading dataset details...")
-         error ($ :div.p-6 "Error: " error)
-         dataset
-         ($ :div.h-full.flex.flex-col
-            ;; Header Bar for the whole dataset page
-            (if is-remote?
-              ;; Remote dataset header - show connection info
-              ($ :div.bg-purple-50.border-b.border-purple-200.px-6.py-4
-                 ($ :div.flex.items-center.gap-3
-                    ($ :span.text-sm.font-semibold.text-purple-700.uppercase "Remote Dataset:")
-                    ($ :span.font-mono.text-purple-900
-                       (let [host (:remote-host dataset)
-                             port (:remote-port dataset)
-                             module (:module-name dataset)]
-                         (cond
-                           (and host port) (str host ":" port " / " module)
-                           host (str host " / " module)
-                           :else module)))))
-              ;; Local dataset header - show title and details
-              ($ :div.bg-white.px-6.py-4
-                 ($ :div.flex.items-center.justify-between
-                    ;; Left side - Title and info
-                    ($ :div.flex.items-center.space-x-4
-                       ($ :h1.text-2xl.font-bold.text-gray-900 (:name dataset))
-                       ;; Details button with conditional chevron
-                       ($ :button.inline-flex.items-center.px-3.py-1.text-sm.text-gray-600.hover:text-gray-800.rounded-md.hover:bg-gray-100.cursor-pointer
-                          {:onClick #(set-show-info (not show-info?))
-                           :title (if show-info? "Hide Dataset Information" "Show Dataset Information")}
-                          ($ :span.mr-1 "Details")
-                          (if show-info?
-                            ($ ChevronUpIcon {:className "h-4 w-4"})
-                            ($ ChevronDownIcon {:className "h-4 w-4"}))))
-                    ;; Right side - reserved for actions
-                    ($ :div.flex.items-center.space-x-4))))
-
-            ;; Collapsible info panel (only for local datasets)
-            (when (and show-info? (not is-remote?))
-              ($ :div.bg-blue-50.border-b.border-blue-200.px-6.py-4
-                 ($ :div.space-y-4
-                    ;; Description
-                    (when (:description dataset)
-                      ($ :div
-                         ($ :h3.text-sm.font-medium.text-blue-900 "Description")
-                         ($ :p.text-sm.text-blue-700.mt-1 (:description dataset))))
-
-                    ;; Schemas - Always show this section
-                    (let [input-schema (:input-json-schema dataset)
-                          output-schema (:output-json-schema dataset)]
-                      ($ :div
-                         ($ :h3.text-sm.font-medium.text-blue-900 "Schemas")
-                         ($ :div.grid.grid-cols-2.gap-4.mt-2
-                            ;; Input Schema - always show
-                            ($ :div
-                               ($ :h4.text-xs.font-medium.text-blue-800.mb-1 "Input Schema")
-                               (if input-schema
-                                 ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-32.text-blue-800
-                                    (pretty-print-json input-schema))
-                                 ($ :div.text-xs.bg-gray-100.p-2.rounded.text-gray-500.italic
-                                    "Schema: nil")))
-                            ;; Output Schema - always show
-                            ($ :div
-                               ($ :h4.text-xs.font-medium.text-blue-800.mb-1 "Output Schema")
-                               (if output-schema
-                                 ($ :pre.text-xs.bg-blue-100.p-2.rounded.overflow-auto.max-h-32.text-blue-800
-                                    (pretty-print-json output-schema))
-                                 ($ :div.text-xs.bg-gray-100.p-2.rounded.text-gray-500.italic
-                                    "Schema: nil")))))))))
-
-            ;; Tab navigation bar
-            ($ :div.bg-white.border-b.border-gray-200
-               ($ :nav.flex.space-x-8.px-6
-                  ($ :a {:href (rfe/href :module/dataset-detail.examples {:module-id module-id, :dataset-id dataset-id}),
-                         :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
-                                               {"border-indigo-500 text-indigo-600" (= active-tab "examples")
-                                                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "examples")})}
-                     "Examples")
-                  ($ :a {:href (rfe/href :module/dataset-detail.experiments {:module-id module-id, :dataset-id dataset-id}),
-                         :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
-                                               {"border-indigo-500 text-indigo-600" (= active-tab "experiments")
-                                                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "experiments")})}
-                     "Experiments")
-                  ($ :a {:href (rfe/href :module/dataset-detail.comparative-experiments {:module-id module-id, :dataset-id dataset-id}),
-                         :className (common/cn "py-2 px-1 border-b-2 font-medium text-sm"
-                                               {"border-indigo-500 text-indigo-600" (= active-tab "comparative")
-                                                "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" (not= active-tab "comparative")})}
-                     "Comparative Experiments"))))
-         :else ($ :div.p-6 "Dataset not found.")))))
+    (cond
+      loading? ($ :div.p-6 "Loading dataset details...")
+      error ($ :div.p-6.text-red-500 "Error loading dataset details")
+      (not dataset) ($ :div.p-6.text-gray-500 "Dataset not found")
+      is-remote? ($ remote-detail-view {:dataset dataset})
+      :else ($ detail-examples {:module-id module-id :dataset-id dataset-id}))))

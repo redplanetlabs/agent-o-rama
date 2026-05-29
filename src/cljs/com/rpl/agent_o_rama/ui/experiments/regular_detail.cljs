@@ -524,7 +524,6 @@
                                                                         :component ($ ContentModal {:content % :title "Reference Output"})}])}))
                        ;; Output Cell with evaluator capsules
                        (let [agent-result (get-in run [:agent-results 0])]
-                         (println "agent-result" agent-result)
                          ($ :td {:key "output-cell" :className (:td common/table-classes)}
                             (if agent-result
                               ;; If results exist, render the content (success or failure)

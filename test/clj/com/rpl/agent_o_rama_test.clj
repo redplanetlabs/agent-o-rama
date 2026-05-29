@@ -1076,6 +1076,7 @@
                             :d (store/get kv :d)
                             :e (store/pstate-select [:b ALL] kv)
                             :f (store/pstate-select-one :a kv)
+                            :async-f (.get (foreign-select-one-async :a (store/get-underlying-pstate kv)))
                             :g [(store/pstate-select :zz kv :e)
                                 (store/pstate-select :zz kv)]
                             :h [(store/pstate-select-one :zz kv :e)
@@ -1120,6 +1121,7 @@
                        :ma?   (store/contains-document-field? doc :m :a)
                        :mc?   (store/contains-document-field? doc :m :c)
                        :psa   (store/pstate-select-one [:s :a] doc)
+                       :async-psa (.get (foreign-select-one-async [:s :a] (store/get-underlying-pstate doc)))
                        :psb   (store/pstate-select [:s :b ALL] doc)
                        :pzz   [(store/pstate-select :zz doc :e)
                                (store/pstate-select :zz doc)]
@@ -1157,10 +1159,12 @@
                  :pstate {:ks   (store/pstate-select [:a MAP-KEYS] p)
                           :kv   (store/pstate-select [:a MAP-VALS] p)
                           :k0   (store/pstate-select-one [:a 0] p)
+                          :async-k0 (.get (foreign-select-one-async [:a 0] (store/get-underlying-pstate p) {:pkey :a}))
                           :zz0  [(store/pstate-select [:zz 0] p :e)
                                  (store/pstate-select [:zz 0] p)]
                           :zz02 [(store/pstate-select-one [:zz 0] p :e)
                                  (store/pstate-select-one [:zz 0] p)]
+                          :async-zz0 (.get (foreign-select-one-async [:zz 0] (store/get-underlying-pstate p) {:pkey :e}))
                          }))
              )))
           (aor/node "end"
@@ -1199,6 +1203,7 @@
                       :d 3
                       :e [3]
                       :f 3
+                      :async-f 3
                       :g [[3] [nil]]
                       :h [3 nil]
                       :i true
@@ -1214,6 +1219,7 @@
                       :ma?   true
                       :mc?   false
                       :psa   6
+                      :async-psa 6
                       :psb   [10 3]
                       :pzz   [[{:a 3 :b [4]}]
                               [nil]]
@@ -1224,8 +1230,10 @@
              :pstate {:ks   [0 1]
                       :kv   [53 3]
                       :k0   53
+                      :async-k0 53
                       :zz0  [[3] [nil]]
-                      :zz02 [3 nil]}}
+                      :zz02 [3 nil]
+                      :async-zz0 3}}
             (:val (invoke-agent-and-return! depot root-pstate [3]))))
      (is (= {:kv     {:a 1
                       :b [3 1]
@@ -1233,6 +1241,7 @@
                       :d 4
                       :e [3 1]
                       :f 1
+                      :async-f 1
                       :g [[1] [nil]]
                       :h [1 nil]
                       :i true
@@ -1248,6 +1257,7 @@
                       :ma?   true
                       :mc?   false
                       :psa   14
+                      :async-psa 14
                       :psb   [10 3 1]
                       :pzz   [[{:a 1 :b [2]}]
                               [nil]]
@@ -1258,8 +1268,10 @@
              :pstate {:ks   [0 1 2]
                       :kv   [54 3 1]
                       :k0   54
+                      :async-k0 54
                       :zz0  [[1] [nil]]
-                      :zz02 [1 nil]}}
+                      :zz02 [1 nil]
+                      :async-zz0 1}}
             (:val (invoke-agent-and-return! depot root-pstate [1]))))
      (is (= 1 (foreign-select-one :a kv)))
      (is (= [3 1] (foreign-select-one :b kv)))

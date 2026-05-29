@@ -487,19 +487,32 @@ public class ResearchAgentModule extends AgentModule {
     return docs;
   }
 
-  private static List<String> wikiSearch(String query) throws IOException, InterruptedException {
-    String url = "https://en.wikipedia.org/w/api.php" +
-      "?action=query&list=search&format=json&srsearch=" +
-      URLEncoder.encode(query, StandardCharsets.UTF_8);
-
+  private static HttpResponse<String> wikiGet(String url) throws IOException, InterruptedException {
     HttpRequest request = HttpRequest.newBuilder()
       .uri(java.net.URI.create(url))
       .header("User-Agent", "Agent-o-rama/1.0 (Research Agent)")
       .header("Accept", "application/json")
       .GET()
       .build();
+    long delayMs = 1000;
+    int attempts = 0;
+    while (true) {
+      HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      if (response.statusCode() != 429) return response;
+      if (attempts == 6)
+        throw new RuntimeException("Wikipedia rate limited, giving up after 7 attempts");
+      Thread.sleep(delayMs);
+      delayMs *= 2;
+      attempts++;
+    }
+  }
 
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+  private static List<String> wikiSearch(String query) throws IOException, InterruptedException {
+    String url = "https://en.wikipedia.org/w/api.php" +
+      "?action=query&list=search&format=json&srsearch=" +
+      URLEncoder.encode(query, StandardCharsets.UTF_8);
+
+    HttpResponse<String> response = wikiGet(url);
 
     if (response.statusCode() == 200) {
       JsonNode root = objectMapper.readTree(response.body());
@@ -525,13 +538,7 @@ public class ResearchAgentModule extends AgentModule {
     String url = "https://en.wikipedia.org/w/api.php" +
       "?action=query&prop=extracts&explaintext=true&format=json&titles=" +
       URLEncoder.encode(title, StandardCharsets.UTF_8);
-    HttpRequest request = HttpRequest.newBuilder()
-      .uri(java.net.URI.create(url))
-      .header("User-Agent", "Agent-o-rama/1.0 (Research Agent)")
-      .header("Accept", "application/json")
-      .GET()
-      .build();
-    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+    HttpResponse<String> response = wikiGet(url);
     if (response.statusCode() == 200) {
       JsonNode root = objectMapper.readTree(response.body());
       JsonNode queryNode = root.path("query");

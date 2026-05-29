@@ -443,7 +443,8 @@
 
       (case> (= *key :reference-output))
        (get *props :output-json-schema :> *output-json-schema)
-       (validate-with-schema> *output-json-schema *value)
+       (<<if (some? *value)
+         (validate-with-schema> *output-json-schema *value))
 
       (default>))
      (update-dataset-example!

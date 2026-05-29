@@ -453,7 +453,7 @@
    snapshot-name :- (s/maybe String)
    example-id :- UUID
    key :- clojure.lang.Keyword
-   value :- Object])
+   value :- s/Any])
 
 (defaorrecord RemoveDatasetExample
   [dataset-id :- UUID

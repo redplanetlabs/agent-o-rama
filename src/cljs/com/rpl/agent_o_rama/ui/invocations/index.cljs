@@ -166,7 +166,8 @@
                (when hasMore
                  ($ :tfoot.bg-gray-50.border-t.border-gray-200
                     ($ :tr.hover:bg-gray-100.transition-colors.duration-150
-                       {:onClick (when-not isFetchingMore loadMore)}
+                       {:data-testid "invocations-load-more"
+                        :onClick (when-not isFetchingMore loadMore)}
                        ($ :td.px-4.py-3.cursor-pointer {:colSpan (+ 5 n-feedback-cols)}
                           ($ :div.flex.justify-center.items-center.text-gray-600.hover:text-gray-800.transition-colors.duration-150
                              ($ :span.mr-2.text-sm.font-medium (if isFetchingMore "Loading..." "Load More"))

@@ -276,12 +276,26 @@ Here are the sections to reflect on for writing: %s")
 (def KW-MAPPER (j/object-mapper {:decode-key-fn keyword}))
 (def STR-MAPPER (j/object-mapper {:decode-key-fn str}))
 
+(def WIKI-HEADERS {"User-Agent" "Agent-o-rama/1.0 (Research Agent)"})
+
+(defn wiki-get
+  [url]
+  (loop [delay-ms 1000
+         attempts 0]
+    (let [{:keys [status body]} @(http/get url {:headers WIKI-HEADERS})]
+      (if (= status 429)
+        (if (= attempts 6)
+          (throw (ex-info "Wikipedia rate limited, giving up after 7 attempts" {:status 429}))
+          (do (Thread/sleep delay-ms)
+              (recur (* 2 delay-ms) (inc attempts))))
+        {:status status :body body}))))
+
 (defn wiki-search
   [^String query]
   (let [url (str "https://en.wikipedia.org/w/api.php"
                  "?action=query&list=search&format=json&srsearch="
                  (java.net.URLEncoder/encode query "UTF-8"))
-        {:keys [status body]} @(http/get url)]
+        {:keys [status body]} (wiki-get url)]
     (if (= status 200)
       (let [data (j/read-value body KW-MAPPER)]
         (mapv :title (get-in data [:query :search])))
@@ -293,7 +307,7 @@ Here are the sections to reflect on for writing: %s")
              "https://en.wikipedia.org/w/api.php"
              "?action=query&prop=extracts&explaintext=true&format=json&titles="
              (java.net.URLEncoder/encode title "UTF-8"))
-        {:keys [status body]} @(http/get url)]
+        {:keys [status body]} (wiki-get url)]
     (if (= status 200)
       (let [data    (j/read-value body KW-MAPPER)
             pages   (vals (get-in data [:query :pages]))

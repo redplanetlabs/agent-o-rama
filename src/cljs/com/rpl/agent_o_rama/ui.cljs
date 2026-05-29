@@ -5,10 +5,13 @@
    [uix.re-frame :refer [use-subscribe]]
    [clojure.string :as str]
 
-   [com.rpl.agent-o-rama.ui.agents :as agents]
+   [com.rpl.agent-o-rama.ui.agents.index :as agents-index]
+   [com.rpl.agent-o-rama.ui.agents.detail :as agents-detail]
    [com.rpl.agent-o-rama.ui.config-page :as config-page]
    [com.rpl.agent-o-rama.ui.global-config-page :as global-config-page]
-   [com.rpl.agent-o-rama.ui.datasets :as datasets]
+   [com.rpl.agent-o-rama.ui.datasets.index :as datasets-index]
+   [com.rpl.agent-o-rama.ui.datasets.detail :as datasets-detail]
+   [com.rpl.agent-o-rama.ui.datasets.examples :as datasets-examples]
    [com.rpl.agent-o-rama.ui.evaluators :as evaluators]
    [com.rpl.agent-o-rama.ui.module-page :as module-page]
    [com.rpl.agent-o-rama.ui.experiments.index :as experiments]
@@ -16,7 +19,6 @@
    [com.rpl.agent-o-rama.ui.experiments.regular-detail :as experiments-detail]
    [com.rpl.agent-o-rama.ui.experiments.comparative-detail :as comparative-experiments-detail]
    [com.rpl.agent-o-rama.ui.analytics :as analytics]
-   [com.rpl.agent-o-rama.impl.ui.rpc.hello-world :as rpc-hello-world]
    [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
    [re-frame.core :as re-frame]
    [re-frame.query :as rfq]
@@ -38,46 +40,50 @@
    [com.rpl.agent-o-rama.ui.datasets.add-from-trace]
    [com.rpl.agent-o-rama.ui.rules :as rules]
    [com.rpl.agent-o-rama.ui.action-log :as action-log]
-   [com.rpl.agent-o-rama.ui.human-feedback-queues :as human-feedback-queues]
+   [com.rpl.agent-o-rama.ui.human-feedback.metrics-index :as hf-metrics]
+   [com.rpl.agent-o-rama.ui.human-feedback.queues.index :as hf-queues-index]
+   [com.rpl.agent-o-rama.ui.human-feedback.queues.detail :as hf-queues-detail]
+   [com.rpl.agent-o-rama.ui.human-feedback.queues.item-detail :as hf-queues-item]
+   [com.rpl.agent-o-rama.ui.human-feedback.queues.queue-end :as hf-queues-end]
    [com.rpl.agent-o-rama.ui.invocations.filters]
-   [com.rpl.agent-o-rama.ui.invocations.index :as inv-index]))
+   [com.rpl.agent-o-rama.ui.invocations.index :as inv-index]
+   [com.rpl.agent-o-rama.ui.invocations.detail :as inv-detail]))
 
 
 (def routes
   [""
-   ["/" {:name :home, :views [agents/index]}]
+   ["/" {:name :home, :views [agents-index/index]}]
    ["/agents"
-    ["" {:name :agents/index, :views [agents/index]}]
+    ["" {:name :agents/index, :views [agents-index/index]}]
     ["/:module-id"
      ["" {:name :module/detail, :views [module-page/index]}]
      ["/datasets"
-      ["" {:name :module/datasets, :views [datasets/index]}]
+      ["" {:name :module/datasets, :views [datasets-index/index]}]
       ["/:dataset-id"
-       {:name :module/dataset, :views [datasets/detail]}
-       ["" {:name :module/dataset-detail, :views [datasets/detail-examples-router]}]
-       ["/examples" {:name :module/dataset-detail.examples, :views [datasets/detail-examples-router]}]
+       {:name :module/dataset, :views [datasets-detail/detail]}
+       ["" {:name :module/dataset-detail, :views [datasets-examples/detail-examples-router]}]
+       ["/examples" {:name :module/dataset-detail.examples, :views [datasets-examples/detail-examples-router]}]
        ["/experiments" {:name :module/dataset-detail.experiments, :views [experiments/index]}]
        ["/experiments/:experiment-id" {:name :module/dataset-detail.experiment-detail, :views [experiments-detail/regular-experiment-detail-page]}]
        ["/comparative-experiments" {:name :module/dataset-detail.comparative-experiments, :views [comparative-experiments/index]}]
        ["/comparative-experiments/:experiment-id" {:name :module/dataset-detail.comparative-experiment-detail, :views [comparative-experiments-detail/detail-page]}]]]
      ["/evaluations" {:name :module/evaluations, :views [evaluators/index]}]
-     ["/human-metrics" {:name :module/human-metrics, :views [human-feedback-queues/metrics-index]}]
-     ["/rpc-hello" {:name :module/rpc-hello, :views [rpc-hello-world/page]}]
+     ["/human-metrics" {:name :module/human-metrics, :views [hf-metrics/metrics-index]}]
      ["/human-feedback-queues"
-      ["" {:name :module/human-feedback-queues, :views [human-feedback-queues/index]}]
+      ["" {:name :module/human-feedback-queues, :views [hf-queues-index/index]}]
       ["/:queue-id"
-       ["" {:name :module/human-feedback-queue-detail, :views [human-feedback-queues/detail]}]
-       ["/items/:item-id" {:name :module/human-feedback-queue-item, :views [human-feedback-queues/item-detail]}]
-       ["/end" {:name :module/human-feedback-queue-end, :views [human-feedback-queues/queue-end]}]]]
+       ["" {:name :module/human-feedback-queue-detail, :views [hf-queues-detail/detail]}]
+       ["/items/:item-id" {:name :module/human-feedback-queue-item, :views [hf-queues-item/item-detail]}]
+       ["/end" {:name :module/human-feedback-queue-end, :views [hf-queues-end/queue-end]}]]]
      ["/global-config" {:name :module/global-config, :views [global-config-page/page]}]
      ["/agent/:agent-name"
-      ["" {:name :agent/detail, :views [agents/agent]}]
+      ["" {:name :agent/detail, :views [agents-detail/agent]}]
 
       ["/invocations"
        ["" {:name :agent/invocations, :views [inv-index/invocations]
             :parameters {:query [:map [:filters {:optional true} :string]]}}]
        ["/:invoke-id" {:name :agent/invocation-detail
-                       :views [agents/invoke]
+                       :views [inv-detail/invocation-page]
                        :parameters {:query [:map
                                             [:node {:optional true} :string]]}}]]
       ["/analytics" {:name :agent/analytics
@@ -126,10 +132,17 @@
 ;; NAVIGATION COMPONENTS
 ;; =============================================================================
 
+(defn- location-under-href? [location href]
+  (and (not= href "/")
+       (.startsWith location href)
+       (let [n (count href)]
+         (or (= (count location) n)
+             (= (.charAt location n) "/")))))
+
 ;; Reusable nav-link component (changed from wouter/Link to anchor tag)
 (defui nav-link [{:keys [href location collapsed? title children]}]
   (let [is-active? (or (= location href)
-                       (and (not= href "/") (.startsWith location href)))
+                       (location-under-href? location href))
         link-classes (common/cn
                       "flex items-center rounded-md transition-colors text-sm font-medium"
                       {"justify-center p-2 w-10 h-10" collapsed?

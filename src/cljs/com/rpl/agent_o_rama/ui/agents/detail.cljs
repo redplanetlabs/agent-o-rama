@@ -1,22 +1,18 @@
-(ns com.rpl.agent-o-rama.ui.agents
+(ns com.rpl.agent-o-rama.ui.agents.detail
   (:require
-   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
-   [com.rpl.agent-o-rama.ui.invocations.detail :as invocation-page]
-   [com.rpl.agent-o-rama.ui.invocations.index :as inv-index]
-   [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
-
-   [uix.core :as uix :refer [defui defhook $]]
+   [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    [reitit.frontend.easy :as rfe]
+   [re-frame.core :as rf]
    [re-frame.query :as rfq]
-
+   [clojure.string :as str]
+   [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
    [com.rpl.agent-o-rama.ui.common :as common]
    [com.rpl.agent-o-rama.ui.forms :as forms]
-   [com.rpl.agent-o-rama.impl.ui.rpc.agents :as rpc-agents]
-   [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]
+   [com.rpl.agent-o-rama.ui.agent-graph :as agent-graph]
+   [com.rpl.agent-o-rama.ui.invocations.index :as inv-index]
    [com.rpl.agent-o-rama.ui.rpc :as rpc]
-   [re-frame.core :as rf]
-   [clojure.string :as str]))
+   [com.rpl.agent-o-rama.impl.ui.rpc.invocations :as rpc-invocations]))
 
 ;; =============================================================================
 ;; FORM REGISTRATION - Manual Run Agent
@@ -62,55 +58,6 @@
                            (forms/set-submitting! (:form-id form-state) false)
                            (forms/set-error! (:form-id form-state) (str "Error: " (if (map? err) (or (:error err) "Unknown error") (str err)))))))))})
 
-(defui index []
-  (let [{:keys [data error]
-         query-status :status}
-        (use-subscribe [::rfq/query ::rpc-agents/get-all!! {}])
-        loading? (#{:loading :idle} query-status)]
-
-    (cond
-      loading? ($ :div.flex.justify-center.items-center.py-8
-                  ($ :div.text-gray-500 "Loading agents..."))
-      error ($ :div.flex.justify-center.items-center.py-8
-               ($ :div.text-red-500 "Error loading agents: " error))
-      (empty? data) ($ :div.flex.justify-center.items-center.py-8
-                       ($ :div.text-gray-500 "No agents found"))
-      :else ($ :div.p-4
-               ($ :div {:className "inline-block bg-white shadow sm:rounded-md"}
-                  ($ :table {:className "divide-y divide-gray-200"}
-                     ($ :thead {:className (:thead common/table-classes)}
-                        ($ :tr
-                           ($ :th {:className (:th common/table-classes)} "Module")
-                           ($ :th {:className (:th common/table-classes)} "Agent")))
-                     ($ :tbody
-                        (let [sorted-agents (sort-by
-                                             (fn [agent]
-                                               (let [module-name (:module-id agent)
-                                                     decoded-module (common/url-decode module-name)
-                                                     agent-name (:agent-name agent)
-                                                     decoded-agent (common/url-decode agent-name)]
-                                                  ;; Sort by: 1) module name, 2) underscore-prefixed agents last, 3) agent name
-                                                 [decoded-module (str/starts-with? decoded-agent "_") decoded-agent]))
-                                             data)]
-                          (into []
-                                (for [agent sorted-agents
-                                      :let [module (common/url-decode (:module-id agent))
-                                            agent-name (common/url-decode (:agent-name agent))
-                                            href (str "/agents/" (common/url-encode (:module-id agent)) "/agent/" (common/url-encode (:agent-name agent)))]]
-                                  ($ :tr {:key href :className "hover:bg-gray-50 cursor-pointer"
-                                          :onClick (fn [_]
-                                                     (rfe/push-state :agent/detail
-                                                                     {:module-id (:module-id agent)
-                                                                      :agent-name (:agent-name agent)}))}
-                                     ($ :td {:className (:td common/table-classes)} module)
-                                     ($ :td {:className (:td common/table-classes)} agent-name))))))))))))
-
-(defui evaluations []
-  (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])]
-    ($ :div
-       ($ :h2.text-xl.font-semibold.mb-4 "Evaluations")
-       ($ :div.text-gray-500 "Evaluations functionality coming soon..."))))
-
 (defui node-stats-panel [{:keys [selected-node module-id agent-name granularity time-label
                                  granularity-items granularity-label stat-items stat-label]}]
   (let [node-id (when selected-node (aget selected-node "id"))
@@ -125,7 +72,7 @@
        ;; Header
        ($ :div.p-4.border-b.border-gray-200
           ($ :h3.text-lg.font-semibold.text-gray-800 "Node Stats"))
-       
+
        ;; Dropdowns at top of panel
        ($ :div.p-4.border-b.border-gray-200.space-y-3
           ($ :div.flex.items-center.gap-2
@@ -203,7 +150,7 @@
              ($ :div.p-6.text-center.text-gray-500
                 (str "No data for \"" node-id "\" at " time-label))))))))
 
-(defui agent-graph [{:keys [selected-node set-selected-node granularity selected-stat]}]
+(defui graph-panel [{:keys [selected-node set-selected-node granularity selected-stat]}]
   (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         decoded-agent-name (common/url-decode agent-name)
 
@@ -233,55 +180,6 @@
                                   :set-selected-node set-selected-node
                                   :node-stats node-stats
                                   :selected-stat selected-stat}))))
-
-(defui stats-summary [{:keys [module-id agent-name]}]
-  ($ :div.p-4.flex.gap-1
-     ($ :a
-        {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/stats")
-         :style {:flex-grow "1"}}
-        ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
-           ($ :div.flex.justify-between.items-start
-              ($ :div
-                 ($ :div.text-sm.font-medium.text-gray-600.mb-3 "Last 10,000 runs")
-                 ($ :div.flex.flex-row.gap-4
-                    ($ :div.flex.flex-col
-                       ($ :span.text-xs.text-gray-500.uppercase.tracking-wide "Avg Tokens")
-                       ($ :span.text-lg.font-semibold.text-gray-900 "1,247.3"))
-                    ($ :div.flex.flex-col
-                       ($ :span.text-xs.text-gray-500.uppercase.tracking-wide "Avg Latency")
-                       ($ :span.text-lg.font-semibold.text-gray-900 "342ms"))))
-              ($ :div.text-gray-400.hover:text-gray-600.transition-colors.duration-150
-                 ($ :svg.w-5.h-5 {:viewBox "0 0 20 20" :fill "currentColor"}
-                    ($ :path {:fillRule "evenodd"
-                              :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                              :clipRule "evenodd"}))))))))
-
-(defui alerts [{:keys [module-id agent-name]}]
-  (let [dummy-alerts [{:metric "Error Rate" :value "2.3%" :threshold "< 5%" :time-ago "2h ago"}
-                      {:metric "Latency" :value "847ms" :threshold "< 500ms" :time-ago "4h ago"}
-                      {:metric "Error Rate" :value "8.1%" :threshold "< 5%" :time-ago "1d ago"}]]
-    ($ :div.p-4.flex.gap-1
-       ($ :a
-          {:href (str "/agents/" (common/url-encode module-id) "/agent/" (common/url-encode agent-name) "/alerts")
-           :style {:flex-grow "1"}}
-          ($ :div.bg-white.rounded-md.border.border-gray-200.shadow-sm.flex-1.p-6.hover:shadow-md.transition-shadow.duration-150.cursor-pointer.relative
-             ($ :div.flex.justify-between.items-start
-                ($ :div.w-full
-                   ($ :div.text-sm.font-medium.text-gray-600.mb-3 "Recent Alerts")
-                   ($ :div.space-y-3
-                      (for [alert dummy-alerts]
-                        ($ :div.flex.justify-between.items-center.text-sm.pb-2.border-b.border-gray-100.last:border-b-0.last:pb-0 {:key (str (:metric alert) (:time-ago alert))}
-                           ($ :div.flex-1
-                              ($ :div.font-semibold.text-red-600 (:metric alert))
-                              ($ :div.text-xs.text-gray-500.mt-1 (str (:value alert) " (threshold: " (:threshold alert) ")")))
-                           ($ :div.text-xs.text-gray-400.text-right.ml-3 (:time-ago alert))))))
-                ($ :div.text-gray-400.hover:text-gray-600.transition-colors.duration-150.ml-2
-                   ($ :svg.w-5.h-5 {:viewBox "0 0 20 20" :fill "currentColor"}
-                      ($ :path {:fillRule "evenodd"
-                                :d "M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                :clipRule "evenodd"})))))))))
-
-
 
 (defui manual-run [{:keys [form-id]}]
   (let [form (forms/use-form form-id)
@@ -392,11 +290,9 @@
      [module-id agent-name form-id])
 
     ($ :div.p-4
-       
-
        ($ :div.flex.gap-4
           ($ :div {:className "w-1/2"}
-             ($ agent-graph {:selected-node selected-node
+             ($ graph-panel {:selected-node selected-node
                              :set-selected-node set-selected-node
                              :granularity granularity
                              :selected-stat selected-stat}))
@@ -417,11 +313,3 @@
 
        ($ :div.p-4
           ($ inv-index/mini-invocations)))))
-
-(defui invoke []
-  (let [{:keys [module-id agent-name invoke-id]} (use-subscribe [::aor-rf/get-in [:route :path-params]])]
-
-    ($ :div
-       ;; Graph content
-       ($ :div.bg-white.p-6.rounded-lg.shadow.mt-4
-          ($ invocation-page/invocation-page)))))

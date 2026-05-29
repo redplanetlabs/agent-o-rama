@@ -1,6 +1,101 @@
 import { expect } from '@playwright/test';
 
 /**
+ * Selects a queue in the "Add to Human Feedback Queue" modal. Uses the stable
+ * `queue-selector-option-<name>` test id and `evaluate(click)` so the option
+ * re-render cannot detach the element mid-click (flaky in long-running tests).
+ * @param {import('@playwright/test').Page} page
+ * @param {import('@playwright/test').Locator} modal
+ * @param {string} queueName
+ * @param {string} [selectorTestId='queue-selector'] - Root test id for SearchableSelector (`queue-selector` in add-to-queue modal, `queue-name-selector` in rules form)
+ */
+export async function selectQueueInAddToQueueModal(page, modal, queueName, selectorTestId = 'queue-selector') {
+  const input = modal.getByPlaceholder(/Type to search queues/);
+  await input.click();
+  const searchTerms = Array.from(new Set([
+    queueName,
+    queueName.substring(0, Math.min(16, queueName.length)),
+    queueName.substring(0, Math.min(8, queueName.length)),
+  ])).filter(Boolean);
+  const option = page.getByTestId(`${selectorTestId}-option-${queueName}`);
+  for (const term of searchTerms) {
+    await input.fill('');
+    await input.fill(term);
+    // SearchableSelector debounces RPC search (~300ms)
+    await page.waitForTimeout(450);
+    if (await option.isVisible().catch(() => false)) {
+      await option.evaluate((el) => el.click());
+      return;
+    }
+  }
+  await expect(option).toBeVisible({ timeout: 25000 });
+  await option.evaluate((el) => el.click());
+}
+
+/**
+ * Waits until the human feedback queue item detail view has loaded item data.
+ * @param {import('@playwright/test').Page} page
+ * @param {{ timeout?: number }} [options]
+ */
+export async function expectQueueItemDetailLoaded(page, options = {}) {
+  const { timeout = 60000 } = options;
+  await page.waitForFunction(
+    () => {
+      const text = document.body?.innerText || '';
+      return /Review Item:/.test(text)
+        && !!document.querySelector('[data-testid="target-info-panel"]');
+    },
+    null,
+    { timeout }
+  );
+}
+
+/** URL path prefix for the E2E test agent module (encoded module id). */
+export const E2E_TEST_MODULE_PATH =
+  '/agents/com.rpl.agent.e2e-test-agent%2FE2ETestAgentModule';
+
+/**
+ * Opens the Human Feedback Queues list for the E2E test module (avoids flaky sidebar clicks on cold tabs).
+ * @param {import('@playwright/test').Page} page
+ */
+export async function gotoE2ETestModuleHumanFeedbackQueues(page) {
+  await page.goto(`${E2E_TEST_MODULE_PATH}/human-feedback-queues`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000,
+  });
+  await expect(page).toHaveURL(/human-feedback-queues/);
+  await expect(page.getByRole('heading', { name: 'Human Feedback Queues' })).toBeVisible({
+    timeout: 60000,
+  });
+}
+
+/**
+ * Cold-opens a queue item detail URL (new tab or hard navigation). The SPA often
+ * does not emit the `load` event, so default `goto` waitUntil can return before
+ * the client router has applied the item route.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} url
+ * @param {{ gotoTimeout?: number, settleTimeout?: number }} [options]
+ */
+export async function openQueueItemDetailUrl(page, url, options = {}) {
+  const { gotoTimeout = 90000, settleTimeout = 60000 } = options;
+  const tryOnce = async () => {
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: gotoTimeout });
+    await expect(page).toHaveURL(/\/items\//, { timeout: settleTimeout });
+    await expectQueueItemDetailLoaded(page, { timeout: settleTimeout });
+  };
+  try {
+    await tryOnce();
+  } catch {
+    // Second full navigation (not reload): cold SPA loads occasionally miss hydration;
+    // reload after a global test timeout can hit a closed page.
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: gotoTimeout });
+    await expect(page).toHaveURL(/\/items\//, { timeout: settleTimeout });
+    await expectQueueItemDetailLoaded(page, { timeout: settleTimeout });
+  }
+}
+
+/**
  * CSS selector for the inline dropdown menu rendered by common/Dropdown.
  * The menu is positioned absolute within the trigger's parent container.
  */
@@ -292,6 +387,29 @@ export async function openDatasetByName(page, name) {
 }
 
 /**
+ * Opens the Add to Dataset dialog on a human feedback queue review item,
+ * selects a dataset, and submits the prefilled example.
+ * @param {import('@playwright/test').Page} page
+ * @param {{ datasetName: string }} options
+ */
+export async function addQueueItemToDatasetFromReview(page, { datasetName }) {
+  const modal = page.locator('[role="dialog"]');
+  await page.getByTestId('add-to-dataset-button').click();
+  await expect(modal).toBeVisible();
+  await expect(modal.getByRole('heading', { name: 'Add to Dataset' })).toBeVisible();
+
+  const datasetInput = modal.getByTestId('dataset-selector-input');
+  await datasetInput.click();
+  await datasetInput.fill(datasetName);
+  await page.locator('[role="option"]').filter({ hasText: datasetName }).first().waitFor({ timeout: 15000 });
+  await page.locator('[role="option"]').filter({ hasText: datasetName }).first().click();
+
+  await modal.getByRole('button', { name: 'Add Example' }).click();
+  await expect(modal).not.toBeVisible({ timeout: 15000 });
+  console.log(`Added queue item to dataset: ${datasetName}`);
+}
+
+/**
  * Deletes a dataset via the UI.
  * @param {import('@playwright/test').Page} page - The Playwright page object.
  * @param {string} name - The name of the dataset to delete.
@@ -355,15 +473,41 @@ export async function deleteEvaluator(page, name) {
   }
   
   console.log(`Deleting evaluator: ${name}`);
-  
-  // Search for the evaluator first to ensure it's visible
-  const searchInput = page.getByPlaceholder('Search evaluators...');
-  if (await searchInput.isVisible()) {
-    await searchInput.fill(name);
-    await page.waitForTimeout(500); // Wait for debounced search
+
+  if (!/\/evaluations/.test(page.url())) {
+    const evalLink = page.getByRole('navigation').getByRole('link', { name: 'Evaluators' });
+    if (await evalLink.isVisible().catch(() => false)) {
+      await evalLink.click();
+      await expect(page).toHaveURL(/evaluations/, { timeout: 30000 });
+    }
   }
   
-  // Set up dialog handler before clicking delete (only if not already handled)
+  const searchInput = page.getByPlaceholder('Search evaluators...');
+  const evalRow = page.locator('table tbody tr').filter({ hasText: name });
+
+  const searchTerms = Array.from(new Set([
+    name,
+    name.substring(0, Math.min(20, name.length)),
+    name.substring(0, Math.min(12, name.length)),
+  ])).filter(Boolean);
+
+  let lastError;
+  for (const term of searchTerms) {
+    if (await searchInput.isVisible().catch(() => false)) {
+      await searchInput.fill('');
+      await searchInput.fill(term);
+      await page.waitForTimeout(800);
+    }
+    try {
+      await expect(evalRow.first()).toBeVisible({ timeout: 20000 });
+      lastError = null;
+      break;
+    } catch (e) {
+      lastError = e;
+    }
+  }
+  if (lastError) throw lastError;
+  
   let dialogHandled = false;
   const dialogHandler = async (dialog) => {
     if (!dialogHandled) {
@@ -372,24 +516,19 @@ export async function deleteEvaluator(page, name) {
       try {
         await dialog.accept();
       } catch (e) {
-        // Dialog already handled by another handler (e.g., test-level handler)
         console.log(`Dialog already handled: ${e.message}`);
       }
     }
   };
   page.once('dialog', dialogHandler);
   
-  const evalRow = page.locator('table tbody tr').filter({ hasText: name });
-  await evalRow.getByRole('button', { name: 'Delete' }).click();
+  await evalRow.first().getByRole('button', { name: 'Delete' }).click({ timeout: 60000 });
   
-  // Wait a bit for dialog to appear and be handled
   await page.waitForTimeout(500);
   
-  // Wait for the row to disappear after deletion
-  await expect(evalRow).not.toBeVisible({ timeout: 10000 });
+  await expect(evalRow.first()).not.toBeVisible({ timeout: 30000 });
   
-  // Clear search if it was used
-  if (await searchInput.isVisible()) {
+  if (await searchInput.isVisible().catch(() => false)) {
     await searchInput.clear();
     await page.waitForTimeout(300);
   }

@@ -2,6 +2,7 @@ package com.rpl.agentorama.store;
 
 import java.util.List;
 import com.rpl.rama.Path;
+import com.rpl.rama.PState;
 
 /**
  * Direct access to Rama's built-in PState storage.
@@ -12,6 +13,16 @@ import com.rpl.rama.Path;
  * @see <a href="https://redplanetlabs.com/docs/~/pstates.html">PStates Documentation</a>
  */
 public interface PStateStore extends Store {
+  /**
+   * Returns the underlying Rama PState for this store.
+   *
+   * <p>This enables use of standard Rama foreign operations (e.g. {@code foreign-select-one-async})
+   * on agent stores, so the same code can work with both raw PState references and AoR stores.
+   *
+   * @return the underlying PState client
+   */
+  PState getUnderlyingPState();
+
   /**
    * Selects data using a path expression.
    *

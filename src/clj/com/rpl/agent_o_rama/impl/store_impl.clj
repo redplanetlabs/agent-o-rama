@@ -269,6 +269,9 @@
 (defn PStateStoreImpl
   [store-params]
   `(PStateStore
+    (~'getUnderlyingPState
+     [this#]
+     (:pstate-client ~store-params))
     (~'select
      [this# jpath#]
      (pstate-select* this# (java-path->clojure-path jpath#)))

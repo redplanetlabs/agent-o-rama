@@ -476,6 +476,69 @@
      (is (every? #(= :failure (:status %)) all))
      )))
 
+(deftest invokes-page-query-args-query-pagination-no-duplicate-keys-test
+  "Regression: UI invocations list uses args-query + load-more; pagination must not
+  repeat or drop [task-id agent-id] pairs at scan/page boundaries (see E2E
+  invocations-pagination.spec.js)."
+  (with-open [ipc (rtest/create-ipc)]
+    (letlocals
+     (bind module
+       (aor/agentmodule
+        [topology]
+        (-> topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node {:keys [token idx]}]
+               (aor/result! agent-node {:token token :idx idx}))))))
+     (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
+     (bind module-name (get-module-name module))
+     (bind agent-manager (aor/agent-manager ipc module-name))
+     (bind foo (aor/agent-client agent-manager "foo"))
+     (bind q (:invokes-page-query (aor-types/underlying-objects foo)))
+
+     (bind token (str "args-pag-dedup-" (random-uuid)))
+     (bind n-invokes 38)
+     (bind created
+       (vec
+        (for [i (range n-invokes)]
+          (aor/agent-initiate foo {:token token :idx i}))))
+     (doseq [inv created]
+       (aor/agent-result foo inv))
+
+     (bind expected-ids
+       (set (map (fn [inv] [(:task-id inv) (:agent-invoke-id inv)]) created)))
+
+     ;; Same default source filter as the UI invocations page + substring on args.
+     (bind filters
+       {:args-query token
+        :source "EXPERIMENT"
+        :source-not? true})
+
+     ;; Tight page and scan sizes so the query runs many scan windows per HTTP page.
+     (bind pages
+       (loop [ret []
+              params nil
+              i 0]
+         (when (> i 300)
+           (throw (ex-info "args-query pagination did not terminate" {:i i})))
+         (let [{:keys [agent-invokes pagination-params]}
+               (foreign-invoke-query q 5 6 params filters)
+               ret (conj ret agent-invokes)]
+           (if (every? nil? (vals pagination-params))
+             ret
+             (recur ret pagination-params (inc i))))))
+
+     (bind all (apply concat pages))
+     (bind all-ids (mapv (fn [m] [(:task-id m) (:agent-id m)]) all))
+
+     (is (> (count pages) 1))
+     (is (= n-invokes (count all-ids)) (str "missing rows: expected " n-invokes " got " (count all-ids)))
+     (is (= (count all-ids) (count (set all-ids)))
+         "duplicate [task-id agent-id] across pages")
+     (is (= expected-ids (set all-ids))))))
+
 (deftest invokes-page-query-scan-page-size-matrix-test
   (with-open [ipc (rtest/create-ipc)]
     (letlocals
@@ -529,9 +592,25 @@
         (for [{:keys [experiment? invoke]} created-runs
               :when experiment?]
           [(:task-id invoke) (:agent-invoke-id invoke)])))
+     (bind expected-count (count expected-experiment-invokes))
+     (bind experiment-source-filter {:source "EXPERIMENT"})
+
+     ;; CI can lag between agent-result and query visibility; poll before asserting pagination.
+     (loop [attempt 0]
+       (when (> attempt 240)
+         (throw (ex-info "experiment invokes not visible to invokes-page-query"
+                         {:expected expected-count
+                          :attempts attempt})))
+       (let [{:keys [agent-invokes]}
+             (foreign-invoke-query q 500 50 nil experiment-source-filter)]
+         (if (= (count agent-invokes) expected-count)
+           nil
+           (do (Thread/sleep 250)
+               (recur (inc attempt))))))
 
      (doseq [scan-page-size [2 3 5 8]]
-       (let [pages
+       (let [result-page-size 2
+             pages
              (loop [ret []
                     params nil
                     i 0]
@@ -541,10 +620,10 @@
                                   :iterations i})))
                (let [{:keys [agent-invokes pagination-params]}
                      (foreign-invoke-query q
-                                          4
+                                          result-page-size
                                           scan-page-size
                                           params
-                                          {:source "EXPERIMENT"})
+                                          experiment-source-filter)
                      ret (conj ret agent-invokes)]
                  (if (every? nil? (vals pagination-params))
                    ret

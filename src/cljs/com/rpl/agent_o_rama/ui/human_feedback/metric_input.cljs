@@ -8,10 +8,10 @@
    [uix.core :refer [defui $]]
    [com.rpl.agent-o-rama.ui.common :as common]))
 
-(defn- numeric-metric? [metric]
+(defn numeric-metric? [metric]
   (contains? metric :min))
 
-(defn- category-metric? [metric]
+(defn category-metric? [metric]
   (contains? metric :categories))
 
 (defn- validate-metric-value
