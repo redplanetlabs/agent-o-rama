@@ -10,7 +10,9 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.rama.ops :as ops])
+   [com.rpl.rama.ops :as ops]
+   [rpl.rama.java-api.cluster :as rama-cluster]
+   [rpl.rama.util.watchable-promise :as wp])
   (:import
    [com.rpl.agentorama
     AgentClient
@@ -494,12 +496,35 @@
         }))
     )))
 
+(defn record-async-store-read!
+  "Attaches a :store-read nested op recording to a foreign select promise. The op is
+  recorded with its result when the promise is delivered, before the caller (which
+  blocks on the returned promise) observes the value, so ordering is preserved."
+  [a-watchable-promise start-time-millis nested-ops-vol info-map]
+  (wp/watch-success
+   (fn [res]
+     (vswap! nested-ops-vol
+             conj
+             (aor-types/->NestedOpInfoImpl
+              start-time-millis
+              (h/current-time-millis)
+              :store-read
+              (assoc info-map "result" res)))
+     res)
+   a-watchable-promise))
+
+;; - foreign selects (foreign-select / foreign-select-one / foreign-proxy) do not
+;;   go through the public PState methods; they dispatch on the internal
+;;   PStateInternal protocol, so the wrapper must implement it to be usable and
+;;   traced. foreign-select-one is sugar over the same select-async-internal call,
+;;   so both record as a "select".
+;; - the public PState methods are also implemented for direct (e.g. Java) callers.
 (defn traced-pstate
   [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
-  (let [pstate (.getForeignPState
-                declared-objects-tg
-                module-name
-                name)]
+  (let [^PState pstate (.getForeignPState
+                        declared-objects-tg
+                        module-name
+                        name)]
     (reify
      PState
      (select [this path]
@@ -549,6 +574,35 @@
          "moduleName" module-name
          "name"       name
         }))
+
+     rama-cluster/PStateInternal
+     (select-async-internal [this compiled-path]
+       (record-async-store-read!
+        (rama-cluster/select-async-internal pstate compiled-path)
+        (h/current-time-millis)
+        nested-ops-vol
+        {"op"         "select"
+         "moduleName" module-name
+         "name"       name
+         "path"       (pr-str compiled-path)
+        }))
+     (select-pkey-async-internal [this partitioning-key compiled-path]
+       (record-async-store-read!
+        (rama-cluster/select-pkey-async-internal pstate partitioning-key compiled-path)
+        (h/current-time-millis)
+        nested-ops-vol
+        {"op"         "select"
+         "moduleName" module-name
+         "name"       name
+         "pkey"       partitioning-key
+         "path"       (pr-str compiled-path)
+        }))
+     ;; proxies are long-lived reactive subscriptions rather than point reads, so
+     ;; they are delegated to the underlying client untraced
+     (proxy-async-internal [this compiled-path callback-fn]
+       (rama-cluster/proxy-async-internal pstate compiled-path callback-fn))
+     (proxy-pkey-async-internal [this partitioning-key compiled-path callback-fn]
+       (rama-cluster/proxy-pkey-async-internal pstate partitioning-key compiled-path callback-fn))
     )))
 
 ;; Wraps the underlying cluster retriever so foreign clients constructed from it
