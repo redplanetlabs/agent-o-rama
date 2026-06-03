@@ -29,7 +29,10 @@
    [com.rpl.rama
     AckLevel
     Depot
+    PState
     QueryTopologyClient]
+   [com.rpl.rama.cluster
+    ClusterManagerBase]
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
@@ -394,6 +397,22 @@
       ret#
     )))
 
+(defmacro traced-store-read-call
+  [expr nested-ops-vol info-map]
+  `(let [info-map# ~info-map
+         start-time-millis# (h/current-time-millis)
+         ret#      ~expr]
+     (vswap! ~nested-ops-vol
+             conj
+             (aor-types/->NestedOpInfoImpl
+              start-time-millis#
+              (h/current-time-millis)
+              :store-read
+              (assoc info-map# "result" ret#)
+             ))
+     ret#
+   ))
+
 (defn traced-depot
   [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
   (let [depot (.getForeignDepot
@@ -473,6 +492,84 @@
          "name"       name
          "args"       (vec args)
         }))
+    )))
+
+(defn traced-pstate
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
+  (let [pstate (.getForeignPState
+                declared-objects-tg
+                module-name
+                name)]
+    (reify
+     PState
+     (select [this path]
+       (traced-store-read-call
+        (.select pstate path)
+        nested-ops-vol
+        {"op"         "select"
+         "moduleName" module-name
+         "name"       name
+         "path"       (pr-str path)
+        }))
+     (select [this pkey path]
+       (traced-store-read-call
+        (.select pstate pkey path)
+        nested-ops-vol
+        {"op"         "select"
+         "moduleName" module-name
+         "name"       name
+         "pkey"       pkey
+         "path"       (pr-str path)
+        }))
+     (selectOne [this path]
+       (traced-store-read-call
+        (.selectOne pstate path)
+        nested-ops-vol
+        {"op"         "selectOne"
+         "moduleName" module-name
+         "name"       name
+         "path"       (pr-str path)
+        }))
+     (selectOne [this pkey path]
+       (traced-store-read-call
+        (.selectOne pstate pkey path)
+        nested-ops-vol
+        {"op"         "selectOne"
+         "moduleName" module-name
+         "name"       name
+         "pkey"       pkey
+         "path"       (pr-str path)
+        }))
+     (getObjectInfo [this]
+       (traced-other-call
+        false
+        (.getObjectInfo pstate)
+        nested-ops-vol
+        {"op"         "getObjectInfo"
+         "moduleName" module-name
+         "name"       name
+        }))
+    )))
+
+;; Wraps the underlying cluster retriever so foreign clients constructed from it
+;; (depots, pstates, query topologies) are pulled from the same per-task client
+;; cache used by the AgentNode fetch interface and have their operations traced
+;; into this node invocation's nested ops.
+(defn traced-cluster-retriever
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg nested-ops-vol]
+  (let [delegate (.getClusterRetriever declared-objects-tg)]
+    (reify
+     ClusterManagerBase
+     (clusterDepot [this module-name name]
+       (traced-depot declared-objects-tg module-name name nested-ops-vol))
+     (clusterPState [this module-name name]
+       (traced-pstate declared-objects-tg module-name name nested-ops-vol))
+     (clusterQuery [this module-name name]
+       (traced-qt-client declared-objects-tg module-name name nested-ops-vol))
+     (getDeployedModuleNames [this]
+       (.getDeployedModuleNames delegate))
+     (getMicrobatchDepotInfo [this module-name topology-name]
+       (.getMicrobatchDepotInfo delegate module-name topology-name))
     )))
 
 (defn mk-agent-node
@@ -603,6 +700,8 @@
         module-name
         name
         nested-ops-vol))
+     (getClusterRetriever [this]
+       (traced-cluster-retriever declared-objects-tg nested-ops-vol))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
      (recordNestedOp [this type start-time-millis finish-time-millis info]
