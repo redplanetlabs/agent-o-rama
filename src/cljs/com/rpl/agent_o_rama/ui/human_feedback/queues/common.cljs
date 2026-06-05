@@ -70,6 +70,7 @@
         is-loading? (= (:status query-state) :loading)
         is-fetching-more? (:fetching-more? query-state)
         is-fetching-before? (:fetching-before? query-state)
+        bidir-outstanding (:initial-bidir-outstanding query-state)
         error (when (= (:status query-state) :error) (:error query-state))
         initial-needed? (and initial-cursor
                              (not (some #(queue-item-matches? % initial-cursor) data)))]
@@ -186,6 +187,7 @@
       (uix/use-effect
        (fn []
          (when (and enabled?
+                    (nil? bidir-outstanding)
                     (or (empty? data) initial-needed?))
            (if (and initial-needed? initial-cursor include-initial-cursor?)
              (do
@@ -194,7 +196,7 @@
                (fetch-page initial-cursor false true true true))
              (fetch-page initial-cursor false include-initial-cursor? false false)))
          js/undefined)
-       [state-path enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
+       [state-path enabled? bidir-outstanding data initial-needed? fetch-page initial-cursor include-initial-cursor?])
 
       (uix/use-effect
        (fn []
