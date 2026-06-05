@@ -170,12 +170,15 @@
                                        :error nil
                                        :should-refetch? false}])
                      (fetch-page nil false false false false))
-                   [fetch-page state-path])]
+                   [fetch-page state-path])
 
-      ;; Effect: Force refetch from start if flag is set and cache exists
+          force-refetch-applied (uix/use-ref false)]
+
+      ;; Effect: Force refetch from start if flag is set and cache exists (once per mount)
       (uix/use-effect
        (fn []
-         (when (and force-from-start? (seq data) enabled?)
+         (when (and force-from-start? (not @force-refetch-applied) (seq data) enabled?)
+           (reset! force-refetch-applied true)
            (refetch))
          js/undefined)
        [force-from-start? data enabled? refetch])
