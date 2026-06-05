@@ -28,6 +28,14 @@
      ($ :dd.mt-1.text-sm.leading-6.text-gray-700.sm:col-span-2.sm:mt-0
         children)))
 
+(defui JsonPathTooltip []
+  ($ common/InfoTooltip {:content ($ :div
+                                     "A JSONPath expression to extract a value from the JSON object."
+                                     ($ :br)
+                                     ($ :a.text-blue-300.hover:underline.cursor-pointer
+                                        {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
+                                        "Learn more on Wikipedia."))}))
+
 (defui EvaluatorDetailsModal [{:keys [spec]}]
   (let [{:keys [name type description builder-name builder-params
                 input-json-path output-json-path reference-output-json-path]} spec
@@ -83,18 +91,6 @@
   (rf/dispatch [:modal/show :evaluator-details
                    {:title (str "Evaluator Details: " (:name spec))
                     :component ($ EvaluatorDetailsModal {:spec spec})}]))
-
-;; =============================================================================
-;; JSONPATH TOOLTIP COMPONENT
-;; =============================================================================
-
-(defui JsonPathTooltip []
-  ($ common/InfoTooltip {:content ($ :div
-                                     "A JSONPath expression to extract a value from the JSON object."
-                                     ($ :br)
-                                     ($ :a.text-blue-300.hover:underline.cursor-pointer
-                                        {:onClick #(js/window.open "https://en.wikipedia.org/wiki/JSONPath" "_blank")}
-                                        "Learn more on Wikipedia."))}))
 
 ;; =============================================================================
 ;; Note: get-evaluator-type-badge-style and get-evaluator-type-display

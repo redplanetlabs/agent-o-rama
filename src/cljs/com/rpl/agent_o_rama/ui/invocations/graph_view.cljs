@@ -28,6 +28,9 @@
    ["react" :refer [useState useCallback useEffect]]
    ["@heroicons/react/24/outline" :refer [ExclamationTriangleIcon ArrowPathIcon ArrowTopRightOnSquareIcon PencilIcon XMarkIcon]]))
 
+(defn- to-pretty-json [val]
+  (js/JSON.stringify (clj->js val) nil 2))
+
 (defui ExceptionDetailModal [{:keys [title content]}]
   ($ :div.p-6.space-y-4
      ($ :pre.text-xs.bg-gray-50.p-3.rounded.border.overflow-auto.max-h-80.font-mono
@@ -587,9 +590,6 @@
         node-name (:node data)
         original-input (:input data)
 
-        ;; Function to pretty-print ClojureScript data to a JSON string
-        to-pretty-json (fn [val] (js/JSON.stringify (clj->js val) nil 2))
-
         ;; Initial text for the textarea
         current-input (get changed-nodes node-id (to-pretty-json original-input))
         [input-text set-input-text] (uix/use-state current-input)
@@ -606,7 +606,7 @@
          (let [original-input (:input selected-node-data)
                current-input (get changed-nodes node-id (to-pretty-json original-input))]
            (set-input-text current-input))))
-     [selected-node-data changed-nodes node-id])
+     [to-pretty-json selected-node-data changed-nodes node-id])
 
     (when selected-node-data
       ($ :div {:className (common/cn "mt-6 bg-white shadow-lg rounded-lg border border-gray-200 max-w-4xl")}

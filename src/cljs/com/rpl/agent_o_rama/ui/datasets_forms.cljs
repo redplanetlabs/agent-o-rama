@@ -339,6 +339,40 @@
 ;; BULK OPERATION MODALS
 ;; =============================================================================
 
+(defui AddTagForm [{:keys [form-id]}]
+  (let [{:keys [field-errors]} (forms/use-form form-id)
+        tag-name-field (forms/use-form-field form-id :tag-name)]
+
+    ($ forms/form
+       ($ forms/form-field {:label "Tag to add"
+                            :value (:value tag-name-field)
+                            :on-change (:on-change tag-name-field)
+                            :error (:error tag-name-field)
+                            :required? true}))))
+
+(defui RemoveTagForm [{:keys [form-id selected-examples]}]
+  (let [{:keys [field-errors]} (forms/use-form form-id)
+        tag-name-field (forms/use-form-field form-id :tag-name)
+
+        ;; Get all unique tags from selected examples
+        all-tags (->> selected-examples
+                      (mapcat :tags)
+                      (map name) ; Convert keywords to strings
+                      (distinct)
+                      (sort))]
+
+    ($ forms/form
+       ($ :div
+          ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tag to remove")
+          ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.focus:outline-none.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
+             {:value (:value tag-name-field)
+              :onChange #((:on-change tag-name-field) (.. % -target -value))}
+             ($ :option {:value ""} "Select a tag to remove...")
+             (for [tag all-tags]
+               ($ :option {:key tag :value tag} tag)))
+          (when (:error field-errors)
+            ($ :div.text-sm.text-red-600.mt-1 (:error field-errors)))))))
+
 (forms/reg-form
  :add-tag-to-selected
  {:steps [:main]
@@ -410,40 +444,6 @@
 
 (defn show-remove-tag-modal! [props]
   (rf/dispatch [:modal/show-form :remove-tag-from-selected props]))
-
-(defui AddTagForm [{:keys [form-id]}]
-  (let [{:keys [field-errors]} (forms/use-form form-id)
-        tag-name-field (forms/use-form-field form-id :tag-name)]
-
-    ($ forms/form
-       ($ forms/form-field {:label "Tag to add"
-                            :value (:value tag-name-field)
-                            :on-change (:on-change tag-name-field)
-                            :error (:error tag-name-field)
-                            :required? true}))))
-
-(defui RemoveTagForm [{:keys [form-id selected-examples]}]
-  (let [{:keys [field-errors]} (forms/use-form form-id)
-        tag-name-field (forms/use-form-field form-id :tag-name)
-
-        ;; Get all unique tags from selected examples
-        all-tags (->> selected-examples
-                      (mapcat :tags)
-                      (map name) ; Convert keywords to strings
-                      (distinct)
-                      (sort))]
-
-    ($ forms/form
-       ($ :div
-          ($ :label.block.text-sm.font-medium.text-gray-700.mb-2 "Tag to remove")
-          ($ :select.w-full.px-3.py-2.border.border-gray-300.rounded-md.focus:outline-none.focus:ring-2.focus:ring-blue-500.focus:border-blue-500
-             {:value (:value tag-name-field)
-              :onChange #((:on-change tag-name-field) (.. % -target -value))}
-             ($ :option {:value ""} "Select a tag to remove...")
-             (for [tag all-tags]
-               ($ :option {:key tag :value tag} tag)))
-          (when (:error field-errors)
-            ($ :div.text-sm.text-red-600.mt-1 (:error field-errors)))))))
 
 (defn handle-delete-selected! [module-id dataset-id snapshot-name example-ids]
   (when (js/confirm (str "Are you sure you want to delete " (count example-ids) " selected examples? This action cannot be undone."))

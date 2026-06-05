@@ -43,7 +43,7 @@
                                     (rf/dispatch [:query/invalidate {:query-key-pattern [:human-metrics module-id]}])
                                     (rf/dispatch [:re-frame.query/invalidate-tags [[:human-feedback/metrics module-id]]])))
                            (.catch (fn [err] (js/alert (str "Error: " (if (map? err) (or (:error err) (str err)) (str err)))))))))
-                       [decoded-module-id])]
+                       [module-id decoded-module-id])]
 
     (if-not decoded-module-id
       ($ :div.p-6

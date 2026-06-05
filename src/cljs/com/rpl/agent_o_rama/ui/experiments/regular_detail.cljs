@@ -132,6 +132,17 @@
      ($ :div.text-xs.font-medium.text-gray-500.uppercase.tracking-wider label)
      ($ :div.text-xl.font-semibold.text-gray-900.mt-1 value)))
 
+(defn format-metric-value [value]
+  (cond
+    (true? value) ($ :span.text-green-700 "True")
+    (false? value) ($ :span.text-red-700 "False")
+    (number? value) (if (and (float? value) (not= value (js/Math.floor value)))
+                      (.toFixed value 2)
+                      (str value))
+    (string? value) (if (> (count value) 20) (str (subs value 0 17) "…") value)
+    (nil? value) ($ :span.italic.text-gray-400 "nil")
+    :else ($ :span.italic.text-gray-400 "…")))
+
 (defui SummaryEvaluatorsMetricsTable [{:keys [summary-evals]}]
   (let [summary-metadata (evaluators/collect-column-metadata summary-evals)]
     (when (seq (:columns summary-metadata))
@@ -197,17 +208,6 @@
 
        ;; Summary Evaluators Table
        ($ SummaryEvaluatorsMetricsTable {:summary-evals summary-evals}))))
-
-(defn format-metric-value [value]
-  (cond
-    (true? value) ($ :span.text-green-700 "True")
-    (false? value) ($ :span.text-red-700 "False")
-    (number? value) (if (and (float? value) (not= value (js/Math.floor value)))
-                      (.toFixed value 2)
-                      (str value))
-    (string? value) (if (> (count value) 20) (str (subs value 0 17) "…") value)
-    (nil? value) ($ :span.italic.text-gray-400 "nil")
-    :else ($ :span.italic.text-gray-400 "…")))
 
 ;; NEW COMPONENTS: Evaluator capsules for compact display within Output column
 (defui EvaluatorCapsule [{:keys [eval-name metric-key metric-value eval-failure eval-invoke module-id columns-metadata]}]

@@ -450,7 +450,7 @@
        (when (and value (not= search-term value))
          (set-search-term! value))
        js/undefined)
-     [value])
+     [search-term value])
 
     ($ :div.relative.w-full
        ($ :div.relative
@@ -762,6 +762,32 @@
              :variant actual-variant
              :variant-opts actual-variant-opts})))))
 
+(defui static-chart-card
+  "Renders a static analytics chart - handles its own data fetching to avoid hooks-in-loop issues."
+  [{:keys [config module-id agent-name granularity-config time-window metadata-key refresh-counter]}]
+  (let [{:keys [metric-id metrics-set]} config
+        {:keys [data loading? error]}
+        (queries/use-rpc-query
+         {:rfq-key ::rpc-analytics/fetch-telemetry!!
+          :params {:module-id module-id
+                   :agent-name agent-name
+                   :granularity (:seconds granularity-config)
+                   :metric-id metric-id
+                   :start-time-millis (:start-time-millis time-window)
+                   :end-time-millis (:end-time-millis time-window)
+                   :metrics-set metrics-set
+                   :metadata-key metadata-key
+                   :refresh-counter refresh-counter}
+          :enabled? (boolean (and module-id agent-name))})]
+    ($ chart-card
+       {:config config
+        :data data
+        :loading? loading?
+        :error error
+        :granularity-config granularity-config
+        :time-window time-window
+        :metadata-key metadata-key})))
+
 (defui analytics-page []
   (let [{:keys [module-id agent-name]} (use-subscribe [::aor-rf/get-in [:route :path-params]])
         ;; Get coerced parameters from Reitit - these are already typed correctly
@@ -776,11 +802,15 @@
         ;; Setters that update URL - accept optional overrides for when multiple values change at once
         set-granularity (uix/use-callback
                          (fn
-                           ([new-granularity] (set-granularity new-granularity nil nil))
+                           ([new-granularity]
+                            (let [final-granularity (if (fn? new-granularity)
+                                                        (new-granularity granularity)
+                                                        new-granularity)]
+                              (update-analytics-url module-id agent-name final-granularity time-offset metadata-key)))
                            ([new-granularity override-time-offset override-metadata-key]
                             (let [final-granularity (if (fn? new-granularity)
-                                                      (new-granularity granularity)
-                                                      new-granularity)
+                                                        (new-granularity granularity)
+                                                        new-granularity)
                                   final-time-offset (if (some? override-time-offset)
                                                       override-time-offset
                                                       time-offset)
@@ -811,7 +841,7 @@
         time-window (uix/use-memo
                      (fn []
                        (calculate-time-window (:seconds granularity-config) time-offset))
-                     [granularity time-offset])
+                     [granularity-config granularity time-offset])
 
         is-live? (:is-live? time-window)
 
@@ -851,34 +881,7 @@
                                       (filter #(and (vector? %) (= :human (first %))))
                                       (keep parse-human-metric-id)
                                       (mapv create-human-chart-config))))
-                             [all-metrics])
-
-        ;; Group ONLY static charts by metric-id (stable hook count)
-        static-metric-groups (uix/use-memo
-                              (fn [] (group-charts-by-metric chart-configs))
-                              [])
-
-        ;; Create queries for static metrics (HTTP RPC; refresh-counter bumps live window)
-        static-metric-queries
-        (into {}
-              (map (fn [[metric-id {:keys [metrics-set]}]]
-                     (let [{:keys [data loading? error]}
-                           (queries/use-rpc-query
-                            {:rfq-key ::rpc-analytics/fetch-telemetry!!
-                             :params {:module-id module-id
-                                      :agent-name decoded-agent-name
-                                      :granularity (:seconds granularity-config)
-                                      :metric-id metric-id
-                                      :start-time-millis (:start-time-millis time-window)
-                                      :end-time-millis (:end-time-millis time-window)
-                                      :metrics-set metrics-set
-                                      :metadata-key metadata-key
-                                      :refresh-counter refresh-counter}
-                             :enabled? (boolean (and module-id decoded-agent-name))})]
-                       [metric-id {:data data :loading? loading? :error error}]))
-                   static-metric-groups))
-
-        metric-queries static-metric-queries]
+                             [all-metrics])]
 
     ($ :div.p-6
        ;; Page header
@@ -901,17 +904,15 @@
        ;; Static metrics section
        ($ :div.grid.grid-cols-1.lg:grid-cols-2.gap-6
           (map (fn [config]
-                 (let [metric-id (:metric-id config)
-                       query-result (get metric-queries metric-id)]
-                   ($ chart-card
-                      {:key (:id config)
-                       :config config
-                       :data (:data query-result)
-                       :loading? (:loading? query-result)
-                       :error (:error query-result)
-                       :granularity-config granularity-config
-                       :time-window time-window
-                       :metadata-key metadata-key})))
+                 ($ static-chart-card
+                    {:key (:id config)
+                     :config config
+                     :module-id module-id
+                     :agent-name decoded-agent-name
+                     :granularity-config granularity-config
+                     :time-window time-window
+                     :metadata-key metadata-key
+                     :refresh-counter refresh-counter}))
                chart-configs))
 
        ;; Eval metrics section (if any exist)

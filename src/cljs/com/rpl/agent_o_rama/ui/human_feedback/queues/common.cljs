@@ -178,7 +178,7 @@
          (when (and force-from-start? (seq data) enabled?)
            (refetch))
          js/undefined)
-       [force-from-start?]) ; Only run on mount
+       [force-from-start? data enabled? refetch])
 
       (uix/use-effect
        (fn []
@@ -191,7 +191,7 @@
                (fetch-page initial-cursor false true true true))
              (fetch-page initial-cursor false include-initial-cursor? false false)))
          js/undefined)
-       [enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
+       [state-path enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
 
       (uix/use-effect
        (fn []

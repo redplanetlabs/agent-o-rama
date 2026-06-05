@@ -21,12 +21,11 @@
         has-definition? (some? (:metric metric-data))
         
         ;; Fetch metric definition if we have a name but no definition
-        fetch-result (when (and has-metric-name? (not has-definition?))
-                       (queries/use-rpc-query
-                        {:rfq-key ::rpc-hf/get-metrics!!
-                         :params {:module-id module-id
-                                  :filters {:search-string metric-name}}
-                         :enabled? true}))
+        fetch-result (queries/use-rpc-query
+                      {:rfq-key ::rpc-hf/get-metrics!!
+                       :params {:module-id module-id
+                                :filters {:search-string metric-name}}
+                       :enabled? (and has-metric-name? (not has-definition?))})
         
         ;; Extract the metric definition from the fetch result
         fetched-metric (when fetch-result

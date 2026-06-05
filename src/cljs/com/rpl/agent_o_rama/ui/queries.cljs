@@ -33,7 +33,7 @@
                  (fn []
                    (when enabled?
                      (rf/dispatch [:re-frame.query/refetch-query rfq-key params])))
-                 [enabled? rfq-key params-sig])]
+                 [enabled? rfq-key params params-sig])]
     {:data data
      :loading? loading?
      :fetching? (boolean fetching?)
@@ -76,12 +76,12 @@
                      (fn []
                        (when (and enabled? has-next?)
                          (rfq/fetch-next-page rfq-key params')))
-                     [enabled? has-next? rfq-key params-sig])
+                     [enabled? has-next? rfq-key params' params-sig])
           refetch (uix/use-callback
                    (fn []
                      (when enabled?
                        (rf/dispatch [:re-frame.query/refetch-infinite-query rfq-key params'])))
-                   [enabled? rfq-key params-sig])]
+                   [enabled? rfq-key params' params-sig])]
       {:data items
        :isLoading (and loading? (empty? items))
        :isFetchingMore (boolean fetching-next?)

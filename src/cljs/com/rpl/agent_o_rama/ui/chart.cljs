@@ -559,7 +559,7 @@
                (js/requestAnimationFrame handle-resize)
                (.addEventListener js/window "resize" handle-resize)
                (fn [] (.removeEventListener js/window "resize" handle-resize))))
-           [height chart-data])]
+           [height chart-data chart-ref])]
 
     ($ :div.w-full
        {:ref container-ref}

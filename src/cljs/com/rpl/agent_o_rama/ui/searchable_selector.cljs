@@ -149,7 +149,7 @@
            (when (not= search-term label)
              (set-search-term! label))))
        js/undefined)
-     [value selected-items multi-select?])
+     [search-term item-label-fn value selected-items multi-select?])
 
     ;; Refetch when dropdown opens
     (uix/use-effect
