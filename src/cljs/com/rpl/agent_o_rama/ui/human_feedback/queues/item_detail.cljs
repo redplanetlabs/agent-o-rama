@@ -83,7 +83,7 @@
 
         ;; Fetch queue items with shared cache for review session
         ;; If item isn't in cache yet, load from its cursor and merge.
-        {:keys [data isLoading isFetchingMore isFetchingBefore
+        {:keys [data isLoading isBidirLoading isFetchingMore isFetchingBefore
                 hasMore hasMoreBefore loadMore loadMoreBefore]}
         (q-common/use-queue-items
          {:module-id module-id
@@ -283,8 +283,8 @@
      [pending-prev? prev-item-id isFetchingBefore hasMoreBefore module-id queue-id])
 
     (cond
-      ;; Block until queue items finish loading (including bidirectional + reconcile).
-      items-loading?
+      ;; Block during bidirectional initial load; otherwise show once the item is available.
+      (or isBidirLoading (and items-loading? (not current-item)))
       ($ :div.p-6
          ($ :div.text-center.text-gray-500 "Loading..."))
 

@@ -231,7 +231,8 @@
        [should-refetch? enabled? refetch state-path])
 
       {:data data
-       :isLoading (or is-loading? (some? bidir-outstanding))
+       :isBidirLoading (some? bidir-outstanding)
+       :isLoading is-loading?
        :isFetchingMore is-fetching-more?
        :isFetchingBefore is-fetching-before?
        :hasMore has-more?
