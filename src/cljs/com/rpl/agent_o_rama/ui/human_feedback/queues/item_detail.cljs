@@ -83,7 +83,8 @@
 
         ;; Fetch queue items with shared cache for review session
         ;; If item isn't in cache yet, load from its cursor and merge.
-        {:keys [data isLoading hasMore hasMoreBefore loadMore loadMoreBefore]}
+        {:keys [data isLoading isFetchingMore isFetchingBefore
+                hasMore hasMoreBefore loadMore loadMoreBefore]}
         (q-common/use-queue-items
          {:module-id module-id
           :queue-id queue-id
@@ -103,6 +104,7 @@
         ;; Navigation:
         ;; - Previous disabled if we're at index 0 (started from URL cursor)
         ;; - Next enabled if there are more items in array OR hasMore on backend
+        nav-busy? (or pending-next? pending-prev? isFetchingMore isFetchingBefore)
         has-prev? (and current-idx (or (> current-idx 0) hasMoreBefore))
         has-next? (and current-idx
                        (or (< current-idx (dec (count items)))
@@ -250,30 +252,39 @@
 
     (uix/use-effect
      (fn []
-       (when (and pending-next? next-item-id)
-         (set-pending-next? false)
-         (rfe/push-state :module/human-feedback-queue-item
-                         {:module-id module-id
-                          :queue-id queue-id
-                          :item-id next-item-id}))
+       (cond
+         (and pending-next? next-item-id)
+         (do
+           (set-pending-next? false)
+           (rfe/push-state :module/human-feedback-queue-item
+                           {:module-id module-id
+                            :queue-id queue-id
+                            :item-id next-item-id}))
+
+         (and pending-next? (not isFetchingMore) (not hasMore))
+         (set-pending-next? false))
        js/undefined)
-     [pending-next? next-item-id module-id queue-id])
+     [pending-next? next-item-id isFetchingMore hasMore module-id queue-id])
 
     (uix/use-effect
      (fn []
-       (when (and pending-prev? current-idx (> current-idx 0) prev-item-id)
-         (set-pending-prev? false)
-         (rfe/push-state :module/human-feedback-queue-item
-                         {:module-id module-id
-                          :queue-id queue-id
-                          :item-id prev-item-id}))
+       (cond
+         (and pending-prev? prev-item-id)
+         (do
+           (set-pending-prev? false)
+           (rfe/push-state :module/human-feedback-queue-item
+                           {:module-id module-id
+                            :queue-id queue-id
+                            :item-id prev-item-id}))
+
+         (and pending-prev? (not isFetchingBefore) (not hasMoreBefore))
+         (set-pending-prev? false))
        js/undefined)
-     [pending-prev? current-idx prev-item-id module-id queue-id])
+     [pending-prev? prev-item-id isFetchingBefore hasMoreBefore module-id queue-id])
 
     (cond
-      ;; Loading state — only block on items until we have the current item;
-      ;; queue info can load in the background for rubric metadata.
-      (and items-loading? (not current-item))
+      ;; Block until queue items finish loading (including bidirectional + reconcile).
+      items-loading?
       ($ :div.p-6
          ($ :div.text-center.text-gray-500 "Loading..."))
 
@@ -291,14 +302,14 @@
                (str "Review Item: " item-id))
             ($ :div.flex.gap-2
                ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
-                  {:disabled (not has-prev?)
+                  {:disabled (or nav-busy? (not has-prev?))
                    :data-testid "previous-item-button"
-                   :onClick #(when has-prev? (handle-prev))}
+                   :onClick #(when (and has-prev? (not nav-busy?)) (handle-prev))}
                   ($ ChevronLeftIcon {:className "h-5 w-5"}))
                ($ :button.px-3.py-2.border.border-gray-300.rounded-md.hover:bg-gray-50.transition-colors.disabled:opacity-50.disabled:cursor-not-allowed.cursor-pointer
-                  {:disabled (not has-next?)
+                  {:disabled (or nav-busy? (not has-next?))
                    :data-testid "next-item-button"
-                   :onClick #(when has-next? (handle-next))}
+                   :onClick #(when (and has-next? (not nav-busy?)) (handle-next))}
                   ($ ChevronRightIcon {:className "h-5 w-5"}))))
 
          ;; Target Info Panel (Agent/Node with trace link)

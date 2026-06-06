@@ -70,34 +70,12 @@
                  (rf/dispatch [:db/set-value (into state-path [:pagination-params]) probe-pagination])
                  (rf/dispatch [:db/set-value (into state-path [:has-more?]) probe-has-more?]))))))
 
-(defn- probe-reverse-pagination!
-  [decoded-module-id decoded-queue-id state-path pagination-params]
-  (-> (rpc/call ::rpc-hf/get-queue-items!!
-                {:module-id decoded-module-id
-                 :queue-name decoded-queue-id
-                 :pagination pagination-params
-                 :limit 1
-                 :include-cursor? true
-                 :reverse? true})
-      (.then (fn [response-data]
-               (let [probe-pagination (:pagination-params response-data)
-                     probe-has-more? (queries/has-more-pages? probe-pagination)]
-                 (rf/dispatch [:db/set-value (into state-path [:reverse-pagination-params]) probe-pagination])
-                 (rf/dispatch [:db/set-value (into state-path [:has-more-before?]) probe-has-more?]))))))
-
 (defn- reconcile-stale-pagination!
-  "After bidirectional merge, forward/reverse cursors can point at loaded items."
+  "After bidirectional merge, the forward cursor can point at an already-loaded item."
   [decoded-module-id decoded-queue-id state-path items]
-  (let [fwd-pagination (get-in @rdb/app-db (into state-path [:pagination-params]))
-        rev-pagination (get-in @rdb/app-db (into state-path [:reverse-pagination-params]))
-        probes (cond-> []
-                 (pagination-already-loaded? fwd-pagination items)
-                 (conj (probe-forward-pagination! decoded-module-id decoded-queue-id state-path fwd-pagination))
-
-                 (pagination-already-loaded? rev-pagination items)
-                 (conj (probe-reverse-pagination! decoded-module-id decoded-queue-id state-path rev-pagination)))]
-    (if (seq probes)
-      (.then (js/Promise.all (clj->js probes)) (fn [_] nil))
+  (let [fwd-pagination (get-in @rdb/app-db (into state-path [:pagination-params]))]
+    (if (pagination-already-loaded? fwd-pagination items)
+      (probe-forward-pagination! decoded-module-id decoded-queue-id state-path fwd-pagination)
       (js/Promise.resolve nil))))
 
 ;; =============================================================================
