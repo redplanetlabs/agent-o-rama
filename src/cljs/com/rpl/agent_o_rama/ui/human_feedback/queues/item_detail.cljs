@@ -271,13 +271,14 @@
      [pending-prev? current-idx prev-item-id module-id queue-id])
 
     (cond
-      ;; Loading state
-      (or queue-info-loading? items-loading?)
+      ;; Loading state — only block on items until we have the current item;
+      ;; queue info can load in the background for rubric metadata.
+      (and items-loading? (not current-item))
       ($ :div.p-6
          ($ :div.text-center.text-gray-500 "Loading..."))
 
       ;; Item not found
-      (not current-item)
+      (and (not items-loading?) (not current-item))
       ($ :div.p-6
          ($ :div.text-center.text-gray-500 "Item not found"))
 

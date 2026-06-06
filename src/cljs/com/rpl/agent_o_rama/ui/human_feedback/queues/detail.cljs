@@ -2,7 +2,7 @@
   "Human feedback queue detail page (queue info + items list)."
   (:require
    [com.rpl.agent-o-rama.ui.re-frame :as aor-rf]
-   [uix.core :refer [defui $]]
+   [uix.core :as uix :refer [defui $]]
    [uix.re-frame :refer [use-subscribe]]
    [reitit.frontend.easy :as rfe]
    ["@heroicons/react/24/outline" :refer [PencilIcon]]
@@ -111,16 +111,22 @@
         queue-info-error error
 
         ;; Query for paginated queue items
-        ;; Force refetch from start to ensure list always shows items 0-19
-        {:keys [data isLoading isFetchingMore hasMore loadMore error]}
+        {:keys [data isLoading isFetchingMore hasMore loadMore error refetch]}
         (q-common/use-queue-items
          {:module-id module-id
           :queue-id queue-id
-          :force-from-start? true
           :enabled? (boolean (and decoded-module-id decoded-queue-id))})
         items-error error
 
-        queue-items data]
+        queue-items data
+
+        ;; Always refetch from start when opening the queue detail page
+        _ (uix/use-effect
+           (fn []
+             (when (boolean (and decoded-module-id decoded-queue-id))
+               (refetch))
+             js/undefined)
+           [module-id queue-id refetch decoded-module-id decoded-queue-id])]
 
     (cond
       (or loading? isLoading)

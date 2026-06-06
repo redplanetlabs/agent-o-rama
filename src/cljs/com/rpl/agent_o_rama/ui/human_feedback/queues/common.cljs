@@ -55,7 +55,7 @@
 ;; =============================================================================
 
 (defhook use-queue-items
-  [{:keys [module-id queue-id initial-cursor include-initial-cursor? force-from-start? enabled?]
+  [{:keys [module-id queue-id initial-cursor include-initial-cursor? enabled?]
     :or {enabled? true}}]
   (let [decoded-module-id (common/url-decode module-id)
         decoded-queue-id (common/url-decode queue-id)
@@ -70,7 +70,6 @@
         is-loading? (= (:status query-state) :loading)
         is-fetching-more? (:fetching-more? query-state)
         is-fetching-before? (:fetching-before? query-state)
-        bidir-outstanding (:initial-bidir-outstanding query-state)
         error (when (= (:status query-state) :error) (:error query-state))
         initial-needed? (and initial-cursor
                              (not (some #(queue-item-matches? % initial-cursor) data)))]
@@ -171,32 +170,14 @@
                                        :error nil
                                        :should-refetch? false}])
                      (fetch-page nil false false false false))
-                   [fetch-page state-path])
-
-          force-refetch-applied (uix/use-ref false)]
-
-      ;; Effect: Force refetch from start if flag is set and cache exists (once per mount)
-      (uix/use-effect
-       (fn []
-         (when (and force-from-start? (not @force-refetch-applied) (seq data) enabled?)
-           (reset! force-refetch-applied true)
-           (refetch))
-         js/undefined)
-       [force-from-start? data enabled? refetch])
+                   [fetch-page state-path])]
 
       (uix/use-effect
        (fn []
-         (when (and enabled?
-                    (nil? bidir-outstanding)
-                    (or (empty? data) initial-needed?))
-           (if (and initial-needed? initial-cursor include-initial-cursor?)
-             (do
-               (rf/dispatch [:db/set-value (into state-path [:initial-bidir-outstanding]) 2])
-               (fetch-page initial-cursor false true true false)
-               (fetch-page initial-cursor false true true true))
-             (fetch-page initial-cursor false include-initial-cursor? false false)))
+         (when (and enabled? (or (empty? data) initial-needed?))
+           (fetch-page initial-cursor false include-initial-cursor? false false))
          js/undefined)
-       [state-path enabled? bidir-outstanding data initial-needed? fetch-page initial-cursor include-initial-cursor?])
+       [state-path enabled? data initial-needed? fetch-page initial-cursor include-initial-cursor?])
 
       (uix/use-effect
        (fn []
