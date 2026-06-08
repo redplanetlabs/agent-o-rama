@@ -56,6 +56,14 @@
   (and (queries/has-more-pages? pagination-params)
        (some #(queue-item-matches? % pagination-params) items)))
 
+(defn- promise-with-timeout
+  [p timeout-ms]
+  (js/Promise.race
+   [p
+    (js/Promise.
+     (fn [resolve]
+       (js/setTimeout #(resolve :timeout) timeout-ms)))]))
+
 (defn- probe-forward-pagination!
   [decoded-module-id decoded-queue-id state-path pagination-params]
   (-> (rpc/call ::rpc-hf/get-queue-items!!
@@ -68,14 +76,18 @@
                (let [probe-pagination (:pagination-params response-data)
                      probe-has-more? (queries/has-more-pages? probe-pagination)]
                  (rf/dispatch [:db/set-value (into state-path [:pagination-params]) probe-pagination])
-                 (rf/dispatch [:db/set-value (into state-path [:has-more?]) probe-has-more?]))))))
+                 (rf/dispatch [:db/set-value (into state-path [:has-more?]) probe-has-more?]))))
+      (.catch (fn [_] nil))))
 
 (defn- reconcile-stale-pagination!
   "After bidirectional merge, the forward cursor can point at an already-loaded item."
   [decoded-module-id decoded-queue-id state-path items]
   (let [fwd-pagination (get-in @rdb/app-db (into state-path [:pagination-params]))]
     (if (pagination-already-loaded? fwd-pagination items)
-      (probe-forward-pagination! decoded-module-id decoded-queue-id state-path fwd-pagination)
+      (-> (promise-with-timeout
+           (probe-forward-pagination! decoded-module-id decoded-queue-id state-path fwd-pagination)
+           10000)
+          (.then (fn [_] nil)))
       (js/Promise.resolve nil))))
 
 ;; =============================================================================

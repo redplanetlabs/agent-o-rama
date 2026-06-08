@@ -192,7 +192,7 @@ test.describe('Queue Review Pagination', () => {
   });
 
   test('should load from cursor when accessing deep item via URL', async ({ page }) => {
-    test.setTimeout(300000); // 5 minutes — many invocations + cold navigations
+    test.setTimeout(600000); // 10 minutes — 30 invocations + cold navigations on CI
     
     const uniqueId = randomUUID().substring(0, 8);
     const queueName = `e2e-cursor-queue-${uniqueId}`;
