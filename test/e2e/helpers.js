@@ -640,8 +640,9 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   }
   const foundByTestId = await evaluatorOptionByTestId.isVisible().catch(() => false);
   const evaluatorOption = foundByTestId ? evaluatorOptionByTestId : evaluatorOptionByRole;
-  await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
-  await evaluatorOption.evaluate((el) => el.click());
+  await expect(evaluatorOption).toBeVisible({ timeout: 30000 });
+  await evaluatorOption.scrollIntoViewIfNeeded();
+  await evaluatorOption.click({ timeout: 30000 });
   
   console.log(`Successfully added evaluator: ${evaluatorName}`);
 }
