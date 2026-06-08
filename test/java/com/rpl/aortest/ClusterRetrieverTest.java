@@ -5,7 +5,6 @@ import com.rpl.agentorama.AgentManager;
 import com.rpl.agentorama.AgentModule;
 import com.rpl.agentorama.AgentNode;
 import com.rpl.agentorama.AgentTopology;
-import com.rpl.agentorama.ops.RamaVoidFunction2;
 import com.rpl.rama.Depot;
 import com.rpl.rama.Path;
 import com.rpl.rama.PState;
@@ -37,48 +36,33 @@ public class ClusterRetrieverTest {
     }
   }
 
-  public static class ClusterRetrieverAgentModule extends AgentModule {
+  private static AgentModule agentModule(String otherModuleName) {
+    return new AgentModule() {
+      @Override
+      protected void defineAgents(AgentTopology topology) {
+        topology
+            .newAgent("foo")
+            .node(
+                "start",
+                null,
+                (AgentNode agentNode, String k) -> {
+                  ClusterManagerBase retriever = agentNode.getClusterRetriever();
+                  Depot depot = retriever.clusterDepot(otherModuleName, "*depot");
+                  PState p = retriever.clusterPState(otherModuleName, "$$p");
 
-    private final String otherModuleName;
+                  depot.append(k);
 
-    public ClusterRetrieverAgentModule(String otherModuleName) {
-      this.otherModuleName = otherModuleName;
-    }
+                  Path kpath = Path.key(k);
+                  List<Object> res = new ArrayList<>();
+                  res.add(p.selectOne(kpath));
+                  res.add(p.selectOne(k, kpath));
+                  res.add(p.select(kpath));
+                  res.add(p.select(k, kpath));
 
-    @Override
-    protected void defineAgents(AgentTopology topology) {
-      topology
-          .newAgent("foo")
-          .node("start", null, new ClusterRetrieverNodeFunction(otherModuleName));
-    }
-  }
-
-  public static class ClusterRetrieverNodeFunction
-      implements RamaVoidFunction2<AgentNode, String> {
-
-    private final String otherModuleName;
-
-    public ClusterRetrieverNodeFunction(String otherModuleName) {
-      this.otherModuleName = otherModuleName;
-    }
-
-    @Override
-    public void invoke(AgentNode agentNode, String k) {
-      ClusterManagerBase retriever = agentNode.getClusterRetriever();
-      Depot depot = retriever.clusterDepot(otherModuleName, "*depot");
-      PState p = retriever.clusterPState(otherModuleName, "$$p");
-
-      depot.append(k);
-
-      Path kpath = Path.key(k);
-      List<Object> res = new ArrayList<>();
-      res.add(p.selectOne(kpath));
-      res.add(p.selectOne(k, kpath));
-      res.add(p.select(kpath));
-      res.add(p.select(k, kpath));
-
-      agentNode.result(res);
-    }
+                  agentNode.result(res);
+                });
+      }
+    };
   }
 
   public static void testClusterRetriever() throws Exception {
@@ -86,8 +70,8 @@ public class ClusterRetrieverTest {
       OtherModule otherModule = new OtherModule();
       ipc.launchModule(otherModule, new LaunchConfig(1, 1));
 
-      ClusterRetrieverAgentModule agentModule =
-          new ClusterRetrieverAgentModule(otherModule.getModuleName());
+      String otherModuleName = otherModule.getModuleName();
+      AgentModule agentModule = agentModule(otherModuleName);
       ipc.launchModule(agentModule, new LaunchConfig(2, 2));
 
       AgentManager manager = AgentManager.create(ipc, agentModule.getModuleName());
