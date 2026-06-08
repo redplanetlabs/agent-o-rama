@@ -113,13 +113,11 @@ public interface AgentNode extends AgentObjectFetcher, IFetchAgentClient {
   <T> QueryTopologyClient<T> getMirrorQueryTopologyClient(String moduleName, String name);
 
   /**
-   * Gets a cluster retriever for constructing foreign clients (depots, pstates, query
+   * Gets the cluster retriever for constructing foreign clients (depots, pstates, query
    * topologies) the same way they are constructed in a foreign client context.
    *
-   * Clients constructed from the returned retriever are pulled from the same per-task
-   * client cache used by the other AgentNode fetch methods, and their operations are
-   * traced into this node invocation just like objects retrieved directly from this
-   * interface.
+   * Operations on clients from this retriever are not traced into this node invocation.
+   * Use the other fetch methods on this interface when you need traced access.
    *
    * @return ClusterManagerBase for constructing foreign clients
    */

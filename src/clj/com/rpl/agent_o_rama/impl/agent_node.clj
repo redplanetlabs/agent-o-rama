@@ -10,9 +10,7 @@
    [com.rpl.agent-o-rama.impl.pobjects :as po]
    [com.rpl.agent-o-rama.impl.store-impl :as simpl]
    [com.rpl.agent-o-rama.impl.types :as aor-types]
-   [com.rpl.rama.ops :as ops]
-   [rpl.rama.java-api.cluster :as rama-cluster]
-   [rpl.rama.util.watchable-promise :as wp])
+   [com.rpl.rama.ops :as ops])
   (:import
    [com.rpl.agentorama
     AgentClient
@@ -31,10 +29,7 @@
    [com.rpl.rama
     AckLevel
     Depot
-    PState
     QueryTopologyClient]
-   [com.rpl.rama.cluster
-    ClusterManagerBase]
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
@@ -399,22 +394,6 @@
       ret#
     )))
 
-(defmacro traced-store-read-call
-  [expr nested-ops-vol info-map]
-  `(let [info-map# ~info-map
-         start-time-millis# (h/current-time-millis)
-         ret#      ~expr]
-     (vswap! ~nested-ops-vol
-             conj
-             (aor-types/->NestedOpInfoImpl
-              start-time-millis#
-              (h/current-time-millis)
-              :store-read
-              (assoc info-map# "result" ret#)
-             ))
-     ret#
-   ))
-
 (defn traced-depot
   [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
   (let [depot (.getForeignDepot
@@ -494,136 +473,6 @@
          "name"       name
          "args"       (vec args)
         }))
-    )))
-
-(defn record-async-store-read!
-  "Attaches a :store-read nested op recording to a foreign select promise. The op is
-  recorded with its result when the promise is delivered, before the caller (which
-  blocks on the returned promise) observes the value, so ordering is preserved."
-  [a-watchable-promise start-time-millis nested-ops-vol info-map]
-  (wp/watch-success
-   (fn [res]
-     (vswap! nested-ops-vol
-             conj
-             (aor-types/->NestedOpInfoImpl
-              start-time-millis
-              (h/current-time-millis)
-              :store-read
-              (assoc info-map "result" res)))
-     res)
-   a-watchable-promise))
-
-;; - foreign selects (foreign-select / foreign-select-one / foreign-proxy) do not
-;;   go through the public PState methods; they dispatch on the internal
-;;   PStateInternal protocol, so the wrapper must implement it to be usable and
-;;   traced. foreign-select-one is sugar over the same select-async-internal call,
-;;   so both record as a "select".
-;; - the public PState methods are also implemented for direct (e.g. Java) callers.
-(defn traced-pstate
-  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg module-name name nested-ops-vol]
-  (let [^PState pstate (.getForeignPState
-                        declared-objects-tg
-                        module-name
-                        name)]
-    (reify
-     PState
-     (select [this path]
-       (traced-store-read-call
-        (.select pstate path)
-        nested-ops-vol
-        {"op"         "select"
-         "moduleName" module-name
-         "name"       name
-         "path"       (pr-str path)
-        }))
-     (select [this pkey path]
-       (traced-store-read-call
-        (.select pstate pkey path)
-        nested-ops-vol
-        {"op"         "select"
-         "moduleName" module-name
-         "name"       name
-         "pkey"       pkey
-         "path"       (pr-str path)
-        }))
-     (selectOne [this path]
-       (traced-store-read-call
-        (.selectOne pstate path)
-        nested-ops-vol
-        {"op"         "selectOne"
-         "moduleName" module-name
-         "name"       name
-         "path"       (pr-str path)
-        }))
-     (selectOne [this pkey path]
-       (traced-store-read-call
-        (.selectOne pstate pkey path)
-        nested-ops-vol
-        {"op"         "selectOne"
-         "moduleName" module-name
-         "name"       name
-         "pkey"       pkey
-         "path"       (pr-str path)
-        }))
-     (getObjectInfo [this]
-       (traced-other-call
-        false
-        (.getObjectInfo pstate)
-        nested-ops-vol
-        {"op"         "getObjectInfo"
-         "moduleName" module-name
-         "name"       name
-        }))
-
-     rama-cluster/PStateInternal
-     (select-async-internal [this compiled-path]
-       (record-async-store-read!
-        (rama-cluster/select-async-internal pstate compiled-path)
-        (h/current-time-millis)
-        nested-ops-vol
-        {"op"         "select"
-         "moduleName" module-name
-         "name"       name
-         "path"       (pr-str compiled-path)
-        }))
-     (select-pkey-async-internal [this partitioning-key compiled-path]
-       (record-async-store-read!
-        (rama-cluster/select-pkey-async-internal pstate partitioning-key compiled-path)
-        (h/current-time-millis)
-        nested-ops-vol
-        {"op"         "select"
-         "moduleName" module-name
-         "name"       name
-         "pkey"       partitioning-key
-         "path"       (pr-str compiled-path)
-        }))
-     ;; proxies are long-lived reactive subscriptions rather than point reads, so
-     ;; they are delegated to the underlying client untraced
-     (proxy-async-internal [this compiled-path callback-fn]
-       (rama-cluster/proxy-async-internal pstate compiled-path callback-fn))
-     (proxy-pkey-async-internal [this partitioning-key compiled-path callback-fn]
-       (rama-cluster/proxy-pkey-async-internal pstate partitioning-key compiled-path callback-fn))
-    )))
-
-;; Wraps the underlying cluster retriever so foreign clients constructed from it
-;; (depots, pstates, query topologies) are pulled from the same per-task client
-;; cache used by the AgentNode fetch interface and have their operations traced
-;; into this node invocation's nested ops.
-(defn traced-cluster-retriever
-  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg nested-ops-vol]
-  (let [delegate (.getClusterRetriever declared-objects-tg)]
-    (reify
-     ClusterManagerBase
-     (clusterDepot [this module-name name]
-       (traced-depot declared-objects-tg module-name name nested-ops-vol))
-     (clusterPState [this module-name name]
-       (traced-pstate declared-objects-tg module-name name nested-ops-vol))
-     (clusterQuery [this module-name name]
-       (traced-qt-client declared-objects-tg module-name name nested-ops-vol))
-     (getDeployedModuleNames [this]
-       (.getDeployedModuleNames delegate))
-     (getMicrobatchDepotInfo [this module-name topology-name]
-       (.getMicrobatchDepotInfo delegate module-name topology-name))
     )))
 
 (defn mk-agent-node
@@ -755,7 +604,7 @@
         name
         nested-ops-vol))
      (getClusterRetriever [this]
-       (traced-cluster-retriever declared-objects-tg nested-ops-vol))
+       (.getClusterRetriever declared-objects-tg))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
      (recordNestedOp [this type start-time-millis finish-time-millis info]
