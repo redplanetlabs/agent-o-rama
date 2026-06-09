@@ -30,6 +30,8 @@
     AckLevel
     Depot
     QueryTopologyClient]
+   [com.rpl.rama.cluster
+    ClusterManagerBase]
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
@@ -474,6 +476,25 @@
          "args"       (vec args)
         }))
     )))
+
+(defn cached-cluster-retriever
+  "ClusterManagerBase that routes foreign client construction through the per-task caches
+  on AgentDeclaredObjectsTaskGlobal. Not traced; delegate is the raw cluster retriever."
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg ^ClusterManagerBase delegate]
+  (reify
+   ClusterManagerBase
+   (clusterDepot [_ module-name name]
+     (.getForeignDepot declared-objects-tg module-name name))
+   (clusterPState [_ module-name name]
+     (.getForeignPState declared-objects-tg module-name name))
+   (clusterQuery [_ module-name name]
+     (.getForeignQuery declared-objects-tg module-name name))
+   (getDeployedModuleNames [_]
+     (.getDeployedModuleNames delegate))
+   (getMicrobatchDepotInfo [_ module-name topology-name]
+     (.getMicrobatchDepotInfo delegate module-name topology-name))
+   (close [_]
+     (.close delegate))))
 
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id execution-context curr-node invoke-id retry-num

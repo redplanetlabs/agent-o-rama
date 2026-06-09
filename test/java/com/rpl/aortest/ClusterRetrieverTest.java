@@ -49,6 +49,7 @@ public class ClusterRetrieverTest {
                   ClusterManagerBase retriever = agentNode.getClusterRetriever();
                   Depot depot = retriever.clusterDepot(otherModuleName, "*depot");
                   PState p = retriever.clusterPState(otherModuleName, "$$p");
+                  PState p2 = retriever.clusterPState(otherModuleName, "$$p");
 
                   depot.append(k);
 
@@ -58,6 +59,7 @@ public class ClusterRetrieverTest {
                   res.add(p.selectOne(k, kpath));
                   res.add(p.select(kpath));
                   res.add(p.select(k, kpath));
+                  res.add(p == p2);
 
                   agentNode.result(res);
                 });
@@ -82,8 +84,8 @@ public class ClusterRetrieverTest {
       if (res == null) {
         throw new AssertionError("Agent should return a result");
       }
-      if (res.size() != 4) {
-        throw new AssertionError("Expected 4 results but got " + res.size());
+      if (res.size() != 5) {
+        throw new AssertionError("Expected 5 results but got " + res.size());
       }
       if (!Long.valueOf(1L).equals(res.get(0))) {
         throw new AssertionError("Expected selectOne result 1 but got " + res.get(0));
@@ -100,6 +102,9 @@ public class ClusterRetrieverTest {
       List<Long> pkeySelectRes = (List<Long>) res.get(3);
       if (!Arrays.asList(1L).equals(pkeySelectRes)) {
         throw new AssertionError("Expected partitioned select result [1] but got " + pkeySelectRes);
+      }
+      if (!Boolean.TRUE.equals(res.get(4))) {
+        throw new AssertionError("Expected cached PState identity but got " + res.get(4));
       }
     }
   }

@@ -25,7 +25,7 @@ Example:\n
   (:require
    [com.rpl.agent-o-rama.impl.store-impl :as simpl])
   (:import
-   [com.rpl.agentorama.store PStateStore]
+   [com.rpl.agentorama.store Store]
    [com.rpl.rama PState]))
 
 (defn get-underlying-pstate
@@ -38,7 +38,7 @@ Args:\n
 \n
 Returns:\n
   - The underlying PState client"
-  ^PState [^PStateStore store]
+  ^PState [^Store store]
   (.getUnderlyingPState store))
 
 (defn get

@@ -14,16 +14,6 @@ import com.rpl.rama.PState;
  */
 public interface PStateStore extends Store {
   /**
-   * Returns the underlying Rama PState for this store.
-   *
-   * <p>This enables use of standard Rama foreign operations (e.g. {@code foreign-select-one-async})
-   * on agent stores, so the same code can work with both raw PState references and AoR stores.
-   *
-   * @return the underlying PState client
-   */
-  PState getUnderlyingPState();
-
-  /**
    * Selects data using a path expression.
    *
    * @param path the path expression for data selection, e.g {@code Path.key("a").mapVals()}

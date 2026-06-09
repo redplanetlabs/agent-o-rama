@@ -1,5 +1,7 @@
 package com.rpl.agentorama.store;
 
+import com.rpl.rama.PState;
+
 /**
  * Base interface for built-in persistent stores accessible from agent nodes.
  *
@@ -16,4 +18,13 @@ package com.rpl.agentorama.store;
  */
 public interface Store {
 
+  /**
+   * Returns the underlying Rama PState backing this store, if any.
+   *
+   * <p>Key-value, document, and PState stores all return their backing PState. This enables
+   * standard Rama foreign operations (e.g. {@code foreign-select-one-async}) on agent stores.
+   *
+   * @return the underlying PState client, or null if this store has no PState backing
+   */
+  PState getUnderlyingPState();
 }

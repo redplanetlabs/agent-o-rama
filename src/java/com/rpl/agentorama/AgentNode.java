@@ -116,8 +116,9 @@ public interface AgentNode extends AgentObjectFetcher, IFetchAgentClient {
    * Gets the cluster retriever for constructing foreign clients (depots, pstates, query
    * topologies) the same way they are constructed in a foreign client context.
    *
-   * Operations on clients from this retriever are not traced into this node invocation.
-   * Use the other fetch methods on this interface when you need traced access.
+   * Clients from this retriever use the same per-task caches as the mirror fetch methods
+   * on this interface. Operations are not traced; use those fetch methods when you need
+   * traced access.
    *
    * @return ClusterManagerBase for constructing foreign clients
    */
