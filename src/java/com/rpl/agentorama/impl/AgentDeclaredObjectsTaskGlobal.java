@@ -29,7 +29,6 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   WorkerManagedResource<ConcurrentHashMap<String, AgentManager>> _managers;
   WorkerManagedResource<ConcurrentHashMap<List, AgentClient>> _mirrorAgents;
   ClusterManagerBase _clusterRetriever;
-  WorkerManagedResource<ClusterManagerBase> _cachedClusterRetriever;
   WorkerManagedResource<AgentManager> _thisManager;
   WorkerManagedResource<ConcurrentHashMap<List, Depot>> _depots;
   WorkerManagedResource<ConcurrentHashMap<List, PState>> _pstates;
@@ -171,7 +170,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   }
 
   public ClusterManagerBase getClusterRetriever() {
-    return _cachedClusterRetriever.getResource();
+    return (ClusterManagerBase) AORHelpers.CACHED_CLUSTER_RETRIEVER.invoke(this, _clusterRetriever);
   }
 
   private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
@@ -187,13 +186,6 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     });
     _evaluators = new ConcurrentHashMap();
     _clusterRetriever = context.getClusterRetriever();
-    final ClusterManagerBase clusterRetriever = _clusterRetriever;
-    _cachedClusterRetriever = new WorkerManagedResource<ClusterManagerBase>(
-      "__cachedClusterRetriever",
-      context,
-      () -> (ClusterManagerBase) AORHelpers.CACHED_CLUSTER_RETRIEVER.invoke(
-        AgentDeclaredObjectsTaskGlobal.this,
-        clusterRetriever));
 
     _objects = new HashMap();
     for(String name: _builders.keySet()) {
@@ -258,6 +250,5 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     _pstates.close();
     _mirrorStoreInfo.close();
     _queries.close();
-    _cachedClusterRetriever.close();
   }
 }
