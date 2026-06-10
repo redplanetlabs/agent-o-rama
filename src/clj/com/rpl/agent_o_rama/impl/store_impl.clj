@@ -9,8 +9,7 @@
    [com.rpl.agentorama.store
     DocumentStore
     KeyValueStore
-    PStateStore
-    Store]
+    PStateStore]
    [com.rpl.rama
     Depot
     PState]
@@ -267,16 +266,13 @@
   (pstate-select-one* [this path] [this pkey path])
   (pstate-transform* [this pkey path]))
 
-(defn StoreUnderlyingPStateImpl
-  [store-params]
-  `(Store
-    (~'getUnderlyingPState
-     [this#]
-     (:pstate-client ~store-params))))
-
 (defn PStateStoreImpl
   [store-params]
   `(PStateStore
+    ;; getUnderlyingPState is declared on Store, a superinterface of PStateStore
+    (~'getUnderlyingPState
+     [this#]
+     (:pstate-client ~store-params))
     (~'select
      [this# jpath#]
      (pstate-select* this# (java-path->clojure-path jpath#)))
@@ -334,12 +330,12 @@
 
 (defn mk-kv-store
   [store-params]
-  (reify-store [StoreUnderlyingPStateImpl KeyValueImpl PStateStoreImpl] store-params))
+  (reify-store [KeyValueImpl PStateStoreImpl] store-params))
 
 (defn mk-doc-store
   [store-params]
-  (reify-store [StoreUnderlyingPStateImpl DocImpl PStateStoreImpl] store-params))
+  (reify-store [KeyValueImpl DocImpl PStateStoreImpl] store-params))
 
 (defn mk-pstate-store
   [store-params]
-  (reify-store [StoreUnderlyingPStateImpl PStateStoreImpl] store-params))
+  (reify-store [PStateStoreImpl] store-params))
