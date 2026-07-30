@@ -22,7 +22,7 @@
   :dependencies [[com.rpl/rama-helpers "0.10.0" :exclusions [org.clojure/clojure]]
                  [com.github.f4b6a3/uuid-creator "6.1.1"]
                  [dev.langchain4j/langchain4j
-                  "1.8.0"
+                  "1.18.1"
                   :exclusions
                   [org.slf4j/slf4j-api]]
                  [com.networknt/json-schema-validator
@@ -68,7 +68,7 @@
                                               "-Xmx6g"]
                           :dependencies
                           [[meander/epsilon "0.0.650"]
-                           [dev.langchain4j/langchain4j-open-ai "1.8.0"]
+                           [dev.langchain4j/langchain4j-open-ai "1.18.1"]
                            [dev.langchain4j/langchain4j-web-search-engine-tavily
                             "1.8.0-beta15"]
                            [thheller/shadow-cljs "3.1.7"]
@@ -80,7 +80,7 @@
                            [org.clojars.abhinav/snitch "0.1.16"]]}
              :examples   {:test-paths   ["examples/clj/test"]
                           :source-paths ["examples/clj/src"]}
-             :provided   {:dependencies [[com.rpl/rama "1.8.0"]
+             :provided   {:dependencies [[com.rpl/rama "1.9.0"]
                                          [org.clojure/clojure "1.12.4"]]}
              :gen        {:prep-tasks   []
                           :source-paths ["scripts"]

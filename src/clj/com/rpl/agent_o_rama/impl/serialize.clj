@@ -1,5 +1,6 @@
 (ns com.rpl.agent-o-rama.impl.serialize
   (:require
+   [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.ramaspecter.defrecord-plus.serialise :as ser]
    [taoensso.nippy :as nippy])
   (:import
@@ -20,6 +21,8 @@
     UserMessage]
    [dev.langchain4j.data.segment
     TextSegment]
+   [dev.langchain4j.invocation
+    InvocationContext]
    [dev.langchain4j.model.chat.request.json
     JsonAnyOfSchema
     JsonArraySchema
@@ -39,7 +42,8 @@
    [dev.langchain4j.service
     Result]
    [dev.langchain4j.service.tool
-    ToolExecution]
+    ToolExecution
+    ToolExecutionResult]
    [dev.langchain4j.store.embedding
     EmbeddingMatch
     EmbeddingSearchResult]
@@ -59,6 +63,8 @@
     Or]
    [java.io
     DataOutput]
+   [java.time
+    LocalDateTime]
    [java.util
     List]))
 
@@ -77,6 +83,24 @@
   (if (empty? coll)
     {}
     coll))
+
+;; ToolExecution requires a non-nil invocationContext, but it's not part of
+;; ToolExecution equality and holds arbitrary user objects (method arguments,
+;; managed parameters), so an empty one is substituted on deserialization
+(defn mk-tool-execution
+  [^ToolExecutionRequest request result failed? start-time end-time]
+  (-> (ToolExecution/builder)
+      (.request request)
+      (.result ^ToolExecutionResult
+               (-> (ToolExecutionResult/builder)
+                   ;; the builder rejects a nil resultText
+                   (.resultText (or result ""))
+                   (.isError (boolean failed?))
+                   .build))
+      (.startTime ^LocalDateTime start-time)
+      (.finishTime ^LocalDateTime end-time)
+      (.invocationContext (.build (InvocationContext/builder)))
+      .build))
 
 (ser/extend-8-byte-freeze
  ToolExecutionRequest
@@ -401,15 +425,24 @@
  ToolExecution
  [^ToolExecution obj out]
  (nippy/freeze-to-out! out (.request obj))
- (nippy/freeze-to-out! out (.result obj)))
+ (nippy/freeze-to-out! out (.result obj))
+ (nippy/freeze-to-out! out (.hasFailed obj))
+ (nippy/freeze-to-out! out (some-> (.startTime obj) str))
+ (nippy/freeze-to-out! out (some-> (.finishTime obj) str)))
 
 (ser/extend-8-byte-thaw
  ToolExecution
  [in]
- (-> (ToolExecution/builder)
-     (.request ^ToolExecutionRequest (nippy/thaw-from-in! in))
-     (.result ^String (nippy/thaw-from-in! in))
-     .build))
+ (let [request    (nippy/thaw-from-in! in)
+       result     (nippy/thaw-from-in! in)
+       failed?    (nippy/thaw-from-in! in)
+       start-time (nippy/thaw-from-in! in)
+       end-time   (nippy/thaw-from-in! in)]
+   (mk-tool-execution request
+                      result
+                      failed?
+                      (h/parse-local-date-time start-time)
+                      (h/parse-local-date-time end-time))))
 
 (ser/extend-8-byte-freeze
  Result

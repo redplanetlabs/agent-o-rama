@@ -23,6 +23,8 @@
     UserMessage]
    [dev.langchain4j.data.segment
     TextSegment]
+   [dev.langchain4j.invocation
+    InvocationContext]
    [dev.langchain4j.model.chat.request
     ChatRequest]
    [dev.langchain4j.model.chat.request.json
@@ -44,7 +46,8 @@
    [dev.langchain4j.service
     Result]
    [dev.langchain4j.service.tool
-    ToolExecution]
+    ToolExecution
+    ToolExecutionResult]
    [dev.langchain4j.store.embedding
     EmbeddingMatch
     EmbeddingSearchResult]
@@ -63,7 +66,9 @@
     Not
     Or]
    [java.io
-    DataOutput]))
+    DataOutput]
+   [java.time
+    LocalDateTime]))
 
 (defn- jroundtrip
   [obj]
@@ -72,6 +77,27 @@
 (defn jser=
   [obj]
   (= obj (jroundtrip obj)))
+
+;; langchain4j requires a non-nil invocationContext on ToolExecution, though
+;; it's not part of its equality
+(defn mk-tool-execution
+  ([] (mk-tool-execution "abcd" false nil nil))
+  ([^String result failed? ^LocalDateTime start-time ^LocalDateTime finish-time]
+   (-> (ToolExecution/builder)
+       (.request (-> (ToolExecutionRequest/builder)
+                     (.id "id1")
+                     (.name "foo")
+                     (.arguments "abcde")
+                     .build))
+       (.result ^ToolExecutionResult
+                (-> (ToolExecutionResult/builder)
+                    (.resultText result)
+                    (.isError (boolean failed?))
+                    .build))
+       (.startTime start-time)
+       (.finishTime finish-time)
+       (.invocationContext (.build (InvocationContext/builder)))
+       .build)))
 
 (deftest json-ser-test
   (is (jser= (-> (ToolExecutionRequest/builder)
@@ -143,14 +169,23 @@
   (is (jser= (TokenUsage. (int 1) (int 2))))
   (is (jser= (TokenUsage. (int 11))))
   (is (jser= (TokenUsage.)))
-  (is (jser= (-> (ToolExecution/builder)
-                 (.request (-> (ToolExecutionRequest/builder)
-                               (.id "id1")
-                               (.name "foo")
-                               (.arguments "abcde")
-                               .build))
-                 (.result "abcd")
-                 .build)))
+  (is (jser= (mk-tool-execution)))
+  (is (jser= (mk-tool-execution "" true nil nil)))
+  (is (jser= (mk-tool-execution "abcd"
+                                true
+                                (LocalDateTime/of 2020 1 2 3 4 5)
+                                (LocalDateTime/of 2020 1 2 3 4 9))))
+  (let [^ToolExecution te (jroundtrip
+                           (mk-tool-execution
+                            "abcd"
+                            true
+                            (LocalDateTime/of 2020 1 2 3 4 5)
+                            (LocalDateTime/of 2020 1 2 3 4 9)))]
+    (is (= "abcd" (.result te)))
+    (is (true? (.hasFailed te)))
+    (is (= (LocalDateTime/of 2020 1 2 3 4 5) (.startTime te)))
+    (is (= (LocalDateTime/of 2020 1 2 3 4 9) (.finishTime te)))
+    (is (some? (.invocationContext te))))
   (is (jser= FinishReason/STOP))
   (is (jser= FinishReason/LENGTH))
   (is (jser= FinishReason/OTHER))

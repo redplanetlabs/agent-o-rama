@@ -24,6 +24,8 @@
     UserMessage]
    [dev.langchain4j.data.segment
     TextSegment]
+   [dev.langchain4j.invocation
+    InvocationContext]
    [dev.langchain4j.model.chat.request
     ChatRequest]
    [dev.langchain4j.model.chat.request.json
@@ -45,7 +47,8 @@
    [dev.langchain4j.service
     Result]
    [dev.langchain4j.service.tool
-    ToolExecution]
+    ToolExecution
+    ToolExecutionResult]
    [dev.langchain4j.store.embedding
     EmbeddingMatch
     EmbeddingSearchResult]
@@ -64,7 +67,9 @@
     Not
     Or]
    [java.io
-    DataOutput]))
+    DataOutput]
+   [java.time
+    LocalDateTime]))
 
 (defn- roundtrip
   [obj]
@@ -73,6 +78,27 @@
 (defn ser=
   [obj]
   (= obj (roundtrip obj)))
+
+;; langchain4j requires a non-nil invocationContext on ToolExecution, though
+;; it's not part of its equality
+(defn mk-tool-execution
+  ([] (mk-tool-execution "abcd" false nil nil))
+  ([^String result failed? ^LocalDateTime start-time ^LocalDateTime finish-time]
+   (-> (ToolExecution/builder)
+       (.request (-> (ToolExecutionRequest/builder)
+                     (.id "id1")
+                     (.name "foo")
+                     (.arguments "abcde")
+                     .build))
+       (.result ^ToolExecutionResult
+                (-> (ToolExecutionResult/builder)
+                    (.resultText result)
+                    (.isError (boolean failed?))
+                    .build))
+       (.startTime start-time)
+       (.finishTime finish-time)
+       (.invocationContext (.build (InvocationContext/builder)))
+       .build)))
 
 (deftest ser-test
   (is (ser= (-> (ToolExecutionRequest/builder)
@@ -156,14 +182,23 @@
   (is (ser= (TokenUsage. (int 1) (int 2))))
   (is (ser= (TokenUsage. (int 11))))
   (is (ser= (TokenUsage.)))
-  (is (ser= (-> (ToolExecution/builder)
-                (.request (-> (ToolExecutionRequest/builder)
-                              (.id "id1")
-                              (.name "foo")
-                              (.arguments "abcde")
-                              .build))
-                (.result "abcd")
-                .build)))
+  (is (ser= (mk-tool-execution)))
+  (is (ser= (mk-tool-execution "" true nil nil)))
+  (is (ser= (mk-tool-execution "abcd"
+                               true
+                               (LocalDateTime/of 2020 1 2 3 4 5)
+                               (LocalDateTime/of 2020 1 2 3 4 9))))
+  (let [^ToolExecution te (roundtrip
+                           (mk-tool-execution
+                            "abcd"
+                            true
+                            (LocalDateTime/of 2020 1 2 3 4 5)
+                            (LocalDateTime/of 2020 1 2 3 4 9)))]
+    (is (= "abcd" (.result te)))
+    (is (true? (.hasFailed te)))
+    (is (= (LocalDateTime/of 2020 1 2 3 4 5) (.startTime te)))
+    (is (= (LocalDateTime/of 2020 1 2 3 4 9) (.finishTime te)))
+    (is (some? (.invocationContext te))))
   (is (ser= FinishReason/STOP))
   (is (ser= FinishReason/LENGTH))
   (is (ser= FinishReason/OTHER))
@@ -171,14 +206,7 @@
                    (TokenUsage. (int 1))
                    [(TextContent. "foo")]
                    FinishReason/STOP
-                   [(-> (ToolExecution/builder)
-                        (.request (-> (ToolExecutionRequest/builder)
-                                      (.id "id1")
-                                      (.name "foo")
-                                      (.arguments "abcde")
-                                      .build))
-                        (.result "abcd")
-                        .build)])
+                   [(mk-tool-execution)])
         ^Result r* (roundtrip r)]
     (is (= (.content r) (.content r*)))
     (is (= (.tokenUsage r) (.tokenUsage r*)))

@@ -21,6 +21,8 @@
     UserMessage]
    [dev.langchain4j.data.segment
     TextSegment]
+   [dev.langchain4j.invocation
+    InvocationContext]
    [dev.langchain4j.model.chat.request.json
     JsonAnyOfSchema
     JsonArraySchema
@@ -40,7 +42,8 @@
    [dev.langchain4j.service
     Result]
    [dev.langchain4j.service.tool
-    ToolExecution]
+    ToolExecution
+    ToolExecutionResult]
    [dev.langchain4j.store.embedding
     EmbeddingMatch
     EmbeddingSearchResult]
@@ -473,14 +476,28 @@
 (extend-protocol JSONFreeze
   ToolExecution
   (json-freeze* [this]
-    {"request" (maybe-json-freeze* (.request this))
-     "result"  (.result this)}))
+    {"request"    (maybe-json-freeze* (.request this))
+     "result"     (.result this)
+     "hasFailed"  (.hasFailed this)
+     "startTime"  (some-> (.startTime this) str)
+     "finishTime" (some-> (.finishTime this) str)}))
 
 (defmethod json-thaw* (.getName ToolExecution)
   [m]
   (-> (ToolExecution/builder)
       (.request ^ToolExecutionRequest (maybe-json-thaw* (get m "request")))
-      (.result ^String (get m "result"))
+      ;; ToolExecution requires a non-nil invocationContext, but it's not part
+      ;; of ToolExecution equality and holds arbitrary user objects (method
+      ;; arguments, managed parameters), so an empty one is substituted here
+      (.invocationContext (.build (InvocationContext/builder)))
+      (.result ^ToolExecutionResult
+               (-> (ToolExecutionResult/builder)
+                   ;; the builder rejects a nil resultText
+                   (.resultText (or (get m "result") ""))
+                   (.isError (boolean (get m "hasFailed")))
+                   .build))
+      (.startTime (h/parse-local-date-time (get m "startTime")))
+      (.finishTime (h/parse-local-date-time (get m "finishTime")))
       (.build)))
 
 (extend-protocol JSONFreeze

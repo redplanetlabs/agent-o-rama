@@ -125,10 +125,15 @@
                                  "tools4"
                                  TOOLS
                                  {:error-handler
-                                  (tools/error-handler-static-string-by-type
-                                   [[ArithmeticException "ae"]
-                                    [clojure.lang.ExceptionInfo "ei"]
-                                    [ClassCastException ""]])})
+                                  (tools/error-handler-by-type
+                                   [[ArithmeticException (constantly "ae")]
+                                    [clojure.lang.ExceptionInfo (constantly "ei")]
+                                    ;; error handler that itself throws a
+                                    ;; different exception
+                                    [ClassCastException
+                                     (fn [_]
+                                       (throw
+                                        (IllegalStateException. "handler")))]])})
          ))
        (bind module-name (get-module-name module))
        (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
@@ -372,10 +377,9 @@
        (is (re-matches
             #"java.lang.ClassCastException: cce[\s\S]*"
             (get info "exception1")))
-       ;; this is from trying to construct tool result with blank string, which
-       ;; isn't allowed by langchain4j
+       ;; this is from the error handler itself throwing
        (is
         (re-matches
-         #"java.lang.IllegalArgumentException: text cannot be null or blank[\s\S]*"
+         #"java.lang.IllegalStateException: handler[\s\S]*"
          (get info "exception2")))
       ))))

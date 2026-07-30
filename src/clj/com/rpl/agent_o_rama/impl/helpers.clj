@@ -23,7 +23,8 @@
     PrintWriter
     StringWriter]
    [java.time
-    Instant]
+    Instant
+    LocalDateTime]
    [java.util
     UUID]
    [java.util.concurrent
@@ -253,6 +254,12 @@
 (defn first-line
   [s]
   (first (str/split s #"\n" 2)))
+
+;; LocalDateTime is serialized as an ISO string since there's no Rama
+;; serializer for it
+(defn parse-local-date-time
+  ^LocalDateTime [^String s]
+  (if s (LocalDateTime/parse s)))
 
 (defn validate-options!
   [context options spec]
