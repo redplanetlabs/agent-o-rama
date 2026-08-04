@@ -236,6 +236,14 @@ public interface AgentClient extends Closeable {
   boolean isAgentInvokeComplete(AgentInvoke invoke);
 
   /**
+   * Asynchronously checks if an agent execution has completed.
+   *
+   * @param invoke the agent invoke handle to check
+   * @return future that completes with true if the agent execution is complete
+   */
+  CompletableFuture<Boolean> isAgentInvokeCompleteAsync(AgentInvoke invoke);
+
+  /**
    * Sets metadata for an agent execution.
    *
    * Note: For agent execution, only the metadata that was set at the start
