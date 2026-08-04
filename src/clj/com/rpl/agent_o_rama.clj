@@ -1433,11 +1433,13 @@ Example:\n
                                 {:pkey task-id}))
 
           (isAgentInvokeComplete [this agent-invoke]
+            (.get ^CompletableFuture (.isAgentInvokeCompleteAsync this agent-invoke)))
+          (isAgentInvokeCompleteAsync [this agent-invoke]
             (let [agent-task-id (.getTaskId agent-invoke)
                   agent-id      (.getAgentInvokeId agent-invoke)]
-              (foreign-select-one [(keypath agent-id) :result (view some?)]
-                                  root-pstate
-                                  {:pkey agent-task-id})))
+              (foreign-select-one-async [(keypath agent-id) :result (view some?)]
+                                        root-pstate
+                                        {:pkey agent-task-id})))
 
           (stream [this agent-invoke node]
             (.stream this agent-invoke node nil))
@@ -2218,6 +2220,8 @@ Returns:\n
 (defn agent-invoke-complete?
   "Checks if an agent invocation has completed.\n
 \n
+Blocks until the check completes. For non-blocking access, use [[agent-invoke-complete?-async]].\n
+\n
 Args:\n
   - agent-client - agent client instance
   - agent-invoke - agent invoke handle
@@ -2226,6 +2230,18 @@ Returns:\n
   - Boolean - True if the invocation has completed"
   [^AgentClient agent-client agent-invoke]
   (.isAgentInvokeComplete agent-client agent-invoke))
+
+(defn agent-invoke-complete?-async
+  "Asynchronously checks if an agent invocation has completed.\n
+\n
+Args:\n
+  - agent-client - agent client instance
+  - agent-invoke - agent invoke handle
+\n
+Returns:\n
+  - CompletableFuture - Future that completes with true if the invocation has completed"
+  ^CompletableFuture [^AgentClient agent-client agent-invoke]
+  (.isAgentInvokeCompleteAsync agent-client agent-invoke))
 
 (defn agent-stream
   "Creates a streaming subscription to receive data from a specific node.\n
