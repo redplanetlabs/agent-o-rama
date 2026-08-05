@@ -34,4 +34,4 @@ Database connections are shared resources that must be thread-safe for concurren
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/agent_objects_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/AgentObjectsAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/AgentObjectsAgent.java`

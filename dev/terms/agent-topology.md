@@ -29,8 +29,8 @@ scope. Topology configuration is immutable once the module is defined
 and deployed.
 
 ## Key Clojure API
-- Primary functions: `agents-topology`, `new-agent`, `declare-key-value-store`, `declare-agent-object`
-- Creation: Created via `agents-topology` function in module definition
+- Primary functions: `agent-topology`, `new-agent`, `declare-key-value-store`, `declare-agent-object`
+- Creation: Created via `agent-topology` function in module definition
 - Low level: - `define-agents!` `underlying-stream-topology`
 - Access: Passed as parameter to `defagentmodule` functions
 
@@ -52,4 +52,4 @@ and deployed.
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/basic_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/BasicAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/BasicAgent.java`

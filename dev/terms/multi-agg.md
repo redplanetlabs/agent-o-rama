@@ -19,7 +19,7 @@ Enables sophisticated result aggregation patterns. Supports custom initializatio
 
 ## Key Clojure API
 - Primary functions: `multi-agg` macro
-- Creation: `(multi-agg :init fn :on fn)`
+- Creation: `(multi-agg (init [] ...) (on "target" [state & args] ...))`
 - Access: In aggregation nodes
 
 ## Key Java API
@@ -33,4 +33,4 @@ Enables sophisticated result aggregation patterns. Supports custom initializatio
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/multi_agg_agent.clj`
-- Java: Not available in Java examples
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/MultiAggAgent.java`

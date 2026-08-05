@@ -1,117 +1,78 @@
 # Agent Step
 
-Individual execution units returned by agent processing that represent discrete progress points in agent execution flow.
+## Definition
+A single unit of step-by-step client control over a running agent invocation, returned by
+`agent-next-step`. It is either a human input request or the agent's completion.
 
-## Purpose
+## Architecture Role
+`com.rpl.agentorama.AgentStep` is an empty marker interface. Exactly two sub-interfaces extend it —
+`HumanInputRequest` and `AgentComplete<T>` — and each has exactly one implementation, a record in
+`com.rpl.agent-o-rama.impl.types`:
 
-Agent steps provide fine-grained control over agent execution:
+- `NodeHumanInputRequest` — implements `HumanInputRequest`; fields
+  `[agent-task-id agent-id node node-task-id invoke-id prompt uuid]`
+- `AgentCompleteImpl` — implements `AgentComplete`; single field `[result]`
 
-- **Progress Tracking**: Monitor individual execution phases
-- **Debugging Support**: Examine agent state at specific execution points
-- **Human Interaction**: Handle human input requests at precise moments
-- **Flow Control**: Enable step-by-step agent execution
+There is no third step type, no error step, and no `:type` tag on either record.
 
-## Step Types
+`agent-next-step` blocks until the invocation either surfaces a human input request or
+terminates. On failure it throws rather than returning a step.
 
-### Result Step
-Contains final output when agent execution completes:
+## Operations
+- `agent-next-step` / `agent-next-step-async` - Get the next step
+- `human-input-request?` - Discriminate the two step types
+- `provide-human-input` - Respond, then step again
+- `pending-human-inputs` - Outstanding requests, up to 1000 (a step surfaces only one)
+
+## Invariants
+- Requires an `AgentInvoke` handle — from `agent-initiate`, `agent-initiate-with-context`, or
+  `agent-initiate-fork`. `agent-invoke` returns the finished result, not a handle.
+- Step records reject undeclared keys: `(:type step)` throws `NoSuchFieldError`, it does not
+  return `nil`. Only the declared fields above are readable.
+- `provide-human-input` must be handed the request record itself, unmodified — it is
+  schema-checked as a `NodeHumanInputRequest` and cleared from the pending set by exact match
+- The completion step wraps the result; `(:result step)` equals `(agent-result client invoke)`
+
+## Key Clojure API
+- Primary functions: `agent-next-step`, `agent-next-step-async`, `human-input-request?`
+- Creation: `(agent-next-step client agent-invoke)`
+- Access: `(:prompt step)` on a request, `(:result step)` on a completion
+- Async: `agent-next-step-async` returns a `java.util.concurrent.CompletableFuture`
+
 ```clojure
-{:type :result
- :value "Final agent response"
- :metadata {:execution-time-ms 2500}}
+(loop [step (aor/agent-next-step chat-agent inv)]
+  (if (aor/human-input-request? step)
+    (do
+      (println (:prompt step))
+      (aor/provide-human-input chat-agent step (read-line))
+      (recur (aor/agent-next-step chat-agent inv)))
+    (println "Final result:" (:result step))))
 ```
 
-### Human Input Request Step
-Pauses execution to request human input:
-```clojure
-{:type :human-input-request
- :prompt "Please approve this action:"
- :context {:action "delete-user" :user-id 12345}
- :request-id "req-abc123"}
+## Key Java API
+- Primary functions: `AgentClient.nextStep(AgentInvoke)`, `nextStepAsync(AgentInvoke)`
+- Creation: Framework-managed
+- Access: narrow with `instanceof` — `HumanInputRequest.getPrompt()` / `getNode()` /
+  `getNodeInvokeId()`, or `((AgentComplete<?>) step).getResult()`
+
+```java
+AgentStep step = agent.nextStep(invoke);
+while (step instanceof HumanInputRequest) {
+  HumanInputRequest humanInput = (HumanInputRequest) step;
+  System.out.println(humanInput.getPrompt());
+  agent.provideHumanInput(humanInput, scanner.nextLine());
+  step = agent.nextStep(invoke);
+}
 ```
 
-### Continuation Step
-Indicates agent continues processing:
-```clojure
-{:type :continuation
- :status "processing"
- :current-node "analyze-data"
- :progress 0.6}
-```
+## Relationships
+- Uses: [Human Input Request](human-input-request.md), [Agent Complete](agent-complete.md)
+- Used by: [Agent Client](agent-client.md), [Agent Invoke](agent-invoke.md)
+- See also: [Sub Agents](sub-agents.md) — calling `agent-result` on a subagent client inside a
+  node runs this same loop internally, proxying its requests to the parent agent
 
-## Client-Side Processing
-
-### Step-by-Step Execution
-```clojure
-(let [agent-invoke (agent-initiate client "MyAgent" input)]
-  (loop [step (agent-next-step client agent-invoke)]
-    (case (:type step)
-      :result
-      (println "Final result:" (:value step))
-
-      :human-input-request
-      (let [response (get-user-input (:prompt step))]
-        (provide-human-input client agent-invoke (:request-id step) response)
-        (recur (agent-next-step client agent-invoke)))
-
-      :continuation
-      (do (println "Progress:" (:progress step))
-          (recur (agent-next-step client agent-invoke))))))
-```
-
-### Asynchronous Processing
-```clojure
-(agent-next-step-async client agent-invoke
-  (fn [step]
-    (handle-step step)
-    (when-not (= :result (:type step))
-      (schedule-next-step))))
-```
-
-## Integration with Streaming
-
-Steps coordinate with streaming subscriptions:
-- **Ordered Delivery**: Steps maintain causal ordering with stream chunks
-- **State Synchronization**: Step progression aligns with streaming data
-- **Completion Signaling**: Result steps signal end of streaming
-
-## Monitoring and Observability
-
-Steps provide detailed execution insights:
-- **Execution Timeline**: Track agent progress through execution graph
-- **Performance Metrics**: Measure time between steps and processing duration
-- **Error Context**: Capture detailed error information at step level
-- **Resource Utilization**: Monitor memory and CPU usage per step
-
-## Error Handling
-
-### Failed Steps
-```clojure
-{:type :error
- :error {:message "Processing failed"
-         :cause "Network timeout"
-         :retry-count 2}
- :recoverable true}
-```
-
-### Retry Logic
-Steps support automatic retry with:
-- **Exponential Backoff**: Increasing delays between retries
-- **Max Retry Limits**: Configurable retry thresholds
-- **Error Classification**: Distinguish transient vs permanent failures
-
-## Use Cases
-
-### Interactive Debugging
-Step through agent execution to understand behavior and identify issues.
-
-### Human-in-the-Loop Workflows
-Handle approval processes, data validation, and decision points requiring human judgment.
-
-### Progress Monitoring
-Track long-running agent operations with real-time progress updates.
-
-### Error Recovery
-Implement sophisticated error handling and retry strategies based on step-level failures.
-
-Agent steps provide the granular control necessary for building robust, interactive, and observable AI agent systems that can handle complex real-world scenarios requiring human oversight and intervention.
+## Examples
+- Clojure: `examples/clj/src/com/rpl/agent/basic/human_input_agent.clj`,
+  `examples/clj/src/com/rpl/agent/simple_human_loop.clj`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/HumanInputAgent.java`
+- Tests: `test/clj/com/rpl/human_test.clj` (LLM-free exercise of the full protocol)

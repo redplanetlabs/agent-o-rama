@@ -36,4 +36,3 @@ Vector stores maintain high-dimensional embedding spaces with consistent dimensi
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/rag_research.clj`
-- Java: `examples/java/react/src/main/java/com/rpl/agent/react/ReActExample.java`

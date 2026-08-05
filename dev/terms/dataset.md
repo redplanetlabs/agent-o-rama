@@ -13,15 +13,15 @@ Creation and population of example collections, execution of evaluation runs aga
 Examples are immutable once added to a dataset. Datasets maintain version control and distributed availability across cluster nodes.
 
 ## Key Clojure API
-- Primary functions: `create-dataset!`, `destroy-dataset!`, `search-datasets`, `add-example`, `search-examples`
+- Primary functions: `create-dataset!`, `destroy-dataset!`, `search-datasets`, `add-dataset-example!`
 - Management: `set-dataset-description!`, `set-dataset-name!`
 - Creation: `create-dataset!` with manager and configuration
 - Access: Through dataset manager instance
 
 ## Key Java API
-- Primary functions: `createDataset`, `addExample`, `searchExamples`
-- Creation: DatasetManager builder pattern
-- Access: Via DatasetManager interface
+- Primary functions: `createDataset`, `addDatasetExample`, `searchDatasets`
+- Creation: `AgentManager.createDataset`
+- Access: Via `AgentManager` interface
 
 ## Relationships
 - Uses: [experiment], [agent-invoke], [pstate]
@@ -36,5 +36,4 @@ Examples are immutable once added to a dataset. Datasets maintain version contro
     dataset -> performance-tracking
 
 ## Examples
-- Clojure: `examples/clj/src/com/rpl/agent/basic/dataset_example.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/DatasetExample.java`
+- Clojure: `examples/clj/src/com/rpl/agent/basic/dataset_agent.clj`

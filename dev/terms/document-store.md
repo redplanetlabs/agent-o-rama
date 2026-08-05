@@ -19,8 +19,8 @@ Persistent storage for unstructured or semi-structured data. Supports hierarchic
 
 ## Key Clojure API
 - Primary functions: `declare-document-store`, `get-store`
-- Creation: `(declare-document-store topology "name")`
-- Access: `(get-store agent-node "name")`
+- Creation: `(declare-document-store topology "$$name" String "field" Class)`
+- Access: `(get-store agent-node "$$name")`
 
 ## Key Java API
 - Primary functions: `get()`, `put()`, `update()`
@@ -33,4 +33,4 @@ Persistent storage for unstructured or semi-structured data. Supports hierarchic
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/document_store_agent.clj`
-- Java: Not available in Java examples
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/DocumentStoreAgent.java`

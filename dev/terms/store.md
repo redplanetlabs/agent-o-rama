@@ -18,7 +18,7 @@ Store operations are scoped to agent execution contexts and maintain isolation b
 - Access: `get-store` within agent node functions
 
 ## Key Java API
-- Primary functions: `Store.get()`, `Store.put()`, `AgentNode.getStore()`
+- Primary functions: `KeyValueStore.get()`, `KeyValueStore.put()`, `AgentNode.getStore()`
 - Creation: `AgentTopology.declareKeyValueStore()`, `declareDocumentStore()`
 - Access: Through `AgentNode` parameter in node functions
 
@@ -46,4 +46,4 @@ digraph store_relationships {
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/keyvalue_store_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/KeyValueStoreAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/KeyValueStoreAgent.java`

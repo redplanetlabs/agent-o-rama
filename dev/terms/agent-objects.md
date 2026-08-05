@@ -32,7 +32,7 @@ ObjectBuilders are instantiated on demand, and pooled.
 
 ## Key Java API
 - Primary functions: `declareAgentObject`, `declareAgentObjectBuilder`,
-  `getAgentObject`, `setup-object-name`
+  `getAgentObject`, `getObjectName`
 - Creation: `AgentObjectOptions` interface with `disableAutoTracing()`,
   `threadSafe()` and `workerObjectLimit()` options.
 - Access: Via AgentNode interface methods
@@ -51,4 +51,4 @@ ObjectBuilders are instantiated on demand, and pooled.
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/langchain4j_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/LangChain4jAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/LangChain4jAgent.java`

@@ -24,7 +24,7 @@ Termination signal and return value for agent graph execution. Passed from nodes
 ## Key Java API
 - Primary functions: `result()`, `getResult()`
 - Creation: `agentNode.result(value)`
-- Access: `AgentInvoke.getResult()`
+- Access: `AgentClient.result(invoke)`
 
 ## Relationships
 - Uses: [Agent Node](agent-node.md)
@@ -32,4 +32,4 @@ Termination signal and return value for agent graph execution. Passed from nodes
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/basic_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/BasicAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/BasicAgent.java`

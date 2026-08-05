@@ -29,8 +29,8 @@ style.
 - Access: `(fn [agent-node & args] ...)`
 
 ## Key Java API
-- Primary functions: `apply()`
-- Creation: Implement `Function` interface
+- Primary functions: `invoke()`
+- Creation: Implement `RamaVoidFunction` interface
 - Access: Pass to `node()` method
 
 ## Relationships
@@ -39,4 +39,4 @@ style.
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/multi_node_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/MultiNodeAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/MultiNodeAgent.java`

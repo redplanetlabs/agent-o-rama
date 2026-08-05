@@ -23,7 +23,7 @@ Top-level container defining complete agent systems. Encapsulates all resources 
 - Access: Module binding
 
 ## Key Java API
-- Primary functions: `define()`, `build()`
+- Primary functions: `define()`, `defineAgents()`
 - Creation: Via `AgentTopology`
 - Access: `AgentModule` class
 
@@ -33,4 +33,4 @@ Top-level container defining complete agent systems. Encapsulates all resources 
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/basic_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/BasicAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/BasicAgent.java`

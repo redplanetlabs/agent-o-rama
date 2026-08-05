@@ -14,9 +14,9 @@ Key-value stores address fundamental state management needs:
 ## Declaration
 
 ```clojure
-(aor/declare-key-value-store topology "user-profiles" String UserProfile)
-(aor/declare-key-value-store topology "session-data" UUID SessionInfo)
-(aor/declare-key-value-store topology "counters" String Long)
+(aor/declare-key-value-store topology "$$user-profiles" String UserProfile)
+(aor/declare-key-value-store topology "$$session-data" UUID SessionInfo)
+(aor/declare-key-value-store topology "$$counters" String Long)
 ```
 
 ## Access Patterns
@@ -25,21 +25,21 @@ Key-value stores address fundamental state management needs:
 ```clojure
 (aor/node "update-profile" "next"
   (fn [agent-node user-id profile-data]
-    (let [store (aor/get-store agent-node "user-profiles")]
+    (let [store (aor/get-store agent-node "$$user-profiles")]
       (store/put! store user-id profile-data)
       (aor/emit! agent-node "next" user-id))))
 ```
 
 ### Conditional Updates
 ```clojure
-(let [store (aor/get-store agent-node "counters")
+(let [store (aor/get-store agent-node "$$counters")
       current (store/get store "page-views" 0)]
   (store/put! store "page-views" (inc current)))
 ```
 
 ### Batch Operations
 ```clojure
-(let [store (aor/get-store agent-node "session-data")]
+(let [store (aor/get-store agent-node "$$session-data")]
   (doseq [[session-id data] session-updates]
     (store/put! store session-id data)))
 ```
@@ -70,8 +70,6 @@ Key-value stores address fundamental state management needs:
 ### Write Operations
 ```clojure
 (store/put! store key value)    ; Store key-value pair
-(store/delete! store key)       ; Remove key
-(store/clear! store)            ; Remove all entries
 ```
 
 ## Partitioning and Distribution
@@ -103,7 +101,7 @@ Frequently accessed entries are cached locally on task nodes for improved read p
 
 ### User Session Management
 ```clojure
-(declare-key-value-store topology "sessions" String SessionData)
+(declare-key-value-store topology "$$sessions" String SessionData)
 
 ;; Store session
 (store/put! sessions-store session-id
@@ -112,7 +110,7 @@ Frequently accessed entries are cached locally on task nodes for improved read p
 
 ### Configuration Storage
 ```clojure
-(declare-key-value-store topology "config" String Object)
+(declare-key-value-store topology "$$config" String Object)
 
 ;; Store configuration
 (store/put! config-store "feature-flags"
@@ -121,7 +119,7 @@ Frequently accessed entries are cached locally on task nodes for improved read p
 
 ### Caching Layer
 ```clojure
-(declare-key-value-store topology "cache" String CachedResult)
+(declare-key-value-store topology "$$cache" String CachedResult)
 
 ;; Cache expensive computations
 (if-let [cached (store/get cache-store cache-key)]

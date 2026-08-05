@@ -34,4 +34,3 @@ Enables parallel execution variants with modified parameters. Supports explorato
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/forking_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/ForkingAgent.java`

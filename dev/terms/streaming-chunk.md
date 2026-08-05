@@ -32,4 +32,4 @@ long-running operations and progressive results.
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/streaming_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/StreamingAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/StreamingAgent.java`

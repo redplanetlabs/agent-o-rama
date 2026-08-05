@@ -48,5 +48,4 @@ evaluator instances.
     evaluator-builder -> dataset
 
 ## Examples
-- Clojure: `examples/clj/src/com/rpl/agent/basic/evaluator_builder_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/EvaluatorBuilderAgent.java`
+- Clojure: `examples/clj/src/com/rpl/agent/basic/evaluator_agent.clj`

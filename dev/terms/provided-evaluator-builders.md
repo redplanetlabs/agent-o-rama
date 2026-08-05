@@ -27,7 +27,7 @@ AI-powered evaluation using large language models to assess agent output quality
 (aor/create-evaluator! manager "quality-judge" "aor/llm-judge"
   {"model" "gpt-4o"
    "temperature" "0.2"
-   "prompt" "Rate the helpfulness of this response..."})
+   "prompt" "Rate the helpfulness of this response..."} "AI-powered quality evaluation")
 ```
 
 ### aor/conciseness
@@ -44,7 +44,7 @@ Boolean evaluator assessing whether outputs meet length constraints.
 **Usage:**
 ```clojure
 (aor/create-evaluator! manager "brief-check" "aor/conciseness"
-  {"threshold" "150"})
+  {"threshold" "150"} "Checks if response is under 150 characters")
 ```
 
 ### aor/f1-score
@@ -61,7 +61,7 @@ Classification metrics calculator providing F1-score, precision, and recall for 
 **Usage:**
 ```clojure
 (aor/create-evaluator! manager "sentiment-f1" "aor/f1-score"
-  {"positiveValue" "positive"})
+  {"positiveValue" "positive"} "F1 score for sentiment classification")
 ```
 
 ## Integration
@@ -93,4 +93,4 @@ The provided builders serve as reference implementations and cover the most comm
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/provided_evaluator_builders_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/ProvidedEvaluatorBuildersAgent.java`
+- Java: Not available in Java examples

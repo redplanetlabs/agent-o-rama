@@ -24,8 +24,8 @@ Tracks and controls individual agent executions. Provides access to results, str
 - Access: Returned from invoke calls
 
 ## Key Java API
-- Primary functions: `getResult()`, `isComplete()`, `fork()`
-- Creation: `AgentClient.invoke()` returns
+- Primary functions: `getTaskId()`, `getAgentInvokeId()`
+- Creation: `AgentClient.initiate()` returns
 - Access: `AgentInvoke` class
 
 ## Relationships
@@ -34,4 +34,4 @@ Tracks and controls individual agent executions. Provides access to results, str
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/async_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/AsyncAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/AsyncAgent.java`

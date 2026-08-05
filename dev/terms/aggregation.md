@@ -15,7 +15,7 @@ Aggregation maintains execution order independence and ensures all emitted value
 ## Key Clojure API
 - Primary functions: `agg-start-node`, `agg-node`, `multi-agg`, `emit!`
 - Creation: `agg-start-node` for scatter, `agg-node` for gather with aggregator
-- Access: Built-in aggregators via Rama `aggs/+sum`, `aggs/+vector`, etc.
+- Access: Built-in aggregators via Rama `aggs/+sum`, `aggs/+vec-agg`, etc.
 
 ## Key Java API
 - Primary functions: `aggStartNode`, `aggNode`, `multiAgg`, `emit`
@@ -40,5 +40,5 @@ Aggregation maintains execution order independence and ensures all emitted value
     aggregation -> batch-processing
 
 ## Examples
-- Clojure: `examples/clj/src/com/rpl/agent/basic/aggregation_example.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/AggregationExample.java`
+- Clojure: `examples/clj/src/com/rpl/agent/basic/aggregation_agent.clj`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/AggregationAgent.java`

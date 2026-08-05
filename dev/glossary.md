@@ -41,7 +41,7 @@ calls, the graph defines the agent's execution logic and control flow.
 
 A handle representing a specific invocation/execution instance of an
 agent, used to track and interact with running agents. Created by
-`agent-initiate` or `agent-invoke`, used with client functions like
+`agent-initiate`, used with client functions like
 `agent-result`, `agent-next-step`, and streaming operations.
 
 ## [Agent Manager](terms/agent-manager.md)
@@ -252,7 +252,7 @@ upon. Provides the distributed runtime, persistent state management,
 partitioning, and scalability features that enable agents to run across
 multiple machines with high performance and fault tolerance.
 
-## [Rama Module](terms/module.md)
+## [Rama Module](terms/rama-module.md)
 
 A deployable unit containing depots, pstates and topologies.  It can be
 launched on a Rama cluster. Rama modules are identified by name and can
@@ -295,7 +295,7 @@ Agents that run within other agents, but with limited functionality (no
 async API or streaming). Referenced in error messages indicating
 restricted capabilities for sub-agent contexts.
 
-## [Tools Agent](terms/tools-sub-agent.md)
+## [Tools Agent](terms/tools-agent.md)
 
 A specialized agent type that executes tool functions, created via
 `newToolsAgent`. Built with tool specifications and automatically

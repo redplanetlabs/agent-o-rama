@@ -19,8 +19,8 @@ High-performance distributed storage with complex querying. Provides ACID proper
 
 ## Key Clojure API
 - Primary functions: `declare-pstate-store`, `get-store`
-- Creation: `(declare-pstate-store topology "name")`
-- Access: `(get-store agent-node "name")`
+- Creation: `(declare-pstate-store topology "$$name" schema)`
+- Access: `(get-store agent-node "$$name")`
 
 ## Key Java API
 - Primary functions: `select()`, `selectOne()`, `transform()`
@@ -33,4 +33,4 @@ High-performance distributed storage with complex querying. Provides ACID proper
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/pstate_store_agent.clj`
-- Java: Not available in Java examples
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/PStateStoreAgent.java`

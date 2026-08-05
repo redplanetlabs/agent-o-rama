@@ -45,4 +45,4 @@ Provides JSON representations that are editable in the UI.
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/langchain4j_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/LangChain4jAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/LangChain4jAgent.java`

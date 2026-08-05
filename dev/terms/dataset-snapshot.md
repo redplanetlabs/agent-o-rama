@@ -33,4 +33,4 @@ Each snapshot represents a frozen point-in-time view of a dataset. Snapshots are
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/dataset_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/DatasetAgent.java`
+- Java: Not available in Java examples

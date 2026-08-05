@@ -53,4 +53,3 @@ identity across dataset operations.
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/dataset_example_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/DatasetExampleAgent.java`

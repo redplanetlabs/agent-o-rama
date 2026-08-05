@@ -35,4 +35,4 @@ Enables human-in-the-loop workflows. Pauses execution pending user response, mai
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/human_input_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/HumanInputAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/HumanInputAgent.java`

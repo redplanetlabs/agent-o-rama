@@ -33,4 +33,4 @@ Core execution blueprint for agents. Defines node relationships, execution paths
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/multi_node_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/MultiNodeAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/MultiNodeAgent.java`

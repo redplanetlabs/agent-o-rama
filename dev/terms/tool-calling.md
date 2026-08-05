@@ -19,7 +19,7 @@ Enables AI-driven external system interaction. Provides structured interface for
 
 ## Key Clojure API
 - Primary functions: `tool-specification`, `tool-info`, `new-tools-agent`
-- Creation: `(tool-specification name description params)`
+- Creation: `(tool-specification name parameters-json-schema description)`
 - Access: `src/clj/com/rpl/agent_o_rama/tools.clj`
 
 ## Key Java API
@@ -28,9 +28,9 @@ Enables AI-driven external system interaction. Provides structured interface for
 - Access: LangChain4j tool interfaces
 
 ## Relationships
-- Uses: [LangChain4j Integration](langchain4j-integration.md), [Tools Sub Agent](tools-sub-agent.md)
+- Uses: [LangChain4j Integration](langchain4j-integration.md), [Tools Agent](tools-agent.md)
 - Used by: [Agent Node](agent-node.md)
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/tools_agent.clj`
-- Java: `examples/java/react/src/main/java/com/rpl/agent/react/ReActExample.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/react/ReActExample.java`

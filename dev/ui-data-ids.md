@@ -23,20 +23,20 @@ The agent trace display consists of three main panels, each with a unique `data-
 - **Location**: Fixed right side panel
 - **Description**: Tabbed panel showing agent metadata and fork management
 - **Contents**:
-  - Tab navigation (Info and Fork tabs)
+  - Tab navigation (Info, Feedback, and Fork tabs)
   - Tab-specific content (see below)
 
-#### Info/Fork Tabs
-The Agent Info Panel contains two tabs:
+#### Tabs
+The Agent Info Panel contains three tabs (`info-tab`, `feedback-tab`, `fork-tab`):
 
 - **Info Tab**
   - **data-id**: `info-tab`
   - **Description**: Displays agent execution information and statistics
   - **Sub-components**:
     - `lineage-panel` - Parent/child fork relationships
-    - `final-result-section` - Result value with success/failure badge and "Add to Dataset" button
+    - `final-result-section` - Result value with success/failure badge
     - `exceptions-panel` - List of exceptions with navigation to nodes
-    - `overall-stats-section` - Execution metrics (time, retries, store ops, model calls, tokens)
+    - `overall-stats-section` - "Overall Stats" heading above the execution metric cards
 
 - **Fork Tab**
   - **data-id**: `fork-tab`
@@ -83,7 +83,6 @@ The Agent Info Panel contains two tabs:
 - **Contents**:
   - Success/failure badge
   - Result value (expandable data viewer)
-  - "Add to Dataset" button for the entire agent invocation
 
 #### Exceptions Panel
 - **data-id**: `exceptions-panel`
@@ -97,8 +96,8 @@ The Agent Info Panel contains two tabs:
 
 #### Overall Stats Section
 - **data-id**: `overall-stats-section`
-- **Description**: Displays execution metrics
-- **Contents**:
+- **Description**: "Overall Stats" heading; the metrics below it are sibling cards with their own `data-id`s
+- **Sibling cards**:
   - Execution time (milliseconds)
   - Retry count (if any retries occurred)
   - Store operations (reads and writes)

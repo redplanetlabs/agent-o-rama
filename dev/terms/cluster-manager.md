@@ -13,7 +13,7 @@ Cluster managers can connect to remote clusters, validate module deployments, cr
 Each cluster manager maintains stable connections to cluster nodes throughout its lifecycle. Cluster managers are thread-safe and can be shared across application threads. Connection state is automatically managed and recovered on failures.
 
 ## Key Clojure API
-- Primary functions: `rama/remote-cluster`, `agent-manager`
+- Primary functions: `rama/open-cluster-manager`, `agent-manager`
 - Creation: Cluster connection functions from Rama
 - Access: Used to create agent managers
 

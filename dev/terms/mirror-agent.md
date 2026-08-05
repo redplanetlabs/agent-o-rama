@@ -17,7 +17,7 @@ Mirror agents maintain referential integrity with their remote counterparts. The
 - Access: Used through standard agent client interfaces
 
 ## Key Java API
-- Primary functions: `AgentNode.getMirrorAgent()`
+- Primary functions: `AgentNode.getMirrorAgentClient()`
 - Access: Through standard `AgentClient` interfaces
 
 ## Relationships

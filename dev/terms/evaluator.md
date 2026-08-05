@@ -26,7 +26,7 @@ evaluation and performance tracking across multiple criteria.
 - Access: Via agent manager
 
 ## Key Java API
-- Primary functions: `evaluate()`, `getScore()`, `tryEvaluator()`,
+- Primary functions: `createEvaluator()`, `searchEvaluators()`, `tryEvaluator()`,
 `tryComparativeEvaluator()`, `trySummaryEvaluator()`, `removeEvaluator()`,
 
 - Creation: Implement evaluator interface. `CreateEvaluatorOptions`

@@ -22,7 +22,7 @@ Signals completion of agent graph traversal. Wraps final result value returned t
 - Access: Return value from invoke operations
 
 ## Key Java API
-- Primary functions: `isComplete()`, `getResult()`
+- Primary functions: `getResult()`
 - Creation: Framework-managed
 - Access: `AgentComplete` class
 
@@ -32,4 +32,4 @@ Signals completion of agent graph traversal. Wraps final result value returned t
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/basic_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/BasicAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/BasicAgent.java`

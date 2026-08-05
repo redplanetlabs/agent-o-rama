@@ -20,12 +20,12 @@ Real-time monitoring and debugging tool. Provides visual insight into agent stat
 ## Key Clojure API
 - Primary functions: `start-ui`, `stop-ui`
 - Creation: `(start-ui ipc)`
-- Access: Web browser at localhost:8080
+- Access: Web browser at localhost:1974
 
 ## Key Java API
-- Primary functions: `UI.start()`, `UI.stop()`
+- Primary functions: `UI.start()`
 - Creation: Static methods
-- Access: Web browser at localhost:8080
+- Access: Web browser at localhost:1974
 
 ## Relationships
 - Uses: [IPC](ipc.md), [Agent Trace](agent-trace.md)

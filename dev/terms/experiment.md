@@ -19,27 +19,6 @@ Experiments orchestrate evaluation through:
 - **Evaluator Execution**: Apply measurement functions to agent outputs
 - **Result Aggregation**: Collect and analyze performance metrics
 
-## Configuration
-
-### Basic Experiment
-```clojure
-(experiments/run-experiment manager
-  {:agent-name "CustomerSupportAgent"
-   :dataset-name "support-scenarios-v2"
-   :evaluators ["accuracy" "response-time" "helpfulness"]
-   :config {:max-retries 3
-            :timeout-ms 30000}})
-```
-
-### Comparative Experiment
-```clojure
-(experiments/compare-agents manager
-  {:agents ["AgentV1" "AgentV2" "AgentV3"]
-   :dataset "benchmark-suite"
-   :evaluators ["accuracy" "latency"]
-   :iterations 100})
-```
-
 ## Execution Model
 
 ### Parallel Evaluation
@@ -58,13 +37,14 @@ Experiments distribute agent executions across cluster resources:
 Experiments apply evaluator functions to agent outputs:
 
 ```clojure
-;; Built-in evaluators
-["accuracy" "response-time" "memory-usage"]
+;; Built-in evaluator builders
+["aor/llm-judge" "aor/conciseness" "aor/f1-score"]
 
 ;; Custom evaluators
-(evaluators/register manager "custom-metric"
-  (fn [expected actual context]
-    {:score 0.85 :details "Custom analysis"}))
+(aor/declare-evaluator-builder topology "custom-metric" "Custom analysis"
+  (fn [params]
+    (fn [fetcher input reference-output output]
+      {"score" 0.85})))
 ```
 
 ## Result Analysis
@@ -74,17 +54,6 @@ Experiments apply evaluator functions to agent outputs:
 - **Confidence Intervals**: Statistical significance analysis
 - **Distribution Analysis**: Performance variation patterns
 - **Comparative Statistics**: Statistical tests between agent versions
-
-### Performance Tracking
-```clojure
-(experiments/get-results manager experiment-id)
-;; Returns:
-{:overall-score 0.87
- :evaluator-results {"accuracy" 0.92 "response-time" 15.2}
- :example-count 500
- :failure-rate 0.03
- :execution-time-ms 45000}
-```
 
 ## Experiment Types
 

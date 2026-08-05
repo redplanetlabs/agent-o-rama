@@ -20,15 +20,15 @@ Subscribe to stream:
 
 ## Key Clojure API
 - Primary functions: `agent-stream`, `agent-stream-all`
-- Creation: `(agent-stream client invoke callback)`
+- Creation: `(agent-stream client invoke node callback)`
 - Access: Callback invocation - must handle `reset?` argument when
   stream is reset because of a retry of the node.  Use
   `agent-stream-reset-info` to get the reset count.
 
 ## Key Java API
 - Primary functions: `stream()`, `streamSpecific()`, `streamAll()`
-- Creation: `agentClient.stream(invoke, callback)` returns `AgentStream`.
-  `agentClient.streamAll(invoke, callback)` returns `AgentStreamByInvoke`.
+- Creation: `agentClient.stream(invoke, node, callback)` returns `AgentStream`.
+  `agentClient.streamAll(invoke, node, callback)` returns `AgentStreamByInvoke`.
 - Access: Via callback interface - must handle `isReset` argument of
   `AgentClient$StreamCallback.onUpdate` when stream is reset because of
   a retry of the node. Use `AgentStream.numResets` or
@@ -43,5 +43,4 @@ Subscribe to stream:
   - `examples/clj/src/com/rpl/agent/basic/streaming_agent.clj` - Basic streaming from first invocation
   - `examples/clj/src/com/rpl/agent/basic/stream_all_agent.clj` - Streaming from multiple invocations
 - Java:
-  - `examples/java/basic/src/main/java/com/rpl/agent/basic/StreamingAgent.java` - Basic streaming from first invocation
-  - `examples/java/basic/src/main/java/com/rpl/agent/basic/StreamAllAgent.java` - Streaming from multiple invocations
+  - `examples/java/src/main/java/com/rpl/agent/basic/StreamingAgent.java` - Basic streaming from first invocation

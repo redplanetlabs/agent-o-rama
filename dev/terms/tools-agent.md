@@ -40,4 +40,4 @@ Run as a sub-agent.
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/tools_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/ToolsAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/react/ReActModule.java`

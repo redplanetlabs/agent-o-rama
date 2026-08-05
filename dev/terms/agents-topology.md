@@ -18,13 +18,13 @@ Configuration layer for agent modules. Provides builder interface for declaring 
 - Immutable after definition
 
 ## Key Clojure API
-- Primary functions: `agents-topology`, `new-agent`, `declare-*-store`
-- Creation: `(agents-topology module-name)`
+- Primary functions: `agent-topology`, `new-agent`, `declare-*-store`
+- Creation: `(agent-topology setup topologies)`
 - Access: Parameter in defagentmodule
 
 ## Key Java API
 - Primary functions: `newAgent()`, `declareKeyValueStore()`, `define()`
-- Creation: `AgentTopology.create(moduleName)`
+- Creation: `AgentTopology.create(setup, topologies)`
 - Access: `AgentTopology` class
 
 ## Relationships
@@ -33,4 +33,4 @@ Configuration layer for agent modules. Provides builder interface for declaring 
 
 ## Examples
 - Clojure: `examples/clj/src/com/rpl/agent/basic/basic_agent.clj`
-- Java: `examples/java/basic/src/main/java/com/rpl/agent/basic/BasicAgent.java`
+- Java: `examples/java/src/main/java/com/rpl/agent/basic/BasicAgent.java`
