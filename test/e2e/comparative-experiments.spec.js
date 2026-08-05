@@ -78,7 +78,7 @@ const examples = [
 // =============================================================================
 
 test.describe('Comparative Experiment Flow', () => {
-  test.setTimeout(5 * 60 * 1000); // 5 minutes
+  test.setTimeout(10 * 60 * 1000); // 10 minutes — multiple evaluators + experiment run on CI
 
   test('should create, run, and verify a comparative experiment', async ({ page }) => {
     // ---

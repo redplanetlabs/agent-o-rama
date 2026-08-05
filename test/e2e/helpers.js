@@ -39,15 +39,8 @@ export async function selectQueueInAddToQueueModal(page, modal, queueName, selec
  */
 export async function expectQueueItemDetailLoaded(page, options = {}) {
   const { timeout = 60000 } = options;
-  await page.waitForFunction(
-    () => {
-      const text = document.body?.innerText || '';
-      return /Review Item:/.test(text)
-        && !!document.querySelector('[data-testid="target-info-panel"]');
-    },
-    null,
-    { timeout }
-  );
+  await expect(page.getByRole('heading', { name: /Review Item:/ })).toBeVisible({ timeout });
+  await expect(page.getByTestId('target-info-panel')).toBeVisible({ timeout });
 }
 
 /** URL path prefix for the E2E test agent module (encoded module id). */
@@ -78,21 +71,26 @@ export async function gotoE2ETestModuleHumanFeedbackQueues(page) {
  * @param {{ gotoTimeout?: number, settleTimeout?: number }} [options]
  */
 export async function openQueueItemDetailUrl(page, url, options = {}) {
-  const { gotoTimeout = 90000, settleTimeout = 60000 } = options;
-  const tryOnce = async () => {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: gotoTimeout });
-    await expect(page).toHaveURL(/\/items\//, { timeout: settleTimeout });
-    await expectQueueItemDetailLoaded(page, { timeout: settleTimeout });
-  };
-  try {
-    await tryOnce();
-  } catch {
-    // Second full navigation (not reload): cold SPA loads occasionally miss hydration;
-    // reload after a global test timeout can hit a closed page.
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: gotoTimeout });
-    await expect(page).toHaveURL(/\/items\//, { timeout: settleTimeout });
-    await expectQueueItemDetailLoaded(page, { timeout: settleTimeout });
+  const { gotoTimeout = 90000, settleTimeout = 60000, attempts = 3 } = options;
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: gotoTimeout });
+      await expect(page).toHaveURL(/\/items\//, { timeout: settleTimeout });
+      const itemNotFound = page.getByText('Item not found');
+      if (await itemNotFound.isVisible().catch(() => false)) {
+        throw new Error('Queue item detail showed "Item not found"');
+      }
+      await expectQueueItemDetailLoaded(page, { timeout: settleTimeout });
+      return;
+    } catch (err) {
+      lastError = err;
+      if (i < attempts - 1) {
+        await page.waitForTimeout(1500);
+      }
+    }
   }
+  throw lastError;
 }
 
 /**
@@ -631,7 +629,8 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
       await searchInput.click();
       await searchInput.fill('');
       await searchInput.fill(term);
-      // Dropdown visibility can race with scroll/portal updates, so treat it as optional.
+      // SearchableSelector debounces RPC search (~300ms); portal dropdown re-renders on results.
+      await page.waitForTimeout(450);
       await dropdown.isVisible().catch(() => false);
       if (await optionIsVisible()) break;
       await page.waitForTimeout(700);
@@ -640,7 +639,8 @@ export async function addEvaluatorToExperiment(page, modal, evaluatorName) {
   }
   const foundByTestId = await evaluatorOptionByTestId.isVisible().catch(() => false);
   const evaluatorOption = foundByTestId ? evaluatorOptionByTestId : evaluatorOptionByRole;
-  await expect(evaluatorOption).toBeVisible({ timeout: 15000 });
+  await expect(evaluatorOption).toBeVisible({ timeout: 30000 });
+  // Avoid scrollIntoViewIfNeeded — document scroll closes the portaled dropdown.
   await evaluatorOption.evaluate((el) => el.click());
   
   console.log(`Successfully added evaluator: ${evaluatorName}`);

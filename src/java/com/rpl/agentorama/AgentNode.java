@@ -3,6 +3,7 @@ package com.rpl.agentorama;
 import com.rpl.agentorama.impl.*;
 import com.rpl.agentorama.store.Store;
 import com.rpl.rama.*;
+import com.rpl.rama.cluster.ClusterManagerBase;
 import java.util.Map;
 
 /**
@@ -110,6 +111,20 @@ public interface AgentNode extends AgentObjectFetcher, IFetchAgentClient {
    * @return QueryTopologyClient instance
    */
   <T> QueryTopologyClient<T> getMirrorQueryTopologyClient(String moduleName, String name);
+
+  /**
+   * Gets the cluster retriever for constructing foreign clients (depots, pstates, query
+   * topologies), primarily for interop with library code that expects a
+   * {@link ClusterManagerBase}.
+   *
+   * Clients from this retriever come from the same per-task caches as the mirror fetch
+   * methods on this interface, but their operations are NOT traced; use those fetch methods
+   * when you need traced access. The returned retriever is shared and managed by the node;
+   * it must not be closed.
+   *
+   * @return ClusterManagerBase for constructing foreign clients
+   */
+  ClusterManagerBase getClusterRetriever();
 
   /**
    * Streams a chunk of data to clients.

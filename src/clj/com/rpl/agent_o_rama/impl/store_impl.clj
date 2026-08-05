@@ -269,6 +269,7 @@
 (defn PStateStoreImpl
   [store-params]
   `(PStateStore
+    ;; getUnderlyingPState is declared on Store, a superinterface of PStateStore
     (~'getUnderlyingPState
      [this#]
      (:pstate-client ~store-params))

@@ -30,6 +30,8 @@
     AckLevel
     Depot
     QueryTopologyClient]
+   [com.rpl.rama.cluster
+    ClusterManagerBase]
    [dev.langchain4j.model.chat
     ChatModel
     StreamingChatModel]
@@ -475,6 +477,26 @@
         }))
     )))
 
+(defn cached-cluster-retriever
+  "Stateless ClusterManagerBase adapter that routes foreign client construction through the
+  per-task caches on AgentDeclaredObjectsTaskGlobal. Reads are not traced. The metadata
+  methods delegate to the raw cluster retriever. close is a no-op: the raw retriever is
+  owned by the task global context and must not be closed here."
+  [^AgentDeclaredObjectsTaskGlobal declared-objects-tg ^ClusterManagerBase delegate]
+  (reify
+   ClusterManagerBase
+   (clusterDepot [_ module-name name]
+     (.getForeignDepot declared-objects-tg module-name name))
+   (clusterPState [_ module-name name]
+     (.getForeignPState declared-objects-tg module-name name))
+   (clusterQuery [_ module-name name]
+     (.getForeignQuery declared-objects-tg module-name name))
+   (getDeployedModuleNames [_]
+     (.getDeployedModuleNames delegate))
+   (getMicrobatchDepotInfo [_ module-name topology-name]
+     (.getMicrobatchDepotInfo delegate module-name topology-name))
+   (close [_])))
+
 (defn mk-agent-node
   [agent-name agent-graph agent-task-id agent-id execution-context curr-node invoke-id retry-num
    store-info ^RamaClientsTaskGlobal rama-clients]
@@ -603,6 +625,8 @@
         module-name
         name
         nested-ops-vol))
+     (getClusterRetriever [this]
+       (.getClusterRetriever declared-objects-tg))
      (streamChunk [this chunk]
        (.streamChunk streaming-recorder chunk))
      (recordNestedOp [this type start-time-millis finish-time-millis info]

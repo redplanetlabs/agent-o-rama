@@ -14,6 +14,8 @@ public class AORHelpers {
       Util.getIFn("com.rpl.agent-o-rama", "agent-manager");
   public static final IFn WRAP_AGENT_OBJECT =
       Util.getIFn("com.rpl.agent-o-rama.impl.agent-node", "wrap-agent-object");
+  public static final IFn CACHED_CLUSTER_RETRIEVER =
+      Util.getIFn("com.rpl.agent-o-rama.impl.agent-node", "cached-cluster-retriever");
   public static IFn FREEZE = Util.getIFn("taoensso.nippy", "freeze");
   public static IFn THAW = Util.getIFn("taoensso.nippy", "thaw");
   public static IFn MAKE_TOOLS_AGENT_OPTIONS =

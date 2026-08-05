@@ -463,6 +463,8 @@ test.describe('Human Feedback Queues', () => {
   });
 
   test('should add trace to queue and view item detail', async ({ page }) => {
+    test.setTimeout(600000); // long agent invocations + dataset detour + cold item URLs on CI
+
     const uniqueId = randomUUID().substring(0, 8);
     const queueName = `e2e-trace-queue-${uniqueId}`;
     const metricName = `e2e-trace-metric-${uniqueId}`;

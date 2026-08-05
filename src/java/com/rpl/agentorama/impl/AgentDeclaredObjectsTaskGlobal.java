@@ -170,7 +170,7 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
   }
 
   public ClusterManagerBase getClusterRetriever() {
-    return _clusterRetriever;
+    return (ClusterManagerBase) AORHelpers.CACHED_CLUSTER_RETRIEVER.invoke(this, _clusterRetriever);
   }
 
   private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
