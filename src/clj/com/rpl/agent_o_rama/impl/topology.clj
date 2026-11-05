@@ -363,7 +363,12 @@
                            [:retry-num (termval *retry-num)]
                            [:graph-version
                             (termval *curr-graph-version)]
-                           [:ack-val (termval (h/half-uuid *root-invoke-id))])]
+                           [:ack-val (termval (h/half-uuid *root-invoke-id))]
+                           ;; a retry is progress: until replayed nodes emit,
+                           ;; the old attempt's time would let the stall
+                           ;; checker count the failed node as a stall
+                           [:last-progress-time-millis
+                            (termval (h/current-time-millis))])]
                          $$root)
 
        (aor-types/->valid-NodeOp *root-invoke-id

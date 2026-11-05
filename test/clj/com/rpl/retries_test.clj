@@ -1640,3 +1640,71 @@
        ;; attempt 0's thread waits for input that can't arrive
        (some-> ^Thread @STALE-THREAD-ATOM .interrupt)
       ))))
+
+;; A :continue retry is progress. Until the first replayed node's emits refresh
+;; it, the run's last progress time would otherwise still be the old attempt's,
+;; so a checker tick in that window walks the run and can count the node that
+;; failed (started, unfinished, not executing) as a stall: a spurious retry.
+(deftest retry-refreshes-progress-test
+  (with-redefs
+    [SEM (h/mk-semaphore 0)
+
+     i/SUBSTITUTE-TICK-DEPOTS true
+     aor-types/get-config (max-retries-override 5)
+     anode/log-node-error (fn [& args])
+     ;; leave only init and retry to write progress
+     at/hook:update-last-progress> no-progress-update>]
+    (with-open [ipc (rtest/create-ipc)
+                _ (TopologyUtils/startSimTime)]
+      (letlocals
+       (bind module
+         (module
+           [setup topologies]
+           (let [topology (aor/agent-topology setup topologies)]
+             (->
+               topology
+               (aor/new-agent "foo")
+               (aor/node
+                "start"
+                "slow"
+                (fn [agent-node]
+                  (aor/emit! agent-node "slow")))
+               (aor/node
+                "slow"
+                nil
+                (fn [agent-node]
+                  (h/acquire-semaphore SEM 1)
+                  (aor/result! agent-node :done))))
+             (aor/define-agents! topology))))
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind failures-depot
+         (foreign-depot ipc
+                        module-name
+                        (po/agent-failures-depot-name "foo")))
+       (bind root-pstate
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "foo")))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+
+       (bind inv (aor/agent-initiate foo))
+       (bind root
+         #(foreign-select-one [(keypath (.getAgentInvokeId inv))
+                               (submap [:retry-num :last-progress-time-millis])]
+                              root-pstate
+                              {:pkey (.getTaskId inv)}))
+       (is (= 0 (:last-progress-time-millis (root))))
+
+       (TopologyUtils/advanceSimTime 1000)
+       (foreign-append! failures-depot
+                        (aor-types/->AgentFailure (.getTaskId inv)
+                                                  (.getAgentInvokeId inv)
+                                                  0))
+       (is (condition-attained? (= 1 (:retry-num (root)))))
+       (is (= 1000 (:last-progress-time-millis (root))))
+
+       (h/release-semaphore SEM 2)
+       (is (= :done (aor/agent-result foo inv)))
+      ))))
