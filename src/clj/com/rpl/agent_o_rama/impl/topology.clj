@@ -303,6 +303,12 @@
     $$stream-shared (po/agent-stream-shared-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (hook:received-retry *agent-task-id *agent-id *expected-retry-num)
+   ;; before reading the root: this can hop to the global task and back, and
+   ;; other events on this task (such as a duplicate of this retry) run in
+   ;; between, so the checks below must come after it to still hold where the
+   ;; retry writes. Once it returns, the version is recorded on this task, so
+   ;; init-root's call below doesn't hop.
+   (fetch-graph-version *agent-name :> *curr-graph-version)
    (local-select> (keypath *agent-id)
                   $$root
                   :> {*root-invoke-id :root-invoke-id
@@ -326,7 +332,6 @@
    (filter> (some? *root-invoke-id))
    (filter> (= *expected-retry-num *curr-retry-num))
    (hook:running-retry> *agent-task-id *agent-id *expected-retry-num)
-   (fetch-graph-version *agent-name :> *curr-graph-version)
    (<<cond
     (case> (= *curr-graph-version *graph-version))
      (identity :continue :> *handle-mode)

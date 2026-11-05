@@ -1708,3 +1708,91 @@
        (h/release-semaphore SEM 2)
        (is (= :done (aor/agent-result foo inv)))
       ))))
+
+(deframaop hopping-graph-version
+  "Hops to another task and back, as fetch-graph-version does (to the global
+  task) on a task's first use after a module update."
+  [*agent-name]
+  (ops/current-task-id :> *task-id)
+  (|direct (mod (inc *task-id) 4))
+  (|direct *task-id)
+  (:> 0))
+
+(deframaop append-duplicate-retries>
+  [*agent-task-id *agent-id]
+  (<<with-substitutions
+   [*agent-depot (po/agent-depot-task-global "foo")]
+   (|direct *agent-task-id)
+   (aor-types/->RetryAgentInvoke *agent-task-id *agent-id 0 :> *retry)
+   (depot-partition-append! *agent-depot *retry :append-ack)
+   (depot-partition-append! *agent-depot *retry :append-ack)
+   (:>)))
+
+;; intake-retry's checks (run unfinished, expected attempt) must still hold
+;; where it writes. fetch-graph-version can hop away from the run's task in
+;; between, and a duplicate retry of the same attempt (as the comment in
+;; intake-retry allows) can pass the same checks before the first one is back.
+;; Both would then dispatch the next attempt, running its nodes twice.
+(deftest retry-checks-hold-across-graph-version-hop-test
+  (let [retries-atom (atom 0)]
+    (with-redefs
+      [SEM (h/mk-semaphore 0)
+       SEM2 (h/mk-semaphore 0)
+       SLOW-INVOKES-ATOM (atom 0)
+
+       i/SUBSTITUTE-TICK-DEPOTS true
+       aor-types/get-config (max-retries-override 5)
+       anode/log-node-error (fn [& args])
+       at/fetch-graph-version hopping-graph-version
+       at/hook:received-retry (fn [& args] (swap! retries-atom inc))]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (module
+             [setup topologies]
+             (declare-depot setup *duplicate-retries-depot :random)
+             (let [topology (aor/agent-topology setup topologies)
+                   s        (aor/underlying-stream-topology topology)]
+               (->
+                 topology
+                 (aor/new-agent "foo")
+                 (aor/node
+                  "start"
+                  "slow"
+                  (fn [agent-node]
+                    (aor/emit! agent-node "slow")))
+                 (aor/node
+                  "slow"
+                  nil
+                  (fn [agent-node]
+                    (let [n (swap! SLOW-INVOKES-ATOM inc)]
+                      (h/acquire-semaphore (if (= 1 n) SEM SEM2) 1)
+                      (aor/result! agent-node n)))))
+               (aor/define-agents! topology)
+               (<<sources s
+                (source> *duplicate-retries-depot :> [*agent-task-id *agent-id])
+                 (append-duplicate-retries> *agent-task-id *agent-id)))))
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind duplicate-retries-depot
+           (foreign-depot ipc module-name "*duplicate-retries-depot"))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+
+         (bind inv (aor/agent-initiate foo))
+         (is (condition-attained? (= 1 @SLOW-INVOKES-ATOM)))
+
+         ;; two retries of attempt 0 land on the run's task back to back
+         (foreign-append! duplicate-retries-depot
+                          [(.getTaskId inv) (.getAgentInvokeId inv)])
+         (is (condition-attained? (= 2 @retries-atom)))
+         (is (condition-attained? (>= @SLOW-INVOKES-ATOM 2)))
+         ;; nothing signals a dropped retry, so allow a second dispatch time to
+         ;; show: it takes a few depot round trips
+         (Thread/sleep 2000)
+         (is (= 2 @SLOW-INVOKES-ATOM))
+
+         (h/release-semaphore SEM2 3)
+         (h/release-semaphore SEM 1)
+         (is (some? (aor/agent-result foo inv)))
+        )))))
