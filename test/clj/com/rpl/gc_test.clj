@@ -554,3 +554,92 @@
          (is (= (all-node-ids)
                 (set/union (trace-node-ids inv3) (trace-node-ids inv4))))
         )))))
+
+;; A retry can be bumped into :valid-invokes and then dropped, leaving the
+;; run's root :retry-num unchanged: here a branch fails after the run already
+;; has its result. GC must still remove the entry when it deletes the run, or
+;; it stays on every task forever.
+(deftest gc-removes-valid-invokes-of-dropped-retry-test
+  (let [retries-atom (atom 0)]
+    (with-redefs [i/SUBSTITUTE-TICK-DEPOTS true
+                  SEM (h/mk-semaphore 0)
+                  apart/next-agent-task (fn [& args] 0)
+                  anode/log-node-error (fn [& args])
+                  at/hook:received-retry (fn [& args] (swap! retries-atom inc))]
+      (with-open [ipc (rtest/create-ipc)]
+        (letlocals
+         (bind module
+           (aor/agentmodule
+            [topology]
+            (-> topology
+                (aor/new-agent "foo")
+                (aor/node
+                 "start"
+                 ["finish" "fail-late"]
+                 (fn [agent-node fail?]
+                   (aor/emit! agent-node "finish")
+                   (when fail?
+                     (aor/emit! agent-node "fail-late"))))
+                (aor/node
+                 "finish"
+                 nil
+                 (fn [agent-node]
+                   (aor/result! agent-node "done")))
+                (aor/node
+                 "fail-late"
+                 nil
+                 (fn [agent-node]
+                   (h/acquire-semaphore SEM 1)
+                   (throw (ex-info "fail after the result" {})))))))
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind config-depot
+           (foreign-depot ipc module-name (po/agent-config-depot-name "foo")))
+         (bind gc-depot
+           (foreign-depot ipc module-name (po/agent-gc-tick-depot-name "foo")))
+         (bind root-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
+         (bind mb-shared-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-mb-shared-task-global-name "foo")))
+         (bind all-agent-invs (all-agent-invs-fn root-pstate 4))
+         (bind valid-entries
+           (fn []
+             (into #{}
+                   (for [i (range 4)
+                         entry (foreign-select [:valid-invokes ALL]
+                                               mb-shared-pstate
+                                               {:pkey i})]
+                     [i entry]))))
+
+         (foreign-append! config-depot (aor-types/change-max-traces-per-task 1))
+
+         (bind inv (aor/agent-initiate foo true))
+         (is (= "done" (aor/agent-result foo inv)))
+         (h/release-semaphore SEM 1)
+
+         ;; the failure bumps the attempt on every task; the retry is dropped
+         ;; because the run has a result
+         (is (condition-attained?
+              (= (set (for [i (range 4)]
+                        [i [[(.getTaskId inv) (.getAgentInvokeId inv)] 1]]))
+                 (valid-entries))))
+         (is (condition-attained? (= 1 @retries-atom)))
+         (is (= 0
+                (foreign-select-one [(keypath (.getAgentInvokeId inv)) :retry-num]
+                                    root-pstate
+                                    {:pkey (.getTaskId inv)})))
+
+         ;; a newer run on the same task pushes the first one out
+         (bind inv2 (aor/agent-initiate foo false))
+         (is (= "done" (aor/agent-result foo inv2)))
+         (dotimes [_ 5]
+           (foreign-append! gc-depot nil))
+         (is (= #{inv2} (all-agent-invs)))
+         (is (condition-attained? (= #{} (valid-entries))))
+        )))))

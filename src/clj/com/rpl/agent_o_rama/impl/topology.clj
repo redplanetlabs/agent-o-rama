@@ -1217,6 +1217,7 @@
     $$root-count (po/agent-root-count-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
     $$stream-shared (po/agent-stream-shared-task-global *agent-name)
+    $$mb-shared (po/agent-mb-shared-task-global *agent-name)
     *gc-valid-depot (po/agent-gc-valid-invokes-depot-task-global *agent-name)]
    (anode/read-config *agent-name
                       aor-types/MAX-TRACES-PER-TASK-CONFIG
@@ -1235,7 +1236,7 @@
          ALL
          *to-delete
          {:allow-yield? true}
-         :> [*agent-id {:keys [*root-invoke-id *retry-num *result]}])
+         :> [*agent-id {:keys [*root-invoke-id *result]}])
        (filter> (some? *result))
        (local-transform> [(keypath *agent-id)
                           (multi-path [:forks NONE>]
@@ -1251,7 +1252,14 @@
        ;; same elements concurrently
        (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
        (<<if *exists?
-         (<<if (> *retry-num 0)
+         ;; the entry, not the root's :retry-num: a retry bumped into
+         ;; :valid-invokes and then dropped (the run already had a result,
+         ;; say) leaves :retry-num unchanged. :valid-invokes is written on
+         ;; every task, so the local copy tells.
+         (local-select> (keypath :valid-invokes [*agent-task-id *agent-id])
+                        $$mb-shared
+                        :> *valid-retry-num)
+         (<<if (some? *valid-retry-num)
            (depot-partition-append! *gc-valid-depot
                                     [*agent-task-id *agent-id]
                                     :append-ack))
