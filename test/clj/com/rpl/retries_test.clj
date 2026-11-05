@@ -1796,3 +1796,111 @@
          (h/release-semaphore SEM 1)
          (is (some? (aor/agent-result foo inv)))
         )))))
+
+;; A run whose nodes all finish without a result is completed with "Agent
+;; completed without result". It must leave :active-invokes like any finished
+;; run. The stall checker walks every active run on each tick, and once GC has
+;; deleted such a run, it read a missing root: the microbatch threw, which
+;; kills the worker, again after every restart. Entries left by runs that
+;; finished before the fix must not do that either.
+(deftest completed-without-result-leaves-active-invokes-test
+  (let [checks-atom (atom 0)]
+    (with-redefs
+      [i/SUBSTITUTE-TICK-DEPOTS true
+       apart/next-agent-task (fn [& args] 0)
+       retries/checker-threshold-millis short-checker-threshold-millis
+       retries/hook:checker-finished (fn [] (swap! checks-atom inc))]
+      (with-open [ipc (rtest/create-ipc)
+                  _ (TopologyUtils/startSimTime)]
+        (letlocals
+         (bind module
+           (module
+             [setup topologies]
+             (declare-depot setup *legacy-active-depot :random)
+             (let [topology (aor/agent-topology setup topologies)
+                   s        (aor/underlying-stream-topology topology)
+                   stream-shared-sym
+                   (symbol (po/agent-stream-shared-task-global-name "foo"))]
+               (->
+                 topology
+                 (aor/new-agent "foo")
+                 (aor/node
+                  "start"
+                  nil
+                  (fn [agent-node result?]
+                    (when result?
+                      (aor/result! agent-node :ok)))))
+               (aor/define-agents! topology)
+               ;; adds an :active-invokes entry as runs finished before the
+               ;; fix left them
+               (<<sources s
+                (source> *legacy-active-depot :> *agent-id)
+                 (|direct 0)
+                 (local-transform> [:active-invokes NONE-ELEM (termval *agent-id)]
+                                   stream-shared-sym)))))
+         (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
+         (bind module-name (get-module-name module))
+         (bind agent-manager (aor/agent-manager ipc module-name))
+         (bind foo (aor/agent-client agent-manager "foo"))
+         (bind check-depot
+           (foreign-depot ipc
+                          module-name
+                          (po/agent-check-tick-depot-name "foo")))
+         (bind config-depot
+           (foreign-depot ipc module-name (po/agent-config-depot-name "foo")))
+         (bind gc-depot
+           (foreign-depot ipc module-name (po/agent-gc-tick-depot-name "foo")))
+         (bind legacy-active-depot
+           (foreign-depot ipc module-name "*legacy-active-depot"))
+         (bind root-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-root-task-global-name "foo")))
+         (bind stream-shared-pstate
+           (foreign-pstate ipc
+                           module-name
+                           (po/agent-stream-shared-task-global-name "foo")))
+         (bind active-invokes
+           #(set (foreign-select [:active-invokes ALL]
+                                 stream-shared-pstate
+                                 {:pkey 0})))
+         (bind root-exists?
+           (fn [^AgentInvoke inv]
+             (some? (foreign-select-one [(keypath (.getAgentInvokeId inv))
+                                         :root-invoke-id]
+                                        root-pstate
+                                        {:pkey 0}))))
+         (bind checker-progress!
+           (fn []
+             (let [s @checks-atom]
+               (TopologyUtils/advanceSimTime 1000)
+               (foreign-append! check-depot nil)
+               (condition-attained? (= (+ 1 s) @checks-atom)))))
+
+         (bind inv (aor/agent-initiate foo false))
+         (is (condition-attained? (aor/agent-invoke-complete? foo inv)))
+         (is (thrown-with-msg? Exception
+                               #"Agent completed without result"
+                               (aor/agent-result foo inv)))
+         (is (= #{} (active-invokes)))
+
+         ;; an entry from before the fix: the checker skips the finished run...
+         (foreign-append! legacy-active-depot (.getAgentInvokeId inv))
+         (is (= #{(.getAgentInvokeId inv)} (active-invokes)))
+         (is (checker-progress!))
+
+         ;; ...and GC removes the entry with the run
+         (foreign-append! config-depot (aor-types/change-max-traces-per-task 1))
+         (bind inv2 (aor/agent-initiate foo true))
+         (is (= :ok (aor/agent-result foo inv2)))
+         (dotimes [_ 5]
+           (foreign-append! gc-depot nil))
+         (is (condition-attained? (not (root-exists? inv))))
+         (is (condition-attained? (= #{} (active-invokes))))
+         (is (checker-progress!))
+
+         ;; an entry whose run is already gone: the checker skips it
+         (foreign-append! legacy-active-depot (h/random-uuid7))
+         (is (condition-attained? (= 1 (count (active-invokes)))))
+         (is (checker-progress!))
+        )))))

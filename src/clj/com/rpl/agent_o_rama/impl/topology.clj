@@ -153,7 +153,9 @@
                                   "Agent completed without result"
                                   true))]
                        [:finish-time-millis (termval *finish-time-millis)])]
-          $$root))
+          $$root)
+         (local-transform> [:active-invokes (set-elem *agent-id) NONE>]
+                           $$stream-shared))
        (finished-streaming-chunk :> *finished-streaming-chunk)
        (local-transform>
         [(keypath *agent-id)
@@ -1264,6 +1266,10 @@
                                     [*agent-task-id *agent-id]
                                     :append-ack))
          (local-transform> [:gc-root-invokes (keypath *root-invoke-id) (termval nil)]
+                           $$stream-shared)
+         ;; only finished runs are deleted, but runs that completed without a
+         ;; result used to stay listed as active
+         (local-transform> [:active-invokes (set-elem *agent-id) NONE>]
                            $$stream-shared)
          (local-transform> [(keypath *agent-id) NONE>] $$root)
          (local-transform> (term dec) $$root-count))))

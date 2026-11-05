@@ -54,7 +54,14 @@
                      :> {:keys [*root-invoke-id
                                 *start-time-millis
                                 *last-progress-time-millis
-                                *retry-num]})
+                                *retry-num
+                                *result]})
+      ;; a run that finished or was GC'd can still be listed: runs that
+      ;; completed without a result weren't removed before, and that data
+      ;; persists. A missing root would otherwise throw below, which is fatal
+      ;; to the worker.
+      (filter> (some? *root-invoke-id))
+      (filter> (nil? *result))
       (filter> (invalid-time-delta? agent-name *last-progress-time-millis))
       (loop<- [*invoke-id *root-invoke-id
                *emitted-millis *start-time-millis]
