@@ -631,7 +631,7 @@
                       prompt
                       (h/random-uuid-str))
              cf      (CompletableFuture.)
-             _ (.putHumanFuture node-exec invoke-id request cf)
+             _ (.putHumanFuture node-exec invoke-id (long retry-num) request cf)
              _ (foreign-append! human-depot request :append-ack)
              ret     (.get cf)]
          (vswap! nested-ops-vol
@@ -658,10 +658,17 @@
        }))))
 
 (defn submit-virtual-task!
-  [invoke-id afn]
-  (let [^AgentNodeExecutorTaskGlobal node-exec
-        (po/agent-node-executor-task-global)]
-    (.submitTask node-exec invoke-id afn)))
+  "Runs afn on a virtual thread. With an invoke id, the execution is tracked as
+  that node's run for attempt retry-num. The 2-arity is for untracked work (nil
+  invoke id)."
+  ([invoke-id afn]
+   (when (some? invoke-id)
+     (throw (h/ex-info "A tracked task needs a retry num" {:invoke-id invoke-id})))
+   (submit-virtual-task! nil -1 afn))
+  ([invoke-id retry-num afn]
+   (let [^AgentNodeExecutorTaskGlobal node-exec
+         (po/agent-node-executor-task-global)]
+     (.submitTask node-exec invoke-id (long retry-num) afn))))
 
 (defn log-node-error
   [t msg data]
@@ -1079,6 +1086,7 @@
                 :> *acquire-timeout-millis)
    (submit-virtual-task!
     *invoke-id
+    *retry-num
     (node-event *agent-name
                 *task-id
                 *invoke-id

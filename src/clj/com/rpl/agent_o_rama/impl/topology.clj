@@ -482,16 +482,25 @@
    (filter> false)))
 
 (defn mark-virtual-task-complete!
-  [invoke-id]
-  (let [^AgentNodeExecutorTaskGlobal node-exec
-        (po/agent-node-executor-task-global)]
-    (.removeTrackedInvokeId node-exec invoke-id)))
+  "Stops tracking the node's run for attempt retry-num, leaving a run of another
+  attempt under the same invoke id tracked. Without retry-num, stops tracking
+  whatever attempt is tracked."
+  ([invoke-id]
+   (let [^AgentNodeExecutorTaskGlobal node-exec
+         (po/agent-node-executor-task-global)]
+     (.removeTrackedInvokeId node-exec invoke-id)))
+  ([invoke-id retry-num]
+   (let [^AgentNodeExecutorTaskGlobal node-exec
+         (po/agent-node-executor-task-global)]
+     (.removeTrackedInvokeId node-exec invoke-id (long retry-num)))))
 
 (deframaop begin-node-complete
   [*agent-name *invoke-id *retry-num]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)]
-   (mark-virtual-task-complete! *invoke-id)
+   ;; before the validity filter: a stale attempt's run has finished too and
+   ;; must be untracked, while a newer attempt's run of the node stays tracked
+   (mark-virtual-task-complete! *invoke-id *retry-num)
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node
