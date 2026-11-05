@@ -940,7 +940,9 @@
 
 (defprotocol AgentClientInternal
   (set-metadata-internal! [this agent-invoke key value])
+  (invoke-with-context-internal [this context args])
   (invoke-with-context-async-internal [this context args])
+  (initiate-with-context-internal [this context args])
   (initiate-with-context-async-internal [this context args])
   (stream-internal [this agent-invoke node callback-fn])
   (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])
