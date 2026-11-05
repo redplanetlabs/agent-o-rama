@@ -16,6 +16,7 @@
    [com.rpl.agentorama
     FinishedAgg]
    [com.rpl.agent_o_rama.impl.types
+    AttemptHumanInputRequest
     HumanInput
     Node
     NodeAgg
@@ -293,7 +294,10 @@
      (multi-path
       [:result
        (termval (aor-types/->valid-AgentResult *message true))]
-      [:finish-time-millis (termval *finish-time-millis)])]
+      [:finish-time-millis (termval *finish-time-millis)]
+      ;; only called when a retry ends the run: the retry invalidated the
+      ;; attempt whose requests these are
+      [:human-requests NONE>])]
     $$root)
    (local-transform> [:active-invokes (set-elem *agent-id) NONE>] $$stream-shared)
    (:>)))
@@ -375,7 +379,10 @@
                            ;; the old attempt's time would let the stall
                            ;; checker count the failed node as a stall
                            [:last-progress-time-millis
-                            (termval (h/current-time-millis))])]
+                            (termval (h/current-time-millis))]
+                           ;; requests of the invalidated attempt: no node is
+                           ;; left to answer them
+                           [:human-requests NONE>])]
                          $$root)
 
        (aor-types/->valid-NodeOp *root-invoke-id
@@ -894,11 +901,27 @@
    [$$root (po/agent-root-task-global *agent-name)
     *node-exec (po/agent-node-executor-task-global)]
    (<<subsource *data
+    ;; appended by nodes before AttemptHumanInputRequest existed: can still be
+    ;; in the depot when the module is updated
     (case> NodeHumanInputRequest :> {:keys [*agent-id]})
      (local-transform> [(must *agent-id)
                         :human-requests
                         NONE-ELEM
                         (termval *data)]
+                       $$root)
+
+    (case> AttemptHumanInputRequest :> {:keys [*request *retry-num]})
+     (identity *request :> {:keys [*agent-task-id *agent-id]})
+     ;; a request of an invalidated attempt would stay pending with no node to
+     ;; answer it
+     (apart/filter-valid-retry-num> *agent-name
+                                    *agent-task-id
+                                    *agent-id
+                                    *retry-num)
+     (local-transform> [(must *agent-id)
+                        :human-requests
+                        NONE-ELEM
+                        (termval *request)]
                        $$root)
 
     (case> HumanInput

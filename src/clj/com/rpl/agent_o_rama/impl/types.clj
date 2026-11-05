@@ -381,6 +381,13 @@
   [request :- NodeHumanInputRequest
    response :- String])
 
+;; What a node appends to the human depot: the request plus the attempt that
+;; asked, so intake can drop requests of invalidated attempts. Only the module
+;; reads the depot; the request alone is what's stored and shown to clients.
+(defaorrecord AttemptHumanInputRequest
+  [request :- NodeHumanInputRequest
+   retry-num :- Long])
+
 (defaorrecord NodeOp
   [invoke-id :- UUID
    fork-invoke-id :- (s/maybe UUID)

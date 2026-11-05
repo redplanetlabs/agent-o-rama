@@ -1563,6 +1563,7 @@
 
 (def ASK-INVOKES-ATOM)
 (def STALE-THREAD-ATOM)
+(def FILTERED-ATOM)
 
 ;; Same reuse of the node invoke id: if the invalidated attempt's run asks for
 ;; human input after the current attempt's run did, it must not hide the
@@ -1573,10 +1574,12 @@
     [SEM (h/mk-semaphore 0)
      ASK-INVOKES-ATOM (atom 0)
      STALE-THREAD-ATOM (atom nil)
+     FILTERED-ATOM (atom 0)
 
      i/SUBSTITUTE-TICK-DEPOTS true
      aor-types/get-config (max-retries-override 5)
-     anode/log-node-error (fn [& args])]
+     anode/log-node-error (fn [& args])
+     apart/hook:filtered-event (fn [& args] (swap! FILTERED-ATOM inc))]
     (with-open [ipc (rtest/create-ipc)]
       (letlocals
        (bind module
@@ -1625,9 +1628,11 @@
                                                   0))
        (is (condition-attained? (= #{"current"} (prompts))))
 
-       ;; now attempt 0's run asks too (its request is stored, see 0.6)
+       ;; now attempt 0's run asks too; its request is dropped as stale
+       (bind filtered-before @FILTERED-ATOM)
        (h/release-semaphore SEM 1)
-       (is (condition-attained? (= #{"current" "stale"} (prompts))))
+       (is (condition-attained? (> @FILTERED-ATOM filtered-before)))
+       (is (= #{"current"} (prompts)))
 
        (aor/provide-human-input foo
                                 (first (filter #(= "current" (:prompt %))
@@ -1904,3 +1909,72 @@
          (is (condition-attained? (= 1 (count (active-invokes)))))
          (is (checker-progress!))
         )))))
+
+(def ASKING-THREADS-ATOM)
+
+;; A retry invalidates every pending human-input request of the run: answering
+;; one would reach no running node. Only the new attempt's requests may stay.
+(deftest retry-clears-pending-human-requests-test
+  (with-redefs
+    [ASK-INVOKES-ATOM (atom 0)
+     ASKING-THREADS-ATOM (atom [])
+
+     i/SUBSTITUTE-TICK-DEPOTS true
+     aor-types/get-config (max-retries-override 5)
+     anode/log-node-error (fn [& args])]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (module
+           [setup topologies]
+           (let [topology (aor/agent-topology setup topologies)]
+             (->
+               topology
+               (aor/new-agent "foo")
+               (aor/node
+                "start"
+                "ask"
+                (fn [agent-node]
+                  (aor/emit! agent-node "ask")))
+               (aor/node
+                "ask"
+                nil
+                (fn [agent-node]
+                  (swap! ASKING-THREADS-ATOM conj (Thread/currentThread))
+                  (let [prompt (if (= 1 (swap! ASK-INVOKES-ATOM inc))
+                                 "first"
+                                 "second")]
+                    (aor/result! agent-node
+                                 (aor/get-human-input agent-node prompt))))))
+             (aor/define-agents! topology))))
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind failures-depot
+         (foreign-depot ipc
+                        module-name
+                        (po/agent-failures-depot-name "foo")))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind foo (aor/agent-client agent-manager "foo"))
+
+       (bind inv (aor/agent-initiate foo))
+       (bind pending #(aor/pending-human-inputs foo inv))
+       (bind prompts #(set (map :prompt (pending))))
+       (is (condition-attained? (= #{"first"} (prompts))))
+
+       ;; retry while attempt 0 waits for input
+       (foreign-append! failures-depot
+                        (aor-types/->AgentFailure (.getTaskId inv)
+                                                  (.getAgentInvokeId inv)
+                                                  0))
+       (is (condition-attained? (contains? (prompts) "second")))
+       (is (= #{"second"} (prompts)))
+
+       (aor/provide-human-input foo
+                                (first (filter #(= "second" (:prompt %)) (pending)))
+                                "answer")
+       (is (= "answer" (aor/agent-result foo inv)))
+
+       ;; attempt 0's thread waits for input that can't arrive
+       (doseq [^Thread t @ASKING-THREADS-ATOM]
+         (.interrupt t))
+      ))))

@@ -39,6 +39,11 @@
     (aor-types/NodeHumanInputRequest? data)
     (:agent-task-id data)
 
+    (aor-types/AttemptHumanInputRequest? data)
+    (-> data
+        :request
+        :agent-task-id)
+
     (aor-types/HumanInput? data)
     (-> data
         :request

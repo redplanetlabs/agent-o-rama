@@ -632,7 +632,11 @@
                       (h/random-uuid-str))
              cf      (CompletableFuture.)
              _ (.putHumanFuture node-exec invoke-id (long retry-num) request cf)
-             _ (foreign-append! human-depot request :append-ack)
+             _ (foreign-append! human-depot
+                                (aor-types/->valid-AttemptHumanInputRequest
+                                 request
+                                 retry-num)
+                                :append-ack)
              ret     (.get cf)]
          (vswap! nested-ops-vol
                  conj
