@@ -333,7 +333,8 @@
                             (str duration "ms")))
                        ;; Add navigation button for agent-call operations
                        (when (= (keyword op-type) :agent-call)
-                         (let [invoke-data (if (= (str (:op info)) "initiate")
+                         (let [invoke-data (if (#{"initiate" "initiateWithContext"}
+                                               (str (:op info)))
                                              (:result info)
                                              (:agent-invoke info))
                                task-id (:task-id invoke-data)
