@@ -68,8 +68,9 @@ public class TestModules {
       topology.declareAgentObject("openai-key", System.getenv("OPENAI_API_KEY"));
       topology.declareAgentObjectBuilder("openai", (AgentObjectSetup setup) -> {
         return OpenAiChatModel.builder()
+                              .baseUrl(System.getenv("OPENAI_BASE_URL"))
                               .apiKey(setup.getAgentObject("openai-key"))
-                              .modelName("gpt-4o-mini")
+                              .modelName("gpt-5.6-luna")
                               .build();
       });
       topology.newToolsAgent("tools", TOOLS);

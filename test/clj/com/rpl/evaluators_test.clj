@@ -745,8 +745,9 @@
                      "openai"
                      (fn [setup]
                        (-> (dev.langchain4j.model.openai.OpenAiChatModel/builder)
+                           (.baseUrl (System/getenv "OPENAI_BASE_URL"))
                            (.apiKey (System/getenv "OPENAI_API_KEY"))
-                           (.modelName "gpt-4o-mini")
+                           (.modelName "gpt-5.6-luna")
                            .build)))
                     (-> topology
                         (aor/new-agent "foo")
