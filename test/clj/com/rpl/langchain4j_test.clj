@@ -41,8 +41,9 @@
            "openai"
            (fn [setup]
              (-> (OpenAiStreamingChatModel/builder)
+                 (.baseUrl (System/getenv "OPENAI_BASE_URL"))
                  (.apiKey (aor/get-agent-object setup "openai-api-key"))
-                 (.modelName "gpt-4o-mini")
+                 (.modelName "gpt-5.6-luna")
                  .build)))
           (->
             topology
@@ -96,8 +97,9 @@
            "openai"
            (fn [setup]
              (-> (OpenAiChatModel/builder)
+                 (.baseUrl (System/getenv "OPENAI_BASE_URL"))
                  (.apiKey (aor/get-agent-object setup "openai-api-key"))
-                 (.modelName "gpt-4o-mini")
+                 (.modelName "gpt-5.6-luna")
                  .build)))
           (->
             topology

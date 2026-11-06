@@ -20,7 +20,13 @@
    [com.rpl.rama.ops :as ops]
    [com.rpl.rama.test :as rtest]
    [com.rpl.test-common :as tc]
-   [meander.epsilon :as m]))
+   [meander.epsilon :as m])
+  (:import
+   [com.rpl.agentorama
+    AgentClient
+    AgentContext]
+   [java.util.concurrent
+    CompletableFuture]))
 
 (deftest local-subagent-test
   (with-redefs [aor-types/get-config (max-retries-override 0)
@@ -416,3 +422,139 @@
 
      (is (= 31 (aor/agent-invoke foo 3)))
     )))
+
+;; Clojure's synchronous context calls must not share the rejected async
+;; dispatch. A delegate that never finishes initiating also catches accidental
+;; blocking before the async method returns.
+(deftest subagent-context-async-rejection-test
+  (let [delegated? (atom false)
+        delegate (reify
+                   AgentClient
+                   aor-types/AgentClientInternal
+                   (initiate-with-context-internal [this context args]
+                     (reset! delegated? true)
+                     (.get (CompletableFuture.)))
+                   (initiate-with-context-async-internal [this context args]
+                     (reset! delegated? true)
+                     (CompletableFuture.)))
+        ^AgentClient child (anode/subagent-client nil delegate "module" "child")
+        context (AgentContext/metadata "k" "v")]
+    (doseq [[label call]
+            [["Clojure invoke" #(aor/agent-invoke-with-context-async
+                                child {:metadata {"k" "v"}} "x")]
+             ["Clojure initiate" #(aor/agent-initiate-with-context-async
+                                  child {:metadata {"k" "v"}} "x")]
+             ["Java invoke" #(.invokeWithContextAsync child context (object-array ["x"]))]
+             ["Java initiate" #(.initiateWithContextAsync child context (object-array ["x"]))]]]
+      (testing label
+        (let [res (future
+                    (try
+                      (call)
+                      (catch Throwable t t)))]
+          (try
+            (let [failure (deref res 5000 ::blocked)]
+              (is (and (instance? clojure.lang.ExceptionInfo failure)
+                       (str/starts-with? (ex-message failure)
+                                         "Async API not implemented for subagents"))))
+            (finally
+              (future-cancel res))))))
+    (is (false? @delegated?))))
+
+;; Every AgentClient method a node can call on a subagent client works and is
+;; recorded in the node's trace, including the with-context, completion and
+;; metadata ones, from Clojure and from Java.
+(deftest subagent-client-methods-test
+  (with-redefs [aor-types/get-config (max-retries-override 0)
+                anode/log-node-error (fn [& args])]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (-> topology
+              (aor/new-agent "child")
+              (aor/node
+               "start"
+               nil
+               (fn [agent-node v]
+                 (aor/result! agent-node
+                              (str v "!" (get (aor/get-metadata agent-node) "k"))))))
+          (-> topology
+              (aor/new-agent "parent")
+              (aor/node
+               "start"
+               nil
+               (fn [agent-node]
+                 (let [^AgentClient child (aor/agent-client agent-node "child")
+                       r1 (aor/agent-invoke-with-context child
+                                                         {:metadata {"k" "a"}}
+                                                         "x")
+                       i2 (aor/agent-initiate-with-context child
+                                                           {:metadata {"k" "b"}}
+                                                           "y")
+                       r2 (aor/agent-result child i2)
+                       r3 (.invokeWithContext child
+                                              (AgentContext/metadata "k" "c")
+                                              (object-array ["z"]))
+                       i4 (.initiateWithContext child
+                                                (AgentContext/metadata "k" "d")
+                                                (object-array ["w"]))
+                       r4 (aor/agent-result child i4)
+                       done? (aor/agent-invoke-complete? child i4)
+                       _ (aor/set-metadata! child i4 "extra" 1)
+                       _ (.setMetadata child i4 "j" "s")
+                       m1 (aor/get-metadata child i4)
+                       _ (aor/remove-metadata! child i4 "extra")
+                       m2 (aor/get-metadata child i4)]
+                   (aor/result! agent-node [r1 r2 r3 r4 done? m1 m2])))))))
+       (launch-module-without-eval-agent! ipc module {:tasks 4 :threads 2})
+       (bind module-name (get-module-name module))
+       (bind agent-manager (aor/agent-manager ipc module-name))
+       (bind parent (aor/agent-client agent-manager "parent"))
+       (bind external-child (aor/agent-client agent-manager "child"))
+       ;; The separate synchronous dispatch also preserves ordinary clients.
+       (is (= "external!e"
+              (aor/agent-invoke-with-context external-child
+                                             {:metadata {"k" "e"}}
+                                             "external")))
+       (bind external-inv (aor/agent-initiate-with-context external-child
+                                                           {:metadata {"k" "f"}}
+                                                           "initiated"))
+       (is (= "initiated!f" (aor/agent-result external-child external-inv)))
+       (bind parent-root
+         (foreign-pstate ipc
+                         module-name
+                         (po/agent-root-task-global-name "parent")))
+       (bind parent-trace (:tracing-query (aor-types/underlying-objects parent)))
+
+       (bind inv (aor/agent-initiate parent))
+       (is (= ["x!a" "y!b" "z!c" "w!d" true
+               {"k" "d" "extra" 1 "j" "s"}
+               {"k" "d" "j" "s"}]
+              (aor/agent-result parent inv)))
+
+       (bind root-invoke-id
+         (foreign-select-one [(keypath (:agent-invoke-id inv)) :root-invoke-id]
+                             parent-root
+                             {:pkey (:task-id inv)}))
+       (bind ops
+         (->> (foreign-invoke-query parent-trace
+                                    (:task-id inv)
+                                    [[(:task-id inv) root-invoke-id]]
+                                    10000)
+              :invokes-map
+              vals
+              (mapcat :nested-ops)
+              (filter #(= :agent-call (:type %)))
+              (mapv #(get-in % [:info "op"]))))
+       (is (= ["initiateWithContext" "nextStep"
+               "initiateWithContext" "nextStep"
+               "initiateWithContext" "nextStep"
+               "initiateWithContext" "nextStep"
+               "isAgentInvokeComplete"
+               "setMetadata" "setMetadata"
+               "getMetadata"
+               "removeMetadata"
+               "getMetadata"]
+              ops))
+      ))))

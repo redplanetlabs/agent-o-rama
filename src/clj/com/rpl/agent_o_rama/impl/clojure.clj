@@ -65,7 +65,7 @@
 
 (defn agent-initiate-with-context
   ^AgentInvoke [agent-client context & args]
-  (.get ^CompletableFuture (apply agent-initiate-with-context-async agent-client context args)))
+  (aor-types/initiate-with-context-internal agent-client context (into [] args)))
 
 (defn agent-result
   [^AgentClient agent-client agent-invoke]

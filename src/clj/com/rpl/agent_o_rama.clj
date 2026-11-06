@@ -1516,12 +1516,18 @@ Example:\n
             (foreign-append!
              agent-edit-depot
              (aor-types/->valid-EditMetadata agentName task-id agent-invoke-id key value)))
+          (invoke-with-context-internal [this context args]
+            (.get ^CompletableFuture
+                  (aor-types/invoke-with-context-async-internal this context args)))
           (invoke-with-context-async-internal [this context args]
             (.thenCompose
              ^CompletableFuture
              (aor-types/initiate-with-context-async-internal this context args)
              (h/cf-function [agent-invoke]
                (.resultAsync this agent-invoke))))
+          (initiate-with-context-internal [this context args]
+            (.get ^CompletableFuture
+                  (aor-types/initiate-with-context-async-internal this context args)))
           (initiate-with-context-async-internal [this context args]
             (let [{:keys [metadata] :as context} (merge {:metadata {}} context)]
               (h/validate-options! agentName
@@ -2007,7 +2013,7 @@ Example:\n
   \"Hello world\")
 </pre>"
   [agent-client context & args]
-  (.get ^CompletableFuture (apply agent-invoke-with-context-async agent-client context args)))
+  (aor-types/invoke-with-context-internal agent-client context (into [] args)))
 
 (defn agent-initiate-with-context-async
   "Asynchronously initiates an agent execution with context metadata.\n

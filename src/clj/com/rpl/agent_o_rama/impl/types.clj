@@ -381,6 +381,13 @@
   [request :- NodeHumanInputRequest
    response :- String])
 
+;; What a node appends to the human depot: the request plus the attempt that
+;; asked, so intake can drop requests of invalidated attempts. Only the module
+;; reads the depot; the request alone is what's stored and shown to clients.
+(defaorrecord AttemptHumanInputRequest
+  [request :- NodeHumanInputRequest
+   retry-num :- Long])
+
 (defaorrecord NodeOp
   [invoke-id :- UUID
    fork-invoke-id :- (s/maybe UUID)
@@ -933,7 +940,9 @@
 
 (defprotocol AgentClientInternal
   (set-metadata-internal! [this agent-invoke key value])
+  (invoke-with-context-internal [this context args])
   (invoke-with-context-async-internal [this context args])
+  (initiate-with-context-internal [this context args])
   (initiate-with-context-async-internal [this context args])
   (stream-internal [this agent-invoke node callback-fn])
   (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn])

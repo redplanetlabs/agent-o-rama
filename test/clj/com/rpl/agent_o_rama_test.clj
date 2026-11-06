@@ -49,6 +49,7 @@
 
 (def SEM)
 (def SEM2)
+(def SEM3)
 
 (deftest graph-test
   (letlocals
@@ -2885,6 +2886,7 @@
 (deftest agent-pending-tracking-test
   (with-redefs [SEM  (h/mk-semaphore 0)
                 SEM2 (h/mk-semaphore 0)
+                SEM3 (h/mk-semaphore 0)
                 anode/log-node-error (fn [& args])
                 aor-types/get-config (max-retries-override 0)]
     (with-open [ipc (rtest/create-ipc)
@@ -2949,6 +2951,9 @@
                 "node3"
                 "node4"
                 (fn [agent-node]
+                  ;; the test releases SEM3 once the progress write from node2 is checked.
+                  ;; node2 sends this op before that write, so it can start first.
+                  (h/acquire-semaphore SEM3 1)
                   (TopologyUtils/advanceSimTime 1)
                   (h/acquire-semaphore SEM2 1)
                   (TopologyUtils/advanceSimTime 40)
@@ -3088,6 +3093,9 @@
        (is (condition-attained?
             (= 63 (last-progress-time bar-root-pstate inv-bar1))))
 
+       (h/release-semaphore SEM3 2)
+       (is (condition-attained? (= 65 (h/current-time-millis))))
+
        (release-and-change-invokes! SEM -1)
        (is (= "abc" (aor/agent-result foo inv-foo1)))
        (is (condition-attained? (= {"bar" 1} (pending-agent-count))))
@@ -3120,6 +3128,7 @@
        (is (condition-attained? (= {"foo" 1 "bar" 1} (pending-agent-count))))
 
        (h/release-semaphore SEM 1)
+       (h/release-semaphore SEM3 1000)
        (h/release-semaphore SEM2 1000)
 
        (aor/agent-result foo inv-foo1)

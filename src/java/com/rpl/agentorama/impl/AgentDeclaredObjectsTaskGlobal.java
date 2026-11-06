@@ -173,9 +173,32 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
     return _clusterRetriever;
   }
 
-  private static Object makeObject(String name, IFn afn, AgentObjectSetup setup, boolean autoTracing) {
-    Object o = afn.invoke(setup);
-    return autoTracing ? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
+  // An object keeps the dependencies it acquired for as long as it exists, so
+  // they're only released if the build fails and there is no object.
+  private Object makeObject(String name, IFn afn, boolean autoTracing) {
+    List<Object[]> dependencies = new ArrayList<>();
+    AgentObjectSetup setup = new AgentObjectSetup() {
+      @Override
+      public <T> T getAgentObject(String otherName) {
+        T dependency = (T) getAgentObjectFromResource(otherName);
+        dependencies.add(new Object[] {otherName, dependency});
+        return dependency;
+      }
+
+      @Override
+      public String getObjectName() {
+        return name;
+      }
+    };
+    try {
+      Object o = afn.invoke(setup);
+      return autoTracing ? AORHelpers.WRAP_AGENT_OBJECT.invoke(name, o) : o;
+    } catch (Throwable t) {
+      for(Object[] dependency: dependencies) {
+        releaseAgentObject((String) dependency[0], dependency[1]);
+      }
+      throw t;
+    }
   }
 
   @Override
@@ -194,20 +217,9 @@ public class AgentDeclaredObjectsTaskGlobal implements TaskGlobalObject {
       boolean threadSafe = (boolean) info.get("threadSafe");
       boolean autoTracing = (boolean) info.get("autoTracing");
       IFn afn = (IFn) info.get("builderFn");
-      AgentObjectSetup setup = new AgentObjectSetup() {
-        @Override
-        public <T> T getAgentObject(String otherName) {
-          return (T) getAgentObjectFromResource(otherName);
-        }
-
-        @Override
-        public String getObjectName() {
-          return name;
-        }
-      };
       _objects.put(name, new WorkerManagedResource(name, context, () -> {
-        if(threadSafe) return makeObject(name, afn, setup, autoTracing);
-        else return new LazyObjectPool(limit, () -> makeObject(name, afn, setup, autoTracing));
+        if(threadSafe) return makeObject(name, afn, autoTracing);
+        else return new LazyObjectPool(limit, () -> makeObject(name, afn, autoTracing));
       }));
     }
 

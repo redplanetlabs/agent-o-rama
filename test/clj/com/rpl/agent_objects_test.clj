@@ -8,6 +8,7 @@
    [clojure.walk :as walk]
    [com.rpl.agent-o-rama :as aor]
    [com.rpl.agent-o-rama.langchain4j :as lc4j]
+   [com.rpl.agent-o-rama.impl.agent-node :as anode]
    [com.rpl.agent-o-rama.impl.core :as i]
    [com.rpl.agent-o-rama.impl.helpers :as h]
    [com.rpl.agent-o-rama.impl.pobjects :as po]
@@ -316,6 +317,71 @@
       (EmbeddingMatch. 0.6 "13" (tc/embedding 0.2 0.4) nil)
       (EmbeddingMatch. 0.8 "14" (tc/embedding 0.3 0.5) (tc/document "doc text" {"author" "Smith" "year" 2023}))
       (EmbeddingMatch. 0.9 "15" (tc/embedding 0.4 0.6) (TextSegment/from "baz"))])))
+
+(def FAILING-BUILDS-ATOM)
+
+(defn fail-first-build!
+  [name]
+  (let [builds (-> FAILING-BUILDS-ATOM
+                   (swap! update name (fnil inc 0))
+                   (get name))]
+    (when (= 1 builds)
+      (throw (ex-info "Intentional build failure" {:name name})))
+    name))
+
+;; A pool's permit is taken before the build, so a build that throws has to give
+;; it back. So does one that acquired a dependency before throwing: nothing else
+;; holds on to that object. Otherwise later acquires can only time out, for every
+;; run on the worker until it restarts.
+(deftest failed-build-releases-pool-permits-test
+  (with-redefs [FAILING-BUILDS-ATOM (atom {})
+                anode/log-node-error (fn [& args])
+                aor-types/get-config
+                (let [prev (max-retries-override 0)]
+                  (fn [m config]
+                    (if (= (:name config) (:name aor-types/ACQUIRE-OBJECT-TIMEOUT-MILLIS-CONFIG))
+                      2000
+                      (prev m config))))]
+    (with-open [ipc (rtest/create-ipc)]
+      (letlocals
+       (bind module
+         (aor/agentmodule
+          [topology]
+          (aor/declare-agent-object-builder
+           topology
+           "pooled"
+           (fn [setup] (fail-first-build! "pooled"))
+           {:worker-object-limit 1})
+          (aor/declare-agent-object-builder
+           topology
+           "dependency"
+           (fn [setup] "dependency")
+           {:worker-object-limit 1})
+          (aor/declare-agent-object-builder
+           topology
+           "dependent"
+           (fn [setup]
+             [(aor/get-agent-object setup "dependency")
+              (fail-first-build! "dependent")])
+           {:worker-object-limit 1})
+          (->
+            topology
+            (aor/new-agent "foo")
+            (aor/node
+             "start"
+             nil
+             (fn [agent-node object-name]
+               (aor/result! agent-node (aor/get-agent-object agent-node object-name)))))))
+       (launch-module-without-eval-agent! ipc module {:tasks 2 :threads 1})
+       (bind agent-manager (aor/agent-manager ipc (get-module-name module)))
+       (bind foo (aor/agent-client agent-manager "foo"))
+
+       (is (thrown? Exception (aor/agent-invoke foo "pooled")))
+       (is (= "pooled" (aor/agent-invoke foo "pooled")))
+
+       (is (thrown? Exception (aor/agent-invoke foo "dependent")))
+       (is (= ["dependency" "dependent"] (aor/agent-invoke foo "dependent")))
+      ))))
 
 (deftest object-wrapping-test
   (with-open [ipc (rtest/create-ipc)

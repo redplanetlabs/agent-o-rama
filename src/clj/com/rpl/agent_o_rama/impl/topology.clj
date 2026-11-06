@@ -16,6 +16,7 @@
    [com.rpl.agentorama
     FinishedAgg]
    [com.rpl.agent_o_rama.impl.types
+    AttemptHumanInputRequest
     HumanInput
     Node
     NodeAgg
@@ -153,7 +154,9 @@
                                   "Agent completed without result"
                                   true))]
                        [:finish-time-millis (termval *finish-time-millis)])]
-          $$root))
+          $$root)
+         (local-transform> [:active-invokes (set-elem *agent-id) NONE>]
+                           $$stream-shared))
        (finished-streaming-chunk :> *finished-streaming-chunk)
        (local-transform>
         [(keypath *agent-id)
@@ -291,7 +294,10 @@
      (multi-path
       [:result
        (termval (aor-types/->valid-AgentResult *message true))]
-      [:finish-time-millis (termval *finish-time-millis)])]
+      [:finish-time-millis (termval *finish-time-millis)]
+      ;; only called when a retry ends the run: the retry invalidated the
+      ;; attempt whose requests these are
+      [:human-requests NONE>])]
     $$root)
    (local-transform> [:active-invokes (set-elem *agent-id) NONE>] $$stream-shared)
    (:>)))
@@ -303,6 +309,12 @@
     $$stream-shared (po/agent-stream-shared-task-global *agent-name)
     *agent-graph (po/agent-graph-task-global *agent-name)]
    (hook:received-retry *agent-task-id *agent-id *expected-retry-num)
+   ;; before reading the root: this can hop to the global task and back, and
+   ;; other events on this task (such as a duplicate of this retry) run in
+   ;; between, so the checks below must come after it to still hold where the
+   ;; retry writes. Once it returns, the version is recorded on this task, so
+   ;; init-root's call below doesn't hop.
+   (fetch-graph-version *agent-name :> *curr-graph-version)
    (local-select> (keypath *agent-id)
                   $$root
                   :> {*root-invoke-id :root-invoke-id
@@ -326,7 +338,6 @@
    (filter> (some? *root-invoke-id))
    (filter> (= *expected-retry-num *curr-retry-num))
    (hook:running-retry> *agent-task-id *agent-id *expected-retry-num)
-   (fetch-graph-version *agent-name :> *curr-graph-version)
    (<<cond
     (case> (= *curr-graph-version *graph-version))
      (identity :continue :> *handle-mode)
@@ -363,7 +374,15 @@
                            [:retry-num (termval *retry-num)]
                            [:graph-version
                             (termval *curr-graph-version)]
-                           [:ack-val (termval (h/half-uuid *root-invoke-id))])]
+                           [:ack-val (termval (h/half-uuid *root-invoke-id))]
+                           ;; a retry is progress: until replayed nodes emit,
+                           ;; the old attempt's time would let the stall
+                           ;; checker count the failed node as a stall
+                           [:last-progress-time-millis
+                            (termval (h/current-time-millis))]
+                           ;; requests of the invalidated attempt: no node is
+                           ;; left to answer them
+                           [:human-requests NONE>])]
                          $$root)
 
        (aor-types/->valid-NodeOp *root-invoke-id
@@ -482,16 +501,25 @@
    (filter> false)))
 
 (defn mark-virtual-task-complete!
-  [invoke-id]
-  (let [^AgentNodeExecutorTaskGlobal node-exec
-        (po/agent-node-executor-task-global)]
-    (.removeTrackedInvokeId node-exec invoke-id)))
+  "Stops tracking the node's run for attempt retry-num, leaving a run of another
+  attempt under the same invoke id tracked. Without retry-num, stops tracking
+  whatever attempt is tracked."
+  ([invoke-id]
+   (let [^AgentNodeExecutorTaskGlobal node-exec
+         (po/agent-node-executor-task-global)]
+     (.removeTrackedInvokeId node-exec invoke-id)))
+  ([invoke-id retry-num]
+   (let [^AgentNodeExecutorTaskGlobal node-exec
+         (po/agent-node-executor-task-global)]
+     (.removeTrackedInvokeId node-exec invoke-id (long retry-num)))))
 
 (deframaop begin-node-complete
   [*agent-name *invoke-id *retry-num]
   (<<with-substitutions
    [$$nodes (po/agent-node-task-global *agent-name)]
-   (mark-virtual-task-complete! *invoke-id)
+   ;; before the validity filter: a stale attempt's run has finished too and
+   ;; must be untracked, while a newer attempt's run of the node stays tracked
+   (mark-virtual-task-complete! *invoke-id *retry-num)
    (local-select> (keypath *invoke-id)
                   $$nodes
                   :> {:keys [*agent-task-id *agent-id *node
@@ -873,11 +901,27 @@
    [$$root (po/agent-root-task-global *agent-name)
     *node-exec (po/agent-node-executor-task-global)]
    (<<subsource *data
+    ;; appended by nodes before AttemptHumanInputRequest existed: can still be
+    ;; in the depot when the module is updated
     (case> NodeHumanInputRequest :> {:keys [*agent-id]})
      (local-transform> [(must *agent-id)
                         :human-requests
                         NONE-ELEM
                         (termval *data)]
+                       $$root)
+
+    (case> AttemptHumanInputRequest :> {:keys [*request *retry-num]})
+     (identity *request :> {:keys [*agent-task-id *agent-id]})
+     ;; a request of an invalidated attempt would stay pending with no node to
+     ;; answer it
+     (apart/filter-valid-retry-num> *agent-name
+                                    *agent-task-id
+                                    *agent-id
+                                    *retry-num)
+     (local-transform> [(must *agent-id)
+                        :human-requests
+                        NONE-ELEM
+                        (termval *request)]
                        $$root)
 
     (case> HumanInput
@@ -1198,6 +1242,7 @@
     $$root-count (po/agent-root-count-task-global *agent-name)
     $$nodes (po/agent-node-task-global *agent-name)
     $$stream-shared (po/agent-stream-shared-task-global *agent-name)
+    $$mb-shared (po/agent-mb-shared-task-global *agent-name)
     *gc-valid-depot (po/agent-gc-valid-invokes-depot-task-global *agent-name)]
    (anode/read-config *agent-name
                       aor-types/MAX-TRACES-PER-TASK-CONFIG
@@ -1216,7 +1261,7 @@
          ALL
          *to-delete
          {:allow-yield? true}
-         :> [*agent-id {:keys [*root-invoke-id *retry-num *result]}])
+         :> [*agent-id {:keys [*root-invoke-id *result]}])
        (filter> (some? *result))
        (local-transform> [(keypath *agent-id)
                           (multi-path [:forks NONE>]
@@ -1232,11 +1277,22 @@
        ;; same elements concurrently
        (local-select> [(keypath *agent-id) (view some?)] $$root :> *exists?)
        (<<if *exists?
-         (<<if (> *retry-num 0)
+         ;; the entry, not the root's :retry-num: a retry bumped into
+         ;; :valid-invokes and then dropped (the run already had a result,
+         ;; say) leaves :retry-num unchanged. :valid-invokes is written on
+         ;; every task, so the local copy tells.
+         (local-select> (keypath :valid-invokes [*agent-task-id *agent-id])
+                        $$mb-shared
+                        :> *valid-retry-num)
+         (<<if (some? *valid-retry-num)
            (depot-partition-append! *gc-valid-depot
                                     [*agent-task-id *agent-id]
                                     :append-ack))
          (local-transform> [:gc-root-invokes (keypath *root-invoke-id) (termval nil)]
+                           $$stream-shared)
+         ;; only finished runs are deleted, but runs that completed without a
+         ;; result used to stay listed as active
+         (local-transform> [:active-invokes (set-elem *agent-id) NONE>]
                            $$stream-shared)
          (local-transform> [(keypath *agent-id) NONE>] $$root)
          (local-transform> (term dec) $$root-count))))

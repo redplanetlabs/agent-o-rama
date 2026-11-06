@@ -34,7 +34,13 @@ public class LazyObjectPool implements Closeable {
     }
 
     Slot s = _available.poll();
-    Object ret = (s != null) ? s.o : _builder.invoke();
+    Object ret;
+    try {
+      ret = (s != null) ? s.o : _builder.invoke();
+    } catch (Throwable t) {
+      _permits.release();
+      throw t;
+    }
     synchronized(_taken) {
       _taken.put(ret, null);
     }

@@ -15,6 +15,7 @@
    [com.rpl.agentorama
     AgentClient
     AgentFailedException
+    AgentInvoke
     AgentNode
     AgentObjectFetcher
     HumanInputRequest
@@ -204,13 +205,29 @@
 
 (defn subagent-client
   [^AgentNode agent-node ^AgentClient client module-name name]
-  (let [agent-info-tuple [module-name name]]
+  (let [agent-info-tuple [module-name name]
+        ;; context is the map form ({:metadata ...}) or nil
+        initiate-with-context
+        (fn [context args]
+          (timed-agent-call
+           (aor-types/initiate-with-context-internal client context (vec args))
+           agent-node
+           agent-info-tuple
+           [res]
+           {"op"       "initiateWithContext"
+            "metadata" (:metadata context)
+            "args"     (vec args)
+            "result"   res}))]
     (reify
      AgentClient
      (invoke [this args]
        (let [inv (.initiate this args)]
          (.result this inv)))
      (invokeAsync [this args]
+       (no-async!))
+     (invokeWithContext [this context args]
+       (.result this (.initiateWithContext this context args)))
+     (invokeWithContextAsync [this context args]
        (no-async!))
      (initiate [this args]
        (timed-agent-call
@@ -222,6 +239,10 @@
          "args"   (vec args) ; so it doesn't put a raw array in the trace
          "result" res}))
      (initiateAsync [this args]
+       (no-async!))
+     (initiateWithContext [this context args]
+       (initiate-with-context (some-> context deref) args))
+     (initiateWithContextAsync [this context args]
        (no-async!))
      (fork [this invoke nodeInvokeIdToNewArgs]
        (let [inv (.initiateFork this invoke nodeInvokeIdToNewArgs)]
@@ -322,13 +343,76 @@
          "response" response}))
      (provideHumanInputAsync [this request response]
        (no-async!))
+     (isAgentInvokeComplete [this agent-invoke]
+       (timed-agent-call
+        (.isAgentInvokeComplete client agent-invoke)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"           "isAgentInvokeComplete"
+         "agent-invoke" agent-invoke
+         "result"       res}))
+     (isAgentInvokeCompleteAsync [this agent-invoke]
+       (no-async!))
+     (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^int value]
+       (aor-types/set-metadata-internal! this agent-invoke key (long value)))
+     (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^long value]
+       (aor-types/set-metadata-internal! this agent-invoke key value))
+     (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^float value]
+       (aor-types/set-metadata-internal! this agent-invoke key (double value)))
+     (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^double value]
+       (aor-types/set-metadata-internal! this agent-invoke key value))
+     (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^String value]
+       (aor-types/set-metadata-internal! this agent-invoke key value))
+     (^void setMetadata [this ^AgentInvoke agent-invoke ^String key ^boolean value]
+       (aor-types/set-metadata-internal! this agent-invoke key value))
+     (removeMetadata [this agent-invoke key]
+       (timed-agent-call
+        (.removeMetadata client agent-invoke key)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"           "removeMetadata"
+         "agent-invoke" agent-invoke
+         "key"          key}))
+     (getMetadata [this agent-invoke]
+       (timed-agent-call
+        (.getMetadata client agent-invoke)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"           "getMetadata"
+         "agent-invoke" agent-invoke
+         "result"       res}))
      (close [this]
        (close! client))
      aor-types/AgentClientInternal
+     (set-metadata-internal! [this agent-invoke key value]
+       (timed-agent-call
+        (aor-types/set-metadata-internal! client agent-invoke key value)
+        agent-node
+        agent-info-tuple
+        [res]
+        {"op"           "setMetadata"
+         "agent-invoke" agent-invoke
+         "key"          key
+         "value"        value}))
+     ;; Clojure's synchronous calls use their own dispatch so the async entry
+     ;; points can reject calls without blocking or starting a child.
+     (invoke-with-context-internal [this context args]
+       (.result this (initiate-with-context context args)))
      (invoke-with-context-async-internal [this context args]
-       (aor-types/invoke-with-context-async-internal client context args))
+       (no-async!))
+     (initiate-with-context-internal [this context args]
+       (initiate-with-context context args))
      (initiate-with-context-async-internal [this context args]
-       (aor-types/initiate-with-context-async-internal client context args))
+       (no-async!))
+     (stream-internal [this agent-invoke node callback-fn]
+       (no-stream!))
+     (stream-specific-internal [this agent-invoke node node-invoke-id callback-fn]
+       (no-stream!))
+     (stream-all-internal [this agent-invoke node callback-fn]
+       (no-stream!))
      (subagent-next-step-async [this agent-invoke]
        (aor-types/subagent-next-step-async client agent-invoke))
      aor-types/UnderlyingObjects
@@ -631,8 +715,12 @@
                       prompt
                       (h/random-uuid-str))
              cf      (CompletableFuture.)
-             _ (.putHumanFuture node-exec invoke-id request cf)
-             _ (foreign-append! human-depot request :append-ack)
+             _ (.putHumanFuture node-exec invoke-id (long retry-num) request cf)
+             _ (foreign-append! human-depot
+                                (aor-types/->valid-AttemptHumanInputRequest
+                                 request
+                                 retry-num)
+                                :append-ack)
              ret     (.get cf)]
          (vswap! nested-ops-vol
                  conj
@@ -658,10 +746,17 @@
        }))))
 
 (defn submit-virtual-task!
-  [invoke-id afn]
-  (let [^AgentNodeExecutorTaskGlobal node-exec
-        (po/agent-node-executor-task-global)]
-    (.submitTask node-exec invoke-id afn)))
+  "Runs afn on a virtual thread. With an invoke id, the execution is tracked as
+  that node's run for attempt retry-num. The 2-arity is for untracked work (nil
+  invoke id)."
+  ([invoke-id afn]
+   (when (some? invoke-id)
+     (throw (h/ex-info "A tracked task needs a retry num" {:invoke-id invoke-id})))
+   (submit-virtual-task! nil -1 afn))
+  ([invoke-id retry-num afn]
+   (let [^AgentNodeExecutorTaskGlobal node-exec
+         (po/agent-node-executor-task-global)]
+     (.submitTask node-exec invoke-id (long retry-num) afn))))
 
 (defn log-node-error
   [t msg data]
@@ -1079,6 +1174,7 @@
                 :> *acquire-timeout-millis)
    (submit-virtual-task!
     *invoke-id
+    *retry-num
     (node-event *agent-name
                 *task-id
                 *invoke-id
