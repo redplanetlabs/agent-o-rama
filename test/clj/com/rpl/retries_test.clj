@@ -942,8 +942,13 @@
                                     {:node k :expected v :actual actual})))
                 ))
               (check-active! 0)
+              ;; distinct because a node on the other path can be running when the
+              ;; failure's retry invalidates its attempt. Its completion is then
+              ;; dropped and it runs again, so it can record the same value twice.
+              ;; What matters here is that the value is right: a retry that didn't
+              ;; reset a partial aggregation would change it.
               (when-not (condition-attained?
-                         (= @tc/AGG-RESULTS-ATOM
+                         (= (transform MAP-VALS #(vec (distinct %)) @tc/AGG-RESULTS-ATOM)
                             {"agg" [[1 1]] "agg2" [[1]] "agg3" [[[1]]]}))
                 (throw (ex-info "Agg failed" {:result @tc/AGG-RESULTS-ATOM})))
             ))
