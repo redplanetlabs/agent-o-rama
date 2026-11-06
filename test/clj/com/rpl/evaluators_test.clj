@@ -374,6 +374,22 @@
        (let [expected-schema-str (schema->json-string (lj/from-json-string os))]
         (is (= expected-schema-str (get result "outputSchema")))))
 
+     ;; a blank temperature isn't sent, and leaves it to the model's default
+     (aor/create-evaluator! manager
+                            "ajudge-no-temperature"
+                            "aor/llm-judge"
+                            {"prompt"       "%input"
+                             "model"        "my-model"
+                             "temperature"  "  "
+                             "outputSchema" os}
+                            "a judge")
+     (is (nil? (get (aor/try-evaluator manager
+                                       "ajudge-no-temperature"
+                                       "AB"
+                                       "CD"
+                                       "EF")
+                    "temperature")))
+
      ;; Verify non-string values are converted to strings in template
      (let [result (aor/try-evaluator manager "ajudge" 42 100 200)]
        (is (= "1 42 2 100 3 200 4 42" (get result "message"))))
@@ -749,7 +765,7 @@
                                      "test-judge"
                                      "aor/llm-judge"
                                      {"model"        "openai"
-                                      "temperature"  "0.0"
+                                      "temperature"  ""
                                       "prompt"       evals/DEFAULT-LLM-PROMPT
                                       "outputSchema" evals/DEFAULT-LLM-OUTPUT-SCHEMA}
                                      "test"))

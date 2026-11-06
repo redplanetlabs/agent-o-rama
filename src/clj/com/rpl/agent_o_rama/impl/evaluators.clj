@@ -126,7 +126,9 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
    {:type        :regular
     :builder-fn
     (fn [params]
-      (let [temperature     (Double/parseDouble (get params "temperature"))
+      (let [^String temperature-param (get params "temperature")
+            temperature     (when-not (str/blank? temperature-param)
+                              (Double/parseDouble temperature-param))
             prompt-template (get params "prompt")
             model-name      (get params "model")
             output-schema   (get params "outputSchema")]
@@ -163,8 +165,8 @@ Be strict: minor wording differences are acceptable, but factual errors, omissio
 
       "temperature"
       {:description
-       "Floating-point temperature of the LLM"
-       :default     "0.0"}
+       "Floating-point temperature of the LLM. Leave blank to use the model's default, since many current models reject other values."
+       :default     ""}
       "outputSchema"
       {:description
        "JSON schema for the output of the LLM. Each key of the output is a separate evaluation score."
