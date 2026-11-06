@@ -25,7 +25,8 @@
   (assoc-in aor-rf/default-app-db
             [:invocations-data invoke-id]
             {:status :success
-             :graph {:nodes nodes
+             :graph {:raw-nodes nodes
+                     :nodes nodes
                      :edges [{:source (str root-id) :target (str worker-id)}]}
              :implicit-edges []
              :root-invoke-id root-id
@@ -47,7 +48,7 @@
           selected-id (get-in db [:ui :invocations invoke-id :selected-node-id])
           node-data (get graph-data selected-id)]
       (is (= worker-id selected-id))
-      (is (= "worker" (:node (assoc node-data :node-id selected-id))))))
+      (is (= "worker" (:node (assoc node-data :node-id selected-id)))))))
 
 (deftest should-schedule-poll-test
   (testing "poll while agent not complete"
@@ -100,8 +101,9 @@
               :finish-time-millis 400}}
         {:keys [nodes edges]} (events/build-drawable-graph raw root-id nil)]
     (is (= 2 (count nodes)))
-    (is (contains? nodes root-id))
-    (is (contains? nodes worker-id))
+    ;; keeps the keys it was given: normalize-raw-nodes-map is what coerces them
+    (is (contains? nodes "00000000-0000-0000-0000-000000000010"))
+    (is (contains? nodes "00000000-0000-0000-0000-000000000011"))
     (is (= 1 (count edges)))))
 
 (deftest build-drawable-graph-root-without-node-test
@@ -119,4 +121,4 @@
 
 (deftest invocation-ui-path-test
   (is (= [:ui :invocations invoke-id :selected-node-id]
-         (inv-subs/invocation-ui-path invoke-id :selected-node-id)))))
+         (inv-subs/invocation-ui-path invoke-id :selected-node-id))))
